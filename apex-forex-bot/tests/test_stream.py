@@ -166,16 +166,42 @@ check("the client is told it lost events",
 stream.reset()
 
 print("\n5. Account events never cross accounts")
+# Asserted on CONTENT, not on queue length. The producer runs on its own
+# cadence and publishes to every registered chat, so any check on an exact
+# count races it — an earlier version of this section passed once by luck and
+# failed on the next two runs.
 stream.reset()
 a_id, a_q = stream.register("aaa")
 b_id, b_q = stream.register("bbb")
-stream._publish({"type": "account.updated", "ts": time.time(), "secret": "A-only"},
+
+
+def _drain(q):
+    out = []
+    while not q.empty():
+        try:
+            out.append(json.loads(q.get_nowait()))
+        except Exception:
+            break
+    return out
+
+
+_drain(a_q)
+_drain(b_q)
+MARK = "A-only-secret-value"
+stream._publish({"type": "account.updated", "ts": time.time(), "secret": MARK},
                 chat_id="aaa")
-check("the addressed client receives it", a_q.qsize() == 1)
-check("the other client receives nothing", b_q.qsize() == 0,
+a_seen, b_seen = _drain(a_q), _drain(b_q)
+check("the addressed client receives it",
+      any(e.get("secret") == MARK for e in a_seen), str(a_seen)[:120])
+check("the other client never receives it",
+      not any(e.get("secret") == MARK for e in b_seen),
       "account and position events are per-chat, not broadcast")
-stream._publish({"type": "market.tick", "ts": time.time(), "rows": []})
-check("market events do reach everyone", a_q.qsize() == 2 and b_q.qsize() == 1)
+BEACON = "market-beacon"
+stream._publish({"type": "market.tick", "ts": time.time(), "rows": [], "beacon": BEACON})
+a_seen, b_seen = _drain(a_q), _drain(b_q)
+check("market events do reach everyone",
+      any(e.get("beacon") == BEACON for e in a_seen)
+      and any(e.get("beacon") == BEACON for e in b_seen))
 stream.reset()
 
 print("\n6. The route is authenticated before the stream opens")

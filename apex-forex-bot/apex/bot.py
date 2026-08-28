@@ -1120,6 +1120,70 @@ def _start_dashboard_server():
             # the trading loop already holds in memory plus one shared markets
             # snapshot, so N clients cost N dict reads rather than N round
             # trips to cTrader.
+            # ── Trading account ─────────────────────────────────────
+            # Identity of the account, never its credentials. No access token,
+            # no refresh token, and the account number is masked: the client
+            # already knows which account is theirs, and a full number on a
+            # screen is a number in a screenshot.
+            if self.path.startswith("/api/app/account"):
+                from apex import user_store as _c_us, user_loop as _c_ul
+                from apex import ui_state as _c_ui, account_mode as _c_am
+                _c_user = self._telegram_identity()
+                if not _c_user:
+                    self._telegram_denied()
+                    return
+                _c_chat = str(_c_user["id"])
+                try:
+                    _c_rec = _c_us.load(_c_chat) or {}
+                    _c_dash = _c_ul.get_dash(_c_chat) or {}
+                except Exception as _c_e:
+                    self._json(200, {"available": False,
+                                     "reason": "ACCOUNT_UNAVAILABLE",
+                                     "detail": str(_c_e)[:120]})
+                    return
+                _c_env, _c_proven, _c_why = _c_ui.environment(_c_rec)
+                _c_mode, _c_src = _c_am.resolve(_c_rec)
+                _c_num = str(_c_rec.get("ctrader_account_id") or "")
+                self._json(200, {
+                    "available": True,
+                    "broker": _c_dash.get("broker") or "cTrader",
+                    "connected": bool(_c_rec.get("_connected_ctrader")),
+                    "environment": {"env": _c_env, "proven": bool(_c_proven),
+                                    "detail": _c_why,
+                                    "badge": _c_am.badge(_c_mode, _c_src)},
+                    # Last four only. Enough to tell two accounts apart.
+                    "accountMask": ("••••" + _c_num[-4:]) if _c_num else None,
+                    "balance": _c_dash.get("balance"),
+                    "equity": _c_dash.get("equityLive"),
+                    "brokerHealth": _c_dash.get("brokerHealth"),
+                })
+                return
+
+            # ── Alerts ──────────────────────────────────────────────
+            # Assembled from what actually happened: refusals and fills from
+            # the decision log, and the risk engine's own verdict. Nothing is
+            # generated, so an empty list means nothing was recorded rather
+            # than nothing occurred.
+            if self.path.startswith("/api/app/alerts"):
+                from apex import trade_events as _l_te, ui_state as _l_ui
+                _l_user = self._telegram_identity()
+                if not _l_user:
+                    self._telegram_denied()
+                    return
+                _l_chat = str(_l_user["id"])
+                try:
+                    _l_rows = _l_te.recent(_l_chat, limit=40)["events"]
+                except Exception as _l_e:
+                    self._json(200, {"available": False,
+                                     "reason": "ALERTS_UNAVAILABLE",
+                                     "detail": str(_l_e)[:120]})
+                    return
+                _l_state, _l_reasons = _l_ui.risk_state(_l_chat)
+                self._json(200, {"available": True, "events": _l_rows,
+                                 "risk": {"engine": _l_state,
+                                          "reasons": _l_reasons}})
+                return
+
             if self.path.startswith("/api/app/stream"):
                 from apex import stream as _v_st
                 _v_user = self._telegram_identity()

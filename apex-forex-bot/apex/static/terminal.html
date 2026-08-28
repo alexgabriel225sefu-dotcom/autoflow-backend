@@ -346,6 +346,42 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
 </section>
 
+<section class="screen" id="s-settings">
+  <div class="sec-h">Settings</div>
+  <div id="setList">
+    <div class="mrow" data-goto="account"><div><div class="msym">Trading account</div>
+      <div class="mpx">Broker, environment, connection</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="automation"><div><div class="msym">Automation</div>
+      <div class="mpx">Strategy, markets, limits</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="alerts"><div><div class="msym">Alerts</div>
+      <div class="mpx">What the platform recorded</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="risk"><div><div class="msym">Risk centre</div>
+      <div class="mpx">Limits and exposure</div></div><div class="mchg na">&rsaquo;</div></div>
+  </div>
+  <div class="sec-h">Security</div>
+  <div style="margin:0 var(--sp4)">
+    <div class="kvr"><span>Telegram session</span><b id="secSess">Verified</b></div>
+    <div class="kvr"><span>Identity</span><b>Signed by Telegram</b></div>
+    <div class="kvr"><span>Trading authorisation</span><b id="secAuth">—</b></div>
+  </div>
+  <div class="note" style="margin:var(--sp3) var(--sp4)">Your broker credentials are
+    never shown here and never leave the server.</div>
+  <div class="sec-h">About</div>
+  <div style="margin:0 var(--sp4) var(--sp6)">
+    <div class="kvr"><span>Platform</span><b>APEX4TRADERS</b></div>
+  </div>
+</section>
+
+<section class="screen" id="s-account">
+  <div class="sec-h">Trading account</div>
+  <div id="acctScreen"><div class="empty">Loading your account…</div></div>
+</section>
+
+<section class="screen" id="s-alerts">
+  <div class="sec-h">Alerts</div>
+  <div id="alertBody"><div class="empty">Loading…</div></div>
+</section>
+
 <section class="screen" id="s-ask">
   <div class="sec-h">Ask APEX</div>
   <div id="askChips"></div>
@@ -405,6 +441,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div data-s="automation"><em>&#9881;</em>Auto</div>
   <div data-s="ask"><em>&#128172;</em>Ask</div>
   <div data-s="risk"><em>&#128737;</em>Risk</div>
+  <div data-s="settings"><em>&#9881;&#65039;</em>More</div>
 </nav>
 <div id="err"></div>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -485,7 +522,8 @@ function refreshEntryLine(pos){
    data layer goes on writing to the same nodes it always did. */
 const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
                history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
-               automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE'};
+               automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE',
+               settings:'SETTINGS',account:'TRADING ACCOUNT',alerts:'ALERTS'};
 let screenNow='home';
 function showScreen(name,push){
   if(!SCREENS[name])name='home';
@@ -500,6 +538,8 @@ function showScreen(name,push){
   if(name==='intelligence') loadIntel(true);
   if(name==='automation') loadAuto(true);
   if(name==='ask') initAsk();
+  if(name==='account') loadAccount(true);
+  if(name==='alerts') loadAlerts(true);
   if(push!==false && location.hash!=='#'+name) location.hash=name;
   window.scrollTo(0,0);
   /* Both charts are laid out while hidden, so they measure 0 wide until the
@@ -691,6 +731,98 @@ async function askSend(q){
   }catch(e){
     card.innerHTML='<div class="q">'+esc(q)+'</div>'
       +'<span class="kind UNKNOWN">UNKNOWN</span>\nI could not reach the platform.';
+  }
+}
+
+/* ── Trading account ──────────────────────────────────────────────────
+   Identity, never credentials. The account number is masked to its last
+   four: the client knows which account is theirs, and a full number on a
+   screen is a number in a screenshot. */
+let acctAt=0;
+async function loadAccount(force){
+  if(!force && Date.now()-acctAt < 8000) return;
+  const H=Q('acctScreen'); if(!H) return;
+  try{
+    const d=await api('/api/app/account');
+    acctAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Your account could not be read just now. '
+        +esc(d.detail||'')+'</div>';
+      return;
+    }
+    const e=d.environment||{};
+    const badge=String(e.badge||'').replace(/[^\x20-\x7E]/g,'').trim().toUpperCase();
+    let h='<div id="rEngine" class="'+(d.connected?'ok':'unk')+'"><b>'
+      +(d.connected?'Connected':'Not connected')+'</b>'
+      +'<div class="note">'+esc(d.broker||'cTrader')+' \u00b7 '+esc(badge||'UNKNOWN')
+      +(e.proven?'':' (unconfirmed)')+'</div>'
+      +(e.detail?'<div class="note">'+esc(e.detail)+'</div>':'')+'</div>';
+    h+='<div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Account</span><b>'+esc(d.accountMask||'—')+'</b></div>'
+      +'<div class="kvr"><span>Balance</span><b'+(d.balance==null?' class="na">Not available':
+        '>$'+Number(d.balance).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}))+'</b></div>'
+      +'<div class="kvr"><span>Equity</span><b'+(d.equity==null?' class="na">Not available':
+        '>$'+Number(d.equity).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}))+'</b></div>'
+      +'<div class="kvr"><span>Broker connection</span><b>'+esc(d.brokerHealth||'unknown')+'</b></div>'
+      +'</div>';
+    if(!e.proven)
+      h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Your account environment '
+        +'could not be verified with your broker. New live orders are unavailable until '
+        +'verification is restored.</div>';
+    h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Your broker credentials are '
+      +'never shown here and never leave the server. To connect or switch an account, '
+      +'send <b>/ctrader</b> in the chat.</div>';
+    H.innerHTML=h;
+    const sa=Q('secAuth'); if(sa) sa.textContent = e.proven ? 'Active' : 'Verification required';
+  }catch(err){
+    H.innerHTML='<div class="empty">Your account could not be read just now.</div>';
+  }
+}
+
+/* ── Alerts ───────────────────────────────────────────────────────────
+   Assembled from the decision log. An empty list means nothing was
+   recorded, which is said rather than left blank. */
+const _EVT_LABEL={'decision.declined':'No trade','order.filled':'Position opened',
+  'order.rejected':'Order rejected','position.closed':'Position closed',
+  'risk.checked':'Settings changed','order.authorized':'Order authorised',
+  'order.submitted':'Order submitted','stop.updated':'Stop moved'};
+let alertAt=0;
+async function loadAlerts(force){
+  if(!force && Date.now()-alertAt < 8000) return;
+  const H=Q('alertBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/alerts');
+    alertAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Alerts are unavailable right now.</div>';
+      return;
+    }
+    let h='';
+    const rk=d.risk||{};
+    if(rk.engine==='RISK_HOLDING')
+      h+='<div id="rEngine" class="halt"><b>Trading paused by the risk engine</b>'
+        +((rk.reasons&&rk.reasons.length)?'<ul>'+rk.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')
+        +'</div>';
+    const rows=d.events||[];
+    if(!rows.length){
+      h+='<div class="empty">Nothing recorded yet. Decisions and positions appear '
+        +'here as they happen.</div>';
+    }else{
+      h+=rows.map(function(ev){
+        const when=new Date((ev.ts||0)*1000).toISOString().replace('T',' ').slice(5,16);
+        const pl=ev.payload||{};
+        const detail=pl.reason||pl.side||(pl.automationChanged?pl.automationChanged.join(', '):'')||'';
+        return '<div class="item" style="margin:0 var(--sp4)"><b>'
+          +esc(_EVT_LABEL[ev.type]||ev.type)+'</b>'
+          +(ev.symbol?' \u00b7 '+esc(String(ev.symbol).replace('_','/')):'')
+          +'<div class="sub">'+esc(when)+' UTC'+(detail?' \u00b7 '+esc(String(detail)):'')
+          +(ev.environment&&ev.environment!=='UNKNOWN'?' \u00b7 '+esc(ev.environment):'')
+          +'</div></div>';
+      }).join('');
+    }
+    H.innerHTML=h;
+  }catch(e){
+    H.innerHTML='<div class="empty">Alerts are unavailable right now.</div>';
   }
 }
 
