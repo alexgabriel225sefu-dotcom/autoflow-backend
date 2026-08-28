@@ -92,9 +92,14 @@ check("no filter re-queries the server",
       "applyHistFilter" in HTML
       and "/api/app/history" not in HTML.split("function applyHistFilter")[1].split("}")[0],
       "filtering must never become a reason to re-query")
-for f in ("all", "wins", "losses", "best"):
+for f in ("all", "wins", "losses", "best", "open", "closed"):
     check(f"the {f!r} filter exists", f'data-hf="{f}"' in HTML)
 check("a symbol filter exists", 'id="histSearch"' in HTML)
+check("a date filter exists", 'id="histDate"' in HTML)
+check("the Open filter says where open positions actually live",
+      "Open positions live in Portfolio" in HTML,
+      "this journal holds closed trades; a filter returning the same list "
+      "silently would be worse than one that explains itself")
 check("an empty filter result is worded, not blank",
       "No trades match this filter" in HTML)
 check("an empty library is worded differently from an empty filter",
@@ -110,8 +115,9 @@ check("the server's total is what decides whether there are more",
 check("a second request cannot start while one is running",
       "if(histLoading" in HTML,
       "two overlapping pages would append the same rows twice")
-check("load-more is hidden under a filter",
-      "histFilter==='all' && !histSearch && histCache.length < histTotal" in HTML,
+check("load-more is hidden under every filter",
+      "histFilter==='all' && !histSearch && !histDate && histCache.length < histTotal"
+      in HTML,
       "a button under a filtered list suggests the FILTER is incomplete")
 check("the server caps the page size itself",
       "min(int(limit or 25), HISTORY_PAGE_MAX)" in

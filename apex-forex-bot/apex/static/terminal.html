@@ -125,6 +125,13 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
   border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-family:inherit}
 #askGo{background:var(--acc);border:none;color:#fff;border-radius:var(--r-md);
   padding:0 18px;font-size:16px;cursor:pointer}
+#connLines{padding:var(--sp3) var(--sp4) 0;font-size:12px;color:var(--t1)}
+#connLines div{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--st-off);flex:none}
+.dot.ok{background:var(--up)} .dot.warn{background:var(--st-unver)}
+.dot.bad{background:var(--st-live)}
+.star{float:right;color:var(--t2);font-size:15px;padding:0 4px;cursor:pointer}
+.star.on{color:var(--gold)}
 .srch{display:block;width:calc(100% - 2*var(--sp4));margin:var(--sp2) var(--sp4) 0;
   background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
   border-radius:var(--r-sm);padding:9px 12px;font-size:13px;font-family:inherit}
@@ -272,6 +279,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 </div>
 <div class="wrap">
 <section class="screen on" id="s-home">
+  <div id="connLines">
+    <div><i class="dot" id="dotPlat"></i><span id="txtPlat">Platform — connecting…</span></div>
+    <div><i class="dot" id="dotBrk"></i><span id="txtBrk">cTrader — connecting…</span></div>
+  </div>
   <div id="greet">Welcome back</div>
   <div id="hero" class="rise">
     <div id="brandRow">
@@ -319,6 +330,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 </section>
 
 <section class="screen" id="s-markets">
+  <input id="mktSearch" class="srch" placeholder="Search markets" maxlength="12">
+  <div class="sec-h">&#11088; Watchlist</div>
+  <div id="mkWatch"><div class="empty">Your watchlist is empty. Tap the star on
+    any instrument to follow it.</div></div>
+  <div class="sec-h">Market movers</div>
+  <div id="mkMovers"><div class="empty">Loading markets…</div></div>
+  <div class="sec-h">Recently viewed</div>
+  <div id="mkRecent"><div class="empty">Instruments you open appear here.</div></div>
   <div class="sec-h">Forex</div>
   <div id="mkForex"><div class="empty">Loading markets…</div></div>
   <div class="sec-h">Metals</div>
@@ -358,8 +377,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div id="histFilter" class="tfrow">
     <div class="on" data-hf="all">All</div><div data-hf="wins">Wins</div>
     <div data-hf="losses">Learning</div><div data-hf="best">Best</div>
+    <div data-hf="open">Open</div><div data-hf="closed">Closed</div>
   </div>
   <input id="histSearch" class="srch" placeholder="Filter by symbol" maxlength="12">
+  <input id="histDate" class="srch" type="date" placeholder="Date">
   <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
 </section>
 
@@ -388,6 +409,12 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       <div class="mpx">Strategy, markets, limits</div></div><div class="mchg na">&rsaquo;</div></div>
     <div class="mrow" data-goto="alerts"><div><div class="msym">Alerts</div>
       <div class="mpx">What the platform recorded</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="notifications"><div><div class="msym">Notifications</div>
+      <div class="mpx">Which messages reach you</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="security"><div><div class="msym">Security &amp; sessions</div>
+      <div class="mpx">Identity and authorisation</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="preferences"><div><div class="msym">Preferences</div>
+      <div class="mpx">Language, currency, times</div></div><div class="mchg na">&rsaquo;</div></div>
     <div class="mrow" data-goto="risk"><div><div class="msym">Risk centre</div>
       <div class="mpx">Limits and exposure</div></div><div class="mchg na">&rsaquo;</div></div>
   </div>
@@ -403,6 +430,42 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div style="margin:0 var(--sp4) var(--sp6)">
     <div class="kvr"><span>Platform</span><b>APEX4TRADERS</b></div>
   </div>
+</section>
+
+<section class="screen" id="s-notifications">
+  <div class="sec-h">Notifications</div>
+  <div id="notifBody"><div class="empty">Loading…</div></div>
+</section>
+
+<section class="screen" id="s-security">
+  <div class="sec-h">Security</div>
+  <div style="margin:0 var(--sp4)">
+    <div class="kvr"><span>Telegram session</span><b id="secVerified">Verified</b></div>
+    <div class="kvr"><span>Identity</span><b>Signed by Telegram</b></div>
+    <div class="kvr"><span>Trading authorisation</span><b id="secAuth2">—</b></div>
+  </div>
+  <div class="note" style="margin:var(--sp3) var(--sp4)">Every request from this
+    screen carries a signature Telegram issued for you, checked on the server
+    before anything is read. Your broker credentials are stored encrypted and
+    are never sent to this app.</div>
+  <div class="sec-h">Sessions</div>
+  <div class="note" style="margin:0 var(--sp4)">The platform holds no separate
+    login. There is one session — this Telegram account — so there is nothing
+    to sign out of elsewhere.</div>
+</section>
+
+<section class="screen" id="s-preferences">
+  <div class="sec-h">Preferences</div>
+  <div style="margin:0 var(--sp4)">
+    <div class="kvr"><span>Language</span><b>English</b></div>
+    <div class="kvr"><span>Currency</span><b id="prefCcy">Account currency</b></div>
+    <div class="kvr"><span>Times</span><b>UTC</b></div>
+  </div>
+  <div class="note" style="margin:var(--sp3) var(--sp4)">Amounts are shown in
+    your account&#8217;s own currency, as your broker reports them — nothing is
+    converted here, because a converted figure is not the one on your statement.
+    Times are UTC throughout, so a timestamp means the same thing in every
+    screen and every message.</div>
 </section>
 
 <section class="screen" id="s-account">
@@ -454,7 +517,17 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div id="rBack">← Back to history</div>
   <div id="rHead"><div id="rTitle">—</div><div id="rSub">—</div><div id="rPnl">—</div></div>
   <div id="rChart"></div>
-  <div id="rCtl"><button id="rPlay">▶ Replay</button><button id="rReset">↺ Reset</button></div>
+  <div id="rCtl">
+    <button id="rBack1">&#9664;</button>
+    <button id="rPlay">&#9654; Replay</button>
+    <button id="rPause">&#10074;&#10074;</button>
+    <button id="rFwd1">&#9654;&#9654;</button>
+    <button id="rReset">&#8635; Reset</button>
+  </div>
+  <div id="rSpeeds" class="tfrow">
+    <div data-spd="0.5">0.5x</div><div class="on" data-spd="1">1x</div>
+    <div data-spd="2">2x</div><div data-spd="4">4x</div>
+  </div>
   <div id="rBody"></div>
 </div>
 
@@ -557,7 +630,8 @@ const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
                history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
                automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE',
                settings:'SETTINGS',account:'TRADING ACCOUNT',alerts:'ALERTS',
-               symbol:'MARKET',trade:'TRADE'};
+               symbol:'MARKET',trade:'TRADE',notifications:'NOTIFICATIONS',
+               security:'SECURITY',preferences:'PREFERENCES'};
 let screenNow='home';
 function showScreen(name,push){
   if(!SCREENS[name])name='home';
@@ -575,6 +649,7 @@ function showScreen(name,push){
   if(name==='account') loadAccount(true);
   if(name==='alerts') loadAlerts(true);
   if(name==='trade' && tradeCur) loadTrade(tradeCur);
+  if(name==='notifications') loadNotif();
   if(push!==false && location.hash!=='#'+name) location.hash=name;
   window.scrollTo(0,0);
   /* Both charts are laid out while hidden, so they measure 0 wide until the
@@ -691,14 +766,17 @@ function renderAccount(d){
    One shared snapshot serves every client (see apex/markets.py). A symbol
    the broker did not price is rendered as unavailable — never as 0.00, and
    never as the last price it happened to have. */
-function marketRow(r){
+function marketRow(r, star){
+  const st = star===false ? '' :
+    '<span class="star'+((prefs.watchlist||[]).indexOf(r.symbol)>=0?' on':'')
+    +'" data-star="'+esc(r.symbol)+'">\u2605</span>';
   if(!r.available) return '<div class="mrow"><div><div class="msym">'+esc(r.symbol)
-    +'</div><div class="mpx">unavailable</div></div><div class="mchg na">—</div></div>';
+    +'</div><div class="mpx">unavailable</div></div><div class="mchg na">—'+st+'</div></div>';
   const up=r.changePct>=0;
   return '<div class="mrow" data-sym="'+esc(r.symbol)+'"><div>'
     +'<div class="msym">'+esc(r.symbol)+'</div>'
     +'<div class="mpx">'+Number(r.price).toLocaleString(undefined,{maximumFractionDigits:5})+'</div></div>'
-    +'<div class="mchg '+(up?'up':'dn')+'">'+(up?'+':'')+r.changePct.toFixed(2)+'%</div></div>';
+    +'<div class="mchg '+(up?'up':'dn')+'">'+(up?'+':'')+r.changePct.toFixed(2)+'%'+st+'</div></div>';
 }
 /* ── Risk Centre ──────────────────────────────────────────────────────
    Presentation only. Every figure comes from the risk engine's published
@@ -780,6 +858,7 @@ async function askSend(q){
 let symChart=null, symSeries=null, symCur='', symTf='15m', symLines=[];
 function openSymbol(sym){
   symCur=String(sym||'').toUpperCase();
+  noteRecent(symCur);
   showScreen('symbol');
   Q('symHead').innerHTML='<div class="s">'+esc(symCur.replace('_','/'))+'</div>'
     +'<div class="p" id="symPx">—</div>';
@@ -880,13 +959,20 @@ document.addEventListener('click',ev=>{
    Filters run over the SAME rows the server already sent. Filtering must
    never become a reason to re-query, and an empty section says so rather
    than showing a placeholder trade. */
-let histFilter='all', histSearch='';
+let histFilter='all', histSearch='', histDate='';
 function applyHistFilter(){
   let rows=(histCache||[]).slice();
   if(histSearch)
     rows=rows.filter(t=>String(t.symbol||'').toUpperCase().indexOf(histSearch)>=0);
+  if(histDate)
+    rows=rows.filter(t=>String(t.time||'').slice(0,10)===histDate);
   if(histFilter==='wins')   rows=rows.filter(t=>t.win===true);
   if(histFilter==='losses') rows=rows.filter(t=>t.win===false);
+  /* "Closed" is every row in this journal — it only holds closed trades — and
+     "Open" therefore has nothing to show here. Saying that is better than a
+     filter that silently returns the same list. */
+  if(histFilter==='closed') rows=rows.filter(t=>t.exit!=null||t.netPnl!=null);
+  if(histFilter==='open')   rows=[];
   if(histFilter==='best')
     rows=rows.filter(t=>t.netPnl!=null).sort((a,b)=>b.netPnl-a.netPnl).slice(0,10);
   drawHistory(rows);
@@ -900,6 +986,9 @@ document.addEventListener('click',ev=>{
 document.addEventListener('input',ev=>{
   if(ev.target && ev.target.id==='histSearch'){
     histSearch=String(ev.target.value||'').toUpperCase(); applyHistFilter();
+  }
+  if(ev.target && ev.target.id==='histDate'){
+    histDate=String(ev.target.value||''); applyHistFilter();
   }
 });
 
@@ -998,10 +1087,19 @@ async function loadAccount(force){
       h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Your account environment '
         +'could not be verified with your broker. New live orders are unavailable until '
         +'verification is restored.</div>';
+    h+='<button class="btn" id="acctRefresh">Refresh connection</button>';
+    h+='<button class="btn" id="acctDisconnect">Disconnect</button>';
     h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Your broker credentials are '
-      +'never shown here and never leave the server. To connect or switch an account, '
-      +'send <b>/ctrader</b> in the chat.</div>';
+      +'never shown here and never leave the server. Connecting, switching and '
+      +'disconnecting an account all happen in the chat, where the broker\u2019s own '
+      +'sign-in runs \u2014 this screen never handles them.</div>';
     H.innerHTML=h;
+    Q('acctRefresh').onclick=()=>{ acctAt=0; loadAccount(true); };
+    Q('acctDisconnect').onclick=()=>sheetOpen('Disconnect account',
+      'Disconnecting is done from the chat, with <b>/ctrader</b>, because it '
+      +'revokes a broker token and that must not be doable from a screen that '
+      +'only ever reads.<br><br>Your open positions are unaffected either way.',
+      null, null);
     const sa=Q('secAuth'); if(sa) sa.textContent = e.proven ? 'Active' : 'Verification required';
   }catch(err){
     H.innerHTML='<div class="empty">Your account could not be read just now.</div>';
@@ -1322,9 +1420,80 @@ async function doClose(){
   }
 }
 
-let mktAt=0;
+/* ── Preferences: watchlist, recently viewed, notification switches ────
+   Held on the server against the client's own record. The watchlist is
+   filtered there against the instruments the platform trades, so a value
+   from this page can never become a market request for something the
+   engine does not know. */
+let prefs={watchlist:[],recent:[],notifications:{}};
+async function loadPrefs(){
+  try{
+    const d=await api('/api/app/prefs');
+    if(d.available) prefs={watchlist:d.watchlist||[],recent:d.recent||[],
+                           notifications:d.notifications||{}};
+  }catch(e){ /* the board still renders; only the star state is missing */ }
+}
+async function savePrefs(patch){
+  try{
+    await fetch('/api/app/prefs',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify(patch)});
+  }catch(e){}
+}
+function toggleWatch(sym){
+  const i=prefs.watchlist.indexOf(sym);
+  if(i>=0) prefs.watchlist.splice(i,1); else prefs.watchlist.push(sym);
+  savePrefs({watchlist:prefs.watchlist});
+  loadMarkets(true);
+}
+function noteRecent(sym){
+  prefs.recent=[sym].concat((prefs.recent||[]).filter(x=>x!==sym)).slice(0,8);
+  savePrefs({recent:prefs.recent});
+}
+document.addEventListener('click',ev=>{
+  const st=ev.target.closest&&ev.target.closest('[data-star]');
+  if(!st)return;
+  ev.stopPropagation();
+  toggleWatch(st.dataset.star);
+});
+
+/* ── Notifications ────────────────────────────────────────────────────
+   Switches only. Nothing here changes what the platform DOES, only which
+   of it reaches the client — so it is deliberately a different door from
+   the automation settings. */
+const NOTIF_ROWS=[['opened','Position opened'],['closed','Position closed'],
+  ['stop','Stop loss'],['target','Take profit'],['price','Price alerts'],
+  ['insight','APEX insights'],['risk','Risk warnings'],['margin','Margin warnings']];
+async function loadNotif(){
+  const H=Q('notifBody'); if(!H) return;
+  await loadPrefs();
+  H.innerHTML='<div style="margin:0 var(--sp4)">'+NOTIF_ROWS.map(function(r){
+    const on=prefs.notifications[r[0]]!==false;
+    return '<div class="kvr"><span>'+esc(r[1])+'</span><b>'
+      +'<button class="pill" data-notif="'+r[0]+'">'+(on?'ON':'OFF')+'</button></b></div>';
+  }).join('')+'</div>'
+   +'<div class="note" style="margin:var(--sp3) var(--sp4)">These control which '
+   +'messages reach you. They do not change what the platform does — a position '
+   +'still opens and closes whether or not you are told about it.</div>';
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest&&ev.target.closest('[data-notif]');
+  if(!b)return;
+  const k=b.dataset.notif, now=b.textContent==='ON';
+  b.textContent=now?'OFF':'ON';
+  prefs.notifications[k]=!now;
+  savePrefs({notifications:prefs.notifications});
+});
+
+let mktAt=0, mktSearch='';
+document.addEventListener('input',ev=>{
+  if(ev.target && ev.target.id==='mktSearch'){
+    mktSearch=String(ev.target.value||''); loadMarkets(true);
+  }
+});
 async function loadMarkets(force){
   if(!force && Date.now()-mktAt < 20000) return;
+  if(!prefs.watchlist.length && !prefs.recent.length) await loadPrefs();
   const F=Q('mkForex'), M=Q('mkMetals'), H=Q('homeMkt');
   try{
     const d=await api('/api/app/markets');
@@ -1335,8 +1504,28 @@ async function loadMarkets(force){
     }
     const by={}; (d.rows||[]).forEach(r=>by[r.symbol]=r);
     const draw=(list)=>(list||[]).map(sym=>by[sym]?marketRow(by[sym]):'').join('');
-    if(F)F.innerHTML=draw(d.forex)||'<div class="empty">No forex instruments.</div>';
-    if(M)M.innerHTML=draw(d.metals)||'<div class="empty">No metals.</div>';
+    const q=(mktSearch||'').toUpperCase();
+    const keep=list=>(list||[]).filter(sym=>!q||sym.indexOf(q)>=0);
+    if(F)F.innerHTML=draw(keep(d.forex))
+      ||'<div class="empty">'+(q?'No instrument matches.':'No forex instruments.')+'</div>';
+    if(M)M.innerHTML=draw(keep(d.metals))
+      ||'<div class="empty">'+(q?'No instrument matches.':'No metals.')+'</div>';
+    /* Watchlist, movers and recently viewed are three views of the SAME rows
+       the server sent — no extra request, and no instrument appears in one of
+       them that is not in the board. */
+    const W=Q('mkWatch'), MV=Q('mkMovers'), RC=Q('mkRecent');
+    if(W) W.innerHTML = draw(keep(prefs.watchlist))
+      || '<div class="empty">Your watchlist is empty. Tap the star on any '
+        +'instrument to follow it.</div>';
+    if(MV){
+      const moved=(d.rows||[]).filter(r=>r.available)
+        .sort((a,b)=>Math.abs(b.changePct)-Math.abs(a.changePct)).slice(0,4);
+      MV.innerHTML = moved.length
+        ? moved.map(r=>marketRow(r,false)).join('')
+        : '<div class="empty">No instrument has moved enough to rank today.</div>';
+    }
+    if(RC) RC.innerHTML = draw(keep(prefs.recent))
+      || '<div class="empty">Instruments you open appear here.</div>';
     /* Home shows a short overview, not the whole board. */
     if(H)H.innerHTML=draw((d.forex||[]).slice(0,3).concat((d.metals||[]).slice(0,1)))
       ||'<div class="empty">No market data.</div>';
@@ -1380,6 +1569,18 @@ async function refresh(){
   Q('err').style.display='none'; lastOk=Date.now(); failStreak=0; everLoaded=true; freshness();
   setBadge(d.account, d.broker);
   renderAccount(d);
+  /* Two lines, two different facts: whether the PLATFORM is answering, and
+     whether the BROKER is. A screen that merges them tells a client their
+     account is fine when only the server is. */
+  const dp=Q('dotPlat'), tp=Q('txtPlat'), db=Q('dotBrk'), tb=Q('txtBrk');
+  if(dp&&tp){ dp.className='dot ok'; tp.textContent='Platform connected'; }
+  if(db&&tb){
+    const h=d.brokerHealth;
+    db.className='dot '+(h==='ok'?'ok':h?'warn':'bad');
+    tb.textContent = h==='ok' ? (esc(d.broker||'Broker')+' connected')
+      : h ? (esc(d.broker||'Broker')+' — '+esc(h))
+          : 'Broker connection unavailable';
+  }
   applyPrecision(d.digits);
   if(d.pipSize) PIP=d.pipSize;
   TFSEC=TF_SECONDS[d.timeframeUsed||TF]||TFSEC;
@@ -1568,8 +1769,10 @@ function drawHistory(rows){
   const el=Q('p-hist'); if(!el) return;
   if(!rows.length){
     el.innerHTML='<div class="empty">'
-      +(histCache.length ? 'No trades match this filter.'
-                         : 'Your completed trades will appear here.')+'</div>';
+      +(histFilter==='open'
+          ? 'Open positions live in Portfolio — this library holds closed trades.'
+          : histCache.length ? 'No trades match this filter.'
+                             : 'Your completed trades will appear here.')+'</div>';
     return;
   }
   el.innerHTML=rows.map(t=>{
@@ -1588,7 +1791,7 @@ function drawHistory(rows){
   /* Only offered when the server said there are more, and only on the
      unfiltered view — "load more" under a filtered list would suggest the
      filter is incomplete rather than the page. */
-  if(histFilter==='all' && !histSearch && histCache.length < histTotal)
+  if(histFilter==='all' && !histSearch && !histDate && histCache.length < histTotal)
     el.insertAdjacentHTML('beforeend',
       '<button class="btn" id="histMore">Load more ('
       +histCache.length+' of '+histTotal+')</button>');
@@ -1674,23 +1877,56 @@ function drawFull(){
   rSeries.setMarkers(markerSet(null));
   rChart.timeScale().fitContent();
 }
-Q('rReset').onclick=()=>{stopReplay();drawFull();};
+/* The playhead lives outside the timer. Speed changes restart the interval,
+   and a replay that jumped back to the entry every time someone pressed 2x
+   would not be a replay. */
+let rIdx=0, rSpeed=1;
+const R_BASE_MS=55;
+function rStartIndex(){
+  if(!rData||!rData.candles.length) return 2;
+  const cs=rData.candles;
+  let i=Math.max(2,cs.findIndex(c=>c.time>=rData.markers.entry.time)-12);
+  return i<2?2:i;
+}
+function rPaint(){
+  if(!rSeries||!rData) return;
+  const cs=rData.candles;
+  rIdx=Math.max(2,Math.min(rIdx,cs.length));
+  rSeries.setData(cs.slice(0,rIdx));
+  rSeries.setMarkers(rIdx>=2?markerSet(cs[rIdx-1].time):[]);
+}
+function rTick(){
+  if(!rData) return stopReplay();
+  rIdx++;
+  if(rIdx>rData.candles.length){stopReplay();rChart.timeScale().fitContent();return;}
+  rPaint();
+}
+function rRun(){
+  stopReplay();
+  Q('rPlay').disabled=true;
+  rTimer=setInterval(rTick, Math.max(12, Math.round(R_BASE_MS/rSpeed)));
+}
+Q('rReset').onclick=()=>{stopReplay();rIdx=0;drawFull();};
+Q('rPause').onclick=()=>{stopReplay();};
+Q('rBack1').onclick=()=>{stopReplay();rIdx=Math.max(2,rIdx-1);rPaint();};
+Q('rFwd1').onclick=()=>{stopReplay();rIdx=rIdx+1;rPaint();};
 Q('rPlay').onclick=()=>{
   if(!rSeries||!rData||!rData.candles.length)return;
-  stopReplay(); Q('rPlay').disabled=true;
-  const cs=rData.candles;
-  // Start a little before the entry so the setup is visible, then draw forward.
-  let i=Math.max(2,cs.findIndex(c=>c.time>=rData.markers.entry.time)-12);
-  if(i<2)i=2;
-  rSeries.setData(cs.slice(0,i)); rSeries.setMarkers([]);
+  if(!rIdx || rIdx>=rData.candles.length) rIdx=rStartIndex();
+  rPaint();
   rChart.timeScale().fitContent();
-  rTimer=setInterval(()=>{
-    i++;
-    if(i>cs.length){stopReplay();rChart.timeScale().fitContent();return;}
-    rSeries.setData(cs.slice(0,i));
-    rSeries.setMarkers(markerSet(cs[i-1].time));
-  }, 55);
+  rRun();
 };
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-spd]');
+  if(!t)return;
+  document.querySelectorAll('#rSpeeds div').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  rSpeed=parseFloat(t.dataset.spd)||1;
+  /* Only re-time a replay that is actually running. Changing speed while
+     paused must not start it. */
+  if(rTimer) rRun();
+});
 
 /* ── THE LIVE TICK ──────────────────────────────────────────────────────────
    /api/app/data rebuilds candles, stats, news and the journal — far too heavy

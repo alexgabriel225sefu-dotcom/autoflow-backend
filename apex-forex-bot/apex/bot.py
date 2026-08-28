@@ -1143,6 +1143,93 @@ def _start_dashboard_server():
             # comes back null when that was never stored. A computed R sitting
             # beside a real P&L reads as a second measurement, and the whole
             # point of this screen is that the numbers on it were measured.
+            # ── Client preferences ──────────────────────────────────
+            # Watchlist, notification switches and display preferences. None
+            # of these touches money, so they get their own tiny allowlist
+            # rather than borrowing the automation tier — a UI preference and
+            # a risk limit should never be settable through the same door.
+            if self.path.startswith("/api/app/prefs"):
+                from apex import user_store as _p_us, markets as _p_mk
+                _p_user = self._telegram_identity()
+                if not _p_user:
+                    self._telegram_denied()
+                    return
+                _p_chat = str(_p_user["id"])
+                if self.command == "GET":
+                    try:
+                        _p_rec = _p_us.load(_p_chat) or {}
+                    except Exception as _p_e:
+                        self._json(200, {"available": False,
+                                         "reason": "PREFS_UNAVAILABLE",
+                                         "detail": str(_p_e)[:120]})
+                        return
+                    self._json(200, {
+                        "available": True,
+                        "watchlist": list(_p_rec.get("watchlist") or []),
+                        "recent": list(_p_rec.get("recent_symbols") or []),
+                        "notifications": {
+                            k: bool(_p_rec.get("notify_" + k, True))
+                            for k in ("opened", "closed", "stop", "target",
+                                      "price", "insight", "risk", "margin")},
+                        "verbose": bool(_p_rec.get("verbose_alerts")),
+                    })
+                    return
+                # POST
+                if not http_security.MINIAPP.check(http_security.client_key(self)):
+                    self._reply(429, {"ok": False, "error": "RATE_LIMITED"})
+                    return
+                try:
+                    _p_len = int(self.headers.get("Content-Length") or 0)
+                    if _p_len <= 0 or _p_len > 4096:
+                        self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                        return
+                    _p_body = json.loads(self.rfile.read(_p_len) or b"{}")
+                except Exception:
+                    self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                    return
+                if not isinstance(_p_body, dict):
+                    self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                    return
+                _p_updates = {}
+                # A watchlist may only contain instruments the platform trades.
+                # An arbitrary string here would end up in a market request.
+                if "watchlist" in _p_body:
+                    _p_fx, _p_me = _p_mk.universe()
+                    _p_allowed = set(_p_fx) | set(_p_me)
+                    _p_want = _p_body.get("watchlist")
+                    if not isinstance(_p_want, list):
+                        self._reply(400, {"ok": False, "error": "BAD_WATCHLIST"})
+                        return
+                    _p_updates["watchlist"] = [
+                        str(x).upper() for x in _p_want[:20]
+                        if str(x).upper() in _p_allowed]
+                if "recent" in _p_body:
+                    _p_fx, _p_me = _p_mk.universe()
+                    _p_allowed = set(_p_fx) | set(_p_me)
+                    _p_r = _p_body.get("recent")
+                    if isinstance(_p_r, list):
+                        _p_updates["recent_symbols"] = [
+                            str(x).upper() for x in _p_r[:8]
+                            if str(x).upper() in _p_allowed]
+                _p_notif = _p_body.get("notifications")
+                if isinstance(_p_notif, dict):
+                    for _p_k in ("opened", "closed", "stop", "target",
+                                 "price", "insight", "risk", "margin"):
+                        if _p_k in _p_notif:
+                            _p_updates["notify_" + _p_k] = bool(_p_notif[_p_k])
+                if not _p_updates:
+                    self._reply(200, {"ok": False, "error": "NOTHING_APPLIED"})
+                    return
+                try:
+                    _p_ok = _p_us.update(_p_chat, _p_updates, strict=True)
+                except Exception as _p_e:
+                    print(f"[Prefs] write failed for {_p_chat}: {_p_e}")
+                    self._reply(500, {"ok": False, "error": "WRITE_FAILED"})
+                    return
+                self._reply(200 if _p_ok else 500,
+                            {"ok": bool(_p_ok), "applied": sorted(_p_updates)})
+                return
+
             if self.path.startswith("/api/app/trade"):
                 from apex import miniapp_api as _t_api, trade_events as _t_te
                 _t_user = self._telegram_identity()
