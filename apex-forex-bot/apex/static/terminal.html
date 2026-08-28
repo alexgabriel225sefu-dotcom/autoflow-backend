@@ -89,6 +89,25 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
 #rEngine.unk{border-color:rgba(245,181,68,.35);background:rgba(245,181,68,.07)}
 #rEngine b{display:block;margin-bottom:3px}
 #rEngine ul{margin:4px 0 0 16px;color:var(--t1);font-size:12.5px}
+/* Confirmation sheet — the only financial action the app can start */
+#sheetBg{position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:40;display:none}
+#sheetBg.on{display:block}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;transform:translateY(100%);
+  transition:transform .28s cubic-bezier(.22,.61,.36,1);background:#0d1017;
+  border-top:1px solid var(--line);border-radius:var(--r-lg) var(--r-lg) 0 0;
+  padding:var(--sp5) var(--sp4) calc(var(--sp5) + var(--safe-b))}
+#sheet.on{transform:none}
+#sheet h3{font-size:var(--fs-lg);font-weight:800;margin-bottom:var(--sp3)}
+#sheet .body{font-size:13.5px;color:var(--t1);line-height:1.5;margin-bottom:var(--sp4)}
+#sheet .body b{color:var(--t0)}
+.btn{display:block;width:100%;text-align:center;padding:15px;border-radius:var(--r-md);
+  font-size:15px;font-weight:800;border:1px solid var(--line);background:transparent;
+  color:var(--t0);margin-top:var(--sp2);cursor:pointer;font-family:inherit}
+.btn.danger{background:var(--st-live);border-color:var(--st-live);color:#fff}
+.btn:disabled{opacity:.5}
+.pclose{display:block;width:100%;margin-top:var(--sp2);padding:11px;border-radius:var(--r-sm);
+  border:1px solid rgba(255,69,96,.35);background:rgba(255,69,96,.08);color:#ff97a8;
+  font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(70% 32% at 50% -4%,rgba(255,45,79,.16),transparent 70%)}
 .wrap{position:relative;z-index:1}
@@ -313,6 +332,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div id="rBody"></div>
 </div>
 
+<div id="sheetBg"></div>
+<div id="sheet" role="dialog" aria-modal="true">
+  <h3 id="shTitle">Close position</h3>
+  <div class="body" id="shBody">—</div>
+  <button class="btn danger" id="shGo">Confirm close</button>
+  <button class="btn" id="shNo">Cancel</button>
+</div>
 <nav id="bottomnav">
   <div class="on" data-s="home"><em>&#127968;</em>Home</div>
   <div data-s="markets"><em>&#128200;</em>Markets</div>
@@ -598,6 +624,65 @@ async function loadRisk(force){
   }
 }
 
+/* ── Close: confirm, then hand it to the same gate every other origin uses.
+   The Mini App names no position. Whatever is on screen, the server closes
+   the position IT holds for this chat — an id from a frontend is a request,
+   not proof of the right to act on it. */
+function sheetOpen(title, body, goText, onGo){
+  Q('shTitle').textContent=title; Q('shBody').innerHTML=body;
+  const go=Q('shGo');
+  go.textContent=goText||'Confirm'; go.disabled=false;
+  go.style.display = onGo ? 'block' : 'none';
+  go.onclick = onGo || null;
+  Q('sheetBg').classList.add('on'); Q('sheet').classList.add('on');
+}
+function sheetClose(){ Q('sheetBg').classList.remove('on'); Q('sheet').classList.remove('on'); }
+Q('shNo').onclick=sheetClose; Q('sheetBg').onclick=sheetClose;
+
+function askClose(pos){
+  const known = pos && pos.pnlUsd!=null;
+  sheetOpen('Close position',
+    '<b>'+esc(String(pos.symbol||'').replace('_','/'))+'</b> \u00b7 '
+    +esc(pos.side||'')+(pos.units!=null?' \u00b7 '+pos.units:'')+'<br><br>'
+    +'Current P&amp;L: <b>'+(known?money(pos.pnlUsd):'not yet priced')+'</b><br><br>'
+    +'This sends a close request to your connected cTrader account. It goes '
+    +'through the same authorization every other close does.',
+    'Confirm close', doClose);
+}
+async function doClose(){
+  const go=Q('shGo'); go.disabled=true; go.textContent='Closing\u2026';
+  try{
+    const r=await fetch('/api/app/close',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:'{}'});
+    const d=await r.json().catch(()=>({}));
+    if(r.status===502 || d.error==='CLOSE_STATUS_UNKNOWN'){
+      /* Neither confirmed nor refused. Telling the client to retry could close
+         a position twice; telling them it failed could be a lie. */
+      sheetOpen('Close status unknown',
+        'The platform is verifying the broker state.<br><br>'
+        +'<b>Do not retry yet.</b> Your position list will update on its own '
+        +'once the broker answers.', null, null);
+    }else if(d.ok){
+      sheetOpen('Position closed',
+        'Closed <b>'+esc(String(d.symbol||'').replace('_','/'))+'</b>'
+        +(d.price!=null?' at <b>'+num(d.price)+'</b>':'')
+        +'.<br><br>cTrader confirmed the close.', null, null);
+      refresh();
+    }else{
+      sheetOpen('Not closed',
+        'The platform could not safely complete this request. '
+        +'<b>Nothing was closed.</b><br><br>Reason: '
+        +esc(d.detail||d.error||'refused by the risk and ownership checks')+'.',
+        null, null);
+    }
+  }catch(e){
+    sheetOpen('Close status unknown',
+      'The request did not complete and the platform cannot confirm whether it '
+      +'reached your broker.<br><br><b>Do not retry yet.</b>', null, null);
+  }
+}
+
 let mktAt=0;
 async function loadMarkets(force){
   if(!force && Date.now()-mktAt < 20000) return;
@@ -633,6 +718,12 @@ document.addEventListener('click',ev=>{
   if(!row)return;
   if(row.dataset.goto) showScreen(row.dataset.goto);
   else if(row.dataset.sym) showScreen('markets');
+});
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest&&ev.target.closest('[data-close]');
+  if(!b)return;
+  const pos=(window.__positions||[]).find(p=>String(p.symbol)===b.dataset.close);
+  if(pos) askClose(pos);
 });
 
 async function api(path){
@@ -781,6 +872,7 @@ async function refresh(){
 function renderPositions(list, count){
   const host=Q('posList'); if(!host)return;
   const rows=(list||[]).filter(p=>p&&p.symbol);
+  window.__positions=rows;
   /* Home carries a compact copy so the first screen answers "am I in
      anything" without a tap. Same rows, same source — never a second
      count computed a different way. */
@@ -810,7 +902,9 @@ function renderPositions(list, count){
       +'<div class="ptop"><b>'+dir+' '+esc(String(p.symbol).replace('_','/'))+'</b>'+pnl+'</div>'
       +'<div class="pgrid"><div>Entry<b>'+px(p.entryPrice)+'</b></div>'
       +'<div>Stop<b>'+px(p.stopLoss)+'</b></div>'
-      +'<div>Target<b>'+px(p.takeProfit)+'</b></div></div></div>';
+      +'<div>Target<b>'+px(p.takeProfit)+'</b></div></div>'
+      +'<button class="pclose" data-close="'+esc(String(p.symbol))+'">Close position</button>'
+      +'</div>';
   }).join('');
 }
 
