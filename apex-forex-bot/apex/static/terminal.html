@@ -75,6 +75,20 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
 .mpx{font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums;margin-top:1px}
 .mchg{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
 .mchg.up{color:var(--up)} .mchg.dn{color:var(--dn)} .mchg.na{color:var(--t2);font-weight:600}
+/* Risk */
+.rmeter{margin:var(--sp3) var(--sp4)}
+.rmeter .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--t1);margin-bottom:5px}
+.rmeter .lbl b{color:var(--t0);font-variant-numeric:tabular-nums}
+.rbar{height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+.rbar i{display:block;height:100%;background:var(--up);border-radius:4px;transition:width .4s}
+.rbar i.warn{background:var(--st-unver)} .rbar i.bad{background:var(--st-live)}
+#rEngine{margin:var(--sp3) var(--sp4);padding:var(--sp3) var(--sp4);border-radius:var(--r-md);
+  border:1px solid var(--line);font-size:13px}
+#rEngine.ok{border-color:rgba(47,213,117,.3);background:rgba(47,213,117,.07)}
+#rEngine.halt{border-color:rgba(255,69,96,.4);background:rgba(255,69,96,.09)}
+#rEngine.unk{border-color:rgba(245,181,68,.35);background:rgba(245,181,68,.07)}
+#rEngine b{display:block;margin-bottom:3px}
+#rEngine ul{margin:4px 0 0 16px;color:var(--t1);font-size:12.5px}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(70% 32% at 50% -4%,rgba(255,45,79,.16),transparent 70%)}
 .wrap{position:relative;z-index:1}
@@ -395,6 +409,7 @@ function showScreen(name,push){
   Q('tbBack').classList.toggle('on',name!=='home');
   Q('cSym').textContent = lastSym;
   if(name==='history') loadHistory();
+  if(name==='risk') loadRisk(true);
   if(push!==false && location.hash!=='#'+name) location.hash=name;
   window.scrollTo(0,0);
   /* Both charts are laid out while hidden, so they measure 0 wide until the
@@ -520,6 +535,69 @@ function marketRow(r){
     +'<div class="mpx">'+Number(r.price).toLocaleString(undefined,{maximumFractionDigits:5})+'</div></div>'
     +'<div class="mchg '+(up?'up':'dn')+'">'+(up?'+':'')+r.changePct.toFixed(2)+'%</div></div>';
 }
+/* ── Risk Centre ──────────────────────────────────────────────────────
+   Presentation only. Every figure comes from the risk engine's published
+   state; the screen computes no limit and enforces none. RISK_UNKNOWN is a
+   third answer and is drawn as its own colour — a risk state we could not
+   read must never look like a risk state that is fine. */
+function meter(label, used, limit, unit){
+  const known = used!=null && limit;
+  const pct = known ? Math.max(0, Math.min(100, (Math.abs(used)/limit)*100)) : 0;
+  const cls = !known ? '' : pct>=90 ? 'bad' : pct>=60 ? 'warn' : '';
+  return '<div class="rmeter"><div class="lbl"><span>'+esc(label)+'</span><b>'
+    +(known ? Math.abs(used).toFixed(2)+unit+' / '+limit.toFixed(2)+unit : 'unknown')
+    +'</b></div><div class="rbar"><i class="'+cls+'" style="width:'+pct+'%"></i></div></div>';
+}
+let riskAt=0;
+async function loadRisk(force){
+  if(!force && Date.now()-riskAt < 8000) return;
+  const H=Q('riskBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/risk');
+    riskAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Risk state unavailable — '+esc(d.detail||d.reason||'')+'</div>';
+      return;
+    }
+    const L=d.limits||{}, T=d.today||{};
+    let html='';
+    /* The engine verdict first: it is the only line that changes what the
+       platform will DO next. */
+    const eng = d.engine==='RISK_HOLDING' ? 'halt' : d.engine==='RISK_OK' ? 'ok' : 'unk';
+    const engTxt = eng==='halt' ? 'Trading paused by the risk engine'
+                 : eng==='ok'   ? 'Risk engine: within limits'
+                 : 'Risk state could not be read';
+    html+='<div id="rEngine" class="'+eng+'"><b>'+engTxt+'</b>'
+      + (d.reasons&&d.reasons.length ? '<ul>'+d.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>' : '')
+      + (eng==='unk' ? '<div class="note">New orders still pass the same gate; this screen simply has nothing to show yet.</div>' : '')
+      + '</div>';
+    html+=meter('Today\u2019s loss vs daily limit',
+                (T.pnlPct!=null && T.pnlPct<0) ? T.pnlPct : (T.pnlPct!=null?0:null),
+                L.maxDailyLossPct, '%');
+    html+=meter('Drawdown from peak', d.drawdownPct, L.maxDrawdownPct, '%');
+    html+='<div class="sec-h">Limits</div>';
+    html+='<div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Risk per trade</span><b>'+(L.riskPerTradePct!=null?L.riskPerTradePct+'%':'—')+'</b></div>'
+      +'<div class="kvr"><span>Daily loss limit</span><b>'+(L.maxDailyLossPct!=null?L.maxDailyLossPct+'%':'—')+'</b></div>'
+      +'<div class="kvr"><span>Max drawdown</span><b>'+(L.maxDrawdownPct!=null?L.maxDrawdownPct+'%':'—')+'</b></div>'
+      +'<div class="kvr"><span>Trades today</span><b>'+(T.trades!=null?T.trades:'—')+'</b></div>'
+      +'</div>';
+    html+='<div class="sec-h">Exposure</div>';
+    html += (d.exposure&&d.exposure.length)
+      ? d.exposure.map(e=>{
+          const bias = e.usdBias>0?'long USD':e.usdBias<0?'short USD':'no USD leg';
+          const known=e.pnlUsd!=null, up=known&&e.pnlUsd>=0;
+          return '<div class="mrow"><div><div class="msym">'+esc(String(e.symbol).replace('_','/'))
+            +'</div><div class="mpx">'+esc(e.side||'')+' \u00b7 '+bias+'</div></div>'
+            +'<div class="mchg '+(known?(up?'up':'dn'):'na')+'">'+(known?money(e.pnlUsd):'—')+'</div></div>';
+        }).join('')
+      : '<div class="empty">No open exposure.</div>';
+    H.innerHTML=html;
+  }catch(e){
+    H.innerHTML='<div class="empty">Risk state unavailable ('+esc(e.message||'error')+').</div>';
+  }
+}
+
 let mktAt=0;
 async function loadMarkets(force){
   if(!force && Date.now()-mktAt < 20000) return;

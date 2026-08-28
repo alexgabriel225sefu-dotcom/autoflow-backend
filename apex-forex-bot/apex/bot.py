@@ -919,6 +919,78 @@ def _start_dashboard_server():
             # a handful of people reading the same eight numbers. Scoped to an
             # authenticated client anyway — the universe is not public, and an
             # unauthenticated caller must not be able to make us poll a broker.
+            # ── Risk Centre ─────────────────────────────────────────
+            # Presentation only. Every number is read from the risk engine's
+            # own published state — the screen computes no limit, applies no
+            # limit, and decides nothing. gates.authorize_order remains the
+            # only thing that can permit an order, and strategies.should_stop
+            # is never called from here: it advances the peak-balance and
+            # daily-reset state as a side effect, so drawing a badge with it
+            # would move the circuit breakers.
+            if self.path.startswith("/api/app/risk"):
+                from apex import user_loop, user_store, strategies as _st
+                from apex import forex as _fx, config as _cfg, ui_state as _ui
+                tg_user = self._telegram_identity()
+                if not tg_user:
+                    self._telegram_denied()
+                    return
+                chat_id = str(tg_user["id"])
+                try:
+                    dash = user_loop.get_dash(chat_id) or {}
+                    u = user_store.load(chat_id) or {}
+                except Exception as e:
+                    self._json(200, {"available": False,
+                                     "reason": "RISK_STATE_UNAVAILABLE",
+                                     "detail": str(e)[:120]})
+                    return
+
+                guard = dash.get("riskGuard")
+                state, reasons = _ui.risk_state(chat_id)
+                sess = {}
+                try:
+                    sess = _st.get_session(chat_id) or {}
+                except Exception as e:
+                    print(f"[Risk] session unreadable for {chat_id}: {e}")
+
+                positions = [p for p in (dash.get("positions") or []) if p.get("symbol")]
+                exposure = []
+                for pos in positions:
+                    try:
+                        bias = _fx.usd_exposure(pos["symbol"], pos.get("side") or "")
+                    except Exception:
+                        bias = 0
+                    exposure.append({
+                        "symbol": pos["symbol"],
+                        "side": pos.get("side"),
+                        "usdBias": bias,
+                        "pnlUsd": pos.get("pnlUsd"),
+                    })
+
+                stats = dash.get("stats") or {}
+                self._json(200, {
+                    "available": True,
+                    # UNKNOWN is a third answer and never renders as OK.
+                    "engine": state,
+                    "halted": bool((guard or {}).get("halted")),
+                    "reasons": reasons or list((guard or {}).get("reasons") or []),
+                    "guardSeen": bool(guard),
+                    "limits": {
+                        "riskPerTradePct": round(float(
+                            u.get("risk_per_trade") or getattr(_cfg, "RISK_PER_TRADE", 0)) * 100, 3),
+                        "maxDailyLossPct": float(getattr(_cfg, "MAX_DAILY_LOSS_PCT", 3.0)),
+                        "maxDrawdownPct": float(getattr(_cfg, "MAX_DD_PCT", 20.0)),
+                    },
+                    "today": {
+                        "pnl": sess.get("dailyPnL"),
+                        "pnlPct": sess.get("dailyPnLPct"),
+                        "trades": sess.get("dailyTrades"),
+                    },
+                    "drawdownPct": stats.get("maxDrawdownPct"),
+                    "peakBalance": sess.get("peakBalance"),
+                    "openPositions": len(positions),
+                    "exposure": exposure,
+                })
+                return
             if self.path.startswith("/api/app/markets"):
                 from apex import user_loop, user_store, markets as _mk
                 tg_user = self._telegram_identity()
