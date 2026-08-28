@@ -662,7 +662,11 @@ function showScreen(name,push){
 document.querySelectorAll('#bottomnav div').forEach(d=>d.onclick=()=>showScreen(d.dataset.s));
 Q('tbBack').onclick=()=>history.back();
 window.addEventListener('hashchange',()=>showScreen((location.hash||'#home').slice(1),false));
-showScreen((location.hash||'#home').slice(1),false);
+/* The first showScreen() call lives with the other boot calls at the very
+   bottom. Running it here read `lastSym` before its `let` had executed, which
+   throws in the temporal dead zone — and a throw at parse-and-run time stops
+   the whole script, so every handler defined below it never existed. That is
+   what "the app does not load" looked like. */
 document.querySelectorAll('#jSwitch div').forEach(d=>d.onclick=()=>{
   document.querySelectorAll('#jSwitch div').forEach(x=>x.classList.remove('on')); d.classList.add('on');
   Q('jTrades').style.display=d.dataset.j==='trades'?'block':'none';
@@ -1585,7 +1589,10 @@ async function refresh(){
   if(d.pipSize) PIP=d.pipSize;
   TFSEC=TF_SECONDS[d.timeframeUsed||TF]||TFSEC;
   lastSym=(d.symbol||'—').replace('_','/');
-  if(!document.querySelector('.tab[data-p="perf"]').classList.contains('on')) Q('cSym').textContent=lastSym;
+  /* The tab strip this used to read was replaced by the screen router. The
+     chart header shows the instrument unless Portfolio is on screen, where the
+     same element titles the equity curve. */
+  if(screenNow!=='portfolio') Q('cSym').textContent=lastSym;
   Q('cMeta').innerHTML='<i id="liveDot"></i><b id="livePx">'+(d.price?px(d.price):'—')+'</b> · '+esc(d.timeframeUsed||d.timeframe||'')+' · '+esc(d.broker||'');
   freshness();
 
@@ -2099,6 +2106,9 @@ setInterval(()=>{
     setConn('delayed','No live update for 30s — showing the last known values.');
 }, 5000);
 openStream();
+
+/* Everything is defined by now, so the first screen can safely be drawn. */
+showScreen((location.hash||'#home').slice(1),false);
 
 tick().finally(()=>{ setInterval(tick, 1500); });
 refresh().finally(()=>{ setInterval(refresh, 6000); });
