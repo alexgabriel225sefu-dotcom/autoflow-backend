@@ -228,6 +228,53 @@ try:
 except Exception as e:
     check("the P&L reader runs", False, f"{type(e).__name__}: {e}")
 
+print("\n10. A broker-closed trade is journalled completely")
+# Measured against the live account before this was fixed: of fifteen journal
+# rows, thirteen had no exit price, all fifteen had no openedAt, nine had no
+# positionId, and six had no side at all. The balance on every row was the
+# balance from BEFORE that trade's own P&L — 3176.23 was filed under a +64.26
+# win whose result was 3240.49.
+# The whole reconciliation block: from the deal lookup at its top to the alert
+# at its end. Anchoring on the label itself does not work — it appears first in
+# a rejection print inside the fallback branch, part way through.
+_MULTI = LOOP[LOOP.index("closed-deal lookup failed"):LOOP.rfind("BROKER_CLOSE_MULTI")]
+check("the exit price from the deal is kept",
+      'xp = _deal.get("exitPrice") or xp' in _MULTI,
+      "xp was only ever assigned in the fallback branch, so a trade closed the "
+      "normal way was journalled with no exit at all")
+check("the direction is carried from the reconciled position",
+      '"side": det.get("side")' in _MULTI,
+      "pos_details has held the side all along; the record simply never took it")
+check("...and so is the broker's position id",
+      '"positionId": det.get("positionId")' in _MULTI)
+check("the balance recorded is the broker's own post-close figure",
+      '_bal_after = (_deal or {}).get("balance")' in _MULTI)
+check("...and the running balance advances even without it",
+      "paper_balance += float(est_pnl)" in _MULTI,
+      "every other close path advances it; this one never did")
+check("the journal falls back to the reconciled side",
+      'src.get("entrySide") or src.get("side")' in LOOP,
+      "_log_trade reads entrySide, so a record carrying only `side` would still "
+      "have been filed with none")
+
+print("\n11. cTrader's close reply is read for everything it carries")
+for field in ("exitPrice", "entryPrice", "balance", "closedAt"):
+    check(f"the deal lookup returns {field}", f'"{field}": ' in CT)
+check("the post-close balance is scaled like money",
+      "_bal = cpd.balance / scale" in CT)
+
+print("\n12. An unknown direction is never drawn as LONG")
+check("there is one direction renderer", "function dirLabel(side)" in HTML)
+check("...and it answers only for a side it was actually given",
+      "side==='BUY'" in HTML and "Direction not recorded" in HTML,
+      "the old expression was `side==='SELL' ? SHORT : LONG`, so every trade "
+      "with no recorded side was drawn as a long one")
+check("no call site still defaults to LONG",
+      "'SELL')?'\U0001f534 SHORT':'\U0001f7e2 LONG'" not in HTML
+      and "side==='SELL'?'\U0001f534 SHORT':'\U0001f7e2 LONG'" not in HTML)
+check("every call site uses the renderer", HTML.count("dirLabel(") == 4,
+      "three call sites plus the definition")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"FAILED {len(failures)}: {', '.join(failures[:8])}")

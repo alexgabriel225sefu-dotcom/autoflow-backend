@@ -668,10 +668,45 @@ class CtraderBroker:
                 swap = cpd.swap / scale
                 commission = abs(cpd.commission) / scale
                 net = round(gross + swap - commission, 2)
+                # Everything else the close already told us, and that the
+                # journal was leaving blank while making this very call.
+                #
+                # `exitPrice` is the deal's own execution price — the trade
+                # journal was recording None for it on this path, so a closed
+                # trade showed no exit, no R multiple and no exit marker on the
+                # replay, all while the exact number sat in this response.
+                #
+                # `balance` is cTrader's OWN post-close account balance. The
+                # loop was recording its local running figure instead, which on
+                # this path is never advanced — so every broker-closed trade
+                # was filed with the balance from BEFORE its own P&L.
+                _exit = None
+                try:
+                    _exit = float(d.executionPrice) or None
+                except Exception:
+                    pass
+                _entry = None
+                try:
+                    _entry = float(cpd.entryPrice) or None
+                except Exception:
+                    pass
+                _bal = None
+                try:
+                    if cpd.HasField("balance"):
+                        _bal = cpd.balance / scale
+                except Exception:
+                    pass
+                _closed_at = None
+                try:
+                    _closed_at = int(d.executionTimestamp) // 1000 or None
+                except Exception:
+                    pass
                 print(f"[cTrader] closed-deal pnl positionId={position_id} "
                       f"gross={gross:.2f} swap={swap:.2f} commission={commission:.2f} -> net={net:.2f}")
                 return {"netPnl": net, "grossPnl": round(gross, 2),
-                        "swap": round(swap, 2), "commissionUsd": round(commission, 2)}
+                        "swap": round(swap, 2), "commissionUsd": round(commission, 2),
+                        "exitPrice": _exit, "entryPrice": _entry,
+                        "balance": _bal, "closedAt": _closed_at}
         except Exception as e:
             print(f"[cTrader] get_closed_deal_pnl lookup failed: {e}")
         return None

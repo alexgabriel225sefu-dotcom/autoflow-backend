@@ -2095,7 +2095,7 @@ function renderPositions(list, count){
   }
   host.style.display='block';
   host.innerHTML=rows.map(p=>{
-    const dir=p.side==='SELL'?'🔴 SHORT':'🟢 LONG';
+    const dir=dirLabel(p.side);
     const known=p.pnlUsd!=null;
     const up=known&&p.pnlUsd>=0;
     const pnl=known
@@ -2155,7 +2155,7 @@ function drawHistory(rows){
     return '<div class="sec-h">'+esc(lbl)+'</div>';
   };
   el.innerHTML=rows.map(t=>{
-      const win=t.win===true, dir=(t.side==='SELL')?'🔴 SHORT':'🟢 LONG';
+      const win=t.win===true, dir=dirLabel(t.side);
       const md=(t.mode||'').toLowerCase();
       const badge=md==='live'?'<span class="chip live">LIVE</span>'
                  :md==='demo'?'<span class="chip demo">DEMO</span>'
@@ -2197,7 +2197,7 @@ async function openReplay(tid){
     const d=await api('/api/app/replay?trade='+encodeURIComponent(tid)+'&timeframe='+encodeURIComponent(TF));
     rData=d;
     const t=d.trade, win=t.win===true;
-    const dir=(t.side==='SELL')?'🔴 SHORT':'🟢 LONG';
+    const dir=dirLabel(t.side);
     Q('rTitle').textContent=dir+' '+String(t.symbol||'').replace('_','/');
     const md=(t.mode||'').toUpperCase();
     Q('rSub').textContent=String(t.time||'').slice(0,16)+(md?' · '+md:'');
@@ -2372,6 +2372,17 @@ function balanceLine(d){
     + (has ? ' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '
              +money(fl)+'</span>' : '')
     + note;
+}
+/* Direction, or an explicit gap. This used to be
+   `side==='SELL' ? SHORT : LONG` at three call sites, which quietly turned
+   every trade with no recorded side into a long one — and the journal's
+   broker-close path recorded no side at all, so a losing SELL closed by its
+   own stop was shown to the client as a winning-looking long. An unknown
+   direction is now unknown. */
+function dirLabel(side){
+  return side==='SELL' ? '\uD83D\uDD34 SHORT'
+       : side==='BUY'  ? '\uD83D\uDFE2 LONG'
+       : '<span class="na">Direction not recorded</span>';
 }
 async function tick(){
   try{
