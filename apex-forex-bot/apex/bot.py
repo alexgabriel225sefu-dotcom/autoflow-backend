@@ -912,6 +912,37 @@ def _start_dashboard_server():
             # position's live P&L, and the money. Small enough to poll about
             # once a second, which is what makes the screen feel like a terminal
             # instead of a page that refreshes.
+            # ── Markets snapshot ────────────────────────────────────
+            # Every tradeable instrument with its close and change on the day.
+            # The snapshot is built once and shared: eight daily-bar fetches
+            # per client would spend cTrader's whole historical allowance on
+            # a handful of people reading the same eight numbers. Scoped to an
+            # authenticated client anyway — the universe is not public, and an
+            # unauthenticated caller must not be able to make us poll a broker.
+            if self.path.startswith("/api/app/markets"):
+                from apex import user_loop, user_store, markets as _mk
+                tg_user = self._telegram_identity()
+                if not tg_user:
+                    self._telegram_denied()
+                    return
+                chat_id = str(tg_user["id"])
+                try:
+                    u = user_store.load(chat_id) or {}
+                    br, _uc = user_loop._make_broker(u)
+                except Exception as e:
+                    # No broker, no prices. Said plainly rather than as an
+                    # empty list, which reads as "the market has nothing".
+                    self._json(200, {"rows": [], "available": False,
+                                     "reason": "MARKET_DATA_UNAVAILABLE",
+                                     "detail": str(e)[:120]})
+                    return
+                snap = _mk.snapshot(br)
+                forex, metals = _mk.universe()
+                self._json(200, {"rows": snap["rows"], "asOf": snap["asOf"],
+                                 "stale": bool(snap.get("stale")),
+                                 "forex": forex, "metals": metals,
+                                 "available": True})
+                return
             if self.path.startswith("/api/app/tick"):
                 from apex import webapp, user_loop, user_store
                 from apex import forex as fx_mod
