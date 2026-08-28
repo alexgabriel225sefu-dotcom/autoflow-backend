@@ -1135,6 +1135,105 @@ def _start_dashboard_server():
             # Candles go through broker.get_candles, which routes through
             # candle_cache — so two clients looking at the same instrument and
             # timeframe cost one historical request, not two.
+            # ── Trade detail + decision timeline ────────────────────
+            # One recorded trade, its R multiple and duration, and the events
+            # the decision log holds for it.
+            #
+            # R is DERIVED from the trade's own recorded stop distance and
+            # comes back null when that was never stored. A computed R sitting
+            # beside a real P&L reads as a second measurement, and the whole
+            # point of this screen is that the numbers on it were measured.
+            if self.path.startswith("/api/app/trade"):
+                from apex import miniapp_api as _t_api, trade_events as _t_te
+                _t_user = self._telegram_identity()
+                if not _t_user:
+                    self._telegram_denied()
+                    return
+                _t_chat = str(_t_user["id"])
+                _t_qs = parse_qs(urlparse(self.path).query)
+                _t_id = (_t_qs.get("id") or [""])[0][:64]
+                if not _t_id:
+                    self._json(400, {"available": False, "reason": "NO_TRADE_ID"})
+                    return
+                # find_trade is user-scoped: an id from the request can only
+                # ever resolve inside the asking client's own journal.
+                try:
+                    _t_row = _t_api.find_trade(_t_chat, _t_id)
+                except Exception as _t_e:
+                    self._json(200, {"available": False,
+                                     "reason": "TRADE_UNAVAILABLE",
+                                     "detail": str(_t_e)[:120]})
+                    return
+                if not _t_row:
+                    self._json(404, {"available": False, "reason": "TRADE_NOT_FOUND"})
+                    return
+
+                def _t_num(v):
+                    try:
+                        return float(v)
+                    except (TypeError, ValueError):
+                        return None
+
+                _t_entry = _t_num(_t_row.get("entry"))
+                _t_exit = _t_num(_t_row.get("exit"))
+                _t_slp = _t_num(_t_row.get("slPips"))
+                _t_net = _t_num(_t_row.get("netPnl"))
+                _t_r = None
+                if _t_entry is not None and _t_exit is not None and _t_slp:
+                    try:
+                        from apex import forex as _t_fx
+                        _t_moved = _t_fx.to_pips(abs(_t_exit - _t_entry),
+                                                 _t_row.get("symbol"), _t_entry)
+                        _t_sign = 1.0 if (_t_net is None or _t_net >= 0) else -1.0
+                        _t_r = round(_t_sign * (_t_moved / _t_slp), 2)
+                    except Exception:
+                        _t_r = None
+                _t_dur = None
+                _t_a = _t_b = None
+                try:
+                    _t_a = _t_api._parse_ts(_t_row.get("openedAt"))
+                    _t_b = _t_api._parse_ts(_t_row.get("time"))
+                    if _t_a and _t_b and _t_b >= _t_a:
+                        _t_dur = int(_t_b - _t_a)
+                except Exception:
+                    _t_dur = None
+                _t_events = []
+                try:
+                    _t_from = _t_a or _t_b
+                    if _t_from:
+                        _t_events = _t_te.timeline(
+                            _t_chat, position_id=_t_row.get("positionId"),
+                            start_ts=_t_from - 900, end_ts=(_t_b or _t_from) + 60,
+                            symbol=_t_row.get("symbol"))
+                except Exception as _t_e:
+                    print(f"[Trade] timeline failed for {_t_chat}: {_t_e}")
+                self._json(200, {
+                    "available": True,
+                    "trade": {
+                        "id": _t_id, "symbol": _t_row.get("symbol"),
+                        "side": _t_row.get("side"), "entry": _t_entry,
+                        "exit": _t_exit, "netPnl": _t_net,
+                        "grossPnl": _t_num(_t_row.get("grossPnl")),
+                        "costUsd": _t_num(_t_row.get("costUsd")),
+                        "slPips": _t_slp, "tpPips": _t_num(_t_row.get("tpPips")),
+                        "rMultiple": _t_r, "durationSec": _t_dur,
+                        "openedAt": _t_row.get("openedAt"),
+                        "closedAt": _t_row.get("time"),
+                        "mode": _t_row.get("mode"),
+                        "strategyId": _t_row.get("strategyId"),
+                        "strategyVersion": _t_row.get("strategyVersion"),
+                        "confidence": _t_row.get("confidence"),
+                        "regime": _t_row.get("regime"),
+                        "action": _t_row.get("action"),
+                    },
+                    # Empty means the decision log holds nothing for this
+                    # window — the trade predates the log, or nothing was
+                    # recorded. It never means the decision had no reason.
+                    "events": _t_events,
+                    "eventsRecorded": bool(_t_events),
+                })
+                return
+
             if self.path.startswith("/api/app/symbol"):
                 from apex import user_loop as _y_ul, user_store as _y_us
                 from apex import markets as _y_mk

@@ -81,7 +81,7 @@ Two branches, kept identical in content:
 | 11 Streaming | done | SSE; adds NO broker calls — publishes in-memory dash + one shared snapshot |
 | 12 Error/empty/loading | done | every screen has loading, empty and failure copy |
 | 13 Security regression | done | 9 new suites; scope, shadowing, credentials, isolation |
-| 14 Performance | **next** | |
+| 14 Performance | done | bounded queries, shared caches, paged history, one shared stream |
 | 15 Full regression | green | see the count in the last commit message |
 
 ## Decision/event model (2nd brief §33-35)
@@ -94,8 +94,8 @@ Redis via `user_store.get_blob`/`set_blob`.
 - Wired at two call sites in `user_loop.py`: every refusal
   (`DECISION_DECLINED`) and every fill (`ORDER_FILLED`). Both wrapped so a
   journalling failure can never reach the execution path.
-- **Still to wire**: `ORDER_AUTHORIZED` / `ORDER_REJECTED` at the gate,
-  `ORDER_SUBMITTED`, `STOP_UPDATED`, `POSITION_CLOSED`.
+- Wired at every point of the decision path: refusal, gate verdict (both
+  ways), submission, fill, stop move, close.
 - There is no backfill. Absence renders as "no recorded decision", never as
   "no reason".
 
@@ -107,6 +107,7 @@ GET  /api/app/risk           risk engine state, presentation only
 GET  /api/app/intelligence   market / strategy / risk / decision, kept apart
 GET  /api/app/automation     status + the writable list, from the policy
 POST /api/app/automation     the ONLY write gate is validate_miniapp
+GET  /api/app/trade          one trade: R, duration, decision timeline
 GET  /api/app/symbol         one instrument; symbol checked against the universe
 GET  /api/app/account        identity only; number masked, no tokens
 GET  /api/app/alerts         recorded events + risk verdict

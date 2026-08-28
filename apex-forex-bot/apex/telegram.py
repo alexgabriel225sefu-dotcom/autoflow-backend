@@ -4372,6 +4372,49 @@ def _screen_live_activation(chat_id):
                                [("↩️ Stay in simulation", "nav:acct")]]))
 
 
+# The menu a client sees behind the slash key. Eight entries, in the order
+# someone actually uses them. Every other command this bot accepts still
+# works; they are simply not how the product introduces itself.
+CLIENT_COMMANDS = [
+    ("app", "Open the platform"),
+    ("markets", "Instruments and prices"),
+    ("portfolio", "Equity and open positions"),
+    ("history", "Your trade library and replay"),
+    ("risk", "Limits, exposure and risk engine"),
+    ("settings", "Account, automation and alerts"),
+    ("start", "Allow execution"),
+    ("stop", "Pause execution"),
+    ("help", "What each command does"),
+]
+
+_PLATFORM_SCREENS = {
+    "markets": ("Markets", "Every instrument the platform trades, with today's move."),
+    "portfolio": ("Portfolio", "Your equity, open positions and performance."),
+    "history": ("Trade history", "Your trade library, with replay."),
+    "risk": ("Risk centre", "Your limits, exposure and the risk engine's verdict."),
+    "settings": ("Settings", "Account, automation, alerts and security."),
+    "intelligence": ("APEX Intelligence", "What the market shows and what APEX decided."),
+}
+
+
+def _open_platform(chat_id, screen):
+    """Open the Mini App directly on one screen.
+
+    The screen name goes in the URL fragment, which the Mini App's router
+    already reads. It is chosen from a fixed table here — never taken from
+    what the client typed — so a crafted command cannot build a URL.
+    """
+    label, blurb = _PLATFORM_SCREENS.get(screen, _PLATFORM_SCREENS["markets"])
+    base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+    if not base:
+        return send_to(chat_id, "⚠️ The platform URL is not configured "
+                                "(RENDER_EXTERNAL_URL). Ask the operator to set it.")
+    send_to(chat_id, f"<b>{_esc(label)}</b>\n\n{_esc(blurb)}",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": f"Open {label}",
+                 "web_app": {"url": f"{base}/app#{screen}"}}]]}})
+
+
 def _handle_terminal(chat_id):
     """Open the Telegram Mini App — live interactive chart, position, news."""
     base = (os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
@@ -5590,14 +5633,17 @@ _DEMO_LIVE_CONTROLS = ((
 _HELP_CLIENT = (f"📋 <b>{cfg.BOT_NAME.upper()}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 f"{_SETUP_LINE_CLIENT}"
-                "/status — live trading snapshot\n"
-                "/ctrader — connect your cTrader account\n"
-                "/start — resume trading\n"
-                "/stop — pause automation\n"
-                "/controls or /settings — all controls explained\n"
-                "/purchase — buy your license ($497)\n"
+                "<b>The platform</b>\n"
+                "/app — open the platform\n"
+                "/markets — instruments and prices\n"
+                "/portfolio — equity and open positions\n"
+                "/history — your trade library and replay\n"
+                "/risk — limits, exposure, risk engine\n"
+                "/settings — account, automation, alerts\n"
+                "/start — allow execution · /stop — pause it\n"
                 "/help — this list\n\n"
-                "/menu — every screen, as buttons\n\n"
+                "<i>Everything below still works, and is the same platform "
+                "answered in chat instead of on a screen.</i>\n\n"
                 "<b>📊 Trading</b>\n"
                 f"/buy — open a BUY · /sell — open a SELL\n"
                 "/close — close current position\n"
@@ -6096,6 +6142,18 @@ def _poll_loop():
         print(f"[TELEGRAM] deleteWebhook → {wr.json()}")
     except Exception as e:
         print(f"[TELEGRAM] deleteWebhook failed: {e}")
+    # The command menu a client sees when they tap the slash. §19: a small
+    # surface, not the forty commands this bot accepts. The rest still work —
+    # they are simply not the way the product presents itself.
+    try:
+        requests.post(f"{_API}/setMyCommands",
+                      json={"commands": [
+                          {"command": c, "description": d} for c, d in CLIENT_COMMANDS]},
+                      timeout=8)
+        print(f"[TELEGRAM] setMyCommands → {len(CLIENT_COMMANDS)} commands")
+    except Exception as e:
+        # Cosmetic. A failure here costs a menu, not a feature.
+        print(f"[TELEGRAM] setMyCommands failed: {e}")
     # Confirm the token is valid so the cause is obvious in the logs
     try:
         me = requests.get(f"{_API}/getMe", timeout=8).json()
@@ -6302,7 +6360,9 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
     elif cmd_l == "/summary":
         if not send_daily_summary(chat_id):
             send_to(chat_id, "📊 No closed trades today yet.")
-    elif cmd_l in ("/controls", "/settings"):
+    elif cmd_l == "/settings":
+        _open_platform(chat_id, "settings")
+    elif cmd_l == "/controls":
         # /settings is an alias, not a nicety: it is the name
         # people reach for first, and the reconnect message told
         # clients to send it while no such command existed.
@@ -6397,6 +6457,12 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _handle_chart(chat_id, args)
     elif cmd_l in ("/terminal", "/app"):
         _handle_terminal(chat_id)
+    elif cmd_l in ("/markets", "/portfolio", "/history", "/risk"):
+        # The small command surface §19 asks for. Each opens the platform on
+        # the screen it names rather than printing a wall of text, and the
+        # legacy commands underneath still work for anyone with them in
+        # muscle memory.
+        _open_platform(chat_id, cmd_l.lstrip("/"))
     elif cmd_l in ("/guide", "/help2", "/manual", "/howto"):
         _handle_guide(chat_id)
     elif cmd_l == "/atr":

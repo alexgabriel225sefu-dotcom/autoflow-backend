@@ -177,8 +177,24 @@ check("the cap is applied on append", "events[-_MAX_EVENTS:]" in BODY)
 
 print("\n10. The trading loop journals without being able to break")
 LOOP = open(os.path.join(ROOT, "apex", "user_loop.py"), encoding="utf-8").read()
-check("refusals are recorded", "_te.DECISION_DECLINED" in LOOP)
-check("fills are recorded", "_te.ORDER_FILLED" in LOOP)
+# Every point in the decision path, not just the two that were easy.
+for const, why in (("DECISION_DECLINED", "a refusal"),
+                   ("ORDER_AUTHORIZED", "the gate saying yes"),
+                   ("ORDER_REJECTED", "the gate saying no"),
+                   ("ORDER_SUBMITTED", "the order reaching the broker"),
+                   ("ORDER_FILLED", "the fill"),
+                   ("STOP_UPDATED", "a stop that moved"),
+                   ("POSITION_CLOSED", "the close")):
+    check(f"{why} is recorded", f".{const}" in LOOP)
+check("the gate verdict is recorded either way",
+      "_te2.ORDER_AUTHORIZED if _decision else _te2.ORDER_REJECTED" in LOOP,
+      "logging only the approvals makes the log look like a success story")
+check("the stop event refuses to file under an unknown user",
+      "no user_id passed to _manage_trailing" in LOOP,
+      "_manage_trailing does not receive user_id by default; without this the "
+      "event would silently never be written")
+check("...and both callers now pass it",
+      LOOP.count("user_id=user_id)") >= 2)
 for marker in ("decision log (skip) failed", "decision log (fill) failed"):
     check(f"...wrapped: {marker!r}", marker in LOOP,
           "an exception in journalling must not reach the execution path")
