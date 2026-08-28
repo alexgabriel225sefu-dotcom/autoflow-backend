@@ -152,3 +152,6 @@ def _env_int(name, default):
 LOGIN = RateLimiter(_env_int("RL_LOGIN_PER_MIN", 10), 60, "dashboard-login")
 MINIAPP = RateLimiter(_env_int("RL_MINIAPP_PER_MIN", 240), 60, "miniapp")
 WEBHOOK = RateLimiter(_env_int("RL_WEBHOOK_PER_MIN", 120), 60, "webhook")
+# /go is public and writes a record per hit, so it is bounded. Generous: a
+# campaign can legitimately push a burst through one carrier NAT.
+GO = RateLimiter(_env_int("RL_GO_PER_MIN", 60), 60, "ad-click")

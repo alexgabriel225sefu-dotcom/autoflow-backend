@@ -11,6 +11,7 @@ import time
 import threading
 import requests
 from apex import config as cfg
+from apex import attribution
 from apex import forex
 from apex import access
 from apex import user_store
@@ -5797,6 +5798,26 @@ if _LICENSE_REQUIRED and not (os.getenv("REQUIRE_LICENSE") or "").strip():
           "the licence gate is ON, which is the default and the safe value.")
 
 
+def _welcome_ad_click(chat_id, token):
+    """Land someone who arrived from an ad rather than from a purchase email.
+
+    Claims the click first — that is what lets the sale, if it happens, be
+    reported back to the ad that produced it — then shows the proof and the
+    offer, which is what they came for. Messaging is best-effort: a failure
+    here must not stop the click being claimed, and there is nothing to grant
+    or refuse, so there is nothing to fail closed about.
+
+    Lives outside _license_ok because it is not a licence decision. The caller
+    treats it as "not licensed" and returns.
+    """
+    attribution.claim(token, str(chat_id))
+    try:
+        send_proof_shots(chat_id)
+        _handle_purchase(chat_id)
+    except Exception as e:
+        print(f"[TELEGRAM] ad-click landing failed for {chat_id}: {e}")
+
+
 def _license_ok(chat_id, text):
     """Validate the buyer's license before granting access to the bot.
 
@@ -5830,7 +5851,21 @@ def _license_ok(chat_id, text):
     first = (text or "").splitlines()[0].strip()
     cmd, _, karg = first.partition(" ")
     cmd_l = cmd.lower().split("@")[0]
-    key = karg.strip().upper()
+    raw_arg = karg.strip()
+
+    # Two very different people arrive with something after /start. A buyer
+    # opening the link from their purchase email brings a licence key. Someone
+    # who clicked an ad brings an attribution token minted by /go — they have
+    # bought nothing yet, and "that doesn't look like a valid key" would be the
+    # worst possible first sentence to show them.
+    #
+    # Checked before the uppercase below on purpose: the token is base64url and
+    # case-sensitive, and .upper() would destroy it.
+    if cmd_l == "/start" and attribution.looks_like_token(raw_arg):
+        _welcome_ad_click(chat_id, raw_arg)
+        return False
+
+    key = raw_arg.upper()
     # /purchase (and aliases) must work for a not-yet-licensed user — that's
     # the whole point of the command. Without this it hit the generic
     # "activation required" branch below and just re-showed the proof shots,

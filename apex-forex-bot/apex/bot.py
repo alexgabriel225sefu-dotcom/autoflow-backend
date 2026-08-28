@@ -635,6 +635,60 @@ def _start_dashboard_server():
                 self.end_headers()
                 self.wfile.write(b"ok")
                 return
+            # ── /go — the ad-click bridge ────────────────────────────────
+            # An ad cannot link straight into Telegram and keep its click
+            # identifier: the deep-link payload is 64 characters of
+            # [A-Za-z0-9_-] and a Meta click id is neither short enough nor
+            # made of those. So the click lands here first, in a browser,
+            # where the identifier still exists. We store it under a token
+            # that does fit, and send the visitor on.
+            #
+            # This must not fail closed. A visitor who clicked a paid ad gets
+            # redirected whatever happens to the store — losing the
+            # measurement costs a data point, losing the visitor costs a sale.
+            if self.path == "/go" or self.path.startswith("/go?"):
+                # Aliased, and every local here is prefixed. do_GET is nested
+                # inside _start_dashboard_server and closes over `urlparse`,
+                # `parse_qs` and `token` from it — binding any of those names
+                # here would make them local to the WHOLE method and break
+                # every branch above that reads them.
+                from urllib.parse import urlparse as _go_urlparse
+                from urllib.parse import parse_qs as _go_parse_qs
+                from urllib.parse import quote as _go_quote
+                from apex import attribution as _go_attr
+                _go_handle = cfg.TELEGRAM_BOT_USERNAME
+                _go_target = f"https://t.me/{_go_handle}"
+                try:
+                    if not http_security.GO.check(http_security.client_key(self)):
+                        # Still a redirect: a rate-limited visitor is far more
+                        # likely to be a shared IP than an attack, and the
+                        # trade-off of a missed click record beats a lost sale.
+                        raise RuntimeError("rate limited")
+                    _go_q = _go_parse_qs(_go_urlparse(self.path).query)
+                    _go_one = lambda k: (_go_q.get(k) or [""])[0]
+                    _go_token = _go_attr.record_click(
+                        fbclid=_go_one("fbclid"),
+                        fbp=_go_one("fbp"),
+                        utm={k: _go_one(k) for k in
+                             ("utm_source", "utm_medium", "utm_campaign",
+                              "utm_content", "utm_term", "ref")},
+                        ip=http_security.client_key(self),
+                        user_agent=self.headers.get("User-Agent") or "",
+                        url=f"https://{self.headers.get('Host') or ''}{self.path}",
+                    )
+                    _go_target = (f"https://t.me/{_go_handle}"
+                                  f"?start={_go_quote(_go_token, safe='')}")
+                except Exception as e:
+                    print(f"[Attribution] /go fell through to a plain "
+                          f"redirect: {e}")
+                self.send_response(302)
+                self.send_header("Location", _go_target)
+                # A click record is per-visitor and short-lived; a cache in
+                # front of this would hand one visitor's token to the next.
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.end_headers()
+                return
             # The voice endpoint is POST-only. Without this, a GET fell through
             # to the dashboard gate and answered "503 — dashboard disabled,
             # DASHBOARD_TOKEN is not set", which is true of the dashboard and

@@ -234,4 +234,31 @@ def handle_webhook(raw_body: bytes, sig_header: str):
     # the event to a customer without carrying the credential itself.
     print(f"[Stripe] activated {chat_id} with license {mask_licence(key)} "
           f"(session={session.get('id')})")
+
+    # Report the sale back to the ad that produced it. Last, and swallowing
+    # everything: the buyer is charged, licensed and told about it by this
+    # point, and no measurement is worth risking a 500 that makes Stripe
+    # redeliver a completed purchase. Only on this path — the "already active"
+    # branch above is a redelivery, and reporting there would count one sale
+    # twice.
+    #
+    # Sends nothing unless META_CAPI_ENABLED is on; see apex/attribution.py for
+    # what leaves and why the flag exists.
+    try:
+        from apex import attribution
+        amount = (session.get("amount_total") or 0) / 100.0
+        details = session.get("customer_details") or {}
+        outcome = attribution.report_purchase(
+            chat_id,
+            amount,
+            currency=(session.get("currency") or "usd").upper(),
+            email=details.get("email") or session.get("customer_email") or "",
+            event_id=event_id or session.get("id") or "",
+        )
+        if outcome not in ("disabled", "sent"):
+            print(f"[Stripe] purchase not reported to Meta for {chat_id}: {outcome}")
+    except Exception as e:
+        print(f"[Stripe] attribution reporting raised for {chat_id} "
+              f"(sale is unaffected): {e}")
+
     return 200, b"ok"
