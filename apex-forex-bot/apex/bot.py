@@ -557,6 +557,51 @@ def _start_dashboard_server():
             #
             # Nothing here can permit a trade. gates.authorize_order still
             # runs on every order whatever this writes.
+            # ── Ask APEX ────────────────────────────────────────────
+            # Read-only, and scoped to the chat the signature proved. The
+            # question is text: it never selects whose data is loaded, and no
+            # id inside it is treated as authorisation. apex/copilot.py holds
+            # the routing and answers from recorded state only — no generated
+            # text is served, and there is no path from here to a broker.
+            if self.path == "/api/app/ask":
+                from apex import copilot as _k_cp, chat_memory as _k_cm
+                _k_user = self._telegram_identity()
+                if not _k_user:
+                    self._telegram_denied()
+                    return
+                _k_chat = str(_k_user["id"])
+                if not http_security.MINIAPP.check(http_security.client_key(self)):
+                    self._reply(429, {"ok": False, "error": "RATE_LIMITED"})
+                    return
+                # The same per-user budget the Telegram assistant uses, so a
+                # flood through this surface cannot starve the trading loop of
+                # the quota it shares.
+                try:
+                    _k_ok, _k_why = _k_cm.allow(_k_chat)
+                except Exception:
+                    _k_ok, _k_why = True, ""
+                if not _k_ok:
+                    self._reply(200, {"ok": True, "kind": "UNKNOWN", "text": _k_why})
+                    return
+                try:
+                    _k_len = int(self.headers.get("Content-Length") or 0)
+                    if _k_len <= 0 or _k_len > 4096:
+                        self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                        return
+                    _k_body = json.loads(self.rfile.read(_k_len) or b"{}")
+                    _k_q = str((_k_body or {}).get("q") or "")[:500]
+                except Exception:
+                    self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                    return
+                try:
+                    _k_ans = _k_cp.answer(_k_chat, _k_q)
+                except Exception as _k_e:
+                    print(f"[Copilot] answer failed for {_k_chat}: {_k_e}")
+                    self._reply(200, {"ok": True, "kind": "UNKNOWN",
+                                      "text": "I could not answer that right now."})
+                    return
+                self._reply(200, {"ok": True, **_k_ans})
+                return
             if self.path == "/api/app/automation" and self.command == "POST":
                 from apex import user_store as _s_us, settings_policy as _s_sp
                 _s_user = self._telegram_identity()

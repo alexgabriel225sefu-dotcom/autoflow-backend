@@ -105,6 +105,26 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
   color:var(--t0);margin-top:var(--sp2);cursor:pointer;font-family:inherit}
 .btn.danger{background:var(--st-live);border-color:var(--st-live);color:#fff}
 .btn:disabled{opacity:.5}
+#askChips{display:flex;flex-wrap:wrap;gap:var(--sp2);padding:0 var(--sp4)}
+#askChips div{border:1px solid var(--line);background:var(--card);border-radius:var(--r-md);
+  padding:9px 13px;font-size:12.5px;color:var(--t1);cursor:pointer}
+#askOut{padding:var(--sp3) var(--sp4)}
+.ans{border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp3) var(--sp4);
+  margin-bottom:var(--sp3);background:var(--card);font-size:13.5px;line-height:1.55;
+  white-space:pre-wrap}
+.ans .kind{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.1em;
+  padding:2px 7px;border-radius:5px;margin-bottom:7px}
+.ans .kind.FACT{background:rgba(47,213,117,.14);color:#8fe7b6}
+.ans .kind.OBSERVATION{background:rgba(245,181,68,.14);color:#f7d08a}
+.ans .kind.ANALYSIS{background:rgba(255,45,79,.14);color:#ff97a8}
+.ans .kind.UNKNOWN{background:rgba(255,255,255,.07);color:var(--t2)}
+.ans .kind.REFUSED{background:rgba(255,69,96,.16);color:#ff97a8}
+.ans .q{color:var(--t2);font-size:12px;margin-bottom:6px}
+#askBar{display:flex;gap:var(--sp2);padding:var(--sp2) var(--sp4) var(--sp5)}
+#askQ{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-family:inherit}
+#askGo{background:var(--acc);border:none;color:#fff;border-radius:var(--r-md);
+  padding:0 18px;font-size:16px;cursor:pointer}
 .pill{background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--t0);
   border-radius:var(--r-sm);padding:5px 14px;font-size:12px;font-weight:800;
   cursor:pointer;font-family:inherit}
@@ -321,6 +341,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
 </section>
 
+<section class="screen" id="s-ask">
+  <div class="sec-h">Ask APEX</div>
+  <div id="askChips"></div>
+  <div id="askOut"></div>
+  <div id="askBar">
+    <input id="askQ" placeholder="Ask about your account…" maxlength="500">
+    <button id="askGo">&#10148;</button>
+  </div>
+</section>
+
 <section class="screen" id="s-automation">
   <div class="sec-h">Automation</div>
   <!-- Reflects server-side state. The controls offered are the ones the
@@ -368,6 +398,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div data-s="history"><em>&#128202;</em>History</div>
   <div data-s="intelligence"><em>&#129504;</em>Insight</div>
   <div data-s="automation"><em>&#9881;</em>Auto</div>
+  <div data-s="ask"><em>&#128172;</em>Ask</div>
   <div data-s="risk"><em>&#128737;</em>Risk</div>
 </nav>
 <div id="err"></div>
@@ -449,7 +480,7 @@ function refreshEntryLine(pos){
    data layer goes on writing to the same nodes it always did. */
 const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
                history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
-               automation:'AUTOMATION',risk:'RISK CENTRE'};
+               automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE'};
 let screenNow='home';
 function showScreen(name,push){
   if(!SCREENS[name])name='home';
@@ -463,6 +494,7 @@ function showScreen(name,push){
   if(name==='risk') loadRisk(true);
   if(name==='intelligence') loadIntel(true);
   if(name==='automation') loadAuto(true);
+  if(name==='ask') initAsk();
   if(push!==false && location.hash!=='#'+name) location.hash=name;
   window.scrollTo(0,0);
   /* Both charts are laid out while hidden, so they measure 0 wide until the
@@ -616,6 +648,47 @@ function kvRows(pairs){
    the policy would refuse — and the execution environment is not in the
    list, by design: a client must never be able to move their own account
    from demo to live from a phone. */
+/* ── Ask APEX ─────────────────────────────────────────────────────────
+   Every reply carries what KIND of claim it is. A reader who cannot tell an
+   observation from a measurement will take the weakest as the strongest, so
+   the label is part of the answer rather than decoration on it. */
+const ASK_CHIPS=['What is my current risk?','What positions are open?',
+  'Show me my best trade',"Why didn't APEX enter GBPUSD?",
+  'What is the market doing?'];
+let askReady=false;
+function initAsk(){
+  if(askReady) return; askReady=true;
+  Q('askChips').innerHTML=ASK_CHIPS.map(c=>'<div>'+esc(c)+'</div>').join('');
+  Q('askChips').querySelectorAll('div').forEach(d=>d.onclick=()=>askSend(d.textContent));
+  Q('askGo').onclick=()=>askSend(Q('askQ').value);
+  Q('askQ').onkeydown=e=>{ if(e.key==='Enter') askSend(Q('askQ').value); };
+}
+async function askSend(q){
+  q=String(q||'').trim(); if(!q) return;
+  Q('askQ').value='';
+  const out=Q('askOut');
+  /* The question is escaped before it is echoed. It came from a keyboard and
+     goes into the DOM; nothing about it is trusted. */
+  const card=document.createElement('div');
+  card.className='ans';
+  card.innerHTML='<div class="q">'+esc(q)+'</div><span class="kind UNKNOWN">…</span>';
+  out.insertBefore(card, out.firstChild);
+  try{
+    const r=await fetch('/api/app/ask',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify({q:q})});
+    const d=await r.json().catch(()=>({}));
+    const kind=String(d.kind||'UNKNOWN');
+    card.innerHTML='<div class="q">'+esc(q)+'</div>'
+      +'<span class="kind '+esc(kind)+'">'+esc(kind)+'</span>\n'+esc(d.text||'')
+      +(d.screen?'<div style="margin-top:9px"><button class="pill" data-goto="'
+        +esc(d.screen)+'">Open '+esc(d.screen)+'</button></div>':'');
+  }catch(e){
+    card.innerHTML='<div class="q">'+esc(q)+'</div>'
+      +'<span class="kind UNKNOWN">UNKNOWN</span>\nI could not reach the platform.';
+  }
+}
+
 let autoAt=0, autoWritable=[];
 function autoField(key, label, value, kind){
   if(autoWritable.indexOf(key) < 0)
