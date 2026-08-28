@@ -168,6 +168,10 @@ BOT_NAME = os.getenv("BOT_NAME") or "Apex4Traders"
 # that actually receives mail; set SUPPORT_EMAIL the day an @apex4traders
 # one exists and every message follows.
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL") or "supportaicashsystem@gmail.com"
+# The bot's @username, used to build the deep link an ad click is redirected
+# into. Wrong value here sends every paid click to a bot that is not this one,
+# so it is configurable rather than guessed.
+TELEGRAM_BOT_USERNAME = (os.getenv("TELEGRAM_BOT_USERNAME") or "FOREX_APEX_BOT").lstrip("@")
 ASSET_EMOJI = os.getenv("ASSET_EMOJI") or "💱"
 ASSET_NOUN = os.getenv("ASSET_NOUN") or "forex"
 LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or "apex-forex"
