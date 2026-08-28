@@ -814,8 +814,8 @@ async function refresh(){
       const past=e.mins<=0, am=Math.abs(e.mins), h=Math.floor(am/60), m=am%60;
       const when=(h?h+'h ':'')+m+'m'+(past?' ago':'');
       const high=(e.impact||'high')==='high';
-      // Only high-impact releases actually hold the bot back, and only inside
-      // the guard window. Saying it on every line would claim the bot reacts
+      // Only high-impact releases actually hold execution back, and only inside
+      // the guard window. Saying it on every line would claim the platform reacts
       // to things it ignores.
       const note=e.guarded?' — automation stands aside':'';
       const fig=[];
