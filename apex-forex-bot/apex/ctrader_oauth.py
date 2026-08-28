@@ -462,7 +462,7 @@ def handle_callback(query: dict):
                            f"✅ <b>cTrader connected!</b>\n\n"
                            f"Account <code>{a['ctid']}</code> ({env})\n"
                            f"{bal_line}\n"
-                           "Setting up your bot — 2 quick taps. 👇")
+                           "Setting up your account — 2 quick taps. 👇")
                 tg.onboard_start(chat_id)
             else:
                 tg.send_to(chat_id, tg.reconnect_summary(

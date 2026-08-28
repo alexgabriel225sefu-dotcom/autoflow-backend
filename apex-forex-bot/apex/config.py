@@ -164,6 +164,10 @@ if PRODUCT != "forex":
 # fund movement is not something this software could do if it wanted to.
 # CTRADER_SCOPE below is "trading" — place and manage orders, nothing else.
 BOT_NAME = os.getenv("BOT_NAME") or "Apex4Traders"
+# The inbox every client-facing message points at. It is still the address
+# that actually receives mail; set SUPPORT_EMAIL the day an @apex4traders
+# one exists and every message follows.
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL") or "supportaicashsystem@gmail.com"
 ASSET_EMOJI = os.getenv("ASSET_EMOJI") or "💱"
 ASSET_NOUN = os.getenv("ASSET_NOUN") or "forex"
 LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or "apex-forex"

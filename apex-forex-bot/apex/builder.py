@@ -135,7 +135,7 @@ _EXIT_STEP = {
 _SESSION_STEP = {  # forex only
     "key": "session_filter",
     "title": "6️⃣ Trading sessions",
-    "sub": "When the bot is allowed to trade (forex reacts to session opens).",
+    "sub": "When execution is allowed (forex reacts to session opens).",
     "options": [
         {"label": "🌍 All sessions", "patch": {"session_filter": []}},
         {"label": "🇬🇧🇺🇸 London + New York", "patch": {"session_filter": ["London", "New York"]}},
@@ -200,6 +200,6 @@ def summary(d):
         f"• Max trades/day: <b>{d.get('max_trades_day', 10)}</b>",
         f"• Daily loss stop: <b>{d.get('max_daily_loss_pct', 4):g}%</b> · Max drawdown: <b>{d.get('max_dd_pct', 20):g}%</b>",
         "━━━━━━━━━━━━━━━━━━━━",
-        "<i>The bot executes exactly this — you stay in control and own the results.</i>",
+        "<i>The platform executes exactly this — you stay in control and own the results.</i>",
     ]
     return "\n".join(lines)

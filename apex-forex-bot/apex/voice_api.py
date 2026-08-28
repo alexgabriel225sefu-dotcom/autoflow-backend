@@ -403,7 +403,7 @@ def ask(token, text):
                                      "anything more than that."}
         return {"ok": False, "status": 504,
                 "reply": "I could not reach the assistant just now. "
-                         "Your bot is unaffected."}
+                         "Execution is unaffected."}
 
     out = {"ok": True, "status": 200, "reply": speakable(reply)}
     print(f"[Voice] answered {user_id} in {time.time() - t0:.1f}s "
