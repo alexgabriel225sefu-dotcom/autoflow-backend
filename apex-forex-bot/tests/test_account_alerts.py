@@ -61,7 +61,14 @@ check("the screen renders the word, not only a colour",
 print("\n3. The screen tells the client where credentials live")
 check("it says they never leave the server",
       HTML.count("never shown here and never leave the server") >= 1)
-check("connecting is directed to the chat command", "send <b>/ctrader</b>" in HTML)
+# The account screen now offers Refresh and Disconnect, and directs BOTH
+# connecting and disconnecting to the chat — the broker's own sign-in runs
+# there, and revoking a token must not be doable from a read-only screen.
+check("connecting and disconnecting are directed to the chat",
+      "happen in the chat" in HTML and "/ctrader" in HTML)
+check("refresh is a real action on this screen", "acctRefresh" in HTML)
+check("disconnect explains why it is not done here",
+      "revokes a broker token" in HTML)
 
 print("\n4. Alerts are recorded events, not generated ones")
 check("events come from the decision log", "_l_te.recent(_l_chat" in ALRC)
