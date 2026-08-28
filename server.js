@@ -565,30 +565,7 @@ function _parseCookies(req) {
   });
   return out;
 }
-function _signAccess(plan) {
-  const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex');
-  return plan + '.' + sig;
-}
-function _verifyAccess(signed) {
-  if (!signed || !signed.includes('.')) return null;
-  const dot = signed.lastIndexOf('.');
-  const plan = signed.slice(0, dot);
-  const sig = signed.slice(dot + 1);
-  const expected = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex');
-  try {
-    if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
-  } catch { return null; }
-  return plan;
-}
-function requireCourse(minPlan) {
-  return (req, res, next) => {
-    const cookies = _parseCookies(req);
-    const plan = _verifyAccess(cookies.af_access || '');
-    if (!plan) return res.redirect('/access.html');
-    if (minPlan === 'pro' && plan !== 'pro') return res.redirect('/access.html');
-    next();
-  };
-}
+
 
 // ── CLIENTS (wrapped in try-catch so a bad key never crashes the server) ──
 let supabase = null;
@@ -709,7 +686,6 @@ const _licenseLimiter = rateLimit({ windowMs: 60*1000, max: 10, standardHeaders:
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase();
 const ADMIN_CODE  = process.env.ADMIN_CODE  || '';
-const COURSE_BYPASS_CODE = process.env.COURSE_BYPASS_CODE || '';
 if (!ADMIN_EMAIL || !ADMIN_CODE) console.warn('[WARN] ADMIN_EMAIL or ADMIN_CODE env var not set — admin login disabled');
 
 // POST /api/auth/login
@@ -1441,49 +1417,7 @@ app.get('/api/logs', auth, (req, res) => {
   res.json(logs.slice(0, 100));
 });
 
-// ════════════════════════════════════════
-// COURSE ACCESS ROUTES
-// ════════════════════════════════════════
 
-// POST /api/verify-code — verify course access code
-app.post('/api/verify-code', _codeLimiter, async (req, res) => {
-  const { code } = req.body;
-  if (!code) return res.status(400).json({ error: 'Access code required' });
-
-  // Owner bypass — requires COURSE_BYPASS_CODE env var to be set
-  if (COURSE_BYPASS_CODE && code.toUpperCase() === COURSE_BYPASS_CODE.toUpperCase()) {
-    const maxAge = 60 * 60 * 24 * 30;
-    const secure = process.env.NODE_ENV === 'production' || process.env.RENDER ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `af_access=${_signAccess('pro')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
-    return res.json({ success: true, plan: 'pro', redirect: '/course-pro.html' });
-  }
-
-  try {
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('purchases')
-        .select('*')
-        .eq('code', code.toUpperCase())
-        .single();
-      if (data) {
-        const plan = data.plan || 'starter';
-        const maxAge = 60 * 60 * 24 * 30; // 30 days
-        const secure = process.env.NODE_ENV === 'production' || process.env.RENDER ? '; Secure' : '';
-        res.setHeader('Set-Cookie', `af_access=${_signAccess(plan)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
-        return res.json({ success: true, plan, redirect: plan === 'pro' ? '/course-pro.html' : '/course-starter.html' });
-      }
-    }
-    return res.status(401).json({ error: 'Invalid access code.' });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// GET /api/logout — clear course access cookie
-app.get('/api/logout', (req, res) => {
-  res.setHeader('Set-Cookie', 'af_access=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
-  res.redirect('/access.html');
-});
 
 // ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
 // Forex keys: FORX-XXXX-XXXX-XXXX — HMAC-SHA256 over a random body.
@@ -2117,66 +2051,6 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
   }
 });
 
-// ════════════════════════════════════════
-// VIDEO DOWNLOAD ROUTES (Veo 3 generated)
-// ════════════════════════════════════════
-
-const VEO_FILES = {
-  v1: 'okco5vw2ygdo',
-  v2: 'kb3wyz27b6rg',
-  v3: 'wish204mx53o',
-  v4: 'mo5kg30u0q2x',
-  v5: 'wehowxf92z6t',
-  v6: 'ki993zeg87pw',
-  v7: 'hcu69oshg8qf',
-};
-
-app.get('/download/:id', requireCourse('any'), async (req, res) => {
-  const fileId = VEO_FILES[req.params.id];
-  if (!fileId) return res.status(404).json({ error: 'Video not found' });
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/files/${fileId}:download?alt=media&key=${apiKey}`;
-    const response = await fetch(url);
-    if (!response.ok) return res.status(502).json({ error: 'Video expired or unavailable' });
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Disposition', `attachment; filename="aicash_ugc_${req.params.id}.mp4"`);
-    const { Readable } = require('stream');
-    const stream = Readable.fromWeb(response.body);
-    stream.on('error', () => { if (!res.headersSent) res.status(500).end(); });
-    stream.pipe(res);
-  } catch (e) {
-    if (!res.headersSent) res.status(500).json({ error: 'Download failed' });
-  }
-});
-
-app.get('/descarcare', requireCourse('any'), (req, res) => {
-  const videos = [
-    { id: 'v1', title: '"I Made $300 Selling AI Bots"', desc: 'Hook direct · 8s' },
-    { id: 'v2', title: '"One Skill Changes Everything"', desc: 'Empatie · 8s' },
-    { id: 'v3', title: '"I Failed First"', desc: 'Vulnerabil · 8s' },
-    { id: 'v4', title: '"Nobody Teaches You This"', desc: 'Educational · 8s' },
-    { id: 'v5', title: '"What Would You Do?"', desc: 'Aspirational · 8s' },
-    { id: 'v6', title: '"2025 Reality Check"', desc: 'Urgenta · 8s' },
-    { id: 'v7', title: '"To the Version of Me"', desc: 'Emotional · 8s' },
-  ];
-  const cards = videos.map(v => `
-    <div style="background:#111;border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:16px">
-      <div>
-        <div style="color:#C8A96E;font-weight:700;font-size:15px">${v.title}</div>
-        <div style="color:#666;font-size:12px;margin-top:4px">${v.desc} · Veo 3 · 9:16</div>
-      </div>
-      <a href="/download/${v.id}" style="background:linear-gradient(135deg,#8A6A2E,#E8CB8A);color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap">⬇ Download</a>
-    </div>`).join('');
-  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Download Videoclipuri TikTok</title></head>
-  <body style="background:#080808;color:#F5F0E8;font-family:sans-serif;padding:24px 16px;max-width:600px;margin:0 auto">
-    <h1 style="color:#C8A96E;text-align:center;font-size:20px;margin-bottom:4px">Videoclipuri TikTok</h1>
-    <p style="text-align:center;color:#666;font-size:12px;margin-bottom:24px">Generate cu Veo 3 · Descarca pe telefon</p>
-    <div style="display:flex;flex-direction:column;gap:12px">${cards}</div>
-    <p style="text-align:center;color:#444;font-size:11px;margin-top:24px">Disponibile 48 ore · aicashsystem.space</p>
-  </body></html>`);
-});
 
 // Diagnostic route — admin only
 app.get('/debug', auth, (req, res) => {
@@ -2420,7 +2294,13 @@ app.get(['/apex-bot', '/apex-bot.html', '/configurator', '/configurator.html',
 // they configured Binance keys and walked a client through deploying the
 // retired Railway image. Serving them would hand a buyer instructions for a
 // product that cannot be delivered. 'configurator-forex' is the live one.
-const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','configurator-forex','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','thank-you','free','guide'];
+// Only pages that belong to this platform. Everything the old AI-course and
+// Blueprint Studio products served — the fourteen course modules, the video
+// tools, the MetaTrader simulator (this product trades cTrader) and the crypto
+// beginner's guide (crypto is retired) — is gone. A visitor or an ad reviewer
+// reaching a "$3K/month automation course" from a forex ad is how ad accounts
+// get flagged, and none of it could be delivered anyway.
+const publicPages = ['privacy','terms','impressum','forex','configurator-forex','ad','results','profile','screens','trading-journal','thank-you'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
@@ -2679,126 +2559,8 @@ async function _sendBotEmailHandler(req, res) {
   return res.json({ success: result.ok, to: email, licenseKey: testKey, method: result.method, error: result.error });
 }
 
-// Protected pages — require any valid course purchase
-const protectedPages = ['videos','blueprints','ai-builder','course-starter',
-  'module1','module2','module3','module4','module5','module6','module7','module8','module9',
-  'module10','module11','module12','module13','module14','chat'];
-protectedPages.forEach(p => {
-  app.get(`/${p}.html`, requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
-  app.get(`/${p}`, requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
-});
-
-// Pro-only pages
-app.get('/course-pro.html', requireCourse('pro'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'course-pro.html')));
-app.get('/course-pro', requireCourse('pro'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'course-pro.html')));
-
-app.get('/tiktok', requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'videos.html')));
-
-// ════════════════════════════════════════
-// AI BUSINESS BUILDER ROUTES
-// ════════════════════════════════════════
-
-app.post('/api/builder/plan', auth, _aiLimiter, async (req, res) => {
-  const { passions, hours, budget, name } = req.body;
-  if (!passions) return res.status(400).json({ error: 'Answers required' });
-
-  const prompt = `You are an expert online business strategist. Based on this user profile, create a complete online business plan. Return ONLY valid JSON, no markdown.
-
-USER:
-- Name: ${name || 'Friend'}
-- Passions/Skills: ${passions}
-- Hours per week: ${hours || '5-10h'}
-- Starting budget: ${budget || '$0'}
-
-Return this exact JSON structure:
-{
-  "business": {
-    "model": "specific business model name",
-    "description": "2 sentences what they will do daily",
-    "why_perfect": "1 sentence why this fits their specific profile",
-    "income_potential": "realistic range after 90 days (e.g. $500–$2,000/month)"
-  },
-  "brand": {
-    "name": "brand name (1-2 words, catchy)",
-    "tagline": "tagline under 7 words",
-    "personality": "3 adjectives",
-    "target_audience": "who they sell to"
-  },
-  "seven_day_plan": [
-    {"day": 1, "focus": "Setup & Foundation", "tasks": ["specific task", "specific task", "specific task"]},
-    {"day": 2, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 3, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 4, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 5, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 6, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 7, "focus": "First Outreach", "tasks": ["...", "...", "..."]}
-  ],
-  "content_hooks": [
-    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"},
-    {"platform": "Instagram", "hook": "opening 3 seconds exactly", "script": "caption 100 words"},
-    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"},
-    {"platform": "Instagram Reels", "hook": "opening 3 seconds exactly", "script": "script outline"},
-    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"}
-  ],
-  "ad_copy": {
-    "headline": "ad headline under 10 words",
-    "body": "50-word ad body text",
-    "cta": "button text"
-  },
-  "daily_routine": [
-    {"time": "Morning", "duration": "30 min", "task": "specific task"},
-    {"time": "Midday", "duration": "1 hour", "task": "specific task"},
-    {"time": "Evening", "duration": "45 min", "task": "specific task"}
-  ],
-  "logo_prompt": "minimalist vector logo for [brand name], [describe style based on niche], clean lines, white background, professional"
-}`;
-
-  try {
-    let result;
-    if (OPENAI_KEY) {
-      const r = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 3500, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] })
-      });
-      const d = await r.json();
-      if (d.choices?.[0]) result = JSON.parse(d.choices[0].message.content);
-    } else if (anthropic) {
-      const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 3500, messages: [{ role: 'user', content: prompt }] });
-      const text = msg.content[0].text;
-      result = JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim());
-    }
-    if (!result) return res.status(500).json({ error: 'No AI provider configured' });
-    addLog(`Business plan generated for ${name || 'user'}`, 'builder', 'success');
-    res.json(result);
-  } catch (e) {
-    console.error('Builder plan error:', e);
-    res.status(500).json({ error: 'Generation failed: ' + e.message });
-  }
-});
-
-app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'Prompt required' });
-  if (!OPENAI_KEY) return res.status(400).json({ error: 'OpenAI key required for logo generation' });
-  try {
-    const r = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-      body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size: '1024x1024', quality: 'standard' })
-    });
-    const d = await r.json();
-    if (d.data?.[0]) { addLog('Logo generated', 'builder', 'success'); return res.json({ url: d.data[0].url }); }
-    res.status(500).json({ error: d.error?.message || 'Logo generation failed' });
-  } catch (e) {
-    res.status(500).json({ error: 'Logo generation failed. Please try again.' });
-  }
-});
 
 
-// ════════════════════════════════════════
-// ADMIN: SYNC BOT FILES → GitHub repo
-// Usage: POST /admin/sync-bot-repo with X-Owner-Secret and X-GitHub-Token headers.
 // ════════════════════════════════════════
 app.post('/admin/sync-bot-repo', async (req, res) => {
   // Was GET with ?secret=<owner secret>&token=ghp_.... Two credentials in one
