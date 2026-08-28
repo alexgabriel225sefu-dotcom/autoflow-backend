@@ -76,8 +76,8 @@ Two branches, kept identical in content:
 | 6 Trade Replay | done | pre-existing; broker-anchored historical bars |
 | 7 Intelligence | done | four blocks kept apart; no win probability |
 | 8 Risk Centre | done | renders the engine, never replaces it |
-| 9 Automation | **next** | `settings_policy` is the write gate |
-| 10 APEX Copilot | todo | reuse `assistant.py` + `quick_answers.py`, user-scoped |
+| 9 Automation | done | third settings tier `MINIAPP_SETTABLE`; environment is not writable |
+| 10 APEX Copilot | **next** | reuse `assistant.py` + `quick_answers.py`, user-scoped |
 | 11 Streaming | todo | **must fan out from ONE shared upstream** or it reintroduces the ~187-user ceiling |
 | 12 Error/empty/loading | partial | done for built screens |
 | 13 Security regression | partial | 5 new suites so far |
@@ -105,6 +105,8 @@ Redis via `user_store.get_blob`/`set_blob`.
 GET  /api/app/markets        shared snapshot, one fetch for all clients
 GET  /api/app/risk           risk engine state, presentation only
 GET  /api/app/intelligence   market / strategy / risk / decision, kept apart
+GET  /api/app/automation     status + the writable list, from the policy
+POST /api/app/automation     the ONLY write gate is validate_miniapp
 POST /api/app/close          the one financial action; same gate as /close
 GET  /go                     ad-click bridge (Meta attribution, separate work)
 ```
@@ -122,3 +124,5 @@ Pre-existing: `/api/app/data`, `/api/app/tick`, `/api/app/history`,
 - Mobile and Telegram Desktop rendering is **unverified** — built mobile-first
   with safe-area handling, but never seen on a device.
 - Settings, Alerts, Account and symbol-detail screens do not exist yet.
+- Automation writes land on the client's own user_store record, never on
+  os.environ — a per-client change must not become process-wide.

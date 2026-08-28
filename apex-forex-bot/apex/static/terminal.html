@@ -105,6 +105,12 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
   color:var(--t0);margin-top:var(--sp2);cursor:pointer;font-family:inherit}
 .btn.danger{background:var(--st-live);border-color:var(--st-live);color:#fff}
 .btn:disabled{opacity:.5}
+.pill{background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:5px 14px;font-size:12px;font-weight:800;
+  cursor:pointer;font-family:inherit}
+.num{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:5px 8px;font-size:13px;width:88px;text-align:right;
+  font-family:inherit;font-variant-numeric:tabular-nums}
 .pclose{display:block;width:100%;margin-top:var(--sp2);padding:11px;border-radius:var(--r-sm);
   border:1px solid rgba(255,69,96,.35);background:rgba(255,69,96,.08);color:#ff97a8;
   font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
@@ -315,6 +321,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
 </section>
 
+<section class="screen" id="s-automation">
+  <div class="sec-h">Automation</div>
+  <!-- Reflects server-side state. The controls offered are the ones the
+       policy says a client may change; the environment (LIVE/DEMO) is not
+       among them and never can be. -->
+  <div id="autoBody"><div class="empty">Loading automation…</div></div>
+</section>
+
 <section class="screen" id="s-intelligence">
   <div class="sec-h">APEX Intelligence</div>
   <!-- Four blocks, never merged: what the market shows, what the strategy
@@ -353,6 +367,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div data-s="portfolio"><em>&#128188;</em>Portfolio</div>
   <div data-s="history"><em>&#128202;</em>History</div>
   <div data-s="intelligence"><em>&#129504;</em>Insight</div>
+  <div data-s="automation"><em>&#9881;</em>Auto</div>
   <div data-s="risk"><em>&#128737;</em>Risk</div>
 </nav>
 <div id="err"></div>
@@ -434,7 +449,7 @@ function refreshEntryLine(pos){
    data layer goes on writing to the same nodes it always did. */
 const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
                history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
-               risk:'RISK CENTRE'};
+               automation:'AUTOMATION',risk:'RISK CENTRE'};
 let screenNow='home';
 function showScreen(name,push){
   if(!SCREENS[name])name='home';
@@ -447,6 +462,7 @@ function showScreen(name,push){
   if(name==='history') loadHistory();
   if(name==='risk') loadRisk(true);
   if(name==='intelligence') loadIntel(true);
+  if(name==='automation') loadAuto(true);
   if(push!==false && location.hash!=='#'+name) location.hash=name;
   window.scrollTo(0,0);
   /* Both charts are laid out while hidden, so they measure 0 wide until the
@@ -594,6 +610,107 @@ function kvRows(pairs){
   return pairs.map(([k,v])=>'<div class="kvr"><span>'+esc(k)+'</span><b'
     +(v==null||v===''?' class="na">Not available':'>'+esc(String(v)))+'</b></div>').join('');
 }
+/* ── Automation ───────────────────────────────────────────────────────
+   Every control here is offered because the SERVER said it is writable.
+   The screen never decides that for itself, so it cannot present a switch
+   the policy would refuse — and the execution environment is not in the
+   list, by design: a client must never be able to move their own account
+   from demo to live from a phone. */
+let autoAt=0, autoWritable=[];
+function autoField(key, label, value, kind){
+  if(autoWritable.indexOf(key) < 0)
+    return '<div class="kvr"><span>'+esc(label)+'</span><b class="na">'
+      +(value==null?'Not available':esc(String(value))+' \u00b7 read-only')+'</b></div>';
+  if(kind==='bool')
+    return '<div class="kvr"><span>'+esc(label)+'</span><b>'
+      +'<button class="pill" data-set="'+key+'" data-val="'+(value?'false':'true')+'">'
+      +(value?'ON':'OFF')+'</button></b></div>';
+  return '<div class="kvr"><span>'+esc(label)+'</span><b>'
+    +'<input class="num" data-set="'+key+'" value="'+esc(value==null?'':String(value))
+    +'" inputmode="decimal"></b></div>';
+}
+async function loadAuto(force){
+  if(!force && Date.now()-autoAt < 8000) return;
+  const H=Q('autoBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/automation');
+    autoAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Automation state unavailable — '
+        +esc(d.detail||d.reason||'')+'</div>';
+      return;
+    }
+    autoWritable = d.writable || [];
+    const st=d.settings||{}, env=d.environment||{};
+    const on = d.running && d.active;
+    let h='<div id="rEngine" class="'+(on?'ok':'unk')+'"><b>'
+      +(on?'Automation active':'Automation not running')+'</b>'
+      +'<div class="note">Mode: '+esc(d.mode||'—')+' \u00b7 Strategy: '
+      +esc(d.strategy||'not set')+'</div></div>';
+    /* The environment is shown here and is NOT a control. */
+    h+='<div class="note" style="margin:var(--sp2) var(--sp4)">Environment: <b>'
+      +esc(env.env||'UNKNOWN')+'</b>'+(env.proven?'':' (unconfirmed)')
+      +' \u2014 set by your broker, not from this screen.</div>';
+    h+='<div class="sec-h">Markets</div><div style="margin:0 var(--sp4)">'
+      +((d.markets&&d.markets.length)
+        ? d.markets.map(m=>'<span class="chip">'+esc(m)+'</span>').join(' ')
+        : '<span class="empty">No instruments selected.</span>')+'</div>';
+    h+='<div class="sec-h">Limits</div><div style="margin:0 var(--sp4)">'
+      +autoField('RISK_PER_TRADE','Risk per trade', st.RISK_PER_TRADE)
+      +autoField('MIN_CONFIDENCE','Minimum confidence', st.MIN_CONFIDENCE)
+      +autoField('MAX_SPREAD_PCT','Max spread %', st.MAX_SPREAD_PCT)
+      +autoField('BREAKEVEN_AT_R','Breakeven at R', st.BREAKEVEN_AT_R)
+      +autoField('TRAILING_STOP','Trailing stop', st.TRAILING_STOP, 'bool')
+      +autoField('HTF_FILTER','Higher-timeframe filter', st.HTF_FILTER, 'bool')
+      +'</div>';
+    h+='<button class="btn" id="autoSave">Save changes</button>';
+    h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Saved settings are '
+      +'checked by the risk engine on every order. Changing them here cannot '
+      +'permit a trade the engine would refuse.</div>';
+    h+='<div id="autoMsg"></div>';
+    H.innerHTML=h;
+    Q('autoSave').onclick=saveAuto;
+  }catch(e){
+    H.innerHTML='<div class="empty">Automation state unavailable ('
+      +esc(e.message||'error')+').</div>';
+  }
+}
+async function saveAuto(){
+  const btn=Q('autoSave'); btn.disabled=true; btn.textContent='Saving\u2026';
+  const body={};
+  document.querySelectorAll('#autoBody [data-set]').forEach(el=>{
+    const k=el.dataset.set;
+    if(el.tagName==='INPUT'){ if(el.value!=='') body[k]=el.value; }
+    else if(el.dataset.pending==='1') body[k]=el.dataset.val;
+  });
+  const msg=Q('autoMsg');
+  try{
+    const r=await fetch('/api/app/automation',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    const d=await r.json().catch(()=>({}));
+    if(d.ok){
+      msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4);color:var(--up)">Saved: '
+        +esc((d.applied||[]).join(', '))+'</div>';
+      loadAuto(true);
+    }else{
+      /* A refusal names the keys, never the values. */
+      msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4);color:var(--st-unver)">'
+        +'Not saved. '+esc((d.refused||[]).join(' \u00b7 ')||d.error||'refused')+'</div>';
+    }
+  }catch(e){
+    msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4)">Could not reach the platform.</div>';
+  }
+  btn.disabled=false; btn.textContent='Save changes';
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest&&ev.target.closest('[data-set].pill');
+  if(!b)return;
+  b.dataset.pending='1';
+  b.textContent = b.dataset.val==='true' ? 'ON' : 'OFF';
+  b.dataset.val = b.dataset.val==='true' ? 'false' : 'true';
+});
+
 let intelAt=0;
 async function loadIntel(force){
   if(!force && Date.now()-intelAt < 8000) return;

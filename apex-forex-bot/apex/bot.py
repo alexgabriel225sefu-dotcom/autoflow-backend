@@ -548,6 +548,79 @@ def _start_dashboard_server():
             # has on screen, the position closed is the one the server holds
             # for that chat: a position id from a frontend is a request to
             # close something, not proof of the right to.
+            # ── Change an automation setting ────────────────────────
+            # settings_policy.validate_miniapp is the ONLY gate. It is a
+            # named allowlist, not a denylist, so a key added to the trading
+            # table later is refused here until someone decides otherwise —
+            # and the keys that decide where money goes (PAPER_TRADING,
+            # CTRADER_ENV, BROKER, LEVERAGE, PAPER_BALANCE) are not in it.
+            #
+            # Nothing here can permit a trade. gates.authorize_order still
+            # runs on every order whatever this writes.
+            if self.path == "/api/app/automation" and self.command == "POST":
+                from apex import user_store as _s_us, settings_policy as _s_sp
+                _s_user = self._telegram_identity()
+                if not _s_user:
+                    self._telegram_denied()
+                    return
+                _s_chat = str(_s_user["id"])
+                if not http_security.MINIAPP.check(http_security.client_key(self)):
+                    self._reply(429, {"ok": False, "error": "RATE_LIMITED"})
+                    return
+                try:
+                    _s_len = int(self.headers.get("Content-Length") or 0)
+                    if _s_len <= 0 or _s_len > 8192:
+                        self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                        return
+                    _s_body = json.loads(self.rfile.read(_s_len) or b"{}")
+                except Exception:
+                    self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                    return
+                if not isinstance(_s_body, dict) or len(_s_body) > 20:
+                    self._reply(400, {"ok": False, "error": "BAD_REQUEST"})
+                    return
+
+                _s_applied, _s_refused = {}, []
+                for _s_k, _s_v in _s_body.items():
+                    try:
+                        _s_key, _s_val = _s_sp.validate_miniapp(_s_k, _s_v)
+                    except Exception as _s_e:
+                        # Named, never valued: a refused key can still carry
+                        # something that should not reach a log.
+                        _s_refused.append(str(_s_e)[:120])
+                        continue
+                    _s_applied[_s_key] = _s_val
+                if not _s_applied:
+                    self._reply(200, {"ok": False, "error": "NOTHING_APPLIED",
+                                      "refused": _s_refused})
+                    return
+                # Persisted on the CLIENT's own record, under the field names
+                # the loop already reads. os.environ is never touched from
+                # here: a per-client change must not become process-wide.
+                _s_map = {"RISK_PER_TRADE": "risk", "MIN_CONFIDENCE": "min_confidence",
+                          "TRAILING_STOP": "trailing", "BREAKEVEN_AT_R": "breakeven_r",
+                          "HTF_FILTER": "htf", "MAX_SPREAD_PCT": "max_spread_pct",
+                          "AUTOPILOT_UNIVERSE": "autopilot_universe"}
+                _s_updates = {_s_map[k]: v for k, v in _s_applied.items() if k in _s_map}
+                try:
+                    _s_ok = _s_us.update(_s_chat, _s_updates, strict=True)
+                except Exception as _s_e:
+                    print(f"[MiniApp] automation write failed for {_s_chat}: {_s_e}")
+                    self._reply(500, {"ok": False, "error": "WRITE_FAILED"})
+                    return
+                if not _s_ok:
+                    self._reply(500, {"ok": False, "error": "WRITE_NOT_CONFIRMED"})
+                    return
+                try:
+                    from apex import trade_events as _s_te
+                    _s_te.record(_s_chat, _s_te.RISK_CHECKED,
+                                 payload={"automationChanged": sorted(_s_applied),
+                                          "origin": "miniapp"})
+                except Exception:
+                    pass
+                self._reply(200, {"ok": True, "applied": sorted(_s_applied),
+                                  "refused": _s_refused})
+                return
             if self.path == "/api/app/close":
                 from apex import user_loop as _c_ul
                 _c_user = self._telegram_identity()
@@ -986,6 +1059,58 @@ def _start_dashboard_server():
             # read from state the engine published, and a field the engine did
             # not publish comes back null so the screen can say "not available"
             # rather than draw a zero.
+            # ── Automation status ───────────────────────────────────
+            # Reflects server-side state. The client is told what IS, and which
+            # of it they may change — the writable list comes from the policy
+            # rather than being repeated here, so the screen cannot offer a
+            # control the server would refuse.
+            if self.path.startswith("/api/app/automation") and self.command == "GET":
+                from apex import user_loop as _u_ul, user_store as _u_us
+                from apex import settings_policy as _u_sp, config as _u_cfg
+                from apex import ui_state as _u_ui
+                _u_user = self._telegram_identity()
+                if not _u_user:
+                    self._telegram_denied()
+                    return
+                _u_chat = str(_u_user["id"])
+                try:
+                    _u_rec = _u_us.load(_u_chat) or {}
+                    _u_dash = _u_ul.get_dash(_u_chat) or {}
+                    _u_running = bool(_u_ul.is_running(_u_chat))
+                except Exception as _u_e:
+                    self._json(200, {"available": False,
+                                     "reason": "AUTOMATION_STATE_UNAVAILABLE",
+                                     "detail": str(_u_e)[:120]})
+                    return
+                _u_env, _u_proven, _u_why = _u_ui.environment(_u_rec)
+                # Assisted = the platform asks before each entry (copilot).
+                # Automatic = it selects and enters on its own (autopilot).
+                # Manual = neither; entries come from the client.
+                _u_mode = ("automatic" if _u_rec.get("autopilot")
+                           else "assisted" if _u_rec.get("copilot")
+                           else "manual")
+                self._json(200, {
+                    "available": True,
+                    "running": _u_running,
+                    "active": bool(_u_rec.get("active")),
+                    "mode": _u_mode,
+                    "strategy": _u_dash.get("strategy") or _u_rec.get("strategy"),
+                    "markets": _u_rec.get("autopilot_universe")
+                               or list(getattr(_u_cfg, "AUTOPILOT_UNIVERSE", []) or []),
+                    "environment": {"env": _u_env, "proven": bool(_u_proven),
+                                    "detail": _u_why},
+                    "settings": {
+                        "RISK_PER_TRADE": _u_rec.get("risk"),
+                        "MIN_CONFIDENCE": _u_rec.get("min_confidence"),
+                        "TRAILING_STOP": _u_rec.get("trailing"),
+                        "BREAKEVEN_AT_R": _u_rec.get("breakeven_r"),
+                        "HTF_FILTER": _u_rec.get("htf"),
+                        "MAX_SPREAD_PCT": _u_rec.get("max_spread_pct"),
+                    },
+                    # The single source of truth for what the screen may offer.
+                    "writable": sorted(_u_sp.MINIAPP_SETTABLE),
+                })
+                return
             if self.path.startswith("/api/app/intelligence"):
                 from apex import user_loop as _n_ul, user_store as _n_us
                 from apex import ui_state as _n_ui, trade_events as _n_te
