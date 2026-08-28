@@ -105,6 +105,32 @@ body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Disp
   color:var(--t0);margin-top:var(--sp2);cursor:pointer;font-family:inherit}
 .btn.danger{background:var(--st-live);border-color:var(--st-live);color:#fff}
 .btn:disabled{opacity:.5}
+#askChips{display:flex;flex-wrap:wrap;gap:var(--sp2);padding:0 var(--sp4)}
+#askChips div{border:1px solid var(--line);background:var(--card);border-radius:var(--r-md);
+  padding:9px 13px;font-size:12.5px;color:var(--t1);cursor:pointer}
+#askOut{padding:var(--sp3) var(--sp4)}
+.ans{border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp3) var(--sp4);
+  margin-bottom:var(--sp3);background:var(--card);font-size:13.5px;line-height:1.55;
+  white-space:pre-wrap}
+.ans .kind{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.1em;
+  padding:2px 7px;border-radius:5px;margin-bottom:7px}
+.ans .kind.FACT{background:rgba(47,213,117,.14);color:#8fe7b6}
+.ans .kind.OBSERVATION{background:rgba(245,181,68,.14);color:#f7d08a}
+.ans .kind.ANALYSIS{background:rgba(255,45,79,.14);color:#ff97a8}
+.ans .kind.UNKNOWN{background:rgba(255,255,255,.07);color:var(--t2)}
+.ans .kind.REFUSED{background:rgba(255,69,96,.16);color:#ff97a8}
+.ans .q{color:var(--t2);font-size:12px;margin-bottom:6px}
+#askBar{display:flex;gap:var(--sp2);padding:var(--sp2) var(--sp4) var(--sp5)}
+#askQ{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-family:inherit}
+#askGo{background:var(--acc);border:none;color:#fff;border-radius:var(--r-md);
+  padding:0 18px;font-size:16px;cursor:pointer}
+.pill{background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:5px 14px;font-size:12px;font-weight:800;
+  cursor:pointer;font-family:inherit}
+.num{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:5px 8px;font-size:13px;width:88px;text-align:right;
+  font-family:inherit;font-variant-numeric:tabular-nums}
 .pclose{display:block;width:100%;margin-top:var(--sp2);padding:11px;border-radius:var(--r-sm);
   border:1px solid rgba(255,69,96,.35);background:rgba(255,69,96,.08);color:#ff97a8;
   font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
@@ -188,6 +214,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #jSwitch div{flex:1;text-align:center;font-size:11px;font-weight:700;padding:7px;border-radius:9px;
   border:1px solid var(--line);color:var(--t1);background:var(--card)}
 #jSwitch div.on{color:#fff;background:rgba(255,45,79,.13);border-color:rgba(255,45,79,.4)}
+#cMeta[data-conn="delayed"] #liveDot{background:var(--st-unver);animation:none}
+#cMeta[data-conn="delayed"]::after{content:' · DELAYED';color:var(--st-unver);
+  font-weight:800;letter-spacing:.06em}
+#cMeta[data-conn="live"]::after{content:' · LIVE';color:var(--up);
+  font-weight:800;letter-spacing:.06em}
 #liveDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--up);margin-right:6px;
   animation:pulse 1.6s ease-in-out infinite}
 #liveDot.stale{background:var(--gold);animation:none}
@@ -315,6 +346,24 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
 </section>
 
+<section class="screen" id="s-ask">
+  <div class="sec-h">Ask APEX</div>
+  <div id="askChips"></div>
+  <div id="askOut"></div>
+  <div id="askBar">
+    <input id="askQ" placeholder="Ask about your account…" maxlength="500">
+    <button id="askGo">&#10148;</button>
+  </div>
+</section>
+
+<section class="screen" id="s-automation">
+  <div class="sec-h">Automation</div>
+  <!-- Reflects server-side state. The controls offered are the ones the
+       policy says a client may change; the environment (LIVE/DEMO) is not
+       among them and never can be. -->
+  <div id="autoBody"><div class="empty">Loading automation…</div></div>
+</section>
+
 <section class="screen" id="s-intelligence">
   <div class="sec-h">APEX Intelligence</div>
   <!-- Four blocks, never merged: what the market shows, what the strategy
@@ -353,6 +402,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   <div data-s="portfolio"><em>&#128188;</em>Portfolio</div>
   <div data-s="history"><em>&#128202;</em>History</div>
   <div data-s="intelligence"><em>&#129504;</em>Insight</div>
+  <div data-s="automation"><em>&#9881;</em>Auto</div>
+  <div data-s="ask"><em>&#128172;</em>Ask</div>
   <div data-s="risk"><em>&#128737;</em>Risk</div>
 </nav>
 <div id="err"></div>
@@ -434,7 +485,7 @@ function refreshEntryLine(pos){
    data layer goes on writing to the same nodes it always did. */
 const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
                history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
-               risk:'RISK CENTRE'};
+               automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE'};
 let screenNow='home';
 function showScreen(name,push){
   if(!SCREENS[name])name='home';
@@ -447,6 +498,8 @@ function showScreen(name,push){
   if(name==='history') loadHistory();
   if(name==='risk') loadRisk(true);
   if(name==='intelligence') loadIntel(true);
+  if(name==='automation') loadAuto(true);
+  if(name==='ask') initAsk();
   if(push!==false && location.hash!=='#'+name) location.hash=name;
   window.scrollTo(0,0);
   /* Both charts are laid out while hidden, so they measure 0 wide until the
@@ -594,6 +647,148 @@ function kvRows(pairs){
   return pairs.map(([k,v])=>'<div class="kvr"><span>'+esc(k)+'</span><b'
     +(v==null||v===''?' class="na">Not available':'>'+esc(String(v)))+'</b></div>').join('');
 }
+/* ── Automation ───────────────────────────────────────────────────────
+   Every control here is offered because the SERVER said it is writable.
+   The screen never decides that for itself, so it cannot present a switch
+   the policy would refuse — and the execution environment is not in the
+   list, by design: a client must never be able to move their own account
+   from demo to live from a phone. */
+/* ── Ask APEX ─────────────────────────────────────────────────────────
+   Every reply carries what KIND of claim it is. A reader who cannot tell an
+   observation from a measurement will take the weakest as the strongest, so
+   the label is part of the answer rather than decoration on it. */
+const ASK_CHIPS=['What is my current risk?','What positions are open?',
+  'Show me my best trade',"Why didn't APEX enter GBPUSD?",
+  'What is the market doing?'];
+let askReady=false;
+function initAsk(){
+  if(askReady) return; askReady=true;
+  Q('askChips').innerHTML=ASK_CHIPS.map(c=>'<div>'+esc(c)+'</div>').join('');
+  Q('askChips').querySelectorAll('div').forEach(d=>d.onclick=()=>askSend(d.textContent));
+  Q('askGo').onclick=()=>askSend(Q('askQ').value);
+  Q('askQ').onkeydown=e=>{ if(e.key==='Enter') askSend(Q('askQ').value); };
+}
+async function askSend(q){
+  q=String(q||'').trim(); if(!q) return;
+  Q('askQ').value='';
+  const out=Q('askOut');
+  /* The question is escaped before it is echoed. It came from a keyboard and
+     goes into the DOM; nothing about it is trusted. */
+  const card=document.createElement('div');
+  card.className='ans';
+  card.innerHTML='<div class="q">'+esc(q)+'</div><span class="kind UNKNOWN">…</span>';
+  out.insertBefore(card, out.firstChild);
+  try{
+    const r=await fetch('/api/app/ask',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify({q:q})});
+    const d=await r.json().catch(()=>({}));
+    const kind=String(d.kind||'UNKNOWN');
+    card.innerHTML='<div class="q">'+esc(q)+'</div>'
+      +'<span class="kind '+esc(kind)+'">'+esc(kind)+'</span>\n'+esc(d.text||'')
+      +(d.screen?'<div style="margin-top:9px"><button class="pill" data-goto="'
+        +esc(d.screen)+'">Open '+esc(d.screen)+'</button></div>':'');
+  }catch(e){
+    card.innerHTML='<div class="q">'+esc(q)+'</div>'
+      +'<span class="kind UNKNOWN">UNKNOWN</span>\nI could not reach the platform.';
+  }
+}
+
+let autoAt=0, autoWritable=[];
+function autoField(key, label, value, kind){
+  if(autoWritable.indexOf(key) < 0)
+    return '<div class="kvr"><span>'+esc(label)+'</span><b class="na">'
+      +(value==null?'Not available':esc(String(value))+' \u00b7 read-only')+'</b></div>';
+  if(kind==='bool')
+    return '<div class="kvr"><span>'+esc(label)+'</span><b>'
+      +'<button class="pill" data-set="'+key+'" data-val="'+(value?'false':'true')+'">'
+      +(value?'ON':'OFF')+'</button></b></div>';
+  return '<div class="kvr"><span>'+esc(label)+'</span><b>'
+    +'<input class="num" data-set="'+key+'" value="'+esc(value==null?'':String(value))
+    +'" inputmode="decimal"></b></div>';
+}
+async function loadAuto(force){
+  if(!force && Date.now()-autoAt < 8000) return;
+  const H=Q('autoBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/automation');
+    autoAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Automation state unavailable — '
+        +esc(d.detail||d.reason||'')+'</div>';
+      return;
+    }
+    autoWritable = d.writable || [];
+    const st=d.settings||{}, env=d.environment||{};
+    const on = d.running && d.active;
+    let h='<div id="rEngine" class="'+(on?'ok':'unk')+'"><b>'
+      +(on?'Automation active':'Automation not running')+'</b>'
+      +'<div class="note">Mode: '+esc(d.mode||'—')+' \u00b7 Strategy: '
+      +esc(d.strategy||'not set')+'</div></div>';
+    /* The environment is shown here and is NOT a control. */
+    h+='<div class="note" style="margin:var(--sp2) var(--sp4)">Environment: <b>'
+      +esc(env.env||'UNKNOWN')+'</b>'+(env.proven?'':' (unconfirmed)')
+      +' \u2014 set by your broker, not from this screen.</div>';
+    h+='<div class="sec-h">Markets</div><div style="margin:0 var(--sp4)">'
+      +((d.markets&&d.markets.length)
+        ? d.markets.map(m=>'<span class="chip">'+esc(m)+'</span>').join(' ')
+        : '<span class="empty">No instruments selected.</span>')+'</div>';
+    h+='<div class="sec-h">Limits</div><div style="margin:0 var(--sp4)">'
+      +autoField('RISK_PER_TRADE','Risk per trade', st.RISK_PER_TRADE)
+      +autoField('MIN_CONFIDENCE','Minimum confidence', st.MIN_CONFIDENCE)
+      +autoField('MAX_SPREAD_PCT','Max spread %', st.MAX_SPREAD_PCT)
+      +autoField('BREAKEVEN_AT_R','Breakeven at R', st.BREAKEVEN_AT_R)
+      +autoField('TRAILING_STOP','Trailing stop', st.TRAILING_STOP, 'bool')
+      +autoField('HTF_FILTER','Higher-timeframe filter', st.HTF_FILTER, 'bool')
+      +'</div>';
+    h+='<button class="btn" id="autoSave">Save changes</button>';
+    h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Saved settings are '
+      +'checked by the risk engine on every order. Changing them here cannot '
+      +'permit a trade the engine would refuse.</div>';
+    h+='<div id="autoMsg"></div>';
+    H.innerHTML=h;
+    Q('autoSave').onclick=saveAuto;
+  }catch(e){
+    H.innerHTML='<div class="empty">Automation state unavailable ('
+      +esc(e.message||'error')+').</div>';
+  }
+}
+async function saveAuto(){
+  const btn=Q('autoSave'); btn.disabled=true; btn.textContent='Saving\u2026';
+  const body={};
+  document.querySelectorAll('#autoBody [data-set]').forEach(el=>{
+    const k=el.dataset.set;
+    if(el.tagName==='INPUT'){ if(el.value!=='') body[k]=el.value; }
+    else if(el.dataset.pending==='1') body[k]=el.dataset.val;
+  });
+  const msg=Q('autoMsg');
+  try{
+    const r=await fetch('/api/app/automation',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    const d=await r.json().catch(()=>({}));
+    if(d.ok){
+      msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4);color:var(--up)">Saved: '
+        +esc((d.applied||[]).join(', '))+'</div>';
+      loadAuto(true);
+    }else{
+      /* A refusal names the keys, never the values. */
+      msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4);color:var(--st-unver)">'
+        +'Not saved. '+esc((d.refused||[]).join(' \u00b7 ')||d.error||'refused')+'</div>';
+    }
+  }catch(e){
+    msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4)">Could not reach the platform.</div>';
+  }
+  btn.disabled=false; btn.textContent='Save changes';
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest&&ev.target.closest('[data-set].pill');
+  if(!b)return;
+  b.dataset.pending='1';
+  b.textContent = b.dataset.val==='true' ? 'ON' : 'OFF';
+  b.dataset.val = b.dataset.val==='true' ? 'false' : 'true';
+});
+
 let intelAt=0;
 async function loadIntel(force){
   if(!force && Date.now()-intelAt < 8000) return;
@@ -1199,6 +1394,95 @@ try{
   Q('greet').textContent = who && who.first_name
     ? part + ', ' + String(who.first_name).slice(0, 24) : part;
 }catch(e){}
+
+/* ── Live stream ──────────────────────────────────────────────────────
+   The stream is an accelerator, never a replacement. Polling keeps running
+   underneath it: if the feed drops, stalls behind a proxy, or the browser
+   has no EventSource, the screen goes on updating on its own — a live view
+   that silently freezes is worse than a slow one.
+
+   A frozen stream that keeps drawing its last frame is a lie about the
+   market, so the connection line reports what the client actually has. */
+let streamAt=0, streamOn=false, es=null;
+function setConn(state, detail){
+  const el=Q('cMeta'); if(!el) return;
+  el.dataset.conn = state;
+  if(state==='delayed' && detail) el.title = detail;
+}
+function applyStream(ev){
+  streamAt=Date.now();
+  if(ev.type==='connection.status'){
+    /* The server dropped events for this client rather than stalling
+       everyone. Say so; the poll below will fill the gap. */
+    if(ev.status==='lagging') setConn('delayed', ev.detail||'');
+    return;
+  }
+  if(ev.type==='account.updated'){
+    if(ev.equity!=null){
+      const bv=Q('balV'), prev=window.__eq; window.__eq=ev.equity;
+      bv.textContent='$'+Number(ev.equity).toLocaleString(undefined,
+        {minimumFractionDigits:2,maximumFractionDigits:2});
+      if(prev!=null&&ev.equity!==prev){
+        bv.classList.remove('up','dn'); void bv.offsetWidth;
+        bv.classList.add(ev.equity>prev?'up':'dn');
+        setTimeout(()=>bv.classList.remove('up','dn'),600);
+      }
+    }
+    if(ev.positions) renderPositions(ev.positions, ev.openCount);
+    setConn(ev.brokerHealth==='ok'?'live':'delayed');
+  }
+  if(ev.type==='market.tick' && ev.rows){
+    const by={}; ev.rows.forEach(r=>by[r.symbol]=r);
+    document.querySelectorAll('#mkForex .mrow,#mkMetals .mrow,#homeMkt .mrow')
+      .forEach(row=>{
+        const r=by[row.dataset.sym]; if(!r||!r.available) return;
+        const px=row.querySelector('.mpx'), ch=row.querySelector('.mchg');
+        if(px) px.textContent=Number(r.price).toLocaleString(undefined,{maximumFractionDigits:5});
+        if(ch){ ch.textContent=(r.changePct>=0?'+':'')+r.changePct.toFixed(2)+'%';
+                ch.className='mchg '+(r.changePct>=0?'up':'dn'); }
+      });
+    if(ev.stale) setConn('delayed','Market snapshot is the last one the broker answered.');
+  }
+  if(ev.type==='risk.updated'){ riskAt=0; if(screenNow==='risk') loadRisk(true); }
+}
+function openStream(){
+  if(!window.EventSource) return;          // fall back to polling entirely
+  try{
+    /* initData cannot ride in a header on EventSource, and it must not ride
+       in a query string — it is a credential and a URL reaches proxy logs.
+       So the stream is opened with fetch, which CAN carry the header, and
+       read as a body stream. */
+    fetch('/api/app/stream',{headers:{'Authorization':'Telegram '+initData}})
+      .then(r=>{
+        if(!r.ok||!r.body) throw new Error('HTTP '+r.status);
+        streamOn=true; setConn('live');
+        const rd=r.body.getReader(), dec=new TextDecoder();
+        let buf='';
+        const pump=()=>rd.read().then(({done,value})=>{
+          if(done){ streamOn=false; setConn('delayed','Live feed closed.');
+                    setTimeout(openStream, 5000); return; }
+          buf+=dec.decode(value,{stream:true});
+          let i;
+          while((i=buf.indexOf('\n\n'))>=0){
+            const frame=buf.slice(0,i); buf=buf.slice(i+2);
+            if(!frame.startsWith('data: ')) continue;   // comment/keepalive
+            try{ applyStream(JSON.parse(frame.slice(6))); }catch(e){}
+          }
+          return pump();
+        }).catch(()=>{ streamOn=false; setConn('delayed','Live feed lost.');
+                       setTimeout(openStream, 5000); });
+        pump();
+      })
+      .catch(()=>{ streamOn=false; setTimeout(openStream, 10000); });
+  }catch(e){ streamOn=false; }
+}
+/* Stale detection is independent of the connection state: a socket that is
+   open but silent looks identical to a working one from the outside. */
+setInterval(()=>{
+  if(streamOn && streamAt && Date.now()-streamAt > 30000)
+    setConn('delayed','No live update for 30s — showing the last known values.');
+}, 5000);
+openStream();
 
 tick().finally(()=>{ setInterval(tick, 1500); });
 refresh().finally(()=>{ setInterval(refresh, 6000); });

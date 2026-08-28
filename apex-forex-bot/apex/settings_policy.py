@@ -53,6 +53,7 @@ import re
 
 __all__ = [
     "OPERATOR_SETTABLE", "OPERATOR_SECRETS", "REMOTE_SETTABLE",
+    "MINIAPP_SETTABLE", "MINIAPP_FORBIDDEN", "validate_miniapp",
     "SECRET_KEYS", "is_secret_key", "validate_operator", "validate_remote",
     "SettingRejected", "cfg_attr",
 ]
@@ -225,6 +226,48 @@ _REMOTE_PROVISIONING = {
 OPERATOR_SECRETS = dict(_SECRETS)
 OPERATOR_SETTABLE = {**_TRADING, **_SECRETS}
 
+# ── What a CLIENT may change from the Mini App ──────────────────────────
+# A third tier, and the smallest, because the Mini App is the least trusted
+# caller of the three: it runs on the client's own phone and its request is
+# whatever that phone chose to send.
+#
+# It is built by NAMING what is allowed rather than by subtracting what is
+# not. A denylist here would silently admit every key added to _TRADING
+# later, and the keys that must never be in it are the ones that decide
+# where money goes:
+#
+#   PAPER_TRADING, CTRADER_ENV, BROKER   the execution environment. §5 of the
+#                                        brief is explicit — a client must
+#                                        never be able to submit paper=false
+#                                        and force live execution. The server
+#                                        derives the environment from the
+#                                        authenticated account, and nothing a
+#                                        phone sends may move it.
+#   PAPER_BALANCE, LEVERAGE              the size of a position, decided away
+#                                        from the account it applies to.
+#   every secret                         obviously.
+#
+# What IS here is a client tuning their own automation within limits the risk
+# engine still enforces afterwards. Nothing in this table can permit a trade:
+# gates.authorize_order runs on every order regardless of what is set here.
+MINIAPP_SETTABLE = {
+    k: _TRADING[k] for k in (
+        "RISK_PER_TRADE",
+        "MIN_CONFIDENCE",
+        "AUTOPILOT_UNIVERSE",
+        "TRAILING_STOP",
+        "BREAKEVEN_AT_R",
+        "HTF_FILTER",
+        "MAX_SPREAD_PCT",
+    ) if k in _TRADING
+}
+
+# Named so the intent survives a future edit: if one of these ever appears in
+# MINIAPP_SETTABLE, the client can move their own execution environment.
+MINIAPP_FORBIDDEN = frozenset({
+    "BROKER", "PAPER_TRADING", "PAPER_BALANCE", "CTRADER_ENV", "LEVERAGE",
+})
+
 # REMOTE is split in two, because "change my stop loss" and "replace my
 # Telegram bot token" are not the same request and must not travel the same
 # path.
@@ -285,6 +328,15 @@ def _validate(table, key, raw, source):
 def validate_operator(key, raw):
     """(canonical_key, coerced_value) for an admin-initiated change, or raise."""
     return _validate(OPERATOR_SETTABLE, key, raw, "operator")
+
+
+def validate_miniapp(key, raw):
+    """(canonical_key, coerced_value) for a change a CLIENT asked for.
+
+    The smallest tier. A key outside it is refused by name — the client needs
+    to know what was ignored — and the value is never echoed back.
+    """
+    return _validate(MINIAPP_SETTABLE, key, raw, "client")
 
 
 def validate_remote(key, raw):
