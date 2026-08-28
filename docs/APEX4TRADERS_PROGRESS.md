@@ -78,8 +78,8 @@ Two branches, kept identical in content:
 | 8 Risk Centre | done | renders the engine, never replaces it |
 | 9 Automation | done | third settings tier `MINIAPP_SETTABLE`; environment is not writable |
 | 10 APEX Copilot | done | facts only; `assistant.chat` deliberately NOT wired in |
-| 11 Streaming | **next** | **must fan out from ONE shared upstream** or it reintroduces the ~187-user ceiling |
-| 12 Error/empty/loading | partial | done for built screens |
+| 11 Streaming | done | SSE; adds NO broker calls — publishes in-memory dash + one shared snapshot |
+| 12 Error/empty/loading | **next** | done for built screens |
 | 13 Security regression | partial | 5 new suites so far |
 | 14 Performance | todo | |
 | 15 Full regression | green | see the count in the last commit message |
@@ -107,6 +107,7 @@ GET  /api/app/risk           risk engine state, presentation only
 GET  /api/app/intelligence   market / strategy / risk / decision, kept apart
 GET  /api/app/automation     status + the writable list, from the policy
 POST /api/app/automation     the ONLY write gate is validate_miniapp
+GET  /api/app/stream         SSE; auth before open, per-chat account events
 POST /api/app/ask            read-only, user-scoped, no generated text
 POST /api/app/close          the one financial action; same gate as /close
 GET  /go                     ad-click bridge (Meta attribution, separate work)
@@ -117,8 +118,10 @@ Pre-existing: `/api/app/data`, `/api/app/tick`, `/api/app/history`,
 
 ## Known limitations (do not claim these are done)
 
-- No streaming layer exists anywhere. The Mini App polls: `tick` 1.5s,
-  `refresh` 6s, `markets` 30s.
+- Streaming is SSE and **adds no broker load**: it publishes `get_dash`
+  (in-memory) plus one shared `markets.snapshot`. Polling still runs
+  underneath (`tick` 1.5s, `refresh` 6s) and is the fallback — the stream is
+  an accelerator, never a replacement.
 - Trades live in Redis (`user_store`), not Supabase. Supabase holds licences,
   bot configs and affiliate tables only. No `trades`/`trade_events` tables
   there — deliberately, per "do not create duplicate tables".

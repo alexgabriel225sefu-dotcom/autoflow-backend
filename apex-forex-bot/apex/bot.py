@@ -1109,6 +1109,62 @@ def _start_dashboard_server():
             # of it they may change — the writable list comes from the policy
             # rather than being repeated here, so the screen cannot offer a
             # control the server would refuse.
+            # ── Live event stream (SSE) ─────────────────────────────
+            # Authenticated BEFORE the stream opens, and fed only from the chat
+            # the signature proved: market events are shared, account and
+            # position events are not. There is no subscription message and no
+            # client-supplied identifier in the protocol, so there is nothing
+            # for a client to tamper with.
+            #
+            # This adds no broker load. See apex/stream.py — it publishes what
+            # the trading loop already holds in memory plus one shared markets
+            # snapshot, so N clients cost N dict reads rather than N round
+            # trips to cTrader.
+            if self.path.startswith("/api/app/stream"):
+                from apex import stream as _v_st
+                _v_user = self._telegram_identity()
+                if not _v_user:
+                    self._telegram_denied()
+                    return
+                _v_chat = str(_v_user["id"])
+                _v_cid, _v_q = _v_st.register(_v_chat)
+                if _v_cid is None:
+                    # Full. Said plainly so the client keeps polling instead of
+                    # believing it has a live feed.
+                    self._json(503, {"error": "STREAM_BUSY",
+                                     "message": "Live updates are at capacity. "
+                                                "The screen will keep refreshing."})
+                    return
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Connection", "keep-alive")
+                    # Render sits in front of this; without it the proxy buffers
+                    # the stream and nothing arrives until it closes.
+                    self.send_header("X-Accel-Buffering", "no")
+                    self.end_headers()
+                    self.wfile.write(b": connected\n\n")
+                    self.wfile.flush()
+                    while True:
+                        try:
+                            _v_msg = _v_q.get(timeout=20)
+                        except Exception:
+                            # Nothing to send. A comment frame keeps the
+                            # connection open through proxy idle timeouts and
+                            # tells us the moment the client is gone.
+                            self.wfile.write(b": keepalive\n\n")
+                            self.wfile.flush()
+                            continue
+                        self.wfile.write(b"data: " + _v_msg.encode("utf-8") + b"\n\n")
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass          # the client went away; that is the normal exit
+                finally:
+                    # Always. A registry that leaks entries is the memory leak
+                    # the client cap was supposed to prevent.
+                    _v_st.unregister(_v_cid)
+                return
             if self.path.startswith("/api/app/automation") and self.command == "GET":
                 from apex import user_loop as _u_ul, user_store as _u_us
                 from apex import settings_policy as _u_sp, config as _u_cfg

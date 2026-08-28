@@ -214,6 +214,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
 #jSwitch div{flex:1;text-align:center;font-size:11px;font-weight:700;padding:7px;border-radius:9px;
   border:1px solid var(--line);color:var(--t1);background:var(--card)}
 #jSwitch div.on{color:#fff;background:rgba(255,45,79,.13);border-color:rgba(255,45,79,.4)}
+#cMeta[data-conn="delayed"] #liveDot{background:var(--st-unver);animation:none}
+#cMeta[data-conn="delayed"]::after{content:' · DELAYED';color:var(--st-unver);
+  font-weight:800;letter-spacing:.06em}
+#cMeta[data-conn="live"]::after{content:' · LIVE';color:var(--up);
+  font-weight:800;letter-spacing:.06em}
 #liveDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--up);margin-right:6px;
   animation:pulse 1.6s ease-in-out infinite}
 #liveDot.stale{background:var(--gold);animation:none}
@@ -1389,6 +1394,95 @@ try{
   Q('greet').textContent = who && who.first_name
     ? part + ', ' + String(who.first_name).slice(0, 24) : part;
 }catch(e){}
+
+/* ── Live stream ──────────────────────────────────────────────────────
+   The stream is an accelerator, never a replacement. Polling keeps running
+   underneath it: if the feed drops, stalls behind a proxy, or the browser
+   has no EventSource, the screen goes on updating on its own — a live view
+   that silently freezes is worse than a slow one.
+
+   A frozen stream that keeps drawing its last frame is a lie about the
+   market, so the connection line reports what the client actually has. */
+let streamAt=0, streamOn=false, es=null;
+function setConn(state, detail){
+  const el=Q('cMeta'); if(!el) return;
+  el.dataset.conn = state;
+  if(state==='delayed' && detail) el.title = detail;
+}
+function applyStream(ev){
+  streamAt=Date.now();
+  if(ev.type==='connection.status'){
+    /* The server dropped events for this client rather than stalling
+       everyone. Say so; the poll below will fill the gap. */
+    if(ev.status==='lagging') setConn('delayed', ev.detail||'');
+    return;
+  }
+  if(ev.type==='account.updated'){
+    if(ev.equity!=null){
+      const bv=Q('balV'), prev=window.__eq; window.__eq=ev.equity;
+      bv.textContent='$'+Number(ev.equity).toLocaleString(undefined,
+        {minimumFractionDigits:2,maximumFractionDigits:2});
+      if(prev!=null&&ev.equity!==prev){
+        bv.classList.remove('up','dn'); void bv.offsetWidth;
+        bv.classList.add(ev.equity>prev?'up':'dn');
+        setTimeout(()=>bv.classList.remove('up','dn'),600);
+      }
+    }
+    if(ev.positions) renderPositions(ev.positions, ev.openCount);
+    setConn(ev.brokerHealth==='ok'?'live':'delayed');
+  }
+  if(ev.type==='market.tick' && ev.rows){
+    const by={}; ev.rows.forEach(r=>by[r.symbol]=r);
+    document.querySelectorAll('#mkForex .mrow,#mkMetals .mrow,#homeMkt .mrow')
+      .forEach(row=>{
+        const r=by[row.dataset.sym]; if(!r||!r.available) return;
+        const px=row.querySelector('.mpx'), ch=row.querySelector('.mchg');
+        if(px) px.textContent=Number(r.price).toLocaleString(undefined,{maximumFractionDigits:5});
+        if(ch){ ch.textContent=(r.changePct>=0?'+':'')+r.changePct.toFixed(2)+'%';
+                ch.className='mchg '+(r.changePct>=0?'up':'dn'); }
+      });
+    if(ev.stale) setConn('delayed','Market snapshot is the last one the broker answered.');
+  }
+  if(ev.type==='risk.updated'){ riskAt=0; if(screenNow==='risk') loadRisk(true); }
+}
+function openStream(){
+  if(!window.EventSource) return;          // fall back to polling entirely
+  try{
+    /* initData cannot ride in a header on EventSource, and it must not ride
+       in a query string — it is a credential and a URL reaches proxy logs.
+       So the stream is opened with fetch, which CAN carry the header, and
+       read as a body stream. */
+    fetch('/api/app/stream',{headers:{'Authorization':'Telegram '+initData}})
+      .then(r=>{
+        if(!r.ok||!r.body) throw new Error('HTTP '+r.status);
+        streamOn=true; setConn('live');
+        const rd=r.body.getReader(), dec=new TextDecoder();
+        let buf='';
+        const pump=()=>rd.read().then(({done,value})=>{
+          if(done){ streamOn=false; setConn('delayed','Live feed closed.');
+                    setTimeout(openStream, 5000); return; }
+          buf+=dec.decode(value,{stream:true});
+          let i;
+          while((i=buf.indexOf('\n\n'))>=0){
+            const frame=buf.slice(0,i); buf=buf.slice(i+2);
+            if(!frame.startsWith('data: ')) continue;   // comment/keepalive
+            try{ applyStream(JSON.parse(frame.slice(6))); }catch(e){}
+          }
+          return pump();
+        }).catch(()=>{ streamOn=false; setConn('delayed','Live feed lost.');
+                       setTimeout(openStream, 5000); });
+        pump();
+      })
+      .catch(()=>{ streamOn=false; setTimeout(openStream, 10000); });
+  }catch(e){ streamOn=false; }
+}
+/* Stale detection is independent of the connection state: a socket that is
+   open but silent looks identical to a working one from the outside. */
+setInterval(()=>{
+  if(streamOn && streamAt && Date.now()-streamAt > 30000)
+    setConn('delayed','No live update for 30s — showing the last known values.');
+}, 5000);
+openStream();
 
 tick().finally(()=>{ setInterval(tick, 1500); });
 refresh().finally(()=>{ setInterval(refresh, 6000); });
