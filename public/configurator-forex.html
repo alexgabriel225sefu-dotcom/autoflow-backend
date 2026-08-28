@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Forex Bot Configurator — Apex Forex Bot</title>
+<title>Configurator — Apex4Traders</title>
 <meta name="robots" content="noindex,nofollow">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -190,7 +190,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <input id="gk" class="gi" type="text" placeholder="APEX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
     <button id="gBtn" class="gb">Verify License →</button>
     <div id="gErr" class="ge"></div>
-    <div class="gl">No license yet? <a href="/apex-bot">Purchase Apex Forex Bot →</a></div>
+    <div class="gl">No licence yet? <a href="/forex">Get Apex4Traders →</a></div>
   </div>
 </div>
 
@@ -562,7 +562,7 @@ document.getElementById('genBtn').addEventListener('click',async()=>{
 // Manual .env fallback if the server save fails
 function showManual(lk){
   const cfg=buildConfig();
-  let env=`# Apex Forex Bot — Railway Environment Variables\n# Generated: ${new Date().toISOString().slice(0,10)}\n\nLICENSE_KEY=${lk}\n`;
+  let env=`# Apex4Traders — Environment Variables\n# Generated: ${new Date().toISOString().slice(0,10)}\n\nLICENSE_KEY=${lk}\n`;
   for(const[k,v] of Object.entries(cfg))env+=`${k}=${v}\n`;
   if(S.broker==='MT5')env+=`\n# MT5 Bridge: set BRIDGE_SECRET on your EA to match MT_BRIDGE_SECRET above.`;
   document.getElementById('etxt').value=env;
