@@ -479,6 +479,63 @@ def _entry_meta(pos):
             if pos and pos.get(k) is not None}
 
 
+# ── Entry metadata that survives a restart ───────────────────────────────
+#
+# `entry_meta_by_sym` is an in-process dict, and the only thing persisted was
+# `open_position_snapshot` — SINGULAR, for the focused symbol. With maxpos > 1
+# the second position's decision snapshot existed nowhere but memory, so a
+# restart orphaned it: the trade later closed and was journalled with no
+# confidence, no regime, no strategy version.
+#
+# That is not a cosmetic gap. `ev.labelled_count` requires a confidence, so
+# every orphaned trade is invisible to the calibrator — which is why the
+# probability model sat at 27 of the 30 samples it needs after 124 trades.
+# The measured probability model is the intelligence that costs nothing to
+# run, and this was quietly starving it.
+#
+# Kept as its own key rather than folded into the position snapshot: a
+# position snapshot is about ONE position and is cleared when it closes,
+# while this has to outlive the close long enough for the reconciliation path
+# to label the trade.
+_META_STORE_KEY = "entry_meta_by_symbol"
+_META_MAX_SYMBOLS = 12          # bounded; the universe is eight instruments
+
+
+def _persist_entry_meta(user_id, by_sym):
+    """Write the per-symbol decision snapshots. Never raises.
+
+    Fail-soft on purpose: losing this costs a LABEL, never a trade. A write
+    error must not be able to stop the loop that is managing real money.
+    """
+    try:
+        if not by_sym:
+            return
+        trimmed = dict(list(by_sym.items())[-_META_MAX_SYMBOLS:])
+        user_store.update(user_id, {_META_STORE_KEY: trimmed})
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] entry-meta persist failed: {e}")
+
+
+def _load_entry_meta(user_id):
+    """Read them back at startup. {} on anything unexpected."""
+    try:
+        raw = (user_store.load(user_id) or {}).get(_META_STORE_KEY)
+        if not isinstance(raw, dict):
+            return {}
+        # Only keys the current code knows about. A stored snapshot from an
+        # older build must not smuggle a field the journal would then record
+        # as though this version had measured it.
+        out = {}
+        for sym, meta in raw.items():
+            if isinstance(meta, dict):
+                out[str(sym)] = {k: v for k, v in meta.items()
+                                 if k in _ENTRY_META_KEYS}
+        return out
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] entry-meta load failed: {e}")
+        return {}
+
+
 def _reattach_entry_meta(pos, meta):
     """Put the decision snapshot back onto a freshly broker-read position.
 
@@ -1477,7 +1534,9 @@ def _loop(user_id, alert_fn, gen=None):
     # reason as entry_risk_by_sym: the live position dict is re-read from the
     # broker every tick and comes back stripped of everything the broker
     # doesn't store. Without this the calibrator never gets a labelled trade.
-    entry_meta_by_sym = {}
+    # Restored from the store, so a restart does not orphan the decision
+    # snapshot of a position the loop is not currently focused on.
+    entry_meta_by_sym = _load_entry_meta(user_id)
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
@@ -1606,6 +1665,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # carries none of it. A redeploy mid-trade must not cost us the
                 # label.
                 entry_meta_by_sym[_nrm(symbol)] = _entry_meta(_snap)
+                _persist_entry_meta(user_id, entry_meta_by_sym)
                 _reattach_entry_meta(open_pos, entry_meta_by_sym[_nrm(symbol)])
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
@@ -1633,6 +1693,7 @@ def _loop(user_id, alert_fn, gen=None):
                 symbol = _snap["symbol"]
                 open_pos = dict(_snap)
                 entry_meta_by_sym[_nrm(symbol)] = _entry_meta(_snap)
+                _persist_entry_meta(user_id, entry_meta_by_sym)
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
                 if _snap.get("initialStop") and _snap.get("entryPrice"):
@@ -2098,8 +2159,13 @@ def _loop(user_id, alert_fn, gen=None):
                 # Same for the decision snapshot — but only AFTER the close has
                 # been journalled above, which is why this sits at the end of
                 # the reconciliation block and not beside the broker read.
-                for _gone in [k for k in entry_meta_by_sym if k not in open_syms]:
+                _dropped = [k for k in entry_meta_by_sym if k not in open_syms]
+                for _gone in _dropped:
                     entry_meta_by_sym.pop(_gone, None)
+                if _dropped:
+                    # Only on an actual change. Writing every tick would put a
+                    # store round trip on the hot path for nothing.
+                    _persist_entry_meta(user_id, entry_meta_by_sym)
             open_count = len(open_syms)
             dash["openCount"] = open_count
             dash["maxpos"] = maxpos
@@ -4198,6 +4264,10 @@ def _loop(user_id, alert_fn, gen=None):
                                 # the snapshot lives for one tick and every
                                 # closed trade is journalled unlabelled.
                                 entry_meta_by_sym[_nrm(symbol)] = _entry_meta(open_pos)
+                                # Straight to the store. Everything above this
+                                # line lives in one process; the trade it
+                                # labels can close hours later, in another.
+                                _persist_entry_meta(user_id, entry_meta_by_sym)
                                 # §17: the thesis, written HERE and nowhere
                                 # else. This is the only moment the real fill
                                 # and the stop that was actually sent are both
