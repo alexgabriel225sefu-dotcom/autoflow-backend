@@ -171,6 +171,45 @@ def _on_open(users):
               f"{'OK' if ok else 'FAILED'} — {detail}")
         _alert(uid, {"action": "MARKET_OPEN", "ok": ok, "detail": detail,
                      "symbol": rec.get("symbol", "")})
+        # The engine's own report, once per market open. It exists so nobody
+        # has to read logs at 22:00 on a Sunday to find out whether the
+        # scanner ran — and it is sent whether the news is good or bad,
+        # because a check that only speaks up on failure is indistinguishable
+        # from one that crashed.
+        #
+        # Deferred: at the instant the market opens the loop has not ticked
+        # yet, so an immediate report would truthfully say "no pass recorded"
+        # every single week and mean nothing.
+        _schedule_selfcheck(uid)
+
+
+# How long after the open to wait before reporting. Long enough for the loop
+# to have completed at least one scan cycle at the default cadence.
+_SELFCHECK_DELAY_S = 20 * 60
+
+
+def _schedule_selfcheck(uid, delay_s=None):
+    """Report on the engine once the loop has had time to run.
+
+    A daemon timer rather than a thread that sleeps in the watcher: the
+    watcher must keep polling for the market edge, and a report is not worth
+    delaying that by twenty minutes.
+    """
+    def _fire():
+        try:
+            from apex import selfcheck, user_loop
+            from apex import telegram as _tg
+            selfcheck.run(uid, dash=user_loop.get_dash(uid),
+                          send=lambda u, text: _tg.send_to(u, text))
+        except Exception as e:
+            print(f"[Session] self-check for {uid} failed: {e}")
+
+    try:
+        t = threading.Timer(delay_s or _SELFCHECK_DELAY_S, _fire)
+        t.daemon = True
+        t.start()
+    except Exception as e:
+        print(f"[Session] could not schedule self-check for {uid}: {e}")
 
 
 # ── Watcher ──────────────────────────────────────────────────────────────────
