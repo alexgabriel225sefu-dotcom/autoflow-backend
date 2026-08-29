@@ -801,6 +801,28 @@ def clear_trades(user_id):
         print(f"[Store] clear_trades failed: {e}")
 
 
+def save_trades(user_id, trades):
+    """Replace the whole closed-trade journal.
+
+    Only the backfill uses this (scripts/backfill_trades.py). Everything in the
+    running platform appends, because a journal is append-only in spirit: it is
+    the one record a client cannot reconstruct, and the tax export reads it.
+
+    The write is refused rather than half-done if the payload is not a list.
+    Same 500-row bound as append_trade, applied from the END so a rewrite can
+    never quietly drop the newest trades.
+    """
+    user_id = str(user_id)
+    if not isinstance(trades, list):
+        raise TypeError("save_trades expects a list of trade records")
+    payload = json.dumps(trades[-500:])
+    if _USE_REDIS:
+        _redis_set(f"{_NS}:trades:{user_id}", payload)
+        return
+    with open(_path(user_id) + ".trades", "w") as f:
+        f.write(payload)
+
+
 def append_trade(user_id, record):
     """Append a closed-trade record to the user's tax journal (keeps last 500)."""
     user_id = str(user_id)

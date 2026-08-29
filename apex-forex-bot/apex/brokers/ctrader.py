@@ -711,6 +711,125 @@ class CtraderBroker:
             print(f"[cTrader] get_closed_deal_pnl lookup failed: {e}")
         return None
 
+    def get_deal_history(self, from_ts, to_ts, max_pages=40):
+        """Every CLOSING deal between two unix timestamps, keyed by position id.
+
+        This exists for the journal backfill. `get_closed_deal_pnl` answers for
+        one position inside a 20-minute window, which is the right shape while
+        the loop is running and the wrong one for reconstructing months of
+        history — it would be one request per trade, against a 5/s historical
+        budget shared by every user on the connection.
+
+        Pages on `hasMore`, oldest window first, and stops at `max_pages` so a
+        wide range can never turn into an unbounded scan.
+
+        SIDE IS DERIVED FROM ARITHMETIC, NOT FROM THE DEAL'S OWN tradeSide.
+        A closing deal's trade side is the OPPOSITE of the position it closes —
+        a long is closed by a sell — and a backfill that got that backwards
+        would silently invert the direction of every historical trade, which is
+        far worse than leaving it blank. Price and profit cannot be misread the
+        same way: a position was long exactly when the exit moved the same way
+        as the profit. When entry, exit or gross is missing, or the price did
+        not move, the side stays None and the caller leaves the gap alone.
+
+        Returns {"ok": bool, "deals": {positionId(str): {...}}}. `ok` is what
+        separates "the account had no trades" from "we could not ask" — a
+        caller that writes to a journal must never confuse the two.
+        """
+        out, opened, ok = {}, {}, False
+        if getattr(self._c, "PAPER_TRADING", True):
+            return {"ok": True, "deals": out}
+        self._load_symbols()
+        id2name = {v: k for k, v in self._sym_id.items()}
+        cur = int(from_ts) * 1000
+        end = int(to_ts) * 1000
+        try:
+            for _ in range(max_pages):
+                if cur >= end:
+                    break
+                req = ProtoOADealListReq()
+                req.ctidTraderAccountId = self._ctid()
+                req.fromTimestamp = cur
+                req.toTimestamp = end
+                req.maxRows = 500
+                res = self._rpc(req, ProtoOADealListRes)
+                ok = True
+                newest = cur
+                for d in res.deal:
+                    try:
+                        newest = max(newest, int(d.executionTimestamp))
+                    except Exception:
+                        pass
+                    if not d.HasField("closePositionDetail"):
+                        # The OPENING leg. Its execution time is when the trade
+                        # actually started, which is the one thing the journal
+                        # needs for a duration and cannot derive from anything
+                        # else. Keep the earliest, since a position can be
+                        # built from several fills.
+                        try:
+                            _pid = str(d.positionId)
+                            _t = int(d.executionTimestamp) // 1000
+                            if _t and (_pid not in opened or _t < opened[_pid]):
+                                opened[_pid] = _t
+                        except Exception:
+                            pass
+                        continue
+                    cpd = d.closePositionDetail
+                    digits = (getattr(cpd, "moneyDigits", 0)
+                              or getattr(d, "moneyDigits", 0) or 2)
+                    scale = 10 ** digits
+                    gross = cpd.grossProfit / scale
+                    swap = cpd.swap / scale
+                    comm = abs(cpd.commission) / scale
+                    entry = exit_ = None
+                    try:
+                        entry = float(cpd.entryPrice) or None
+                    except Exception:
+                        pass
+                    try:
+                        exit_ = float(d.executionPrice) or None
+                    except Exception:
+                        pass
+                    side = None
+                    if entry and exit_ and gross and exit_ != entry:
+                        side = "BUY" if ((exit_ - entry) > 0) == (gross > 0) else "SELL"
+                    bal = None
+                    try:
+                        if cpd.HasField("balance"):
+                            bal = cpd.balance / scale
+                    except Exception:
+                        pass
+                    out[str(d.positionId)] = {
+                        "positionId": str(d.positionId),
+                        "symbol": id2name.get(d.symbolId, str(d.symbolId)),
+                        "netPnl": round(gross + swap - comm, 2),
+                        "grossPnl": round(gross, 2),
+                        "swap": round(swap, 2),
+                        "commissionUsd": round(comm, 2),
+                        "entryPrice": entry,
+                        "exitPrice": exit_,
+                        "side": side,
+                        "balance": bal,
+                        "closedAt": int(d.executionTimestamp) // 1000,
+                    }
+                if not getattr(res, "hasMore", False):
+                    break
+                if newest <= cur:
+                    break              # no forward progress; stop rather than spin
+                cur = newest + 1
+        except Exception as e:
+            print(f"[cTrader] deal history {from_ts}..{to_ts} failed: {e}")
+            return {"ok": ok, "deals": out, "error": str(e)[:200]}
+        # Attach the open time to the close it belongs to. Only where the
+        # opening leg was inside the same window — a position opened before it
+        # has no recoverable start, and an absent duration is the honest answer.
+        for _pid, _row in out.items():
+            if _pid in opened:
+                _row["openedAt"] = opened[_pid]
+                if _row.get("closedAt"):
+                    _row["durationS"] = max(0, _row["closedAt"] - opened[_pid])
+        return {"ok": ok, "deals": out}
+
     # -- positions ------------------------------------------------------------
     def get_open_position(self, instrument=None):
         """Open position for the symbol, or None when the account is FLAT.
