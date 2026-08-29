@@ -26,3 +26,8 @@ apex-forex-bot/data/history/
 # created and locked while an agent runs, then removed. Committing one nests a
 # working copy inside the repo it was cut from.
 .claude/worktrees/
+
+# Browser session cookies for video-eyes. A cookies.txt is a live login for
+# whatever account exported it — committing one hands over the account.
+cookies.txt
+*cookies*.txt
