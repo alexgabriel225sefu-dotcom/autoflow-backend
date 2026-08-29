@@ -1086,6 +1086,70 @@ def drop_broker_connection(user) -> bool:
     return True
 
 
+def _shadow_pm_on():
+    """Whether the shadow position manager runs. Off unless switched on.
+
+    §72: safe defaults. This writes journal events on every managed tick, so
+    an operator who has not asked for it does not silently start paying for
+    the storage.
+    """
+    return (os.getenv("SHADOW_POSITION_MANAGER", "").strip().lower()
+            in ("1", "true", "yes", "on"))
+
+
+def _shadow_manage(user_id, pos, symbol, price, initial_risk, dash, cfg):
+    """Record what a thesis-driven manager would have proposed. Never acts.
+
+    Wrapped whole: this decorates the journal, and a bug in it must not be
+    able to take a trading loop down or delay a real stop amendment.
+    """
+    try:
+        from apex import position_manager as _pm, thesis as _th
+        from apex import trade_events as _te
+
+        th = _th.Thesis.from_dict(pos.get("thesis")) if pos.get("thesis") else None
+        if th is None:
+            # Reconstructing a thesis for a position that predates one would be
+            # the retrospective invention §24 forbids. Build it from what was
+            # RECORDED at entry, or record nothing.
+            entry = pos.get("entryPrice")
+            stop = pos.get("initialStop") or pos.get("stopLoss") or pos.get("sl")
+            if entry is None or stop is None:
+                return
+            th = _th.Thesis(
+                symbol=symbol, direction=pos.get("side"),
+                conditions=[_th.Condition(_th.LEVEL, stop,
+                                          detail="stop recorded at entry")],
+                strategy_id=(dash or {}).get("strategyId"),
+                strategy_version=None, entry_price=entry, initial_stop=stop,
+                initial_target=pos.get("takeProfit") or pos.get("tp"))
+
+        mkt = (dash or {}).get("market") or {}
+        obs = {"price": price,
+               "htfTrend": mkt.get("htfTrend"),
+               "structureTrend": mkt.get("trend"),
+               "regime": ((dash or {}).get("regime") or {}).get("regime")}
+        if obs["regime"]:
+            from apex import regime as _rg
+            obs["regime"] = _rg.from_legacy((dash or {}).get("regime")).regime
+
+        prop = _pm.evaluate(pos, th, obs, policy={
+            "protect_from_r": float(getattr(cfg, "SHADOW_PROTECT_FROM_R", 1.0)),
+            "protect_trail_r": float(getattr(cfg, "SHADOW_PROTECT_TRAIL_R", 1.5)),
+        })
+        # HOLD is the common case and recording every one would bury the
+        # journal. What is worth keeping is a proposal that DIFFERS from what
+        # the live policy is doing — that is the evidence the comparison needs.
+        if not prop.acts and prop.reason != _pm.THESIS_INVALIDATED:
+            return
+        _te.record(user_id, _te.MANAGEMENT_SHADOW, symbol=symbol,
+                   position_id=pos.get("positionId"),
+                   payload={**prop.to_dict(), "livePolicy": "trailing+breakeven",
+                            "shadow": True})
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] shadow position manager: {e}")
+
+
 def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None,
                      user_id=None):
     """Trailing stop + break-even (Strategy Builder exit modes). Moves the SL
@@ -2199,6 +2263,27 @@ def _loop(user_id, alert_fn, gen=None):
                                 entry_risk_by_sym[_nrm(symbol)] = _risk
                     _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
 
+                # ── Position manager, in SHADOW (§46) ────────────────
+                #
+                # The live exit policy below is unchanged. This records what a
+                # thesis-driven manager WOULD have proposed for the same
+                # position at the same moment, so the exit policy can be
+                # changed on evidence instead of on an argument.
+                #
+                # Why that matters here: the live policy produces a 60% win
+                # rate at a profit factor of 1.10, because break-even at 1R
+                # plus a 1R trail caps winners near 1R while losers run the
+                # full stop. Switching it on an argument would be replacing
+                # one untested policy with another. Switching it after reading
+                # a fortnight of these events is a decision.
+                #
+                # It proposes into the journal and nowhere else. It cannot
+                # amend a stop, and it cannot close anything.
+                if open_pos and _shadow_pm_on():
+                    _shadow_manage(user_id, open_pos, symbol, price,
+                                   entry_risk_by_sym.get(_nrm(symbol)),
+                                   dash, cfg)
+
                 # Trailing-stop / break-even management for the open position
                 # (Strategy Builder exit modes). Fail-soft; real-broker only.
                 if open_pos and not cfg.PAPER_TRADING:
@@ -3158,23 +3243,39 @@ def _loop(user_id, alert_fn, gen=None):
                 entry_ok = False
                 _skip(f"signal TTL expired ({_sig_age:.1f}s > 12s)")
             # ── Multi-position gates (live) ──
+            #
+            # The position cap and the correlation guard used to be written out
+            # here. They were correct, and they only ever ran on THIS path — so
+            # a manual /buy skipped both. They now live in apex/portfolio.py and
+            # `gates.authorize_order` calls them for every path.
+            #
+            # This block still runs, and is not a duplicate: it calls the same
+            # function. It is here to produce the DECLINE RECORD — the reason a
+            # setup was passed over, which §61 needs and which a denial inside
+            # gates would reach too late to attribute to this candidate. Gates
+            # remains the authority; this is the explanation.
             if entry_ok and not cfg.PAPER_TRADING:
                 if all_positions is None:
                     entry_ok = False  # couldn't read positions — don't stack blind
-                elif open_count >= maxpos:
-                    entry_ok = False
-                    _skip(f"at max positions ({open_count}/{maxpos})")
-                elif _nrm(symbol) in open_syms:
-                    entry_ok = False  # already holding this symbol
                 else:
-                    # Correlation guard: cap how many positions share the same
-                    # USD direction, so 5 trades aren't secretly one USD bet.
-                    new_exp = forex.usd_exposure(symbol, action)
-                    if new_exp != 0:
-                        same_dir = sum(1 for e in open_exposure if e == new_exp)
-                        if same_dir >= 2:
-                            entry_ok = False
-                            _skip(f"correlation guard — already {same_dir} {'USD-long' if new_exp>0 else 'USD-short'} positions")
+                    from apex import portfolio as _pf
+                    _exp = {"openCount": open_count, "maxPositions": maxpos,
+                            "symbols": sorted(open_syms),
+                            "usdBias": list(open_exposure)}
+                    _pok, _pcode, _pwhy = _pf.check(
+                        symbol, action, _exp,
+                        limits={"max_positions": maxpos,
+                                "max_same_usd_side": int(
+                                    getattr(cfg, "MAX_SAME_USD_SIDE", 0)
+                                    or _pf.DEFAULT_MAX_SAME_USD_SIDE)})
+                    if not _pok:
+                        entry_ok = False
+                        # Already holding the instrument is an ordinary state,
+                        # not a refusal worth telling the client about on every
+                        # tick it stays true.
+                        if _pcode != _pf.SYMBOL_ALREADY_OPEN:
+                            _skip(f"{_pf.deny_text(_pcode)}"
+                                  + (f" ({_pwhy})" if _pwhy else ""))
             # Daily trade cap. The Strategy Builder shows every client a
             # "Max trades/day" figure and bakes one into each risk preset
             # (Low 6 / Medium 10 / High 15), but nothing read the setting —

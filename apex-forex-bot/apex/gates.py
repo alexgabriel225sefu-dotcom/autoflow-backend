@@ -35,7 +35,8 @@ than accidental.
 import time
 
 from apex import access, ledger, ownership, user_store
-from apex import account_mode
+from apex import account_mode, portfolio
+from apex import config as cfg
 
 # Verdicts. Strings rather than an enum so they survive the JSON round trip
 # through the control plane unchanged.
@@ -173,13 +174,52 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
         reasons = "; ".join(str(r) for r in (guard.get("reasons") or [])) or "risk limit"
         return Decision(False, "RISK_HALTED", reasons), None
 
-    # 4. Ownership. Another container managing the same account is worse than
+    # 4. Portfolio. These checks existed, were correct, and lived inside the
+    #    autonomous loop — so an autonomous entry was checked against exposure
+    #    and correlation while a manual /buy was not. §14 requires every path
+    #    through one engine, so they moved to apex/portfolio.py and are called
+    #    from here. This is a move, not a new policy: the same USD-side cap
+    #    the loop applied is the default.
+    #
+    #    Deliberately AFTER the risk-guard check and BEFORE the ledger claim.
+    #    A denial here must not burn an idempotency claim, and it must not
+    #    outrank a halted account — "trading is paused" is the more useful
+    #    thing to tell a client than "you already hold two dollar shorts".
+    try:
+        _lim = {
+            "max_positions": (u.get("maxpos")
+                              if u.get("maxpos") is not None
+                              else getattr(cfg, "MAX_POSITIONS", None)),
+            "max_same_usd_side": int(
+                u.get("max_same_usd_side")
+                or getattr(cfg, "MAX_SAME_USD_SIDE", 0)
+                or portfolio.DEFAULT_MAX_SAME_USD_SIDE),
+            "max_data_age_s": (u.get("max_data_age_s")
+                               or getattr(cfg, "MAX_DATA_AGE_S", 0) or None),
+        }
+        _exp = portfolio.state(d, max_positions=_lim["max_positions"])
+        _age = None
+        _last = (d or {}).get("lastTickTs")
+        if _last:
+            _age = max(0.0, time.time() - float(_last))
+        _ok, _code, _why = portfolio.check(symbol, side, _exp, limits=_lim,
+                                           data_age_s=_age)
+        if not _ok:
+            return Decision(False, _code, portfolio.deny_text(_code)
+                            + (f" ({_why})" if _why else "")), None
+    except Exception as e:
+        # A portfolio-check bug must not become a way to open a position. This
+        # is a risk gate: it fails closed, like every other branch here.
+        print(f"[Gates] portfolio check failed for {user_id}: {e}")
+        return Decision(False, "PORTFOLIO_CHECK_FAILED", str(e)[:120]), None
+
+    # 5. Ownership. Another container managing the same account is worse than
     #    a missed entry, and an unverifiable lease is not ownership.
     own_ok, own_why = ownership.may_trade(user_id, live=live)
     if not own_ok:
         return Decision(False, "NOT_OWNER", own_why), None
 
-    # 5. Idempotency, last — so the claim is only taken for a request that has
+    # 6. Idempotency, last — so the claim is only taken for a request that has
     #    already cleared everything else.
     ok, why, rid = ledger.claim(user_id, symbol, side, units, sl, tp,
                                 fail_closed=live)
