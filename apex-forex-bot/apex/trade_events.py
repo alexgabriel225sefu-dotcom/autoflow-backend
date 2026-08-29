@@ -64,11 +64,30 @@ STOP_UPDATED = "stop.updated"
 TAKE_PROFIT_UPDATED = "take_profit.updated"
 POSITION_CLOSED = "position.closed"
 
+# ── Engine events ────────────────────────────────────────────────────────
+# The scanner used to evaluate every watched instrument on each pass, keep the
+# single best, and leave no trace of the rest. These are what make that pass
+# readable afterwards, and what §26 and §61 read.
+SETUP_DETECTED = "setup.detected"
+CANDIDATES_RANKED = "candidates.ranked"
+DECISION_RECORDED = "decision.recorded"      # any action, including NO_TRADE
+THESIS_CREATED = "thesis.created"
+THESIS_EVALUATED = "thesis.evaluated"
+MANAGEMENT_PROPOSED = "management.proposed"
+# Recorded when the position manager runs in shadow: what it WOULD have done,
+# beside what the live policy actually did. §46 — the engine sees live
+# conditions and does not execute, so the exit policy can be changed on
+# evidence rather than on an argument.
+MANAGEMENT_SHADOW = "management.shadow"
+AI_REJECTED = "ai.rejected"                  # a model reply that failed schema
+
 _TYPES = {
     MARKET_SNAPSHOT, SIGNAL_GENERATED, ANALYSIS_COMPLETED, RISK_CHECKED,
     DECISION_DECLINED, ORDER_AUTHORIZED, ORDER_SUBMITTED, ORDER_FILLED,
     ORDER_REJECTED, POSITION_UPDATED, STOP_UPDATED, TAKE_PROFIT_UPDATED,
     POSITION_CLOSED,
+    SETUP_DETECTED, CANDIDATES_RANKED, DECISION_RECORDED, THESIS_CREATED,
+    THESIS_EVALUATED, MANAGEMENT_PROPOSED, MANAGEMENT_SHADOW, AI_REJECTED,
 }
 
 # Bounded, because this is a per-user list in Redis and an unbounded one is a
