@@ -110,7 +110,7 @@ with another is a different bet, not an improvement.
 
 ## 8. Tests
 
-120 files pass. Added in this work:
+121 files pass. Added in this work:
 
 | File | Checks |
 |---|---|
@@ -119,6 +119,7 @@ with another is a different bet, not an improvement.
 | `test_portfolio_gate.py` | 24 |
 | `test_shadow_manager.py` | 36 |
 | `test_engine_failures.py` | 34 |
+| `test_engine_active.py` | 47 |
 
 Two test-writing rules came out of this session and are worth keeping:
 
@@ -134,15 +135,21 @@ Stated plainly per §75 rather than left to be discovered.
 
 | Phase | State |
 |---|---|
-| **7 — scanner** | The loop still uses its own inline scan, ranked by confidence alone. `SetupCandidate` / `ranking` / `decision` are built and tested but **not yet driving entries**. This is the largest remaining piece |
-| **18 — Mini App read models** | Not wired. The new decisions do not reach a screen yet, so §61's "why didn't APEX trade" is still limited to what `DECISION_DECLINED` already carried |
+| **18 — Mini App read models** | Not wired. The new decisions are journalled but do not reach a screen yet, so §61's "why didn't APEX trade" still shows what `DECISION_DECLINED` carried rather than the full ranked pass |
 | **19 — WebSocket events** | Not wired for the new event types |
-| **12 — AI orchestration** | The schema exists and is tested; `ai.py` does not call it yet |
 | **43/44 — backtest, walk-forward** | `walkforward.py` exists and was not extended |
-| **17 — thesis at entry** | The module exists; the loop does not yet write a thesis when it opens a position, so only the shadow's reconstructed-from-recorded-fields version runs |
 
-Nothing in that list is faked, stubbed, or partially wired in a way that could
-act. Every module listed as built is either called or inert.
+### Now active (was pending in the first draft of this report)
+
+| Phase | What changed |
+|---|---|
+| **7 — scanner** | `scanner.py` drives the scan. The loop's confidence-only ranking is gone; every watched instrument produces a `SetupCandidate` — including the ones skipped or unreadable — and the whole list goes through `ranking.rank` and `decision.evaluate_all`. The pass is journalled |
+| **12 — AI orchestration** | `ai._validate_verdict` calls `ai_schema.safe_validate` before its own normaliser. A reply about a different instrument, a reversed direction, or one carrying a computed field is rejected and journalled as `ai.rejected` |
+| **17 — thesis at entry** | The loop writes a thesis at the fill, from the scanner's own candidate when the direction matches. That is the only moment the real fill and the stop that was actually sent are both known |
+
+Nothing is faked, stubbed, or partially wired in a way that could act. Being
+active did not make any of these able to execute — `test_engine_active.py`
+asserts that on the parsed modules.
 
 ## 10. Known limitations
 

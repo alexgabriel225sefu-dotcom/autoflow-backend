@@ -1086,6 +1086,85 @@ def drop_broker_connection(user) -> bool:
     return True
 
 
+def _write_thesis(user_id, open_pos, symbol, action, entry_price,
+                  stop_price, target_price, signal):
+    """Record why this trade was taken, from the setup that justified it.
+
+    Built from the scanner's own proposal when one exists, so the conditions
+    are the ones that were actually measured before the order. When the entry
+    came from somewhere else — a manual /buy, or a scan that predates this —
+    the thesis is built from the recorded levels alone rather than composed
+    from whatever looks reasonable now. §24 forbids the reconstruction, and a
+    thesis with invented conditions would evaluate as valid forever.
+
+    Fail-soft: a position without a thesis is managed by its broker stop, which
+    is what happens today. Losing one must never cost the trade.
+    """
+    try:
+        from apex import setups as _st, thesis as _th
+        prop, cand = _last_proposal.get(_nrm(symbol)) or (None, None)
+        # Only the setup that produced THIS entry may write the thesis. A
+        # proposal for a different direction is a different trade, and reusing
+        # it would attach conditions nobody measured for the position that
+        # actually opened.
+        if cand is not None and cand.direction != action:
+            prop, cand = None, None
+        if cand is None:
+            cand = _st.SetupCandidate(
+                symbol=symbol, direction=action,
+                timeframe=getattr(signal, "get", lambda *_: None)("timeframe"),
+                strategy_id=(signal or {}).get("strategy_id"),
+                strategy_version=(signal or {}).get("strategy_version"),
+                features={"htfTrend": (signal or {}).get("htfTrend"),
+                          "structureTrend": (signal or {}).get("structureTrend")},
+                status=_st.CANDIDATE)
+        th = _th.from_candidate(cand, entry_price=entry_price,
+                                initial_stop=stop_price,
+                                initial_target=target_price,
+                                decision_id=getattr(prop, "id", None))
+        open_pos["thesis"] = th.to_dict()
+        try:
+            from apex import trade_events as _te
+            _te.record(user_id, _te.THESIS_CREATED, symbol=symbol,
+                       position_id=open_pos.get("positionId"),
+                       strategy_id=th.strategy_id,
+                       strategy_version=th.strategy_version,
+                       payload=th.to_dict())
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] thesis write failed: {e}")
+
+
+def _strategy_version(strategy_id=None):
+    """The version of the strategy that is about to decide, or None.
+
+    None rather than a placeholder: §23 says a historical decision must stay
+    reproducible, and a decision stamped with a version nobody can resolve is
+    worse than one that admits it does not know which version ran.
+    """
+    try:
+        from apex import strategy_api as _sapi
+        s = _sapi.get(strategy_id) if strategy_id else None
+        return getattr(s, "strategy_version", None) if s else None
+    except Exception:
+        return None
+
+
+# The proposal the scanner produced for a symbol on the most recent pass, kept
+# so the entry path can write the thesis from the setup that justified the
+# trade rather than reconstructing one at order time. Process-local and
+# bounded: a lost entry here costs a thesis, never a trade.
+_last_proposal = {}
+
+
+def _remember_proposal(symbol, proposal, candidate=None):
+    _last_proposal[symbol] = (proposal, candidate)
+    if len(_last_proposal) > 64:
+        for k in list(_last_proposal)[:32]:
+            _last_proposal.pop(k, None)
+
+
 def _shadow_pm_on():
     """Whether the shadow position manager runs. Off unless switched on.
 
@@ -2041,33 +2120,61 @@ def _loop(user_id, alert_fn, gen=None):
             due_to_scan = (tick % _scan_every == 0) or (
                 spread_blocked.get(_nrm(symbol), 0) > time.time())
             if watchlist and slot_free and due_to_scan and rate_ok:
+                # ── APEX scanner + decision engine ───────────────────
+                #
+                # This replaces a loop that read every instrument, kept the
+                # one with the highest confidence, and discarded the rest.
+                # Ranking by confidence alone compares one strategy's opinion
+                # of its own trigger against another's as if they were one
+                # scale, and the discarded readings were why "why didn't APEX
+                # trade GBPUSD" had no answer for six of seven instruments.
+                #
+                # The focus behaviour is unchanged: the best eligible
+                # candidate becomes the focused symbol and then goes through
+                # the SAME full pipeline below. Nothing here opens a position,
+                # and gates.authorize_order still authorises every order.
                 best = None
-                for ws in watchlist:
-                    if _nrm(ws) in open_syms:
-                        continue  # already holding this one
-                    if spread_blocked.get(_nrm(ws), 0) > time.time():
-                        continue  # spread blown out recently — try others first
-                    try:
-                        time.sleep(0.35)  # space out trendbar requests — cTrader rate-limits bursts
-                        c2 = broker.get_candles(ws, cfg.TIMEFRAME, 160)
-                        if not c2 or len(c2) < 130:
-                            continue
-                        ind2 = indicators.analyze(c2)
-                        st2 = strategies.analyze(c2)
-                        m2 = cfg.STRATEGY
-                        if m2 == "auto":
-                            reg2 = strategies.detect_regime(c2)
-                            if reg2["regime"] == "quiet":
-                                continue
-                            m2 = {"trending": "trend", "ranging": "mean_reversion",
-                                  "volatile": "breakout"}.get(reg2["regime"], "mean_reversion")
-                        s2 = ai.signal_for_mode(m2, ind2, st2, None)
-                        if (s2.get("action") in ("BUY", "SELL")
-                                and s2.get("confidence", 0) >= cfg.MIN_CONFIDENCE
-                                and (not best or s2["confidence"] > best[1])):
-                            best = (ws, s2["confidence"])
-                    except Exception as e:
-                        print(f"[UserLoop:{user_id}] scan {ws}: {e}")
+                try:
+                    from apex import decision as _dec, ranking as _rank
+                    from apex import scanner as _scan
+                    _skip = {k for k in open_syms} | {
+                        k for k, until in spread_blocked.items()
+                        if until > time.time()}
+                    _cands = _scan.scan(
+                        broker, cfg, watchlist, forex=forex, skip=_skip,
+                        context={"exposureCount": open_count,
+                                 "maxPositions": maxpos,
+                                 "openSymbols": sorted(open_syms),
+                                 "strategyVersion": _strategy_version()})
+                    _policy = {
+                        "min_confidence": cfg.MIN_CONFIDENCE,
+                        "max_spread_ratio": float(
+                            getattr(cfg, "MAX_SPREAD_RATIO", 0) or 0.25),
+                        "require_htf": bool(getattr(cfg, "HTF_FILTER", False)),
+                        "allow_unknown_regime": True,
+                    }
+                    _rc = {"halted": bool((dash.get("riskGuard") or {}).get("halted"))}
+                    _ranked = _rank.rank(_cands)
+                    _decisions, _proposals = _dec.evaluate_all(
+                        _ranked, policy=_policy, risk_context=_rc,
+                        slots_free=max(0, maxpos - open_count),
+                        account_env=dash.get("mode"))
+                    _scan.record(user_id, _cands, _decisions, ranked=_ranked)
+                    if _proposals:
+                        _top = _proposals[0]
+                        best = (_top.symbol, _top.rank_score)
+                        # Keep the CANDIDATE beside the decision. The thesis is
+                        # written from the setup that justified the trade, and
+                        # the decision alone does not carry the measured
+                        # features it was built from.
+                        _remember_proposal(
+                            _nrm(_top.symbol), _top,
+                            next((c for c in _ranked if c.id == _top.setup_id),
+                                 None))
+                except Exception as e:
+                    # The scan is how the bot finds work. A failure here must
+                    # leave the focus where it was, not stand the loop down.
+                    print(f"[UserLoop:{user_id}] APEX scan failed: {e}")
                 if best:
                     _focus(best[0])
                 elif (spread_blocked.get(_nrm(symbol), 0) > time.time()
@@ -3105,6 +3212,11 @@ def _loop(user_id, alert_fn, gen=None):
                                            min_confidence=cfg.MIN_CONFIDENCE,
                                            candles=candles,
                                            regime=regime,
+                                           # So a model reply rejected by the
+                                           # schema is journalled against the
+                                           # account it was asked for, rather
+                                           # than only printed to a log.
+                                           user_id=user_id,
                                            spread_pips=_recent_spread())
                         _last_ai[_nrm(symbol)] = {
                             "features": _now_feat, "signal": dict(signal),
@@ -4086,6 +4198,16 @@ def _loop(user_id, alert_fn, gen=None):
                                 # the snapshot lives for one tick and every
                                 # closed trade is journalled unlabelled.
                                 entry_meta_by_sym[_nrm(symbol)] = _entry_meta(open_pos)
+                                # §17: the thesis, written HERE and nowhere
+                                # else. This is the only moment the real fill
+                                # and the stop that was actually sent are both
+                                # known — from the next tick the broker reports
+                                # the CURRENT stop, which starts moving as soon
+                                # as the trail engages, and a thesis composed
+                                # from that would measure R against a number
+                                # that is no longer the trade's risk.
+                                _write_thesis(user_id, open_pos, symbol, action,
+                                              price, sl_price, tp_price, signal)
                             except Exception as _e:
                                 print(f"[UserLoop:{user_id}] entry snapshot failed: {_e}")
 
