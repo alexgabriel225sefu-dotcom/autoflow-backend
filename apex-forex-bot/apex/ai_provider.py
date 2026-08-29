@@ -216,14 +216,30 @@ class GroqProvider(AIProvider):
         return out if isinstance(out, str) else json.dumps(out)
 
     def health(self):
-        from apex import config as cfg
-        if not (getattr(cfg, "GROQ_API_KEY", "") or os.getenv("GROQ_API_KEY")):
+        if not _groq_key():
             return DISABLED, "no GROQ_API_KEY"
         # Deliberately not an inference. §42 says not to pay for one on every
         # health check, and for a hosted provider the only cheap signal is
         # whether a key is present — so this reports "configured", and the
         # first real call is what proves it works.
         return READY, f"{self.model} (hosted, free tier)"
+
+
+def _groq_key():
+    """The key, from wherever this platform actually keeps it.
+
+    Selection used to read os.environ while health read config, so the two
+    could disagree — a key loaded from a .env would be invisible to selection
+    and visible to health, and the provider would report DISABLED while the
+    direct call worked. One source for both.
+    """
+    try:
+        from apex import config as cfg
+        if getattr(cfg, "GROQ_API_KEY", ""):
+            return True
+    except Exception:
+        pass
+    return bool(os.getenv("GROQ_API_KEY"))
 
 
 # ── Selection ────────────────────────────────────────────────────────────
@@ -255,7 +271,7 @@ def select(force=False):
         p = NullProvider()
     elif os.getenv("OLLAMA_MODEL"):
         p = OllamaProvider()
-    elif os.getenv("GROQ_API_KEY"):
+    elif _groq_key():
         p = GroqProvider()
     else:
         p = NullProvider()
