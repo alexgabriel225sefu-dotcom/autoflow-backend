@@ -3422,6 +3422,22 @@ def _screen_risk_advanced(chat_id):
                 [{"text": "☰ Menu", "callback_data": "nav:menu"}]]}})
 
 
+def _handle_engine(chat_id):
+    """What the engine has actually done recently.
+
+    Reads only recorded events — it makes no broker call, changes nothing, and
+    reports absence as absence. The same report the platform sends itself
+    after each market open, available on demand.
+    """
+    try:
+        from apex import selfcheck, user_loop
+        r = selfcheck.build(str(chat_id), dash=user_loop.get_dash(str(chat_id)))
+        send_to(chat_id, selfcheck.format_report(r))
+    except Exception as e:
+        send_to(chat_id, "Engine status is unavailable right now "
+                         f"({str(e)[:80]}).")
+
+
 def _handle_risk(chat_id, args):
     args = (args or "").strip()
     if not args:
@@ -4393,6 +4409,7 @@ def _screen_live_activation(chat_id):
 # works; they are simply not how the product introduces itself.
 CLIENT_COMMANDS = [
     ("app", "Open the platform"),
+    ("engine", "What APEX has been doing"),
     ("markets", "Instruments and prices"),
     ("portfolio", "Equity and open positions"),
     ("history", "Your trade library and replay"),
@@ -6445,6 +6462,8 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _handle_paper(chat_id, args)
     elif cmd_l == "/risk":
         _handle_risk(chat_id, args)
+    elif cmd_l == "/engine":
+        _handle_engine(chat_id)
     elif cmd_l == "/sl":
         _handle_sl(chat_id, args)
     elif cmd_l == "/tp":
