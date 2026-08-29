@@ -3158,23 +3158,39 @@ def _loop(user_id, alert_fn, gen=None):
                 entry_ok = False
                 _skip(f"signal TTL expired ({_sig_age:.1f}s > 12s)")
             # ── Multi-position gates (live) ──
+            #
+            # The position cap and the correlation guard used to be written out
+            # here. They were correct, and they only ever ran on THIS path — so
+            # a manual /buy skipped both. They now live in apex/portfolio.py and
+            # `gates.authorize_order` calls them for every path.
+            #
+            # This block still runs, and is not a duplicate: it calls the same
+            # function. It is here to produce the DECLINE RECORD — the reason a
+            # setup was passed over, which §61 needs and which a denial inside
+            # gates would reach too late to attribute to this candidate. Gates
+            # remains the authority; this is the explanation.
             if entry_ok and not cfg.PAPER_TRADING:
                 if all_positions is None:
                     entry_ok = False  # couldn't read positions — don't stack blind
-                elif open_count >= maxpos:
-                    entry_ok = False
-                    _skip(f"at max positions ({open_count}/{maxpos})")
-                elif _nrm(symbol) in open_syms:
-                    entry_ok = False  # already holding this symbol
                 else:
-                    # Correlation guard: cap how many positions share the same
-                    # USD direction, so 5 trades aren't secretly one USD bet.
-                    new_exp = forex.usd_exposure(symbol, action)
-                    if new_exp != 0:
-                        same_dir = sum(1 for e in open_exposure if e == new_exp)
-                        if same_dir >= 2:
-                            entry_ok = False
-                            _skip(f"correlation guard — already {same_dir} {'USD-long' if new_exp>0 else 'USD-short'} positions")
+                    from apex import portfolio as _pf
+                    _exp = {"openCount": open_count, "maxPositions": maxpos,
+                            "symbols": sorted(open_syms),
+                            "usdBias": list(open_exposure)}
+                    _pok, _pcode, _pwhy = _pf.check(
+                        symbol, action, _exp,
+                        limits={"max_positions": maxpos,
+                                "max_same_usd_side": int(
+                                    getattr(cfg, "MAX_SAME_USD_SIDE", 0)
+                                    or _pf.DEFAULT_MAX_SAME_USD_SIDE)})
+                    if not _pok:
+                        entry_ok = False
+                        # Already holding the instrument is an ordinary state,
+                        # not a refusal worth telling the client about on every
+                        # tick it stays true.
+                        if _pcode != _pf.SYMBOL_ALREADY_OPEN:
+                            _skip(f"{_pf.deny_text(_pcode)}"
+                                  + (f" ({_pwhy})" if _pwhy else ""))
             # Daily trade cap. The Strategy Builder shows every client a
             # "Max trades/day" figure and bakes one into each risk preset
             # (Low 6 / Medium 10 / High 15), but nothing read the setting —
