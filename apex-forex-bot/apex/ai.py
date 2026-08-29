@@ -58,7 +58,7 @@ def _call_groq(prompt):
 _VALID_ACTIONS = ("BUY", "SELL", "HOLD")
 
 
-def _validate_verdict(raw):
+def _validate_verdict(raw, *, symbol=None, user_id=None):
     """Normalise a model's reply into a verdict, or None if it isn't one.
 
     `_extract_json` only guarantees the text contained *some* JSON object. What
@@ -79,6 +79,34 @@ def _validate_verdict(raw):
     """
     if not isinstance(raw, dict):
         return None
+    # Hard schema first (§40, §41). This checks what the shape check below
+    # cannot: whether the reply is an answer to the question that was ASKED.
+    # A well-formed verdict about a different instrument, or one carrying a
+    # price the model produced itself, passes every structural test and is
+    # exactly the failure mode that matters. The two layers are complementary
+    # — this one rejects, the one below normalises what survives.
+    try:
+        from apex import ai_schema as _sch
+        _clean, _why = _sch.safe_validate(
+            raw, allowed_actions=frozenset(_VALID_ACTIONS), symbol=symbol,
+            require_evidence=False)
+        if _clean is None:
+            print(f"[AI ❌] reply rejected by schema: {_why}")
+            if user_id:
+                try:
+                    from apex import trade_events as _te
+                    _te.record(user_id, _te.AI_REJECTED, symbol=symbol,
+                               payload={"code": _why,
+                                        "reply": str(raw)[:300]})
+                except Exception:
+                    pass
+            return None
+    except Exception as _se:
+        # A validator failure is a rejection, not a bypass. The rule engine's
+        # own verdict stands and trading continues without the model (§68).
+        print(f"[AI ❌] schema check failed ({_se}) — treating as unusable")
+        return None
+
     action = raw.get("action")
     if not isinstance(action, str):
         return None
@@ -170,7 +198,7 @@ _MODE_RULES = {
 def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion",
                symbol=None, timeframe=None, sl_pips=None, tp_pips=None,
                risk_pct=None, min_confidence=None, candles=None,
-               regime=None, spread_pips=None):
+               regime=None, spread_pips=None, user_id=None):
     """Rule-based signal is PRIMARY. AI confirms or blocks — never initiates.
 
     The trade context arguments matter more than they look. Without them the
@@ -369,7 +397,8 @@ Respond ONLY with valid JSON:
     # A reply that does not carry a usable decision is NOT a decision. It is
     # the same situation as the model being unreachable, and is handled the
     # same way — never as a HOLD, and never as a contradiction.
-    verdict = _validate_verdict(ai_sig)
+    verdict = _validate_verdict(ai_sig, symbol=_sym_lbl,
+                                user_id=user_id)
     if ai_sig is not None and verdict is None:
         print(f"[AI ❌] {mode} reply had no usable verdict "
               f"({str(ai_sig)[:120]}) — treating as unavailable")
