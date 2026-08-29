@@ -389,6 +389,15 @@ Respond ONLY with valid JSON:
     # chain, it is a branch that only ever costs an exception — and it kept
     # the boot log warning about a missing key nobody intended to add.
     # The chart is dropped here: Groq's Llama path is text-only.
+    # Deliberately still the direct call, not ai_provider.select().
+    #
+    # Routing this through the abstraction was tried and reverted. It moved
+    # the seam two test files inject at, and bought nothing: Groq is the only
+    # provider this deployment can reach, and will stay so until there is a
+    # machine that can run a local model. The abstraction exists for the AGENT
+    # (apex/agent.py), which is new code with no such history — retrofitting a
+    # working veto layer for symmetry is churn, and this layer has a veto over
+    # real orders.
     try:
         ai_sig = _call_groq(prompt)
     except Exception as err:
