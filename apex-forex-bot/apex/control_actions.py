@@ -178,6 +178,62 @@ def build():
         return {"user": uid, "record": u, "summary": _summarize(uid),
                 "dash": user_loop.get_dash(uid) or {}}
 
+    def h_trade_journal(args):
+        """The closed-trade journal, for analysis that needs more than the dash.
+
+        `dash["trades"]` is capped at 50 AND rebuilt in memory, so after a
+        restart it holds only what has closed since. The durable record is the
+        journal in the store, and until now nothing exposed it — which meant an
+        analysis of "what actually works" could only ever see the last few
+        days.
+
+        LABELLED IS THE NUMBER THAT MATTERS, NOT TOTAL
+
+        A row without a confidence carries no regime, no strategy version and
+        no entry snapshot. It says a trade happened and what it paid; it cannot
+        say why. `ev.labelled_count` is the platform's own definition of what
+        is measurable, and it is reported here beside the total so a caller
+        cannot mistake 131 rows for 131 usable observations.
+
+        Read-only. Touches no broker and changes nothing.
+        """
+        uid = str(args["user_id"])
+        rows = user_store.load_trades(uid) or []
+        n = max(1, min(int(args.get("limit", 200) or 200), 500))
+        labelled_only = bool(args.get("labelled_only"))
+
+        def _labelled(t):
+            pnl = t.get("netPnl") if t.get("netPnl") is not None else t.get("grossPnl")
+            return t.get("confidence") is not None and pnl is not None
+
+        sel = [t for t in rows if _labelled(t)] if labelled_only else rows
+        # Newest last in the store; the caller wants newest first.
+        out = list(reversed(sel))[:n]
+
+        # Only the fields an analysis reads. The journal also carries entry
+        # snapshots that are useful to the calibrator and noise here, and
+        # trimming keeps a 500-row answer from being mostly whitespace.
+        keep = ("time", "symbol", "side", "entry", "exit", "netPnl", "grossPnl",
+                "costUsd", "balance", "openedAt", "positionId", "confidence",
+                "regime", "spreadPips", "atr", "slPips", "tpPips", "probability",
+                "evR", "strategyId", "strategyVersion", "mode", "action", "win")
+        try:
+            from apex import ev as _ev
+            lab = _ev.labelled_count(rows)
+        except Exception:
+            lab = sum(1 for t in rows if _labelled(t))
+
+        return {
+            "user": uid,
+            "total": len(rows),
+            # Stated separately and deliberately: a caller reading `total` as
+            # the size of its sample would be measuring rows it cannot explain.
+            "labelled": lab,
+            "returned": len(out),
+            "labelledOnly": labelled_only,
+            "trades": [{k: t.get(k) for k in keep if k in t} for t in out],
+        }
+
     def h_events(args):
         from apex import control
         n = int(args.get("limit", 40))
@@ -373,6 +429,7 @@ def build():
     return {
         "status": h_status,
         "user_detail": h_user_detail,
+        "trade_journal": h_trade_journal,
         "events": h_events,
         "ctrader_account": h_ctrader_account,
         "restart_loop": h_restart_loop,
