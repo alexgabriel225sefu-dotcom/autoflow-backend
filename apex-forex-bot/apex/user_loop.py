@@ -647,12 +647,40 @@ def _profit_too_small_to_take(pos, price, symbol, initial_risk, user_id=""):
     except Exception:
         cost_move = 0.0
 
-    floor = cost_move
-    if initial_risk:
+    # Recover the risk this trade put up. Without it the max() below collapses
+    # to the cost floor — two or three pips — and the 1R rule stops existing
+    # while still looking present. That is not a rare path: entry_risk_by_sym
+    # is in-memory and empty after every restart, and the recovery beside it
+    # reads `open_position_snapshot`, which holds ONE position while maxpos is
+    # 2. Live, that cut AUDUSD at 0.52R and GBPUSD at 0.53R on 1:2 targets.
+    #
+    # Each source is the same quantity measured a different way, most exact
+    # first: the value the caller pinned at entry, the entry-to-original-stop
+    # distance, the slPips recorded in the entry snapshot, and finally the
+    # configured stop. The last is a floor of last resort, not an estimate of
+    # this trade — but a real stop distance is a far better guess than zero,
+    # which is what "no risk known" silently meant before.
+    risk = None
+    for candidate in (
+            lambda: abs(float(initial_risk)) if initial_risk else None,
+            lambda: (abs(entry - float(pos["initialStop"]))
+                     if pos.get("initialStop") else None),
+            lambda: (forex.from_pips(float(pos["entrySlPips"]), symbol, px)
+                     if pos.get("entrySlPips") else None),
+            lambda: forex.from_pips(
+                float(getattr(cfg_mod, "STOP_LOSS_PIPS", 0) or 0), symbol, px),
+    ):
         try:
-            floor = max(floor, float(initial_risk) * min_r)
-        except (TypeError, ValueError):
-            pass
+            got = candidate()
+        except (TypeError, ValueError, KeyError, ZeroDivisionError):
+            continue
+        if got and got > 0:
+            risk = got
+            break
+
+    floor = cost_move
+    if risk:
+        floor = max(floor, risk * min_r)
 
     # Compare in pips, not raw price. 15 pips of AUDUSD is 0.0015 one way and
     # 0.0014999999999999 the other depending on which subtraction produced it,
