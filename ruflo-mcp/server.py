@@ -43,8 +43,8 @@ _REDIS = {
 # the literal "ruflo", published in this repository — so the whole operator
 # surface sat at a URL anyone could type. Financial actions were still safe
 # (the bot refuses level 2/3 without MCP_SIGNING_SECRET), but the read tools
-# are not nothing: user_detail, audit_log and bot_status expose client
-# records. Production now refuses to start rather than serve them from a
+# are not nothing: user_detail, trade_journal, audit_log and bot_status expose
+# client records. Production now refuses to start rather than serve them from a
 # guessable path.
 _SECRET = (os.getenv("RUFLO_MCP_SECRET") or "").strip()
 _IS_PROD = (os.getenv("APP_ENV") or "").strip().lower() not in (
@@ -172,6 +172,27 @@ def bot_status(product: str) -> dict:
 def user_detail(product: str, user_id: str) -> dict:
     """Full (token-redacted) settings + dashboard for one user."""
     return _call(product, "user_detail", {"user_id": user_id})
+
+
+@mcp.tool()
+def trade_journal(product: str, user_id: str, limit: int = 200,
+                  labelled_only: bool = False) -> dict:
+    """The full closed-trade journal for one user — newest first.
+
+    Use this instead of user_detail when analysing performance. The dash's
+    trade list is capped at 50 and rebuilt in memory, so after a restart it
+    holds only what has closed since; this reads the durable journal.
+
+    The reply reports `total` and `labelled` separately, and the difference
+    matters: a row without a confidence has no regime, no strategy version and
+    no entry snapshot, so it can say a trade happened but not why. Only the
+    labelled rows can answer "what works". Pass labelled_only=True to get just
+    those.
+
+    Read-only. Makes no broker call and changes nothing.
+    """
+    return _call(product, "trade_journal", {
+        "user_id": user_id, "limit": limit, "labelled_only": labelled_only})
 
 
 @mcp.tool()
