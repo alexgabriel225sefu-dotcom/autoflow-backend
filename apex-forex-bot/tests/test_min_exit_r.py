@@ -85,15 +85,31 @@ for loss_pips in (0.1, 0.7, 2.4, 9.3, 10.8):
 check("exactly flat exits freely",
       blocked(pos("SELL"), 0.70581, SYM, RISK_15) is False)
 
-print("\n── cost floor applies when no risk is pinned ──")
-# No initial_risk (position adopted mid-flight): fall back to round-trip cost.
+print("\n── an unpinned risk is RECOVERED, not waived ──")
+# This section used to assert the opposite: with no initial_risk the floor fell
+# back to round-trip cost alone, on the reasoning that a position adopted
+# mid-flight has no risk on record. Live trading showed what that costs. The
+# path is common, not exceptional — entry_risk_by_sym is in-memory and empty
+# after every restart, and the recovery beside it reads
+# `open_position_snapshot`, which holds ONE position while maxpos is 2 — and a
+# spread-sized floor is no floor: AUDUSD (20-pip stop) was taken at +10.5 and
+# GBPUSD (39.1-pip stop) at +20.6, both on 1:2 targets.
+#
+# So the risk is now reconstructed from the position itself and, failing that,
+# from the configured stop. Same reasoning _manage_trailing already applies one
+# function above: a risk figure we cannot know is not a reason to measure the
+# wrong thing, and "unknown" must not quietly mean "zero".
 check("0.5 pips with a 0.7-pip spread is blocked (cannot pay 1.4 pips cost)",
       blocked(pos("SELL", spread=0.7), 0.70581 - 0.5 * PIP, SYM, None) is True)
-check("3 pips with a 0.7-pip spread clears the cost floor",
-      blocked(pos("SELL", spread=0.7), 0.70581 - 3 * PIP, SYM, None) is False)
-check("no risk AND no spread on record → nothing to enforce, allow",
+check("3 pips is now blocked too — the configured stop supplies a real floor",
+      blocked(pos("SELL", spread=0.7), 0.70581 - 3 * PIP, SYM, None) is True)
+check("no risk and no spread on record still gets the configured floor",
       blocked({"side": "SELL", "entryPrice": 0.70581, "symbol": SYM},
-              0.70581 - 0.2 * PIP, SYM, None) is False)
+              0.70581 - 0.2 * PIP, SYM, None) is True)
+check("a position carrying its own stop uses THAT, not the config",
+      blocked(pos("SELL", spread=0.7) | {"initialStop": 0.70581 + 15 * PIP},
+              0.70581 - 20 * PIP, SYM, None) is False,
+      "20 pips on the position's own 15-pip stop is 1.33R and must pass")
 
 print("\n── malformed input never blocks a close ──")
 check("no entry price", blocked({"side": "SELL"}, 0.70583, SYM, RISK_15) is False)
@@ -102,8 +118,11 @@ check("junk entry price",
       blocked({"side": "SELL", "entryPrice": "n/a"}, 0.70583, SYM, RISK_15) is False)
 check("junk price",
       blocked(pos("SELL"), None, SYM, RISK_15) is False)
-check("junk risk falls back to the cost floor",
-      blocked(pos("SELL"), 0.70581 - 3 * PIP, SYM, "oops") is False)
+check("junk risk is ignored and the real floor still applies",
+      blocked(pos("SELL"), 0.70581 - 3 * PIP, SYM, "oops") is True,
+      "unreadable input must not become a waiver — the other checks in this "
+      "section pass because `move` itself cannot be computed, which is a "
+      "different thing from a risk we can recover another way")
 
 print("\n── MIN_EXIT_R=0 disables the gate entirely ──")
 os.environ["MIN_EXIT_R"] = "0"
