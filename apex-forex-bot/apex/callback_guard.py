@@ -37,8 +37,8 @@ import time
 # something a caller can smuggle in as a string.
 NAMESPACES = {
     "nav", "go", "am", "pf", "emg", "pos", "live", "acct", "bot", "ob",
-    "bld", "risk", "reset", "cp", "purgebad", "tr", "strat", "sig", "ui",
-    "notif", "voice",
+    "bld", "risk", "reset", "cp", "purgebad", "markart", "tr", "strat", "sig",
+    "ui", "notif", "voice",
 }
 
 # Actions that change money, settings or the account binding. Navigation is
@@ -46,7 +46,10 @@ NAMESPACES = {
 # be solved, and rate-limiting it would make the bot feel broken.
 ACTION_NAMESPACES = {
     "am", "emg", "pos", "live", "acct", "bot", "risk", "reset", "cp",
-    "purgebad", "tr", "ob",
+    # purgebad deletes journal rows; markart relabels them so they stop
+    # counting toward a client's totals. Neither is navigation, and a double
+    # tap on either rewrites the one record a client cannot reconstruct.
+    "purgebad", "markart", "tr", "ob",
     # Issuing a voice key REPLACES the previous one, so a double tap silently
     # kills a working shortcut on a phone that is not in the room. Revoking is
     # the same shape of change. Neither is navigation.

@@ -811,23 +811,33 @@ def clear_trades(user_id):
 def save_trades(user_id, trades):
     """Replace the whole closed-trade journal.
 
-    Only the backfill uses this (scripts/backfill_trades.py). Everything in the
+    Used by the backfill and by the artefact migration. Everything in the
     running platform appends, because a journal is append-only in spirit: it is
     the one record a client cannot reconstruct, and the tax export reads it.
 
     The write is refused rather than half-done if the payload is not a list.
     Same 500-row bound as append_trade, applied from the END so a rewrite can
     never quietly drop the newest trades.
+
+    Returns True only when the write is confirmed. It used to return None
+    whatever happened, so a caller asking "did that save?" got a falsy answer
+    on success and could only either ignore the result or report a failure that
+    had not occurred. That matters more since Upstash writes of a large journal
+    were failing outright with 431.
     """
     user_id = str(user_id)
     if not isinstance(trades, list):
         raise TypeError("save_trades expects a list of trade records")
     payload = json.dumps(trades[-500:])
     if _USE_REDIS:
-        _redis_set(f"{_NS}:trades:{user_id}", payload)
-        return
-    with open(_path(user_id) + ".trades", "w") as f:
-        f.write(payload)
+        return bool(_redis_set(f"{_NS}:trades:{user_id}", payload))
+    try:
+        with open(_path(user_id) + ".trades", "w") as f:
+            f.write(payload)
+        return True
+    except Exception as e:
+        print(f"[Store] save_trades failed for {user_id}: {e}")
+        return False
 
 
 def append_trade(user_id, record):
