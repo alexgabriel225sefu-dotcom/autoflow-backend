@@ -257,6 +257,15 @@ check("purgebad still deletes and markartefacts still does not",
       and "save_trades" not in _purge,
       "the two commands must stay distinguishable: one removes, one labels")
 
+print("\n11. The control plane cannot start the flow on a client's behalf")
+_ca = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "apex", "control_actions.py"), encoding="utf-8").read()
+_deny = _ca[_ca.index("_MSG_DENY = {"):]
+_deny = _deny[:_deny.index("}")]
+check("/markartefacts is denied to client_message, like /purgebad",
+      '"/markartefacts"' in _deny and '"/purgebad"' in _deny,
+      "which rows stop counting as a client's own trades is the client's call")
+
 print("\n" + "=" * 66)
 if failures:
     print(f"FAILED {len(failures)}: {', '.join(failures[:6])}")
