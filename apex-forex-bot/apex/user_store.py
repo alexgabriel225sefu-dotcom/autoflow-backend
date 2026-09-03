@@ -392,7 +392,13 @@ def _redis_set(key, value_str):
         except Exception as e:
             print(f"[Redis] SET failed for {key}: {e}")
             return False
-    res = _upstash(["SET", key, value_str])
+    # POST, not the GET path form: the value would otherwise ride in the URL,
+    # and a value that outgrows the edge's limit fails PERMANENTLY — it never
+    # shrinks back, so every retry sends the same oversized request. Seen live
+    # as `431 Request Header Fields Too Large` on evt:user:*, retried four
+    # times and abandoned. This same function writes the closed-trade journal
+    # (500 rows) and whole user records, where a lost write loses a trade.
+    res = _upstash_post(["SET", key, value_str])
     if res is None:
         print(f"[Redis] SET returned no result for {key} — treating as FAILED")
         return False
@@ -545,7 +551,8 @@ def set_blob(key, value_str, ttl_s=None):
         except Exception as e:
             print(f"[Redis] SET ex failed: {e}")
             return None
-    return _upstash(["SET", key, value_str, "EX", int(ttl_s)])
+    # POST for the same reason as _redis_set: the value must not be in the URL.
+    return _upstash_post(["SET", key, value_str, "EX", int(ttl_s)])
 
 
 def _redis_sadd(key, member):
