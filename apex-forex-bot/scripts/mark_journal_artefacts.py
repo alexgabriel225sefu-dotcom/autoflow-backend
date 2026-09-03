@@ -47,40 +47,14 @@ Apply:
 
 Idempotent: a row already marked is left alone and reported as such.
 """
-import statistics
 import sys
 
 sys.path.insert(0, ".")
-from apex import forex, user_store  # noqa: E402
+from apex import journal_audit, user_store  # noqa: E402
 
-FOREIGN_BALANCE_MULTIPLE = 10.0
-IMPOSSIBLE_PNL_FRACTION = 0.20
-
-
-def classify(row, median_balance):
-    """Return a reason string, or None when the row looks like a real trade."""
-    bal = row.get("balance")
-    sym = row.get("symbol")
-    pnl = row.get("netPnl")
-    if pnl is None:
-        pnl = row.get("grossPnl")
-
-    try:
-        if bal and median_balance and float(bal) > median_balance * FOREIGN_BALANCE_MULTIPLE:
-            return "foreign_account"
-    except (TypeError, ValueError):
-        pass
-
-    if sym and not forex.is_tradeable(str(sym)):
-        return "foreign_instrument"
-
-    try:
-        if bal and pnl is not None and float(bal) > 0:
-            if abs(float(pnl)) > float(bal) * IMPOSSIBLE_PNL_FRACTION:
-                return "impossible_size"
-    except (TypeError, ValueError):
-        pass
-    return None
+FOREIGN_BALANCE_MULTIPLE = journal_audit.FOREIGN_BALANCE_MULTIPLE
+IMPOSSIBLE_PNL_FRACTION = journal_audit.IMPOSSIBLE_PNL_FRACTION
+classify = journal_audit.classify
 
 
 def main():
@@ -97,25 +71,9 @@ def main():
         return
     print(f"Loaded {len(rows)} rows for {uid}.")
 
-    balances = [float(r["balance"]) for r in rows
-                if r.get("balance") not in (None, "")]
-    median_balance = statistics.median(balances) if balances else 0.0
-    print(f"Median balance: {median_balance:,.2f}  "
-          f"(foreign above {median_balance * FOREIGN_BALANCE_MULTIPLE:,.2f})\n")
-
-    already = [r for r in rows if user_store.is_artefact(r)]
-    out, newly = [], []
-    for r in rows:
-        if user_store.is_artefact(r):
-            out.append(r)
-            continue
-        reason = classify(r, median_balance)
-        if reason:
-            marked = {**r, user_store.ARTEFACT_FIELD: reason}
-            out.append(marked)
-            newly.append(marked)
-        else:
-            out.append(r)
+    out, newly, already, med = journal_audit.plan(rows)
+    print(f"Median balance: {med:,.2f}  "
+          f"(foreign above {med * FOREIGN_BALANCE_MULTIPLE:,.2f})\n")
 
     if already:
         print(f"{len(already)} row(s) already marked, left alone:")

@@ -13,6 +13,7 @@ import requests
 from apex import config as cfg
 from apex import attribution
 from apex import forex
+from apex import journal_audit
 from apex import access
 from apex import user_store
 from apex import user_loop
@@ -54,6 +55,7 @@ _wizards = {}      # per-chat wizard state: {chat_id: {step: str, data: dict}}
                    # MUST be per-chat — many clients run /setup on the same shared
                    # bot at once; a single global dict would clobber their flows.
 _purge_pending = {}  # chat_id -> target user_id awaiting /purgebad confirmation
+_markart_pending = {}  # chat_id -> target user_id awaiting /markartefacts confirmation
 _bot_control = {}  # callbacks: {set_paused, get_paused, reload_broker}
 
 _PAIR_RE = re.compile(r"^[A-Z]{3}_[A-Z]{3}$")
@@ -2609,7 +2611,10 @@ def _route_cb(chat_id, data):
             target = _purge_pending.pop(str(chat_id), None)
         if not target:
             return send_to(chat_id, "⌛ That request expired — send /purgebad again.")
-        trades = user_store.load_trades(target)
+        # RAW: load_trades() hides artefact-marked rows, and this writes the
+        # whole list back — filtering here would delete every marked row as a
+        # side effect of removing a six-figure one.
+        trades = user_store.load_trades(target, include_artefacts=True)
         good = [t for t in trades if abs(t.get("netPnl") or 0) <= _PURGE_THRESHOLD
                 and abs(t.get("grossPnl") or 0) <= _PURGE_THRESHOLD]
         removed = len(trades) - len(good)
@@ -2620,6 +2625,29 @@ def _route_cb(chat_id, data):
             with open(user_store._path(target) + ".trades", "w") as f:
                 f.write(json.dumps(good))
         send_to(chat_id, f"✅ Removed {removed} corrupted record(s) — {len(good)} remain in the journal.")
+    elif data == "markart:yes":
+        with _lock:
+            target = _markart_pending.pop(str(chat_id), None)
+        if not target:
+            return send_to(chat_id, "⌛ That request expired — send /markartefacts again.")
+        rows = user_store.load_trades(target, include_artefacts=True)
+        out, newly, _already, _med = journal_audit.plan(rows)
+        if not newly:
+            return send_to(chat_id, "✅ Nothing to mark — the journal is already clean.")
+        if not user_store.save_trades(target, out):
+            return send_to(chat_id, "⚠️ The write did not confirm — nothing changed. "
+                                    "Try again in a moment.")
+        real = user_store.load_trades(target)
+        net = sum(float(t.get("netPnl") or 0) for t in real)
+        send_to(chat_id,
+                f"✅ Marked {len(newly)} row(s) as artefacts. Nothing was deleted — "
+                f"they stay in the journal and in your backups, just outside the totals.\n"
+                f"Your journal now reads <b>{len(real)} trades, "
+                f"{'+' if net >= 0 else ''}${net:,.2f} net</b>.")
+    elif data == "markart:no":
+        with _lock:
+            _markart_pending.pop(str(chat_id), None)
+        send_to(chat_id, "✖️ Cancelled — nothing changed.")
     elif data == "purgebad:no":
         with _lock:
             _purge_pending.pop(str(chat_id), None)
@@ -4783,6 +4811,51 @@ def _handle_purge_bad(chat_id, args):
                 {"text": "✖️ Cancel", "callback_data": "purgebad:no"}]]}})
 
 
+def _handle_mark_artefacts(chat_id, args):
+    """Admin-only: flag journal rows that are not this account's trades.
+
+    Distinct from /purgebad, which DELETES rows above a size threshold. This
+    marks and keeps them: the journal is the one record a client cannot
+    reconstruct, and a row that is wrong is still evidence something wrote it.
+    Marked rows stop counting toward net P&L, win rate and drawdown, and stay
+    in the file and in backups.
+
+    Dry run until the button is pressed, and it shows every row it would mark
+    with the reason, so the decision is reviewable rather than trusted.
+    """
+    target = (args or "").strip() or str(chat_id)
+    rows = user_store.load_trades(target, include_artefacts=True)
+    if not rows:
+        return send_to(chat_id, f"📒 No journal for <code>{target}</code>.")
+    out, newly, already, med = journal_audit.plan(rows)
+
+    if not newly:
+        note = (f"\n{len(already)} row(s) already marked." if already else "")
+        return send_to(chat_id,
+                       f"✅ Journal for <code>{target}</code> looks clean — "
+                       f"{len(rows)} rows, nothing new to flag.{note}")
+
+    lines = "\n".join(
+        f"• {t.get('time','?')} {t.get('symbol','?')} "
+        f"${float(t.get('netPnl') or 0):,.2f} — <i>{t[user_store.ARTEFACT_FIELD]}</i>"
+        for t in newly[:10])
+    removed = sum(float(t.get("netPnl") or 0) for t in newly)
+    real = [t for t in out if not user_store.is_artefact(t)]
+    real_net = sum(float(t.get("netPnl") or 0) for t in real)
+    with _lock:
+        _markart_pending[str(chat_id)] = target
+    send_to(chat_id,
+            f"🔍 <b>{len(newly)} row(s) do not look like this account's trades</b>\n"
+            f"<i>median balance ${med:,.2f}</i>\n\n{lines}\n\n"
+            f"They account for <b>${removed:,.2f}</b>.\n"
+            f"Without them: <b>{len(real)} trades, "
+            f"{'+' if real_net >= 0 else ''}${real_net:,.2f} net</b>.\n\n"
+            "Mark them? They are kept in the journal, just excluded from your totals.",
+            extra={"reply_markup": {"inline_keyboard": [[
+                {"text": "🏷 Mark them", "callback_data": "markart:yes"},
+                {"text": "✖️ Cancel", "callback_data": "markart:no"}]]}})
+
+
 def _handle_users(chat_id):
     admins  = access.list_admins()
     clients = access.list_clients()
@@ -6410,6 +6483,8 @@ def dispatch_command(chat_id, raw, msg_id=None, first_line=None,
         _handle_revoke(chat_id, args)
     elif cmd_l == "/purgebad" and is_adm:
         _handle_purge_bad(chat_id, args)
+    elif cmd_l == "/markartefacts" and is_adm:
+        _handle_mark_artefacts(chat_id, args)
     elif cmd_l == "/setup":
         # Every paying client self-configures their OWN trading via the
         # wizard (writes only their user record); admin extras apply
