@@ -116,7 +116,10 @@ def dump():
                 print(f"[Backup] user {uid} is not valid JSON — skipped",
                       file=sys.stderr)
         try:
-            out["journals"][uid] = user_store.load_trades(uid) or []
+            # Everything, artefacts included: a backup that quietly drops
+            # rows cannot restore what was there.
+            out["journals"][uid] = user_store.load_trades(
+                uid, include_artefacts=True) or []
         except Exception as e:
             print(f"[Backup] journal for {uid} unreadable: {e}", file=sys.stderr)
 
