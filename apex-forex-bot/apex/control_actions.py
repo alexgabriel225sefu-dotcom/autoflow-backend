@@ -359,6 +359,11 @@ def build():
         "/setkeys",      # credential rotation
         "/deploy",       # ships code
         "/purgebad",     # destroys journal rows
+        # Only previews until a button is pressed, and the control plane
+        # cannot press it. Listed anyway: deciding which of a client's rows
+        # stop counting as their own trades belongs to the client, and the
+        # preview is where that decision is made.
+        "/markartefacts",
         "/grant", "/revoke",   # access control
         "/buy", "/sell", "/close",   # use force_trade / force_close instead
     }
