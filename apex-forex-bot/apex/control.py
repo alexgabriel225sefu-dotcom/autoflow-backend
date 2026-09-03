@@ -79,6 +79,11 @@ WRITE_ACTIONS = {"restart_loop", "bot_on", "bot_off", "refresh_token",
 LEVEL_1_READ = {
     "status", "user_detail", "events", "ctrader_account", "audit_log",
     "recent_commands", "recent_events",
+    # The closed-trade journal. A read like the rest of this set: it loads the
+    # stored rows, filters them through an allowlist and returns them. It
+    # reaches no broker and changes nothing. Unlisted actions default to level
+    # 3 and are refused, which is why this line has to exist at all.
+    "trade_journal",
     "bot_alive", "bot_status",
     # The ops API (see apex/ops_api.py). All read-only by construction.
     "ops_system_health", "ops_user_health", "ops_user_license",
