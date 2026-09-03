@@ -60,14 +60,25 @@ def seed(events):
 print("\n🧪 NEWS PANEL — it must actually have something to show\n")
 
 print("1. The timezone bug that hid events from their own day")
-# 01:30 UTC today, written as 21:30 yesterday in the feed's -04:00 offset.
+# An early-UTC time today, written as the PREVIOUS day in the feed's -04:00
+# offset — that mismatch is the bug this guards.
+#
+# The hour is derived from the clock rather than pinned at 01:30, because the
+# assertion below also requires the event to have HAPPENED. A fixed 01:30 is
+# still in the future whenever this runs between midnight and 01:30 UTC, so
+# the check failed for ninety minutes a day and said the code was broken when
+# it was the fixture that was. Pick the latest instant that is both today and
+# already past, capped inside the early-UTC window so the -04:00 rendering
+# still lands on the previous day.
 now = datetime.now(timezone.utc)
-utc_early = now.replace(hour=1, minute=30, second=0, microsecond=0)
+_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+utc_early = min(max(_midnight, now - timedelta(minutes=5)),
+                _midnight + timedelta(hours=3, minutes=59))
 seed([{"title": "Employment Change", "currency": "AUD", "impact": "High",
        "time": utc_early.astimezone(timezone(timedelta(hours=-4))).isoformat(),
        "forecast": "11.7K", "previous": "76.3K", "actual": None}])
 got = news.today()
-check("an event at 01:30 UTC counts as today",
+check("an early-UTC event counts as today, not yesterday",
       len(got) == 1 and got[0]["title"] == "Employment Change",
       f"got {got} — the feed wrote it as {utc_early.astimezone(timezone(timedelta(hours=-4)))}")
 check("and it is marked released, not upcoming",
