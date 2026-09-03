@@ -833,7 +833,10 @@ def save_trades(user_id, trades):
 def append_trade(user_id, record):
     """Append a closed-trade record to the user's tax journal (keeps last 500)."""
     user_id = str(user_id)
-    trades = load_trades(user_id)
+    # RAW on purpose. This reads the journal, appends, and writes the whole
+    # list back — a filtering read would drop every marked row on the next
+    # closed trade, deleting the evidence the mark exists to preserve.
+    trades = load_trades(user_id, include_artefacts=True)
     trades.append(record)
     trades = trades[-500:]
     payload = json.dumps(trades)
@@ -847,8 +850,39 @@ def append_trade(user_id, record):
         print(f"[Store] append_trade failed: {e}")
 
 
-def load_trades(user_id):
-    """Load the user's closed-trade journal, or [] if none."""
+ARTEFACT_FIELD = "artefact"
+
+
+def is_artefact(row) -> bool:
+    """True when a row is marked as not being one of this account's trades.
+
+    The mark is a non-empty REASON, never a bare flag: a row excluded from a
+    client's totals has to say on what grounds. An empty string or a null is
+    not a verdict and does not exclude anything.
+    """
+    try:
+        return bool(str(row.get(ARTEFACT_FIELD) or "").strip())
+    except AttributeError:
+        return False
+
+
+def load_trades(user_id, include_artefacts=False):
+    """Load the user's closed-trade journal, or [] if none.
+
+    Rows marked as artefacts are excluded BY DEFAULT. A backfill once wrote
+    five rows from a different (470k) account into a 3k account's journal, and
+    every total built on this list — /report's net P&L, win rate, profit
+    factor, drawdown — stated them as the client's own results.
+
+    The default is the safe one because sixteen call sites read this, and the
+    seventeenth would not remember to filter.
+
+    `include_artefacts=True` returns the journal exactly as stored. Two callers
+    need it and both would otherwise destroy data: append_trade re-reads,
+    appends and writes the whole list back, so a filtering read would delete
+    every marked row on the next closed trade; and a backup that silently drops
+    rows is not a backup.
+    """
     user_id = str(user_id)
     if _USE_REDIS:
         raw = _redis_get(f"{_NS}:trades:{user_id}")
@@ -859,7 +893,10 @@ def load_trades(user_id):
             raw = None
     if raw:
         try:
-            return json.loads(raw)
+            rows = json.loads(raw)
+            if include_artefacts:
+                return rows
+            return [t for t in rows if not is_artefact(t)]
         except Exception:
             pass
     return []
