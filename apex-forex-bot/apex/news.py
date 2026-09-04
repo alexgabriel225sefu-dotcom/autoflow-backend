@@ -283,6 +283,49 @@ def high_impact_window(currencies, window=None):
         return None
 
 
+def next_high_impact(currencies, within_min):
+    """The nearest high-impact release still AHEAD, within `within_min` minutes.
+
+    Deliberately one-sided, which is the whole difference from
+    high_impact_window() above. That one is symmetric ±window and is right for
+    an ENTRY: the minutes after a print are as untradeable as the ones before,
+    so the bot should not open into either side of it.
+
+    A position that is ALREADY open asks a different question, and the
+    symmetric answer is wrong for it. Once the number is out, the move it
+    caused is in the price; closing 20 minutes later books that move instead
+    of avoiding it. Only a release still ahead is a reason to get flat.
+
+    Fail-open like every other lookup here: no data, a dead feed, the guard
+    switched off, or any error at all returns None and nothing acts on it.
+    """
+    try:
+        if not enabled():
+            return None
+        win = float(within_min)
+        if win <= 0:
+            return None
+        curset = {str(c).upper() for c in currencies}
+        now = datetime.now(timezone.utc)
+        best, best_mins = None, None
+        for e in _load():
+            if not _impact_high(e.get("impact")):
+                continue
+            if e.get("currency") not in curset:
+                continue
+            t = _parse_time(e.get("time"))
+            if not t:
+                continue
+            mins = (t - now).total_seconds() / 60.0
+            if 0 <= mins <= win and (best_mins is None or mins < best_mins):
+                best_mins = mins
+                best = {"title": e["title"], "currency": e["currency"],
+                        "mins": int(mins), "time": e["time"]}
+        return best
+    except Exception:
+        return None
+
+
 def upcoming(currencies=None, hours=24, limit=8):
     """List upcoming high-impact events in the next `hours` (for /news). Fail-open."""
     try:
