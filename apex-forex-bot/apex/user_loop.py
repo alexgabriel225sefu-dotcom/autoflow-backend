@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import access, sentinel, institutional, cot, ledger
-from apex import automation, gates, ownership, news_alerts
+from apex import automation, gates, ownership, news_alerts, regime_gate
 from apex import strategy_api
 # Registering the shipped modules is what makes strategy_api.get() return
 # anything. Without this the registry is empty, every lookup misses, and the
@@ -1088,6 +1088,10 @@ def _make_broker(user):
         SENTINEL_MIN_CONFIDENCE = getattr(_appcfg, "SENTINEL_MIN_CONFIDENCE", None),
         SENTINEL_TTL_S     = int(getattr(_appcfg, "SENTINEL_TTL_S", 0) or 0),
         INSTITUTIONAL_GATE = getattr(_appcfg, "INSTITUTIONAL_GATE", "shadow"),
+        # Regime entry gate. Same warning again: a key absent here is a key the
+        # loop cannot read, and REGIME_GATE=off in the environment would do
+        # nothing while looking like it had worked.
+        REGIME_GATE        = getattr(_appcfg, "REGIME_GATE", "enforce"),
     )
     broker = _CtraderBroker(fake_cfg)
     # Refine the LEVERAGE guess with the broker's real, per-instrument value
@@ -3504,6 +3508,43 @@ def _loop(user_id, alert_fn, gen=None):
             if entry_ok and regime_block:
                 entry_ok = False
                 _skip(regime.get("label", "market too quiet"))
+
+            # ── Regime entry gate (apex/regime_gate.py) ──
+            # The block above only runs in AUTO. A PINNED strategy never sees
+            # the regime→engine mapping at all, so a retracement engine trades
+            # every regime including the one it fades. On this account's own
+            # labelled journal, 42 trades:
+            #   fibonacci in ranging   n=14  net +132.52  win 71.4%  ← kept
+            #   fibonacci in trending  n= 7  net -180.47  win 28.6%  ← refused
+            # 59% of recent losses sat in that second row, five straight SELLs
+            # into strength. The gate refuses the entry and nothing else — it
+            # cannot close, cannot order, and never reaches authorize_order.
+            #
+            # `active_mode` and not cfg.STRATEGY: in AUTO that is the engine
+            # the regime already chose, so the gate is a no-op there by
+            # construction rather than by luck.
+            if entry_ok:
+                try:
+                    _rg_mode = getattr(cfg, "REGIME_GATE", "enforce")
+                    _rg_refuse, _rg_why = regime_gate.decide(
+                        active_mode, regime.get("regime"), _rg_mode)
+                    dash["regimeGate"] = (
+                        _rg_why if regime_gate.mode(_rg_mode) == "enforce"
+                        else f"{_rg_why} ({regime_gate.mode(_rg_mode)})")
+                    if _rg_refuse:
+                        entry_ok = False
+                        _skip(f"regime gate: {_rg_why}")
+                    elif regime_gate.mode(_rg_mode) == "shadow" and not \
+                            regime_gate.entry_allowed(
+                                active_mode, regime.get("regime"))[0]:
+                        print(f"[UserLoop:{user_id}] regime gate shadow: "
+                              f"WOULD BLOCK {action} {symbol} — {_rg_why}")
+                except Exception as e:
+                    # Seven trades is a small sample; a bug in the correction
+                    # must never be able to stand a live account down. Fail
+                    # OPEN, like the sentinel and institutional gates below.
+                    print(f"[UserLoop:{user_id}] regime gate error: {e}")
+
             if entry_ok and getattr(cfg, "HTF_CONFIRM", False):
                 htf_c = None
                 try:

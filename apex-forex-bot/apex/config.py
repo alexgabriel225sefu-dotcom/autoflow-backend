@@ -265,6 +265,19 @@ SENTINEL_TTL_S = int(os.getenv("SENTINEL_TTL_S") or 0)
 # usable — thin coverage is handled inside institutional.build().
 INSTITUTIONAL_GATE = (os.getenv("INSTITUTIONAL_GATE") or "shadow").strip().lower()
 
+# Regime entry gate (see apex/regime_gate.py). Refuses ENTRIES for a
+# mean-reversion-shaped strategy in the regime it is built to lose in. Same
+# three modes as the gates above, but the only one that defaults to `enforce`:
+# those are models whose refusals cannot be predicted without watching them
+# first, this is a fixed strategy→regime table whose answer shadow mode would
+# only read back. Measured on the live account (42 labelled trades):
+#   fibonacci in ranging   n=14  net +132.52  win 71.4%   ← kept
+#   fibonacci in trending  n= 7  net -180.47  win 28.6%   ← refused
+# 59% of recent losses came from that second row. Seven trades is a small
+# sample, so the retreat is this variable and no deploy: shadow to watch, off
+# to remove.
+REGIME_GATE = (os.getenv("REGIME_GATE") or "enforce").strip().lower()
+
 # Show the AI the actual chart, not just indicator values. Structure — where
 # price keeps failing, whether a level was tested once or five times, whether
 # the approach looks impulsive or exhausted — does not survive being flattened
