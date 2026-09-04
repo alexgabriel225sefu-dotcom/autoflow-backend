@@ -5186,6 +5186,30 @@ def _user_alert(uid, result):
                          + ("Back to trading normally."
                             if guarded else
                             "The release has passed and the market is settling."))
+    elif action == "NEWS_FLATTEN":
+        # A close the client did not ask for, so this message has to name the
+        # release that caused it. The weekend flatten's rule applies here too:
+        # report what ACTUALLY happened, and lead with any position still open,
+        # because that is the half the client can still act on.
+        ev = result.get("event") or {}
+        ccy = _esc(str(ev.get("currency") or ""))
+        title = _esc(str(ev.get("title") or "a high-impact release"))
+        _closed = result.get("closed") or []
+        _failed = result.get("failed") or []
+        _lines = []
+        if _failed:
+            _lines.append(
+                f"⚠️ Still open: <b>{_esc(', '.join(_failed))}</b> — I couldn't "
+                "close it. Close it yourself in cTrader if you'd rather not "
+                "hold it through the release.")
+        if _closed:
+            _lines.append(f"Closed: <b>{_esc(', '.join(_closed))}</b>")
+        send_to(uid,
+                f"📰 <b>{ccy} · {title} is minutes away</b>\n"
+                + "\n".join(_lines) + "\n\n"
+                "<i>Spreads blow out and price gaps around a release — a stop "
+                "can fill well past its own level, so I'd rather be flat. "
+                "I'll look for setups again once it has passed.</i>")
     elif action == "SUGGEST":
         # Trade Opportunity — the approval-required variant. The state banner
         # is not decoration: "is this my demo or my real account" is the first

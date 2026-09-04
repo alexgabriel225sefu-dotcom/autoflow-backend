@@ -31,6 +31,11 @@ ESSENTIAL = {
     # market shut" and is why this stays essential while WEEKEND_REOPEN
     # (below) does not.
     "WEEKEND_CLOSE",
+    # The same fact for the other gap the bot closes ahead of: a high-impact
+    # release. A position was closed that the client did not ask to close, and
+    # any position it could NOT close is still exposed to the print — neither
+    # is optional information, whatever their alert preference.
+    "NEWS_FLATTEN",
     # The market session itself. MARKET_OPEN carries the result of the
     # reconnect, so it is the message that says "your account answered and the
     # bot can trade today" — or that it could not, which is the whole reason

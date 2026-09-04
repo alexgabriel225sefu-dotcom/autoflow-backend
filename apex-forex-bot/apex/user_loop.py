@@ -106,6 +106,42 @@ def _currency_legs(symbol):
     return []
 
 
+def _news_exit_due(cfg, symbol):
+    """The high-impact release this OPEN position would be carried into, or None.
+
+    The news guard only ever answered the entry question — "may I open into
+    this?" — and left a position taken hours earlier to ride the print. On
+    2026-09-04 that carried EURUSD and USDCHF through Non-Farm Payrolls: the
+    EURUSD stop sat 21.6 pips below entry and filled 32.7 below, 11.1 pips
+    past its own level, for a combined -116.67. A stop is a price you hope to
+    be filled at, and around a release it is not one.
+
+    Two switches, and BOTH have to say yes:
+
+      NEWS_FILTER    the client's own toggle. Somebody who turned the news
+                     guard off has said what they want, and this is the same
+                     guard acting one step later.
+      NEWS_EXIT_MIN  the operator's lead time, in minutes. 0 disables it
+                     entirely without a deploy.
+
+    Fail-open on absolutely everything else — a dead calendar, a symbol that
+    parses to no currency, any exception at all. Spuriously flattening a live
+    account because a feed hiccuped is a worse failure than the one this fixes.
+    """
+    try:
+        if not getattr(cfg, "NEWS_FILTER", True):
+            return None
+        lead = float(getattr(cfg, "NEWS_EXIT_MIN", 0) or 0)
+        if lead <= 0:
+            return None
+        legs = _currency_legs(symbol)
+        if not legs:
+            return None
+        return news.next_high_impact(legs, lead)
+    except Exception:
+        return None
+
+
 def _nrm(x):
     """Broker-agnostic symbol key (EUR_USD / EUR/USD / eurusd → EURUSD).
     Module-level so the startup recovery can key off it too — it used to be
@@ -1061,6 +1097,11 @@ def _make_broker(user):
         TRAILING_STOP    = bool(user.get("trailing", True)),      # move SL behind price — ON by default
         BREAKEVEN_AT_R   = float(user.get("breakeven_r", 1.0)),   # move SL to entry at +1R
         NEWS_FILTER      = bool(user.get("news_filter", True)),
+        # How many minutes before a high-impact release an ALREADY-OPEN
+        # position is closed. Same warning as the EV block below: a key missing
+        # from this object is unreachable from inside the loop, so
+        # NEWS_EXIT_MIN in the environment would silently do nothing.
+        NEWS_EXIT_MIN    = float(getattr(_appcfg, "NEWS_EXIT_MIN", 15)),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
         MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
         # Caps scaled with RISK_PER_TRADE above (2.5x risk) so the bot still
@@ -3199,6 +3240,170 @@ def _loop(user_id, alert_fn, gen=None):
                 weekend_failed = _wk_failed
                 time.sleep(_LOOP_INTERVAL)
                 continue
+
+            # ── News gap protection for OPEN positions ───────────────────
+            #
+            # The same idea as the weekend flatten above, for the other gap
+            # this account keeps being carried into. The news guard further
+            # down sets entry_ok = False and stops there — it has never looked
+            # at a position that is already open. On 2026-09-04 the bot
+            # announced Non-Farm Payrolls at 12:05:38 with 'guarded': True,
+            # then held EURUSD and USDCHF (opened just after midnight) straight
+            # through the 12:30:00 print. EURUSD's stop had trailed to 21.6
+            # pips below entry; it filled 32.7 below — 11.1 pips PAST the stop,
+            # a 51% overshoot — for a combined -116.67, 34% of the account's
+            # recent losses. Refusing to open into a release while riding one
+            # through it is not a policy, it is half of one.
+            #
+            # Fail-open everywhere. `all_positions` is None when this tick's
+            # position read failed, and "unknown" is not "flat": acting on it
+            # would be guessing with real money. No event, an unreadable
+            # calendar or any exception at all leaves every position exactly
+            # where it is.
+            #
+            # Scope is the whole ACCOUNT, like the weekend flatten and unlike
+            # the multi-position trailing above, which deliberately touches
+            # only what this process opened. The difference is what is being
+            # protected: a trail is management of our own trade, while the
+            # exposure to a USD print is the account's whether the bot or the
+            # client opened the position. A client who does not want that turns
+            # news_filter off, which switches this off with it.
+            _news_closed, _news_failed, _news_event = [], [], None
+            try:
+                _news_targets = []
+                if cfg.PAPER_TRADING:
+                    if open_pos:
+                        _news_targets = [{**open_pos,
+                                          "symbol": open_pos.get("symbol") or symbol}]
+                elif all_positions:
+                    _news_targets = list(all_positions)
+                # Ask the calendar first and load the user once, rather than
+                # per position: on the overwhelming majority of ticks nothing
+                # is due and this costs one cached lookup per open trade.
+                _news_due = []
+                for _np in _news_targets:
+                    _nev = _news_exit_due(cfg, _np.get("symbol") or symbol)
+                    if _nev:
+                        _news_due.append((_np, _nev))
+                _news_user = user_store.load(user_id) if _news_due else None
+                for _np, _nev in _news_due:
+                    _nsym = _np.get("symbol") or symbol
+                    _news_event = _nev
+                    # EVERY close passes the gate — ownership so two containers
+                    # cannot both close this position, and idempotency so a
+                    # timed-out close is not retried into closing whatever was
+                    # reopened after it. Not `emergency`: a scheduled release
+                    # is the opposite of "get me out now at any cost", and a
+                    # coordination outage is a good reason to leave this to the
+                    # instance that actually owns the account.
+                    _nd, _nrid = gates.authorize_close(
+                        user_id, position_id=_np.get("positionId"),
+                        symbol=_nsym, origin="news_exit", user=_news_user)
+                    gates.audit(user_id, "CLOSE", _nd, origin="news_exit",
+                                rid=_nrid)
+                    if not _nd:
+                        # Refused is not closed. Say so rather than journalling
+                        # an exit that never happened.
+                        print(f"[UserLoop:{user_id}] news exit of {_nsym} "
+                              f"refused by the gate: {_nd.reason}")
+                        _news_failed.append(_nsym)
+                        continue
+                    _nclose = None
+                    if not cfg.PAPER_TRADING:
+                        try:
+                            _nclose = broker.close_position(_nsym)
+                        except Exception as _nce:
+                            # Do NOT book a close that did not happen. The
+                            # position is still live, still exposed, and the
+                            # broker-side stop is still the only thing holding
+                            # it. The next tick tries again while the release
+                            # is still ahead.
+                            print(f"[UserLoop:{user_id}] news exit of {_nsym} "
+                                  f"FAILED: {_nce} — position stays open")
+                            _news_failed.append(_nsym)
+                            continue
+                        if (_nclose or {}).get("status") == "FLAT":
+                            continue   # already gone — nothing to journal
+                    ledger.record(_nrid, {"closed": True, "symbol": _nsym})
+                    # The broker-side close detector at the top of the next
+                    # tick would otherwise rediscover this as a mystery close
+                    # and re-journal it from an estimate.
+                    prev_open_syms.discard(_nrm(_nsym))
+                    _news_closed.append(_nsym)
+                    # `price` belongs to the focused instrument; for any other
+                    # position it is the wrong number to value a fill with.
+                    exit_price = ((_nclose or {}).get("fillPrice")
+                                  or (price if _nrm(_nsym) == _nrm(symbol)
+                                      else _np.get("entryPrice")))
+                    units_ = _np.get("units") or _np.get("quantity", 1000)
+                    gross = forex.pnl_usd(_np["side"], _np["entryPrice"],
+                                          exit_price, units_, _nsym)
+                    pv = forex.pip_value_per_unit(_nsym, exit_price)
+                    cost_usd = realized_cost_usd(_np, _nclose, pv, units_,
+                                                 cfg.PAPER_TRADING)
+                    net = gross - cost_usd
+                    if cfg.PAPER_TRADING:
+                        paper_balance += net
+                    else:
+                        # LIVE: read the real post-close balance — same fix as
+                        # every other close path, same bug otherwise (a stale
+                        # balance printed next to a fresh P&L for the trade
+                        # that supposedly just moved it).
+                        try:
+                            paper_balance = broker.get_balance()
+                        except Exception:
+                            paper_balance += net
+                    if net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    else:
+                        loss_streak = 0
+                    result = {"action": "CLOSE", "symbol": _nsym, "price": exit_price,
+                              "entryPrice": _np.get("entryPrice"),
+                              "side": _np.get("entrySide") or _np.get("side"),
+                              "initialStop": _np.get("initialStop"),
+                              "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                              "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                              "openedAt": _np.get("openedAt"), "time": now_str,
+                              "reasoning": (
+                                  f"Closed ahead of {_nev.get('currency', '')} "
+                                  f"{_nev.get('title', 'a high-impact release')} "
+                                  f"(~{_nev.get('mins', 0)} min away) — a stop is "
+                                  f"not reliable through a release.")}
+                    _log_trade(user_id, result, _np)
+                    if cfg.PAPER_TRADING:
+                        user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                    last_close_at = time.time()
+                    _persist_risk_state()
+                    strategies.record_trade(net > 0, net,
+                                            dash.get("startBalance") or paper_balance,
+                                            user_id=user_id, symbol=_nsym)
+                    if open_pos and _nrm(_nsym) == _nrm(open_pos.get("symbol") or symbol):
+                        open_pos = None
+                        dash["openPosition"] = None
+                        _persist_open_snapshot(None)
+                    dash["balance"] = paper_balance
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
+            except Exception as _ne:
+                # Loud, and open. Nothing in this block may take a trading tick
+                # down with it, and nothing in it may close a position by
+                # accident on the way out.
+                print(f"[UserLoop:{user_id}] news exit check failed ({_ne}) — "
+                      f"open positions left as they are")
+            # One message for the reason, after the attempts — never before,
+            # and never claiming more than actually happened. Deliberately
+            # OUTSIDE the try: a close that reached the broker has to be
+            # reported even if the accounting after it raised, because the
+            # client's money moved either way. Both lists are empty on a tick
+            # where nothing was due, so the quiet case stays quiet.
+            if alert_fn and (_news_closed or _news_failed):
+                alert_fn(user_id, {"action": "NEWS_FLATTEN", "symbol": symbol,
+                                   "event": _news_event,
+                                   "closed": sorted(_news_closed),
+                                   "failed": sorted(_news_failed)})
 
             # Check risk limits (per-user, from the Strategy Builder)
             # user_id makes the circuit breakers PER-USER. Without it every

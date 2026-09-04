@@ -243,6 +243,27 @@ MIN_EXIT_R = float(os.getenv("MIN_EXIT_R") or 1.0)
 RIDE_AT_R = float(os.getenv("RIDE_AT_R") or 2.0)
 RIDE_LOCK = float(os.getenv("RIDE_LOCK") or 0.6)
 
+# ─── News exit for OPEN positions (see user_loop._news_exit_due) ─────
+# The news guard kept the bot from OPENING into a high-impact release and did
+# nothing about a position that was already open, so a trade taken hours
+# earlier was carried straight through the print. Measured on the live account
+# on 2026-09-04: EURUSD and USDCHF, both opened just after midnight, both still
+# open when Non-Farm Payrolls landed at 12:30:00 — a release the bot had itself
+# announced at 12:05:38. EURUSD's stop sat 21.6 pips below entry and it filled
+# 32.7 below: 11.1 pips THROUGH the stop, a 51% overshoot. Combined -116.67,
+# which was 34% of the account's recent losses.
+#
+# This is the lead time, in minutes, at which an open position is closed ahead
+# of a release affecting either of its currencies. 15 because the calendar gave
+# 24 minutes of warning that day and the loop ticks every 1-5 minutes, so it
+# leaves at least three attempts to get flat while keeping the flat period
+# short — a position is not held hostage for an hour by a release that has not
+# happened yet. 0 switches the behaviour off entirely, with no deploy.
+#
+# It never acts on its own: the client's `news_filter` toggle gates it too, so
+# somebody who turned the news guard off keeps the bot they asked for.
+NEWS_EXIT_MIN = float(os.getenv("NEWS_EXIT_MIN") or 15)
+
 # ─── Permanent Market Sentinel (see apex/sentinel.py) ────
 # A persistent, EXPIRING view of each symbol, so "what the AI thinks about
 # EURUSD" outlives the single function call that produced it — and so a stale
