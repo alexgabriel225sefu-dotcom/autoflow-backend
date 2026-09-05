@@ -2310,11 +2310,21 @@ def _loop(user_id, alert_fn, gen=None):
                 try:
                     from apex import decision as _dec, ranking as _rank
                     from apex import scanner as _scan
-                    _skip = {k for k in open_syms} | {
+                    # NOT `_skip`: that name is the skip-reason logger
+                    # defined for this loop, and `_loop` holds the tick loop,
+                    # so rebinding it here made it a set for the LIFE of the
+                    # loop. Every later _skip(reason) then raised "'set'
+                    # object is not callable" — seen live four times on
+                    # 2026-09-04. Refusals still took effect (every call site
+                    # sets entry_ok = False first), but the client-facing
+                    # record of WHY was lost and, at the seven call sites
+                    # without a local try/except, the rest of the tick went
+                    # with it.
+                    _scan_skip = {k for k in open_syms} | {
                         k for k, until in spread_blocked.items()
                         if until > time.time()}
                     _cands = _scan.scan(
-                        broker, cfg, watchlist, forex=forex, skip=_skip,
+                        broker, cfg, watchlist, forex=forex, skip=_scan_skip,
                         context={"exposureCount": open_count,
                                  "maxPositions": maxpos,
                                  "openSymbols": sorted(open_syms),
@@ -3245,7 +3255,17 @@ def _loop(user_id, alert_fn, gen=None):
                               "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                               "openedAt": open_pos.get("openedAt"), "time": now_str,
                               "reasoning": "Closed before the weekend — avoiding gap risk over Sat/Sun."}
-                    _log_trade(user_id, result, open_pos)
+                    # The PERSISTED snapshot, not the position dict. Anything read back
+                    # from broker.get_all_positions() carries symbol, side, entryPrice,
+                    # stopLoss and units — a broker does not record WHY a trade was
+                    # taken — so passing it here journalled every Friday close
+                    # unlabelled and dropped a whole day of the week out of
+                    # ev.calibrate(). Live on 2026-09-05 the journal went 82 -> 84 rows
+                    # while `labelled` stayed at 42. Falls back to the position for one
+                    # this loop opened and still holds in full.
+                    _wmeta = entry_meta_by_sym.get(_nrm(_wsym))
+                    _log_trade(user_id, result,
+                               {**_wmeta, "symbol": _wsym} if _wmeta else open_pos)
                     if cfg.PAPER_TRADING:
                         user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     last_close_at = time.time()
@@ -3424,7 +3444,13 @@ def _loop(user_id, alert_fn, gen=None):
                                   f"{_nev.get('title', 'a high-impact release')} "
                                   f"(~{_nev.get('mins', 0)} min away) — a stop is "
                                   f"not reliable through a release.")}
-                    _log_trade(user_id, result, _np)
+                    # The PERSISTED snapshot, not the position from the broker's list.
+                    # `_np` came from get_all_positions(), which reports what is open and
+                    # never why it was taken, so passing it labels nothing and the row is
+                    # skipped by ev.calibrate(). Same defect the weekend flatten had.
+                    _nmeta = entry_meta_by_sym.get(_nrm(_nsym))
+                    _log_trade(user_id, result,
+                               {**_nmeta, "symbol": _nsym} if _nmeta else _np)
                     if cfg.PAPER_TRADING:
                         user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     last_close_at = time.time()
