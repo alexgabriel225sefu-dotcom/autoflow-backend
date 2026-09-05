@@ -353,6 +353,13 @@ def _run_block(rec, *, positions, tracked=None, paper=False,
         "_persist_risk_state": lambda: None,
         "_persist_open_snapshot": rec.snapshots.append,
         "_news_exit_due": user_loop._news_exit_due,
+        # Declared, not inherited: the block is executed in a namespace
+        # built by hand, so a helper it starts calling has to be added
+        # here. Without this the call raises NameError, the block's own
+        # fail-open try/except swallows it, and every check below reads
+        # "nothing was closed" — which is how this test caught
+        # NEWS_EXIT_SKIP_MANUAL being wired in.
+        "_news_skip_manual": user_loop._news_skip_manual,
         "_nrm": user_loop._nrm,
         "forex": user_loop.forex,
         "realized_cost_usd": user_loop.realized_cost_usd,
