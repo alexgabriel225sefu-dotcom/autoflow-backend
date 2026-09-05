@@ -1,7 +1,11 @@
 """Legendary-trader strategy engine (port of strategies.js).
 
-Turtle breakout, Livermore structure, Soros momentum, PTJ/Seykota defense,
-Druckenmiller position sizing.
+Turtle breakout, Livermore structure, Soros momentum, PTJ defense (daily loss
+and drawdown limits), Druckenmiller position sizing.
+
+The Seykota loss-streak defense — stand aside after three losses in a row —
+was removed at the owner's instruction. The streak is still counted; it just
+no longer stops or shrinks anything. See `should_stop`.
 """
 import time
 from datetime import date
@@ -53,6 +57,56 @@ def _persist_session(user_id):
         print(f"[STRATEGY:{user_id}] session persist failed: {e}")
 
 
+def rescale_peak(old_balance, new_balance, user_id=None):
+    """Move the drawdown peak onto a new capital base after a deposit or a
+    withdrawal.
+
+    Cash in or out changes how big the account is, not how well it has traded,
+    so the peak has to follow — PROPORTIONALLY. Scaling preserves the drawdown
+    percentage the account was actually carrying; shifting the peak by the cash
+    delta instead does not, and leaves it stranded far above the new base
+    whenever the account was already below its peak:
+
+        peak 6309.44, balance 6256.97 (a real -0.83% drawdown), withdraw to 10.74
+          by delta        -> peak   63.21  -> reads as -83.0%  (still halted)
+          proportionally  -> peak   10.83  -> reads as  -0.83% (the truth)
+
+    This matters because should_stop() halts on that percentage and the peak
+    only ever ratchets upward. Get it wrong and the account is bricked: no
+    trade can run to recover it, a restart reloads the same peak, and no
+    operator setting reaches it. A client who grows a small deposit, withdraws
+    the profit and starts again would hit that every time.
+    """
+    s = get_session(user_id)
+    peak = s.get("peakBalance")
+    try:
+        peak, old_balance, new_balance = (float(peak), float(old_balance),
+                                          float(new_balance))
+    except (TypeError, ValueError):
+        return
+    if peak <= 0 or old_balance <= 0 or new_balance <= 0:
+        return
+    s["peakBalance"] = max(peak * (new_balance / old_balance), new_balance)
+    _persist_session(user_id)
+    print(f"[STRATEGY:{user_id or '?'}] capital base {old_balance:.2f} -> "
+          f"{new_balance:.2f} (deposit/withdrawal, not a trading loss) — "
+          f"drawdown peak rescaled {peak:.2f} -> {s['peakBalance']:.2f}")
+
+
+def reset_peak(balance, user_id=None):
+    """Drop the drawdown peak to `balance` — the clean-slate path behind
+    /resetstats, which promises stats "start fresh from this moment" but used
+    to leave the persisted peak untouched, so a stale peak could keep the bot
+    halted straight through a reset the user believed had cleared it."""
+    s = get_session(user_id)
+    try:
+        s["peakBalance"] = max(0.0, float(balance))
+    except (TypeError, ValueError):
+        return
+    _persist_session(user_id)
+    print(f"[STRATEGY:{user_id or '?'}] drawdown peak reset -> {s['peakBalance']:.2f}")
+
+
 def _default_symbol_session():
     return {"consecutiveLosses": 0, "consecutiveWins": 0, "lastLossAt": 0.0}
 
@@ -98,41 +152,48 @@ def _reset_daily_if_needed(user_id=None):
         print(f"[STRATEGY:{user_id or '?'}] 🌅 New day — counters reset.")
 
 
-_SEYKOTA_COOLDOWN_MIN = 60  # after 3 losses in a row, stand aside this long, then clear the streak
-
-
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
-                max_dd_pct=20.0, user_id=None, symbol=None,
-                seykota_cooldown_min=_SEYKOTA_COOLDOWN_MIN):
+                max_dd_pct=20.0, user_id=None, symbol=None):
     """Circuit breaker — per-user when user_id is provided.
 
-    The Seykota "3 losses in a row" rule is scoped to `symbol` (when given):
-    a whipsaw on one instrument stands aside on THAT instrument only, instead
-    of freezing the whole account while a completely different pair might
-    have a perfectly good setup right now. Daily loss % and drawdown from
-    peak stay account-wide — those protect total capital, not a single
-    instrument. No cap on trades/day — a good setup is a good setup
-    regardless of how many came before it today.
+    Two limits, both measured in MONEY: the daily loss percentage and the
+    drawdown from peak. Both are account-wide, because they protect total
+    capital rather than one instrument.
+
+    There is no cap on trades per day — a good setup is a good setup however
+    many came before it — and, since the owner removed it, no limit based on
+    a run of losing RESULTS. See the note in the body for what that rule was
+    and why it existed.
+
+    `symbol` is still accepted: the per-instrument streak is counted and
+    persisted for the journal and the dashboard. It no longer gates anything.
     """
     _reset_daily_if_needed(user_id)
     s = get_session(user_id)
     reasons = []
     if s["peakBalance"] is None or balance > s["peakBalance"]:
         s["peakBalance"] = balance
-    loss_s = get_symbol_session(user_id, symbol) if symbol else s
-    if loss_s["consecutiveLosses"] >= 3:
-        # Time-boxed, not permanent: this only clears on a WIN, and the bot
-        # can't win a trade it's forbidden from entering — that deadlocked a
-        # user for 37+ hours in production. Stand aside for the cooldown, then
-        # clear the streak so a fresh run of losses is needed to re-trigger it.
-        elapsed_min = (time.time() - loss_s["lastLossAt"]) / 60 if loss_s["lastLossAt"] else seykota_cooldown_min
-        if elapsed_min >= seykota_cooldown_min:
-            loss_s["consecutiveLosses"] = 0
-            _persist_session(user_id) if not symbol else _persist_symbol_session(user_id, symbol)
-        else:
-            left = int(seykota_cooldown_min - elapsed_min) + 1
-            where = f"{symbol}: " if symbol else ""
-            reasons.append(f"{where}3 consecutive losses — standing aside {left}m more (Seykota rule)")
+    # THE SEYKOTA "3 LOSSES IN A ROW" STAND-ASIDE IS REMOVED, at the owner's
+    # instruction. It used to halt entries on an instrument for an hour after
+    # three consecutive losses.
+    #
+    # It is worth recording what it was for, because removing it removes a
+    # real protection: three losses in a row is usually either a market the
+    # strategy does not suit or the beginning of revenge trading, and an hour
+    # away from the screen costs one setup and can save several. It also had
+    # a history — an earlier version cleared only on a WIN, which deadlocked
+    # an account for 37 hours, since the bot cannot win a trade it is
+    # forbidden from entering. The cooldown was the fix for that.
+    #
+    # What remains, and is what actually protects the account: the daily loss
+    # limit and the drawdown-from-peak limit below. Both are about how much
+    # money is gone, which is the question that matters — rather than how
+    # many results in a row were red, which a single mis-journaled close can
+    # get wrong.
+    #
+    # The streak is still COUNTED (strategy_session.consecutiveLosses) so the
+    # journal and the dashboard keep telling the truth about what happened.
+    # It just no longer stops anything.
     daily_dd_pct = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
     if daily_dd_pct < -abs(max_daily_loss_pct):
         reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "
@@ -193,15 +254,11 @@ def livermore_structure(candles):
     return {"trend": "NEUTRAL", "strength": 0.2, "reason": "Mixed structure"}
 
 
-def soros_momentum(candles, velocity_thr=None):
+def soros_momentum(candles, velocity_thr=None, symbol=None):
     if len(candles) < 8:
         return {"momentum": 0, "direction": "NEUTRAL", "velocity": 0}
     if velocity_thr is None:
-        try:
-            from apex import config as _cfg
-            velocity_thr = 1.0 if getattr(_cfg, "PRODUCT", "forex") == "crypto" else 0.3
-        except Exception:
-            velocity_thr = 0.3
+        velocity_thr = 0.3
     recent = candles[-8:]
     wins = sum(1 for c in recent if c["close"] > c["open"])
     bull_pct = wins / len(recent)
@@ -337,7 +394,7 @@ def resample(candles, ratio=12):
     return out
 
 
-def detect_regime(candles):
+def detect_regime(candles, symbol=None):
     """Classify the market so the AUTO strategy can pick the right engine.
 
     Self-calibrating (ratios, not absolute thresholds), so it works the same
@@ -379,15 +436,8 @@ def detect_regime(candles):
     if vol_ratio <= 0.42:
         return {"regime": "quiet", "vol_ratio": round(vol_ratio, 2),
                 "label": f"very low volatility ({vol_ratio:.1f}× normal) — standing aside"}
-    # EMA-separation cutoff for "trending". 0.18% is FX-scale; crypto EMAs sit
-    # 1-5%+ apart almost always, so on crypto that gate is always true and the
-    # regime never comes back "ranging". Raise it for the crypto build so the
-    # trend/range split is meaningful.
-    try:
-        from apex import config as _cfg
-        sep_thr = 0.9 if getattr(_cfg, "PRODUCT", "forex") == "crypto" else 0.30
-    except Exception:
-        sep_thr = 0.18
+    # EMA-separation cutoff for "trending", at FX scale.
+    sep_thr = 0.30
     if sep_pct >= sep_thr and liv.get("trend") in ("BULLISH", "BEARISH") and liv.get("strength", 0) >= 0.55:
         return {"regime": "trending", "vol_ratio": round(vol_ratio, 2),
                 "label": f"{liv['trend'].lower()} trend — trend following"}

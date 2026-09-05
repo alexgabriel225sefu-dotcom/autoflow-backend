@@ -1,50 +1,36 @@
-"""AI signal generation (port of ai.js). Anthropic primary, Groq free fallback."""
+"""AI signal generation (port of ai.js). Groq (free) provides the second opinion."""
 import re
 import json
 import requests
 from apex import config as cfg
 from apex import forex
 
-_anthropic_client = None
 
 
-def _context_line():
-    """One extra line of market context for the AI prompt — sentiment for
-    crypto (Fear & Greed), upcoming high-impact events for forex. This is
+def _context_line(symbol=None):
+    """One extra line of market context for the AI prompt — upcoming
+    high-impact calendar events for this pair. This is
     informational context the AI weighs alongside the technicals, never a
-    standalone prediction and never a hard block on its own."""
+    standalone prediction and never a hard block on its own.
+
+    `symbol` is the instrument actually being evaluated. Without it this fell
+    back to the process-global cfg.SYMBOL, so an Auto-Pilot account scanning
+    eight pairs got EUR_USD's news calendar attached to every one of them.
+    """
     try:
-        if getattr(cfg, "PRODUCT", "forex") == "crypto":
-            from apex import sentiment
-            fg = sentiment.fear_greed()
-            if not fg:
-                return "- Market sentiment: unavailable right now — weigh technicals only"
-            return (f"- Crypto Fear & Greed Index: {fg['value']}/100 ({fg['label']}) — "
-                    "context only: extreme readings often precede mean-reversion, "
-                    "but do not treat this as a standalone signal")
-        else:
-            from apex import news
-            currencies = [c for c in re.split(r"[_/]", cfg.SYMBOL) if c]
-            events = news.upcoming(currencies, hours=12, limit=3)
-            if not events:
-                return "- Upcoming high-impact news (next 12h): none scheduled"
-            lines = "; ".join(f"{e['title']} ({e['currency']}) in {e['in_min']}m" for e in events)
-            return (f"- Upcoming high-impact news (next 12h): {lines} — "
-                    "reduce confidence or stand aside if entry timing lands near release time")
+        from apex import news
+        _sym = (symbol or cfg.SYMBOL or "").upper()
+        _flat = _sym.replace("_", "").replace("/", "").replace("-", "")
+        currencies = ([_flat[:3], _flat[3:]] if len(_flat) == 6 and _flat.isalpha()
+                      else [c for c in re.split(r"[_/]", _sym) if c])
+        events = news.upcoming(currencies, hours=12, limit=3)
+        if not events:
+            return "- Upcoming high-impact news (next 12h): none scheduled"
+        lines = "; ".join(f"{e['title']} ({e['currency']}) in {e['in_min']}m" for e in events)
+        return (f"- Upcoming high-impact news (next 12h): {lines} — "
+                "reduce confidence or stand aside if entry timing lands near release time")
     except Exception:
         return "- Market context: unavailable this tick — weigh technicals only"
-
-
-def _get_anthropic():
-    global _anthropic_client
-    if _anthropic_client is None:
-        import anthropic
-        # The SDK's default timeout is 600s — a slow/hung Anthropic call would
-        # stall a user's trading tick that long before falling back to Groq
-        # (get_signal only falls back on an exception, not on latency). Cap it
-        # short so a slow API degrades to the fallback instead of freezing.
-        _anthropic_client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, timeout=20.0)
-    return _anthropic_client
 
 
 def _extract_json(text):
@@ -69,29 +55,80 @@ def _call_groq(prompt):
     return _extract_json(text)
 
 
-def _call_anthropic(prompt):
-    models = ["claude-haiku-4-5-20251001", "claude-3-5-haiku-20241022", "claude-3-haiku-20240307"]
-    for model in models:
-        try:
-            msg = _get_anthropic().messages.create(
-                model=model, max_tokens=400, temperature=0,
-                messages=[{"role": "user", "content": prompt}])
-            text = msg.content[0].text.strip()
-            print(f"[AI] ✅ Anthropic {model}")
-            return _extract_json(text)
-        except Exception as err:
-            status = getattr(err, "status_code", None) or getattr(getattr(err, "response", None), "status_code", "N/A")
-            print(f"[AI ❌] Anthropic {model} | Status: {status} | {err}")
-            if status in (400, 401):
-                break
-    raise RuntimeError("Anthropic unavailable")
+_VALID_ACTIONS = ("BUY", "SELL", "HOLD")
+
+
+def _validate_verdict(raw, *, symbol=None, user_id=None):
+    """Normalise a model's reply into a verdict, or None if it isn't one.
+
+    `_extract_json` only guarantees the text contained *some* JSON object. What
+    reached the caller after that was trusted completely, and two real ways a
+    model breaks the contract were being read as deliberate decisions:
+
+      * `{"action": "buy"}` — lowercase. It matches neither the rule action
+        ("BUY") nor "HOLD", so it fell through to the contradiction branch and
+        BLOCKED the trade. The model agreed and the bot read agreement as a
+        veto. Temperature 0 makes this rare, not impossible, and "Buy" or
+        "BUY " with a trailing space do the same thing.
+      * `{"reasoning": "..."}` with no action at all — `.get("action", "HOLD")`
+        turned an unparseable answer into a confident neutral one, complete
+        with the confidence penalty that a real HOLD earns.
+
+    None means "the model did not give a usable verdict", which is a different
+    thing from HOLD and must be handled as such by the caller.
+    """
+    if not isinstance(raw, dict):
+        return None
+    # Hard schema first (§40, §41). This checks what the shape check below
+    # cannot: whether the reply is an answer to the question that was ASKED.
+    # A well-formed verdict about a different instrument, or one carrying a
+    # price the model produced itself, passes every structural test and is
+    # exactly the failure mode that matters. The two layers are complementary
+    # — this one rejects, the one below normalises what survives.
+    try:
+        from apex import ai_schema as _sch
+        _clean, _why = _sch.safe_validate(
+            raw, allowed_actions=frozenset(_VALID_ACTIONS), symbol=symbol,
+            require_evidence=False)
+        if _clean is None:
+            print(f"[AI ❌] reply rejected by schema: {_why}")
+            if user_id:
+                try:
+                    from apex import trade_events as _te
+                    _te.record(user_id, _te.AI_REJECTED, symbol=symbol,
+                               payload={"code": _why,
+                                        "reply": str(raw)[:300]})
+                except Exception:
+                    pass
+            return None
+    except Exception as _se:
+        # A validator failure is a rejection, not a bypass. The rule engine's
+        # own verdict stands and trading continues without the model (§68).
+        print(f"[AI ❌] schema check failed ({_se}) — treating as unusable")
+        return None
+
+    action = raw.get("action")
+    if not isinstance(action, str):
+        return None
+    action = action.strip().upper()
+    if action not in _VALID_ACTIONS:
+        return None
+    out = {"action": action, "reasoning": str(raw.get("reasoning", ""))[:300]}
+    # Confidence is advisory here — the rule engine owns the number — so an
+    # unusable one is dropped rather than failing the whole verdict.
+    try:
+        c = float(raw.get("confidence"))
+        out["confidence"] = c * 100.0 if c <= 1.0 else c
+    except (TypeError, ValueError):
+        pass
+    return out
 
 
 _MODE_INTRO = {
     "mean_reversion": ("Forex ranges far more than it trends, so your PRIMARY edge is MEAN REVERSION: "
                        "fade overbought/oversold extremes back to the mean (RSI + Bollinger Bands), and only "
                        "ride a move when the higher-timeframe trend is genuinely strong. This is the opposite "
-                       "of a crypto breakout bot."),
+                       "of a breakout-chasing bot."),
     "trend": ("Your PRIMARY edge is TREND FOLLOWING (Livermore: trade WITH the tape): identify the "
               "higher-timeframe trend and enter only in its direction — buy pullbacks to value in an uptrend, "
               "sell rallies in a downtrend. NEVER fade the trend, never chase an extended move."),
@@ -116,6 +153,7 @@ _MODE_INTRO = {
             "buyer/seller volume at key price levels (small body, equal wicks, average volume), signaling "
             "indecision that resolves into a directional move. Enter on the resolution."),
 }
+
 
 _MODE_RULES = {
     "mean_reversion": """- BUY (fade oversold dip, min 3/5): price in lower BB (<30%), RSI≤35 or bullish divergence, Stoch RSI K low, price stretched below EMA20, no strong downtrend
@@ -157,8 +195,21 @@ _MODE_RULES = {
 }
 
 
-def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion"):
-    """Rule-based signal is PRIMARY. AI confirms or blocks — never initiates."""
+def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_reversion",
+               symbol=None, timeframe=None, sl_pips=None, tp_pips=None,
+               risk_pct=None, min_confidence=None, candles=None,
+               regime=None, spread_pips=None, user_id=None):
+    """Rule-based signal is PRIMARY. AI confirms or blocks — never initiates.
+
+    The trade context arguments matter more than they look. Without them the
+    prompt was built from the process-global config, so an Auto-Pilot account
+    scanning eight instruments described every single one as EUR_USD: the model
+    was shown gold's prices (3350.42, EMA 3349.8) under the heading "EUR_USD",
+    an instrument that trades at 1.08, and asked to judge the setup. It was
+    also told the global SL/TP/risk and confidence floor rather than this
+    user's. Since the AI can veto an entry outright, that was an arbitrary
+    verdict on seven symbols out of eight.
+    """
     mode = (mode or "mean_reversion").lower()
     if mode not in _MODE_INTRO:
         mode = "mean_reversion"
@@ -192,9 +243,81 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
                 else "- Volume: N/A (this data source has no forex tick volume — judge on price action, do NOT treat as low liquidity)")
     vol_crit = "tick volume>1.2x" if has_volume else "Stoch RSI K aligned with direction"
 
+    # Trade context for the prompt. Each falls back to the process-global
+    # config only when the caller did not supply it — which is what used to
+    # happen for every call, labelling all eight Auto-Pilot instruments
+    # "EUR_USD" and quoting the wrong SL/TP/risk back to the model.
+    # Everything below is already computed every tick and was never shown to
+    # the model. The AI is the last thing standing between a signal and a live
+    # order, and it was the least-informed component in the loop: it saw price
+    # and oscillators, but not what kind of market it was looking at, not the
+    # strategy engines' own structural read, and not what the trade would cost.
+    _rg = regime or {}
+    _regime_line = "- Market regime: unknown"
+    if _rg.get("regime"):
+        _regime_line = (f"- Market regime: <b>{_rg['regime']}</b> "
+                        f"(volatility {_rg.get('vol_ratio', '?')}x its own recent norm)"
+                        f" — {_rg.get('label', '')}").replace("<b>", "").replace("</b>", "")
+
+    _sd = strategy_data or {}
+    _turtle = _sd.get("turtle") or {}
+    _liv = _sd.get("livermore") or {}
+    _soros = _sd.get("soros") or {}
+    _mr = _sd.get("mean_reversion") or {}
+    _strategy_block = "\n".join(filter(None, [
+        f"- Turtle (20-bar channel): signal={_turtle.get('signal', 'NONE')}, "
+        f"strength={_turtle.get('breakoutStr', 'N/A')}" if _turtle else None,
+        f"- Livermore (structure): trend={_liv.get('trend', 'N/A')}, "
+        f"strength={_liv.get('strength', 'N/A')}" if _liv else None,
+        f"- Soros (momentum/velocity): signal={_soros.get('signal', 'NONE')}"
+        if _soros else None,
+        f"- Mean-reversion z-score: {_mr.get('zscore', 'N/A')} "
+        f"(stretched={_mr.get('stretched', False)})" if _mr else None,
+    ])) or "- (strategy engines produced no read this bar)"
+
+    # Indicator values arrive as floats, None, or occasionally strings — coerce
+    # rather than trust, or a stray type takes down the whole signal path.
+    _adx_line = "- ADX: N/A"
+    try:
+        _adx = float(ind.get("adx"))
+    except (TypeError, ValueError):
+        _adx = None
+    if _adx is not None:
+        _strength = ("no trend" if _adx < 20 else "developing" if _adx < 25
+                     else "trending" if _adx < 40 else "strong trend")
+        _adx_line = (f"- ADX: {_adx:.1f} ({_strength}) | "
+                     f"+DI {ind.get('plus_di', 'N/A')} / -DI {ind.get('minus_di', 'N/A')}")
+
+    # What the trade costs, in the only unit that matters: how much of the stop
+    # is spent before the trade can be right.
+    _cost_line = "- Spread: unknown"
+    if spread_pips is not None and sl_pips:
+        try:
+            _cost_pct = (float(spread_pips) / float(sl_pips)) * 100
+            _cost_line = (f"- Recent spread: {float(spread_pips):.1f} pips — "
+                          f"{_cost_pct:.0f}% of the {float(sl_pips):g}-pip stop is "
+                          f"paid up front. A setup must beat that before it is "
+                          f"worth taking.")
+        except (TypeError, ValueError, ZeroDivisionError):
+            pass
+
+    _sym_lbl = symbol or cfg.SYMBOL
+    _tf_lbl = timeframe or cfg.TIMEFRAME
+    _sl_lbl = float(cfg.STOP_LOSS_PIPS if sl_pips is None else sl_pips)
+    _tp_lbl = float(cfg.TAKE_PROFIT_PIPS if tp_pips is None else tp_pips)
+    _risk_lbl = float(cfg.RISK_PER_TRADE if risk_pct is None else risk_pct)
+    _minconf_lbl = int(cfg.MIN_CONFIDENCE if min_confidence is None else min_confidence)
+
+    # No chart section: the only provider that could receive an image was
+    # Anthropic, and Groq's llama-3.3-70b is text-only. Leaving this wired to
+    # AI_VISION would have been worse than removing it — switching the flag on
+    # would tell the model "a chart is attached" while nothing was ever sent,
+    # and it would answer as though it had looked at one.
+    _chart_note = ""
+
     prompt = f"""You are a professional FOREX trader with 20 years of experience. {_MODE_INTRO[mode]} Analyze ALL the data and give a precise signal.
 
-## MARKET DATA — {cfg.SYMBOL} ({cfg.TIMEFRAME})
+## MARKET DATA — {_sym_lbl} ({_tf_lbl})
 - Active sessions: {sessions} (liquidity is best when London/New York overlap)
 ### Price & Trend
 - Current price: {ind['price']}
@@ -223,19 +346,32 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
 - Liquidity Sweep: signal={ind.get('liquiditySweep', {}).get('signal', 'NONE')}, type={ind.get('liquiditySweep', {}).get('type', 'none')}, swept={ind.get('liquiditySweep', {}).get('swept', 'N/A')}
 - EVC (Equilibrium Volume): signal={ind.get('evc', {}).get('signal', 'NONE')}, equilibrium={ind.get('evc', {}).get('equilibrium', False)}
 
+### Trend strength
+{_adx_line}
+
+### Market regime
+{_regime_line}
+
+### What the strategy engines see
+{_strategy_block}
+
+### Cost of trading right now
+{_cost_line}
+
 ### Last 5 candles
 {recent}
 
+{_chart_note}
 ### Market Context
-{_context_line()}
+{_context_line(_sym_lbl)}
 
 ## ACCOUNT
 - Balance: ${balance:.2f} USD | Leverage: 1:{cfg.LEVERAGE:g}
 - Open position: {pos}
 
 ## ENTRY RULES — {STRATEGY_MODES[mode]['label'].upper() if mode in STRATEGY_MODES else 'MEAN REVERSION'}
-- SL: {cfg.STOP_LOSS_PIPS:g} pips | TP: {cfg.TAKE_PROFIT_PIPS:g} pips | Risk: {cfg.RISK_PER_TRADE * 100:g}% per trade
-- Minimum confidence: {cfg.MIN_CONFIDENCE}%
+- SL: {_sl_lbl:g} pips | TP: {_tp_lbl:g} pips | Risk: {_risk_lbl * 100:g}% per trade
+- Minimum confidence: {_minconf_lbl}%
 {_MODE_RULES[mode]}
 - Leverage is 1:{cfg.LEVERAGE:g} — size for stability, not for chasing volatility
 - Weigh the Market Context line above like any other input: it can lower your
@@ -246,19 +382,42 @@ Respond ONLY with valid JSON:
 {{"action":"BUY"|"SELL"|"HOLD"|"CLOSE","confidence":<0-100>,"reasoning":"<max 2 sentences>","riskLevel":"LOW"|"MEDIUM"|"HIGH","keyFactors":["f1","f2","f3"],"criteriaScore":<0-5>}}"""
 
     ai_sig = None
+    # Groq is the only signal provider. Anthropic used to sit in front of it,
+    # but the key was never set on this deployment: every single call raised
+    # "ANTHROPIC_API_KEY not set", was swallowed, and fell through to Groq.
+    # A first choice that has never once been reachable is not a fallback
+    # chain, it is a branch that only ever costs an exception — and it kept
+    # the boot log warning about a missing key nobody intended to add.
+    # The chart is dropped here: Groq's Llama path is text-only.
+    # Deliberately still the direct call, not ai_provider.select().
+    #
+    # Routing this through the abstraction was tried and reverted. It moved
+    # the seam two test files inject at, and bought nothing: Groq is the only
+    # provider this deployment can reach, and will stay so until there is a
+    # machine that can run a local model. The abstraction exists for the AGENT
+    # (apex/agent.py), which is new code with no such history — retrofitting a
+    # working veto layer for symmetry is churn, and this layer has a veto over
+    # real orders.
     try:
-        ai_sig = _call_anthropic(prompt)
-    except Exception:
-        try:
-            ai_sig = _call_groq(prompt)
-        except Exception as err:
-            print(f"[AI ❌] AI unavailable ({err}) — using rule signal")
+        ai_sig = _call_groq(prompt)
+    except Exception as err:
+        print(f"[AI ❌] AI unavailable ({err}) — using rule signal")
 
-    if ai_sig is None:
+    # A reply that does not carry a usable decision is NOT a decision. It is
+    # the same situation as the model being unreachable, and is handled the
+    # same way — never as a HOLD, and never as a contradiction.
+    verdict = _validate_verdict(ai_sig, symbol=_sym_lbl,
+                                user_id=user_id)
+    if ai_sig is not None and verdict is None:
+        print(f"[AI ❌] {mode} reply had no usable verdict "
+              f"({str(ai_sig)[:120]}) — treating as unavailable")
+
+    if verdict is None:
         print(f"[AI] {mode} rule-only: {rule_action} {rule_conf}%")
         return rule_sig
 
-    ai_action = ai_sig.get("action", "HOLD")
+    ai_sig = verdict
+    ai_action = verdict["action"]
     if ai_action == rule_action:
         rule_sig["confidence"] = min(88, rule_conf + 8)
         rule_sig.setdefault("keyFactors", []).append("AI confirms")
@@ -270,9 +429,17 @@ Respond ONLY with valid JSON:
         return rule_sig
     # AI contradicts → block
     print(f"[AI] {mode} rule {rule_action} BLOCKED by AI ({ai_action})")
+    # blockedAction carries the direction the rule engine wanted, which the
+    # HOLD would otherwise discard. The loop uses it to follow the refused
+    # setup and report whether refusing was right — a filter nobody can audit
+    # is indistinguishable from a filter that is wrong.
     return {"action": "HOLD", "confidence": 45, "criteriaScore": 1,
             "reasoning": f"Rule {rule_action} blocked — AI sees {ai_action}",
-            "riskLevel": "LOW", "keyFactors": ["rule-AI disagreement"]}
+            "riskLevel": "LOW", "keyFactors": ["rule-AI disagreement"],
+            "blockedAction": rule_action,
+            "blockedConfidence": rule_conf,
+            "blockedBy": "AI disagreed with the setup",
+            "blockedReasoning": str(ai_sig.get("reasoning", ""))[:300]}
 
 
 def rule_based_fallback(ind, open_position=None):
@@ -343,10 +510,10 @@ def rule_based_fallback(ind, open_position=None):
 
 
 def mean_reversion_signal(ind, open_position=None):
-    """FOREX-specific MEAN REVERSION engine (the real Crypto↔Forex difference).
+    """MEAN REVERSION engine — this product's primary edge.
 
     Forex ranges far more than it trends, so this fades extremes back to the
-    mean instead of chasing breakouts like the crypto trend-following engine:
+    mean instead of chasing breakouts:
       • BUY  an oversold dip at the lower Bollinger Band (RSI/StochRSI low)
       • SELL an overbought spike at the upper band (RSI/StochRSI high)
       • EXIT when price reverts to the BB midline (target reached)
@@ -371,13 +538,46 @@ def mean_reversion_signal(ind, open_position=None):
     # has overshot well past the mean (profit-taking zone, not midline).
     if open_position:
         side = open_position.get("side")
+
+        def _exit_reason():
+            """Say whether the exit is actually in profit, instead of assuming.
+
+            This rule fires on Bollinger position alone and used to label every
+            exit "taking profit" — including exits where price had moved
+            AGAINST the trade. Live examples: a SELL at 0.70581 booked as
+            "taking profit" at 0.70583, and a USDCHF BUY at 0.8132 closed at
+            0.81306 for -$2.14 under the same words. The P&L accounting was
+            right both times; only the sentence the user reads was false, which
+            is worse than useless — it teaches you to trust a number that is
+            not being measured.
+
+            The band said the thesis is finished. Whether that is a profit is a
+            separate fact, and it is right here in entryPrice.
+            """
+            entry = open_position.get("entryPrice") or open_position.get("entry_price")
+            try:
+                entry, now_px = float(entry), float(price)
+            except (TypeError, ValueError):
+                # No usable entry price: describe the trigger, claim nothing
+                # about the outcome.
+                return "Mean reversion: price reached the mean — thesis done"
+            if not entry or not now_px:
+                return "Mean reversion: price reached the mean — thesis done"
+            gain = (now_px - entry) if side == "BUY" else (entry - now_px)
+            if gain > 0:
+                return "Mean reversion: price overshot past mean — taking profit"
+            if gain < 0:
+                return ("Mean reversion: price reached the mean against the "
+                        "position — closing at a loss, thesis broke")
+            return "Mean reversion: price reached the mean — closing flat"
+
         if side == "BUY" and bb_pos >= 65:
             return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price overshot past mean — taking profit",
+                    "reasoning": _exit_reason(),
                     "riskLevel": "LOW", "keyFactors": ["overshot mean"]}
         if side == "SELL" and bb_pos <= 35:
             return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
-                    "reasoning": "Mean reversion: price overshot past mean — taking profit",
+                    "reasoning": _exit_reason(),
                     "riskLevel": "LOW", "keyFactors": ["overshot mean"]}
         return {"action": "HOLD", "confidence": 55, "criteriaScore": 2,
                 "reasoning": "Holding mean-reversion trade — riding to TP",
@@ -431,11 +631,8 @@ def mean_reversion_signal(ind, open_position=None):
     # Strong-trend guard: fading a strong trend is how mean-reversion bots blow up.
     # Only fade in the trend's direction (buy dips in an uptrend, sell rallies in a downtrend).
     trend_sep = abs(ema50 - ema200) / price * 100 if price else 0
-    # 0.5% is an FX "strong trend" cutoff; crypto sits above it almost always,
-    # which would turn mean-reversion into a trend-only engine and kill genuine
-    # range fades. Raise the cutoff for crypto.
-    _mr_crypto = getattr(cfg, "PRODUCT", "forex") == "crypto"
-    if trend_sep > (2.0 if _mr_crypto else 0.5):
+    # 0.5% is the FX "strong trend" cutoff.
+    if trend_sep > 0.5:
         uptrend = ema50 > ema200
         if not ((score >= 3 and uptrend) or (score <= -3 and not uptrend)):
             return {"action": "HOLD", "confidence": 45, "criteriaScore": crit,
@@ -508,20 +705,10 @@ def trend_signal(ind, strat=None, open_position=None):
     elif sor.get("direction") == "BEARISH":
         score -= 1; factors.append("bearish momentum")
     # Entry timing: pullback to value, not a chase. Buy dips (price at/under
-    # EMA20 with RSI cooled off), sell rallies mirrored. Crypto trends harder
-    # and its RSI runs hotter, so a forex-tight pullback band (RSI 35-60, price
-    # ≤ EMA20+0.05%) almost never triggers on a crypto uptrend — widen the band
-    # and shave the score threshold for the crypto build so it actually rides
-    # trends instead of waiting forever.
-    _crypto = getattr(cfg, "PRODUCT", "forex") == "crypto"
-    if _crypto:
-        pullback_buy = score > 0 and price <= ema20 * 1.004 and 38 <= rsi_v <= 70
-        pullback_sell = score < 0 and price >= ema20 * 0.996 and 30 <= rsi_v <= 62
-        thr = 3
-    else:
-        pullback_buy = score > 0 and price <= ema20 * 1.005 and 35 <= rsi_v <= 65
-        pullback_sell = score < 0 and price >= ema20 * 0.995 and 35 <= rsi_v <= 65
-        thr = 3
+    # EMA20 with RSI cooled off), sell rallies mirrored.
+    pullback_buy = score > 0 and price <= ema20 * 1.005 and 35 <= rsi_v <= 65
+    pullback_sell = score < 0 and price >= ema20 * 0.995 and 35 <= rsi_v <= 65
+    thr = 3
     if pullback_buy:
         score += 1; factors.append(f"pullback to EMA20 (RSI {rsi_v:.0f})")
     if pullback_sell:
@@ -622,14 +809,51 @@ def fibonacci_signal(ind, strat=None, open_position=None):
                 "reasoning": f"No Fibonacci level reaction (nearest: {nearest})",
                 "riskLevel": "LOW", "keyFactors": []}
 
-    factors = [f"price at Fib {nearest}", f"swing trend {trend}"]
+    # RSI and the EMA trend used to be READ, formatted into a string, and
+    # discarded — the action was the raw level signal and the confidence was a
+    # hardcoded 72 no matter what. They now carry weight, which also gives this
+    # engine a confidence that varies with setup quality instead of a constant
+    # that makes MIN_CONFIDENCE, the position-size multiplier and the EV
+    # calibration all meaningless.
+    factors = [f"price rejected Fib {nearest}", f"swing trend {trend}"]
+    score = 0
+
     rsi_v = float(ind.get("rsi") or 50)
     if signal == "BUY" and rsi_v < 45:
-        factors.append(f"RSI supports ({rsi_v:.0f})")
+        score += 1
+        factors.append(f"RSI oversold ({rsi_v:.0f})")
     elif signal == "SELL" and rsi_v > 55:
-        factors.append(f"RSI supports ({rsi_v:.0f})")
+        score += 1
+        factors.append(f"RSI overbought ({rsi_v:.0f})")
+    elif (signal == "BUY" and rsi_v > 70) or (signal == "SELL" and rsi_v < 30):
+        # Buying a bounce into an already-overbought tape, or selling into an
+        # oversold one, is the setup working against itself.
+        score -= 1
+        factors.append(f"RSI disagrees ({rsi_v:.0f})")
 
-    return {"action": signal, "confidence": 72, "criteriaScore": 3,
+    ema20 = float(ind.get("ema20") or 0)
+    ema50 = float(ind.get("ema50") or 0)
+    if ema20 and ema50:
+        if (signal == "BUY" and ema20 > ema50) or (signal == "SELL" and ema20 < ema50):
+            score += 1
+            factors.append("EMA20/50 aligned")
+        else:
+            score -= 1
+            factors.append("EMA20/50 against the setup")
+
+    macd_h = float(ind.get("macdHist") or 0)
+    if (signal == "BUY" and macd_h > 0) or (signal == "SELL" and macd_h < 0):
+        score += 1
+        factors.append("MACD momentum agrees")
+
+    if score <= -1:
+        return {"action": "HOLD", "confidence": 45, "criteriaScore": 1,
+                "reasoning": f"Fibonacci {signal} rejected — {', '.join(factors)}",
+                "riskLevel": "LOW", "keyFactors": factors}
+
+    confidence = min(88, 66 + score * 7)
+    return {"action": signal, "confidence": confidence,
+            "criteriaScore": min(5, 2 + score),
             "reasoning": f"Fibonacci {signal}: {', '.join(factors)}",
             "riskLevel": "MEDIUM", "keyFactors": factors}
 

@@ -4,38 +4,1049 @@ import threading
 import time
 from datetime import datetime
 from apex import user_store, indicators, ai, strategies, forex, news, market
+from apex import access, sentinel, institutional, cot, ledger
+from apex import automation, gates, ownership, news_alerts, regime_gate
+from apex import strategy_api
+# Registering the shipped modules is what makes strategy_api.get() return
+# anything. Without this the registry is empty, every lookup misses, and the
+# loop silently falls back to calling the engine directly -- working, but with
+# no §14 provenance on any trade.
+strategy_api.load_builtins()
 from apex import config as cfg_mod
+# Imported under an alias: `ev` is already a local variable inside _loop (the
+# news-window event), and a module-level `ev` would be shadowed for the whole
+# function scope.
+from apex import ev as ev_engine
+from apex import shadow
 from apex.brokers.ctrader import CtraderBroker as _CtraderBroker
 
 
 _loops = {}   # user_id → {"thread": Thread, "running": bool, "dash": dict}
 _lock  = threading.Lock()
 
-_LOOP_INTERVAL = 300  # 5 minutes between ticks
+# The candle-close fallback used when a broker-side close is discovered with no
+# get_closed_deal_pnl() record (restart gap, multi-position sweep) prices the
+# exit off broker.get_candles(symbol, ...) — if that ever returns another
+# instrument's candle (bad cache key, symbol-ID collision), entryPrice and
+# exit_price belong to two different assets and forex.pnl_usd() reports a
+# nonsense PnL. A same-symbol close during a single bot-downtime gap never
+# legitimately moves more than this — treat anything past it as an
+# untrustworthy estimate rather than a fact worth alerting on.
+_MAX_PLAUSIBLE_GAP_MOVE = 0.5  # 50% — generous even for a bad gap
+
+
+def _plausible_exit_price(entry_price, exit_price):
+    """True if exit_price could plausibly be the SAME symbol's price as
+    entry_price (guards the candle-close PnL fallback against fetching the
+    wrong instrument)."""
+    try:
+        entry_price = float(entry_price)
+        exit_price = float(exit_price)
+    except (TypeError, ValueError):
+        return False
+    if entry_price <= 0 or exit_price <= 0:
+        return False
+    return abs(exit_price - entry_price) / entry_price <= _MAX_PLAUSIBLE_GAP_MOVE
+
+
+
+def _phantom_levels(price, side, ind, symbol):
+    """Stop and target a refused entry would have been given.
+
+    Mirrors the live SL/TP rule rather than sharing it: that block runs inside
+    `if entry_ok`, which by definition never executes for a blocked trade.
+    Approximate is fine here — the phantom only has to answer "target or stop
+    first", and both branches use the same distances the real order would.
+    """
+    pip = forex.pip_size(symbol, price)
+    atr_v = 0.0
+    try:
+        atr_v = float((ind or {}).get("atr") or 0)
+    except (TypeError, ValueError):
+        atr_v = 0.0
+    if getattr(cfg_mod, "ATR_STOPS", False) and atr_v > 0:
+        sl_dist, tp_dist = 2.5 * atr_v, 5.0 * atr_v
+        floor_abs = 20.0 * pip
+        if sl_dist < floor_abs:
+            sl_dist, tp_dist = floor_abs, 2.0 * floor_abs
+    else:
+        sl_dist = cfg_mod.STOP_LOSS_PIPS * pip
+        tp_dist = cfg_mod.TAKE_PROFIT_PIPS * pip
+        if tp_dist < sl_dist:
+            tp_dist = 2.0 * sl_dist
+    if side == "BUY":
+        return round(price - sl_dist, 6), round(price + tp_dist, 6)
+    return round(price + sl_dist, 6), round(price - tp_dist, 6)
+
+
+def _currency_legs(symbol):
+    """The ISO currency codes a symbol is exposed to, for the news calendar.
+
+    Handles both spellings the bot uses: EUR_USD (manual /symbol) and EURUSD
+    (every Auto-Pilot symbol). Metals map to their quote currency plus the
+    metal code, so XAUUSD is still guarded against USD releases. Anything that
+    is not a recognisable 6-character pair returns no legs rather than a
+    garbage one, leaving the guard fail-open as designed.
+    """
+    s = (symbol or "").upper().replace("_", "").replace("/", "").replace("-", "")
+    if not s.isalpha():
+        return []
+    if len(s) == 6:
+        return [s[:3], s[3:]]
+    # Everything this platform trades is a 6-character pair and takes the branch
+    # above. The by-name split below is kept because returning NO legs is a
+    # silent fail-open — high_impact_window([]) matches nothing and returns
+    # None, so a symbol that slips past the 3+3 rule would trade straight
+    # through NFP/CPI/FOMC with the filter on and nothing logged.
+    for q in ("USDT", "USDC", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF"):
+        if len(s) > len(q) and s.endswith(q):
+            base = s[:-len(q)]
+            # USDT/USDC are dollar proxies for calendar purposes.
+            return [base, "USD" if q in ("USDT", "USDC") else q]
+    return []
+
+
+def _news_exit_due(cfg, symbol):
+    """The high-impact release this OPEN position would be carried into, or None.
+
+    The news guard only ever answered the entry question — "may I open into
+    this?" — and left a position taken hours earlier to ride the print. On
+    2026-09-04 that carried EURUSD and USDCHF through Non-Farm Payrolls: the
+    EURUSD stop sat 21.6 pips below entry and filled 32.7 below, 11.1 pips
+    past its own level, for a combined -116.67. A stop is a price you hope to
+    be filled at, and around a release it is not one.
+
+    Two switches, and BOTH have to say yes:
+
+      NEWS_FILTER    the client's own toggle. Somebody who turned the news
+                     guard off has said what they want, and this is the same
+                     guard acting one step later.
+      NEWS_EXIT_MIN  the operator's lead time, in minutes. 0 disables it
+                     entirely without a deploy.
+
+    Fail-open on absolutely everything else — a dead calendar, a symbol that
+    parses to no currency, any exception at all. Spuriously flattening a live
+    account because a feed hiccuped is a worse failure than the one this fixes.
+    """
+    try:
+        if not getattr(cfg, "NEWS_FILTER", True):
+            return None
+        lead = float(getattr(cfg, "NEWS_EXIT_MIN", 0) or 0)
+        if lead <= 0:
+            return None
+        legs = _currency_legs(symbol)
+        if not legs:
+            return None
+        return news.next_high_impact(legs, lead)
+    except Exception:
+        return None
+
+
+
+def _news_skip_manual(targets, tracked_symbol, manual_hold, enabled):
+    """Drop the client's own trade from the news-flatten target list.
+
+    A /buy or /sell belongs to the person who typed it, the same line the
+    strategy exit already draws. Returns the list unchanged unless the setting
+    is on AND the loop is tracking a hand-opened position.
+
+    The guarantee is narrow, and narrow on purpose rather than by omission:
+    `manual_hold` says "the position this loop is TRACKING was opened by hand".
+    It is one flag, not a mark on each position, and it cannot become one —
+    broker.get_all_positions() reports what is open, not which software opened
+    it. A hand-opened trade that is not the loop's current focus is therefore
+    indistinguishable from a bot one and is still closed.
+
+    Pure and total: it only ever removes, never adds, and never raises.
+    """
+    if not (enabled and manual_hold and targets and tracked_symbol):
+        return list(targets or [])
+    keep = _nrm(tracked_symbol)
+    out = []
+    for p in targets:
+        try:
+            if _nrm(p.get("symbol")) == keep:
+                continue
+        except Exception:
+            pass
+        out.append(p)
+    return out
+
+
+def _nrm(x):
+    """Broker-agnostic symbol key (EUR_USD / EUR/USD / eurusd → EURUSD).
+    Module-level so the startup recovery can key off it too — it used to be
+    re-defined inside every tick of the loop, below the point where recovery
+    runs."""
+    return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
+
+
+# Restart recovery has exactly three outcomes, and which one is chosen is the
+# most safety-critical decision the process makes at startup. It lived inline
+# inside a two-thousand-line loop, where the only way to check it was to read
+# it. Extracted verbatim so it can be EXERCISED — the loop below calls this
+# and behaves exactly as before.
+ADOPT = "ADOPT"                    # broker says the position is still open
+KEEP_TRACKED = "KEEP_TRACKED"      # broker never answered — do not guess
+CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
+
+
+# Leverage is a property of the INSTRUMENT and of the account, not of a
+# build-time constant. The broker's own per-symbol answer is preferred; this
+# static is only the fallback when it cannot be read.
+#
+# This mattered more than it looks. `calc_units` uses leverage only for the
+# margin cap — so an assumed 30x on a 5x instrument does not merely overstate
+# capacity, it makes the cap check a different question than the one the
+# broker will ask. The position that "uses 8.7% of the account" at 30x needs
+# 52% of it at 5x, and the guard that exists to prevent exactly that reports
+# the wrong number without failing.
+_LEV_CACHE = {}
+_LEV_STATIC_FX = 30.0
+
+
+def leverage_for_symbol(broker, cfg, symbol):
+    """The broker's real leverage for `symbol`, cached, with a per-INSTRUMENT
+    fallback rather than a per-build one.
+
+    An explicit client setting always wins — `cfg.LEVERAGE` is already the
+    resolved value when the user set one, and second-guessing it here would
+    silently override a deliberate choice.
+    """
+    sym = _nrm(symbol)
+    # An explicit client setting wins for every symbol. This used to be
+    # reachable only when no symbol was passed — which never happens in real
+    # trading — so the setting was honoured nowhere but the display.
+    if getattr(cfg, "LEVERAGE_EXPLICIT", False):
+        explicit = float(getattr(cfg, "LEVERAGE", 0) or 0)
+        if explicit > 0:
+            return explicit
+    if not sym:
+        return float(getattr(cfg, "LEVERAGE", _LEV_STATIC_FX))
+    if sym in _LEV_CACHE:
+        return _LEV_CACHE[sym]
+    static = _LEV_STATIC_FX
+    lev = static
+    try:
+        if broker is not None and hasattr(broker, "leverage_for"):
+            got = float(broker.leverage_for(symbol) or 0)
+            if got > 0:
+                lev = got
+    except Exception as e:
+        # Best-effort refinement, never a hard dependency — but the fallback
+        # is now the right ORDER OF MAGNITUDE for the instrument, which is the
+        # part that was wrong.
+        print(f"[UserLoop] leverage_for({symbol}) failed, using {static}x: {e}")
+    _LEV_CACHE[sym] = lev
+    return lev
+
+
+def broker_min_units(broker, symbol, fallback=0.0):
+    """The broker's real minimum order size in units, or `fallback`.
+
+    forex.min_units() is a per-class guess (1,000 for FX, 0.01 for everything
+    else). The broker's actual minimum is the number that decides what gets
+    sent, and it is only knowable by asking. Cached broker-side per symbol, so
+    this is one RPC per instrument per process, not one per entry.
+
+    Unknown falls back rather than assuming zero: "the broker did not answer"
+    must not read as "there is no minimum", which would put the risk check
+    back to validating a size that gets replaced on the way out.
+    """
+    try:
+        if getattr(broker, "min_units", None) is None:
+            return fallback
+        got = broker.min_units(symbol)
+        return float(got) if got else fallback
+    except Exception as e:
+        print(f"[UserLoop] broker min_units({symbol}) failed: {e}")
+        return fallback
+
+
+def flash_spike_pct_for(cfg, symbol):
+    """Violent-candle threshold. One value for every instrument this bot
+    trades — FX majors and metals share the same 1.2% convention."""
+    return float(getattr(cfg, "FLASH_SPIKE_PCT", 0.012))
+
+
+def max_spread_pct_for(cfg, symbol):
+    """Optional %-of-price spread ceiling. Off unless an operator sets one:
+    every instrument this platform trades has a sane pip size, so MAX_SPREAD_PIPS
+    is the real guard. Kept as a per-symbol call so a future instrument with
+    odd pip conventions has a place to be handled."""
+    return float(getattr(cfg, "MAX_SPREAD_PCT", 0) or 0)
+
+
+def recovery_verdict(live_position, got_answer):
+    """What a restart may conclude about a position it used to hold.
+
+    The distinction that matters is between `not live_position` and "the
+    broker told us there is no position". They are not the same fact, and
+    treating them as one is how a transient hiccup at exactly the wrong moment
+    gets read as "closed" — abandoning a position that is still open and from
+    then on unmanaged.
+
+    `got_answer` is deliberately "did any attempt succeed", not "did any
+    attempt fail". With the latter, failing twice and then getting a clean
+    definitive answer on the third try still counted as unreachable, because
+    the flag stayed set from the earlier failures.
+    """
+    if live_position:
+        return ADOPT
+    if not got_answer:
+        return KEEP_TRACKED
+    return CONFIRMED_CLOSED
+
+
+def _risk_from_snapshot(entry_price, initial_stop):
+    """abs(entry - stop) from a persisted snapshot, or None if either value is
+    missing/unusable. The snapshot is external state (Redis/disk) that can be
+    partially written or corrupted, so this must never raise into a caller
+    that isn't itself wrapped (restart recovery runs before any try/except)."""
+    try:
+        return abs(float(entry_price) - float(initial_stop))
+    except (TypeError, ValueError):
+        return None
+
+
+def _position_still_open(broker, pos, focus_symbol, user_id):
+    """True when `pos` is still open at the broker despite being absent from
+    this tick's read.
+
+    The single-position sync reads only the FOCUSED instrument. Auto-Pilot
+    rotates focus between ticks, so a position on the previous instrument
+    stops appearing the moment focus moves — and the loop read that absence as
+    "the broker closed it". Live proof: USDCAD 54303026 was declared closed at
+    netPnl 0.00 six seconds after focus moved to EURUSD, while the position was
+    open at the broker the whole time. The invented close booked a losing
+    trade, pushed the day's count from 3 to 4, and cleared the snapshot the
+    still-open position needs to survive the next restart.
+
+    Asking about the position's OWN symbol is the question that was missing.
+    Only called once focus has moved, so it costs one extra broker read per
+    rotation, not per tick.
+
+    A failed read means "unknown", and unknown must never be reported as
+    still-open: the branch this guards is how a client finds out their trade
+    hit its stop, and silence there is worse than a spurious close.
+    """
+    sym = pos.get("symbol")
+    if not sym or _nrm(sym) == _nrm(focus_symbol):
+        return False
+    try:
+        live = broker.get_open_position(sym)
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] re-check of {sym} failed ({e}) — "
+              f"treating it as closed")
+        return False
+    if not live:
+        return False
+    # Same instrument is not the same trade: one can close and another open
+    # on the pair between ticks. The broker's own id settles it.
+    pid, live_pid = pos.get("positionId"), live.get("positionId")
+    if pid and live_pid and pid != live_pid:
+        return False
+    print(f"[UserLoop:{user_id}] {sym} is still open at the broker — focus "
+          f"moved to {focus_symbol}, this is not a close")
+    return True
+
+
+def _price_open_position(pos, symbol, price):
+    """Attach floating (unrealised) P&L to an open position, in pips and USD.
+
+    bot.py — the single-account loop — has always done this, but the per-user
+    loop that actually runs in production never did, and every reader of that
+    number defaulted it to zero: Telegram's /status printed `PnL: +$0.00` on a
+    position that was $22 down, and the web terminal read `pnlUsd`/`pnlPips`
+    that were simply absent. A trade showing exactly $0.00 the whole time it is
+    open reads as a broken bot, and it hides the one number the client most
+    wants while a position is live.
+
+    Returns the position (a copy, so the broker's dict is never mutated) or
+    None. Never raises: this decorates the dashboard and must not be able to
+    take the trading loop down.
+    """
+    if not pos:
+        return pos
+    try:
+        entry = float(pos.get("entryPrice"))
+        px = float(price)
+    except (TypeError, ValueError):
+        return pos
+    if not entry or not px:
+        return pos
+    sym = pos.get("symbol") or symbol
+    side = pos.get("side")
+    if side not in ("BUY", "SELL"):
+        return pos
+    out = dict(pos)
+    try:
+        d = 1 if side == "BUY" else -1
+        out["pnlPips"] = round(forex.to_pips((px - entry) * d, sym, px), 1)
+        units = pos.get("units") or pos.get("quantity") or 0
+        if units:
+            out["pnlUsd"] = round(
+                forex.pnl_usd(side, entry, px, units, sym), 2)
+    except Exception as e:
+        print(f"[UserLoop] floating P&L for {sym} failed: {e}")
+    return out
+
+
+# Tick cadence. This was hardcoded to 300 while config computed
+# LOOP_INTERVAL_MS (60s in scalp mode) and used it only for DISPLAY —
+# telegram.py and logger.py told the client "Interval: 1m" while the loop ran
+# every five minutes. On a 1m strategy that decides entries up to five bars
+# late, and it biases WHICH setups get seen: a level touch that lasts one bar
+# is usually missed, while price stalling at a level across several bars is
+# nearly always caught — and stalling at a level is the failed-rejection case.
+# Sampling every fifth bar systematically over-represents the worse half.
+_LOOP_INTERVAL = max(30, int(getattr(cfg_mod, "LOOP_INTERVAL_MS", 300_000) / 1000))
+# Re-pick the focus symbol on a TIME cadence, not a tick count. Tick-based
+# meant shortening the interval silently multiplied broker calls; at 300s x 3
+# forex re-scanned every 15 minutes, which on 1m bars is most of the day blind.
+_SCAN_INTERVAL_S = int(os.getenv("SCAN_INTERVAL_S") or 180)
 _HEARTBEAT_TICKS = 30  # heartbeat every 30 ticks (~2.5 hours swing)
 _AI_ERROR_THROTTLE = 30  # alert AI failure at most once per 30 ticks
 _SKIP_WARN_THROTTLE = 36  # "don't trade now" warnings — only every ~3h (was 30m)
+# Per (symbol, reason) cooldown for refusal alerts. Distinct reasons are never
+# suppressed by each other — only the identical one repeating tick after tick.
+_SKIP_ALERT_COOLDOWN_S = 3 * 3600
 _LOSS_COOLDOWN_MIN = 15   # pause after a loss — avoid revenge trades in the same move
 _CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 
 
-def _log_trade(user_id, record):
-    """Persist a closed trade to the per-user tax journal (date, entry, exit,
-    fees/spread cost, gross & net PnL) — exportable for tax reporting."""
+_DEDUPE_WINDOW_S = 900  # 15 min — two paths racing on one close land seconds apart
+
+
+def _mode_of(user_id):
+    """"demo", "live", "simulation", or None when it cannot be known.
+
+    None rather than a guess: a trade filed under the wrong account mode is
+    worse than one filed under none, because the report looks complete while
+    being wrong.
+
+    This used to be `"demo" if paper else "live"`, which read the WRONG AXIS.
+    `paper` distinguishes simulated fills from broker-executed ones; it says
+    nothing about whether the broker account is real money. Account 47765456
+    runs paper=false against a cTrader DEMO account, so every trade it closed
+    was journalled "live" — and the history screen prints this field verbatim,
+    which would show a client demo trades labelled LIVE.
+
+    Deliberately does NOT call the broker: this runs inside the journal writer
+    on every close, and a network call there could fail a write that must not
+    fail. The stored env is the right axis, which was the actual defect; the
+    Mini App badge asks the broker itself (see apex/account_mode.py).
+    """
     try:
-        user_store.append_trade(user_id, {
-            "time":      record.get("time"),
-            "symbol":    record.get("symbol"),
-            "entry":     record.get("entryPrice"),
-            "exit":      record.get("price"),
-            "grossPnl":  record.get("grossPnl"),
-            "costUsd":   record.get("costUsd"),
-            "netPnl":    record.get("netPnl"),
-            "balance":   record.get("balance"),
-            "openedAt":  record.get("openedAt"),
-        })
+        from apex import account_mode
+        u = user_store.load(user_id) or {}
+        mode, _src = account_mode.resolve(u, allow_broker=False)
+        return {account_mode.LIVE: "live",
+                account_mode.DEMO: "demo",
+                account_mode.SIMULATION: "simulation"}.get(mode)
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] could not read account mode: {e}")
+        return None
+
+
+def _already_journaled(journal, row):
+    """True if this exact close is already in the journal.
+
+    Two independent paths can journal the same broker-side close: the restart
+    recovery (which fires when the persisted snapshot says open but the broker
+    says closed) and the in-loop detection (prev_pos set, open_pos now None).
+    Around a redeploy both run, seconds apart, and the trade was written twice
+    — observed live as two BROKER_CLOSE events 14s apart with identical P&L.
+
+    The cost is not just a duplicated row: loss_streak counts each close twice,
+    so the "3 consecutive losses" rule cuts risk to a quarter after what were
+    really two losses, and the duplicate becomes a second training label for a
+    trade that only happened once.
+
+    positionId is the exact key when the broker gave us one, and two DIFFERENT
+    ids settle it the other way: those are genuinely different trades.
+
+    Otherwise: same symbol, same entry price, inside a short window. P&L used
+    to be part of that key, and that was backwards. The duplicate worth
+    catching is the one whose P&L DISAGREES — the second path estimates from a
+    balance delta and books $0.00 — so requiring the numbers to match deduped
+    only the harmless case and let the wrong one through. Observed live: the
+    same EURUSD close journalled twice one second apart, +$2.89 from the
+    broker's own fill and $0.00 from the estimate, both kept.
+
+    Two genuinely distinct trades on one pair matching to five decimals on
+    entry within fifteen minutes does not happen; that was already the
+    argument, and P&L was never carrying it.
+    """
+    pid = row.get("positionId")
+    for old in reversed(journal[-40:]):
+        old_pid = old.get("positionId")
+        if pid and old_pid:
+            if old_pid == pid:
+                return True
+            continue          # different positions — not a duplicate
+        if (old.get("symbol") == row.get("symbol")
+                and old.get("entry") is not None
+                and old.get("entry") == row.get("entry")):
+            try:
+                t_old = datetime.strptime(old["time"], "%Y-%m-%d %H:%M:%S")
+                t_new = datetime.strptime(row["time"], "%Y-%m-%d %H:%M:%S")
+                if abs((t_new - t_old).total_seconds()) <= _DEDUPE_WINDOW_S:
+                    return True
+            except (KeyError, TypeError, ValueError):
+                # No usable timestamps — treat an otherwise exact match as a
+                # duplicate rather than risk double-counting a loss.
+                return True
+    return False
+
+
+# What was true when we DECIDED to enter. These keys live only in this
+# process (and in the persisted open-position snapshot) — the broker knows
+# nothing about them, so every live position read hands back a dict without
+# them. See _reattach_entry_meta.
+_ENTRY_META_KEYS = (
+    "entryConfidence", "entryRegime", "entryAtr", "entrySlPips",
+    "entryTpPips", "entrySide", "entryProbability", "entryEvR",
+    "entrySpreadPips", "openedAt",
+    # §14 reproducibility: which strategy, at which version, opened this.
+    # Carried on the position so it is still known at CLOSE time, hours later
+    # and possibly after a restart or an Auto-Pilot rotation to another mode.
+    "entryStrategyId", "entryStrategyVersion",
+    # Whether "this trade can no longer lose" has already been announced.
+    # Without this the flag dies with the position dict on the next broker
+    # re-read and the message fires again on every tick once the stop is
+    # past entry — which is the exact repetition it exists to stop.
+    "breakevenAnnounced",
+)
+
+
+def _strategy_label(key):
+    """Display name for a strategy, from the registry.
+
+    Reading this out of ai.STRATEGY_MODES defaulted to mean_reversion
+    for anything without an ai.py engine, so /status reported the wrong
+    method for every strategy added after V1 -- while the trade alerts,
+    which come from the module itself, named the right one. Two answers
+    to "what is it trading" in the same conversation.
+    """
+    try:
+        from apex import telegram as _tg
+        return _tg.friendly_strategy(key)[0]
+    except Exception:
+        pass
+    try:
+        return ai.STRATEGY_MODES[key]["label"]
+    except Exception:
+        return str(key)
+
+
+def _entry_meta(pos):
+    """Extract the decision snapshot from a position dict."""
+    return {k: pos[k] for k in _ENTRY_META_KEYS
+            if pos and pos.get(k) is not None}
+
+
+# ── Entry metadata that survives a restart ───────────────────────────────
+#
+# `entry_meta_by_sym` is an in-process dict, and the only thing persisted was
+# `open_position_snapshot` — SINGULAR, for the focused symbol. With maxpos > 1
+# the second position's decision snapshot existed nowhere but memory, so a
+# restart orphaned it: the trade later closed and was journalled with no
+# confidence, no regime, no strategy version.
+#
+# That is not a cosmetic gap. `ev.labelled_count` requires a confidence, so
+# every orphaned trade is invisible to the calibrator — which is why the
+# probability model sat at 27 of the 30 samples it needs after 124 trades.
+# The measured probability model is the intelligence that costs nothing to
+# run, and this was quietly starving it.
+#
+# Kept as its own key rather than folded into the position snapshot: a
+# position snapshot is about ONE position and is cleared when it closes,
+# while this has to outlive the close long enough for the reconciliation path
+# to label the trade.
+_META_STORE_KEY = "entry_meta_by_symbol"
+_META_MAX_SYMBOLS = 12          # bounded; the universe is eight instruments
+
+
+def _persist_entry_meta(user_id, by_sym):
+    """Write the per-symbol decision snapshots. Never raises.
+
+    Fail-soft on purpose: losing this costs a LABEL, never a trade. A write
+    error must not be able to stop the loop that is managing real money.
+    """
+    try:
+        if not by_sym:
+            return
+        trimmed = dict(list(by_sym.items())[-_META_MAX_SYMBOLS:])
+        user_store.update(user_id, {_META_STORE_KEY: trimmed})
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] entry-meta persist failed: {e}")
+
+
+def _load_entry_meta(user_id):
+    """Read them back at startup. {} on anything unexpected."""
+    try:
+        raw = (user_store.load(user_id) or {}).get(_META_STORE_KEY)
+        if not isinstance(raw, dict):
+            return {}
+        # Only keys the current code knows about. A stored snapshot from an
+        # older build must not smuggle a field the journal would then record
+        # as though this version had measured it.
+        out = {}
+        for sym, meta in raw.items():
+            if isinstance(meta, dict):
+                out[str(sym)] = {k: v for k, v in meta.items()
+                                 if k in _ENTRY_META_KEYS}
+        return out
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] entry-meta load failed: {e}")
+        return {}
+
+
+def _reattach_entry_meta(pos, meta):
+    """Put the decision snapshot back onto a freshly broker-read position.
+
+    In LIVE mode every tick replaces the tracked position with
+    `broker.get_open_position(symbol)`. That dict is the broker's truth about
+    price/size/stop — and it carries none of the entry* fields we recorded
+    when the trade was opened. So the snapshot written at entry survived
+    exactly one tick, and by the time the position closed it was gone:
+    _log_trade wrote `confidence: None`, ev.labelled_count() didn't count the
+    row, and evCalibration sat at 1/30 no matter how many trades closed.
+
+    entrySpreadPips is in the same set, which is why the spread half of
+    realised cost read $0 on every live close.
+
+    The broker's own values always win — this only fills in what it cannot
+    know.
+    """
+    if not pos or not meta:
+        return pos
+    for k, v in meta.items():
+        if pos.get(k) is None:
+            pos[k] = v
+    return pos
+
+
+def realized_cost_usd(open_pos, close_res, pv, units, paper):
+    """Costs to subtract from a gross P&L that was computed off FILL prices.
+
+    In LIVE the entry and the exit are the broker's own executions — a buy
+    fills at the ask and its close at the bid — so the ROUND-TRIP SPREAD IS
+    ALREADY INSIDE `gross`. Subtracting the entry-spread estimate on top of it
+    charged the client for the spread twice and made every live trade read
+    worse than the same trade in cTrader's History tab. The broker's own
+    authoritative number (`ctrader.get_closed_deal_pnl`) is
+    `grossProfit + swap - commission` — no spread term at all, for exactly
+    this reason. Commission is a genuinely separate charge and still applies.
+
+    In PAPER there are no fills: entry and exit are candle/level mid prices
+    with no spread baked in, so the estimate is the only thing modelling the
+    cost of crossing it and it MUST be charged. That asymmetry is the whole
+    point of this function — the previous code applied the paper formula to
+    live trades.
+    """
+    commission = float((close_res or {}).get("commissionUsd", 0.0) or 0.0)
+    if not paper:
+        return commission
+    spread_pips = float(open_pos.get("entrySpreadPips", 0.0) or 0.0)
+    return spread_pips * pv * units + commission
+
+
+def _profit_too_small_to_take(pos, price, symbol, initial_risk, user_id=""):
+    """True when a strategy's discretionary exit would cut a winner short.
+
+    This is the single biggest money-loser found in the live account. A week
+    of real trades, converted to pips:
+
+        wins   +0.6, +1.7                    (mean 1.15 pips)
+        losses -0.7, -2.4, -9.3, -10.8       (mean 5.8 pips)
+
+    SL was 15 pips and TP was 30 — 2:1 on paper. The realised ratio was 1:5
+    AGAINST, because losers ran to the full stop while winners were closed by
+    mean_reversion's "price overshot past mean" rule the moment price touched
+    the Bollinger midline, typically 1 pip in. At 1:5 you need an 83% win rate
+    to break even. The account did 33%.
+
+    Worse, that rule fires on band position alone and never looks at P&L: one
+    live trade was SOLD at 0.70581 and "took profit" at 0.70583 — price had
+    moved AGAINST the position and it was still booked as a profitable exit.
+
+    So: a discretionary profit-take must capture at least MIN_EXIT_R of the
+    risk the trade put up, and must clear its own round-trip cost. Below that
+    it is not profit, it is churn that pays the spread.
+
+    The rule is deliberately ASYMMETRIC — it only ever blocks exits that are
+    in profit. A strategy closing an UNDERWATER trade is saying its thesis
+    broke, and holding that to a full stop would turn a small loss into a big
+    one. Those exits always pass.
+
+    MIN_EXIT_R defaults to 1.0, which pairs with the breakeven trail: below 1R
+    the stop has not moved to breakeven yet, so there is nothing to protect and
+    no reason to take crumbs; at or above 1R the downside is already covered
+    and a discretionary exit is free.
+    """
+    try:
+        entry = float(pos.get("entryPrice"))
+        side = pos.get("side")
+        if not entry or side not in ("BUY", "SELL"):
+            return False
+        px = float(price)
+    except (TypeError, ValueError):
+        return False
+
+    move = (px - entry) if side == "BUY" else (entry - px)
+    if move <= 0:
+        return False        # losing or flat — thesis broke, let it out
+
+    min_r = float(os.getenv("MIN_EXIT_R") or getattr(cfg_mod, "MIN_EXIT_R", 1.0))
+    if min_r <= 0:
+        return False        # feature off
+
+    # Round-trip cost floor: the exit must at minimum pay for itself. Uses the
+    # spread measured at entry (the only spread we know for this trade) and
+    # doubles it for the return leg.
+    cost_move = 0.0
+    try:
+        sp = float(pos.get("entrySpreadPips") or 0.0)
+        if sp > 0:
+            cost_move = forex.from_pips(sp * 2, symbol, px)
+    except Exception:
+        cost_move = 0.0
+
+    # Recover the risk this trade put up. Without it the max() below collapses
+    # to the cost floor — two or three pips — and the 1R rule stops existing
+    # while still looking present. That is not a rare path: entry_risk_by_sym
+    # is in-memory and empty after every restart, and the recovery beside it
+    # reads `open_position_snapshot`, which holds ONE position while maxpos is
+    # 2. Live, that cut AUDUSD at 0.52R and GBPUSD at 0.53R on 1:2 targets.
+    #
+    # Each source is the same quantity measured a different way, most exact
+    # first: the value the caller pinned at entry, the entry-to-original-stop
+    # distance, the slPips recorded in the entry snapshot, and finally the
+    # configured stop. The last is a floor of last resort, not an estimate of
+    # this trade — but a real stop distance is a far better guess than zero,
+    # which is what "no risk known" silently meant before.
+    risk = None
+    for candidate in (
+            lambda: abs(float(initial_risk)) if initial_risk else None,
+            lambda: (abs(entry - float(pos["initialStop"]))
+                     if pos.get("initialStop") else None),
+            lambda: (forex.from_pips(float(pos["entrySlPips"]), symbol, px)
+                     if pos.get("entrySlPips") else None),
+            lambda: forex.from_pips(
+                float(getattr(cfg_mod, "STOP_LOSS_PIPS", 0) or 0), symbol, px),
+    ):
+        try:
+            got = candidate()
+        except (TypeError, ValueError, KeyError, ZeroDivisionError):
+            continue
+        if got and got > 0:
+            risk = got
+            break
+
+    floor = cost_move
+    if risk:
+        floor = max(floor, risk * min_r)
+
+    # Compare in pips, not raw price. 15 pips of AUDUSD is 0.0015 one way and
+    # 0.0014999999999999 the other depending on which subtraction produced it,
+    # and a trade sitting exactly on the threshold must not be decided by the
+    # last bit of a float. A twentieth of a pip is far below any real spread.
+    move_pips = forex.to_pips(move, symbol, px)
+    floor_pips = forex.to_pips(floor, symbol, px)
+    if move_pips >= floor_pips - 0.05:
+        return False
+
+    if user_id:
+        print(f"[UserLoop:{user_id}] held {symbol}: strategy wanted out at "
+              f"{move_pips:.1f} pips, needs {floor_pips:.1f} "
+              f"({min_r}R + cost) — not cutting the winner short")
+    return True
+
+
+def _ride_instead_of_close(broker, cfg, pos, symbol, price, initial_risk,
+                           ind=None, user_id=""):
+    """Hand a strongly-running winner to the trailing stop instead of closing it.
+
+    _profit_too_small_to_take stops the bot cutting winners short. It does not
+    make the bot let winners RUN — nothing did. A live XAUUSD trade closed at
+    +$26.88 on a $9 risk (2.99R) with the reason "price overshot past mean",
+    while gold kept going. The exit was not premature by the 1R rule, but it
+    was still the strategy capping a trend trade at its own midline.
+
+    Mean reversion's exit says "price reached the mean, my thesis is done". In
+    a trending instrument that thesis is finished but the MOVE is not. So once
+    a trade is running well AND the trend still agrees with it, don't take the
+    money off the table — pull the stop up behind price and let the market
+    decide when it is over.
+
+    Returns True only when the stop has actually been tightened, i.e. when the
+    profit is genuinely protected. Every failure path returns False so the
+    caller closes normally: a position we could not protect must never be held
+    open on the strength of an intention.
+    """
+    if not getattr(cfg, "TRAILING_STOP", False):
+        return False        # nothing to hand the trade to
+    try:
+        ride_r = float(os.getenv("RIDE_AT_R") or getattr(cfg_mod, "RIDE_AT_R", 2.0))
+        lock = float(os.getenv("RIDE_LOCK") or getattr(cfg_mod, "RIDE_LOCK", 0.6))
+    except (TypeError, ValueError):
+        return False
+    if ride_r <= 0 or not (0 < lock < 1):
+        return False
+
+    try:
+        entry = float(pos.get("entryPrice"))
+        side = pos.get("side")
+        px = float(price)
+        pid = pos.get("positionId")
+        cur_sl = float(pos.get("stopLoss") or pos.get("sl") or 0)
+        risk = abs(float(initial_risk or 0))
+    except (TypeError, ValueError):
+        return False
+    if not (pid and entry and cur_sl and risk > 0 and side in ("BUY", "SELL")):
+        return False
+    if not hasattr(broker, "amend_sltp"):
+        return False
+
+    profit = (px - entry) if side == "BUY" else (entry - px)
+    if profit < ride_r * risk:
+        return False        # not running hard enough to be worth the give-back
+
+    # The trend must still be behind the trade. Riding a reversal is how a 3R
+    # winner becomes a scratch — if the move is over, take the money.
+    try:
+        ema50 = float((ind or {}).get("ema50") or 0)
+    except (TypeError, ValueError):
+        ema50 = 0
+    if ema50:
+        aligned = px > ema50 if side == "BUY" else px < ema50
+        if not aligned:
+            return False
+
+    # Lock most of the open profit. The give-back is bounded and known:
+    # (1 - lock) x profit, versus unlimited upside if the move continues.
+    keep = entry + profit * lock if side == "BUY" else entry - profit * lock
+    improved = (keep - cur_sl) if side == "BUY" else (cur_sl - keep)
+    if improved <= 0:
+        return False        # trail is already tighter — leave it alone
+
+    try:
+        # Both sides, always: an amend replaces the pair, so leaving the
+        # take-profit out would delete it. See CtraderBroker.amend_sltp.
+        if not broker.amend_sltp(pid, sl=round(keep, 6),
+                                 tp=(pos.get("takeProfit") or pos.get("tp")),
+                                 instrument=symbol):
+            return False    # could not protect it → fall through and close
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] ride amend failed on {symbol}: {e}")
+        return False
+
+    pos["stopLoss"] = round(keep, 6)
+    if user_id:
+        print(f"[UserLoop:{user_id}] riding {symbol}: {profit / risk:.1f}R and "
+              f"trend still aligned — stop moved to {keep:.5f}, locking "
+              f"{lock:.0%} of the move instead of closing")
+    return True
+
+
+def _institutional_observations(symbol, ind, regime, spread_pips, now=None):
+    """Map what this bot can actually see onto the Institutional State features.
+
+    Five of the spec's nine features have a free source the bot already
+    reaches; four do not:
+
+        price_momentum      RSI / EMA / MACD          ✓ (critical)
+        volatility          regime vol_ratio          ✓
+        liquidity_quality   spread + trading session  ✓
+        macro_risk          economic calendar         ✓
+        futures_positioning licensed futures feed     ✗
+        cot_bias            CFTC weekly (free, TODO)  ✗
+        rate_differential   yield curves              ✗
+        central_bank_bias   policy statements         ✗
+
+    The four without a source are simply not emitted. That is the point: they
+    show up in `missing`, they pull `data_quality` down to what it honestly is,
+    and nothing pretends they are neutral. Adding a COT adapter later means
+    appending one observation here — no other code changes.
+    """
+    out = []
+
+    def add(feature, value, source, conf=1.0, ttl=3600):
+        o = institutional.observe(feature, value, source,
+                                  confidence=conf, ttl_s=ttl, now=now)
+        if o["value"] is not None:
+            out.append(o)
+
+    ind = ind or {}
+
+    # ── price_momentum: agreement between RSI, the EMA stack and MACD ──
+    try:
+        score, n = 0.0, 0
+        rsi = float(ind.get("rsi") or 0) or None
+        if rsi:
+            score += max(-1.0, min(1.0, (rsi - 50.0) / 25.0)); n += 1
+        e50, e200 = ind.get("ema50"), ind.get("ema200")
+        if e50 and e200:
+            score += 1.0 if float(e50) > float(e200) else -1.0; n += 1
+        macd, sig = ind.get("macd"), ind.get("macdSignal")
+        if macd is not None and sig is not None:
+            score += 1.0 if float(macd) > float(sig) else -1.0; n += 1
+        if n:
+            add("price_momentum", score / n, "indicators", ttl=1800)
+    except (TypeError, ValueError):
+        pass
+
+    # ── volatility: signed away from "normal", not a raw magnitude ──
+    try:
+        vr = float((regime or {}).get("vol_ratio") or 0)
+        if vr > 0:
+            add("volatility", (vr - 1.0), "regime", ttl=1800)
+    except (TypeError, ValueError):
+        pass
+
+    # ── liquidity_quality: tight spread in a live session is good liquidity ──
+    try:
+        sp = float(spread_pips or 0)
+        if sp > 0:
+            tight = max(-1.0, min(1.0, (1.5 - sp) / 1.5))
+            sess = market.session()
+            in_session = bool(sess) and "closed" not in str(sess).lower()
+            add("liquidity_quality", tight if in_session else min(tight, 0.0),
+                "spread+session", ttl=900)
+    except (TypeError, ValueError, AttributeError):
+        pass
+
+    # ── macro_risk: negative near a high-impact release, for either leg ──
+    # Only emitted when the calendar actually holds events. Without the
+    # has_data() check this published +0.2 ("nothing due") whenever the feed
+    # was down — observed live as a 403 from the calendar provider, which would
+    # have been recorded as the confident fact that no releases were pending,
+    # and would have RAISED data_quality for a source that knew nothing.
+    try:
+        legs = _currency_legs(symbol)
+        if legs and news.has_data():
+            hit = news.high_impact_window(legs)
+            add("macro_risk", -1.0 if hit else 0.2, "calendar", ttl=1800)
+    except Exception:
+        pass
+
+    # ── cot_bias: CFTC speculative positioning, the one free institutional
+    # source. Weekly and days old by construction, so it carries a reduced
+    # confidence rather than being treated as a current reading.
+    try:
+        legs = _currency_legs(symbol)
+        cb = cot.pair_bias(symbol, legs=tuple(legs) if legs else None)
+        if cb is not None:
+            _age = cot.age_days(symbol, legs=tuple(legs) if legs else None)
+            # A reading loses weight as it ages toward the next release.
+            _conf = 0.8 if (_age or 0) <= 7 else 0.5
+            add("cot_bias", cb, "cftc_cot", conf=_conf, ttl=8 * 86400)
+    except Exception:
+        pass
+
+    return out
+
+
+def _log_trade(user_id, record, pos=None):
+    """Persist a closed trade to the per-user tax journal (date, entry, exit,
+    fees/spread cost, gross & net PnL) — exportable for tax reporting.
+
+    `pos` is the position being closed. Its `entry*` keys are the DECISION
+    snapshot, and they are what turns a closed trade into a labelled training
+    example rather than just an accounting row: without the confidence, regime
+    and spread that were true AT ENTRY, there is no way to measure afterwards
+    how often a given kind of setup actually reached TP before SL, and
+    ev.calibrate() has nothing to learn from.
+
+    Callers that no longer hold the position (broker-side reconciliation) may
+    omit it; those rows are still written for accounting, just unlabelled and
+    skipped by the calibrator.
+    """
+    # Never let one instrument's entry data be filed under another's. A
+    # mismatch here means the caller's `symbol` and its position disagree —
+    # the journal row would carry the wrong entry price (and the P&L computed
+    # upstream is already suspect), so drop the position-derived fields and say
+    # so loudly rather than writing a plausible-looking lie into the record the
+    # calibrator and the tax export both read.
+    if pos and record.get("symbol") and pos.get("symbol"):
+        if _nrm(pos["symbol"]) != _nrm(record["symbol"]):
+            print(f"[UserLoop:{user_id}] REFUSED mismatched trade log: record is "
+                  f"{record['symbol']} but position is {pos['symbol']} — "
+                  f"entry fields dropped")
+            pos = None
+    src = {**(pos or {}), **record}   # record wins on any overlapping key
+    row = {
+        "time":      record.get("time"),
+        "symbol":    record.get("symbol"),
+        "entry":     record.get("entryPrice"),
+        "exit":      record.get("price"),
+        "grossPnl":  record.get("grossPnl"),
+        "costUsd":   record.get("costUsd"),
+        "netPnl":    record.get("netPnl"),
+        "balance":   record.get("balance"),
+        "openedAt":  record.get("openedAt"),
+        # Broker's own id for the closed position — the exact dedupe key.
+        "positionId": src.get("positionId"),
+        # ── decision snapshot (for ev.calibrate) ──
+        "confidence":  src.get("entryConfidence"),
+        "regime":      src.get("entryRegime"),
+        "spreadPips":  src.get("entrySpreadPips"),
+        "atr":         src.get("entryAtr"),
+        "slPips":      src.get("entrySlPips"),
+        "tpPips":      src.get("entryTpPips"),
+        "probability": src.get("entryProbability"),
+        "evR":         src.get("entryEvR"),
+        # `entrySide` comes from the decision snapshot taken when the trade
+        # opened. When that snapshot is gone — a restart, or a position the
+        # broker closed after the loop forgot it — the caller may still know
+        # the direction from the position it reconciled against, so fall back
+        # to it. Without this the row is filed with no side at all, and the
+        # journal reader draws a missing side as LONG.
+        "side":        src.get("entrySide") or src.get("side"),
+        # ── §14 reproducibility ──
+        # Which strategy, at which version, opened this trade. Without both,
+        # comparing strategies on real results is guesswork: the journal knows
+        # the outcome but not what produced it, and a strategy whose logic
+        # changed last week is indistinguishable from the one that traded.
+        "strategyId":      src.get("entryStrategyId"),
+        "strategyVersion": src.get("entryStrategyVersion"),
+        # Demo and live results mixed together make a report useless exactly
+        # when it matters. Recorded per trade because the account can switch:
+        # reading the CURRENT mode at report time would relabel every past
+        # demo trade as live the moment a client goes live.
+        #
+        # Read from THIS user's record, not the process-global config. Each
+        # client runs their own loop with their own mode, so the global flag
+        # would stamp every client's trades with whatever the process default
+        # happened to be.
+        "mode":            _mode_of(user_id),
+    }
+    try:
+        if _already_journaled(user_store.load_trades(user_id), row):
+            print(f"[UserLoop:{user_id}] duplicate close ignored: "
+                  f"{row.get('symbol')} netPnl={row.get('netPnl')}")
+            return False
+        user_store.append_trade(user_id, row)
+        try:
+            from apex import trade_events as _te4
+            _te4.record(user_id, _te4.POSITION_CLOSED,
+                        symbol=row.get("symbol"),
+                        position_id=row.get("positionId"),
+                        strategy_id=row.get("strategyId"),
+                        strategy_version=row.get("strategyVersion"),
+                        payload={"side": row.get("side"), "entry": row.get("entry"),
+                                 "exit": row.get("exit"), "netPnl": row.get("netPnl"),
+                                 "grossPnl": row.get("grossPnl"),
+                                 "costUsd": row.get("costUsd"),
+                                 "action": row.get("action"), "mode": row.get("mode")})
+        except Exception as _e4:
+            print(f"[UserLoop:{user_id}] decision log (close) failed: {_e4}")
+        return True
     except Exception as e:
         print(f"[UserLoop:{user_id}] trade-log failed: {e}")
+        return False
 
 
 def _persist_open_position(user_id, cfg, pos):
@@ -47,6 +1058,16 @@ def _persist_open_position(user_id, cfg, pos):
     function both the loop and those two call, instead of a loop-only
     closure — a manual trade needs the exact same restart protection as an
     autonomous one."""
+    # The Mini App reads positions through a short cache. This is the one place
+    # every open and close passes through — loop, manual /buy//close, and the
+    # MCP tools alike — so it is where the cache has to be dropped. Without it a
+    # client watches a trade close and still sees it listed for seconds
+    # afterwards, which is precisely the staleness a terminal must not have.
+    try:
+        from apex import miniapp_cache
+        miniapp_cache.invalidate(user_id)
+    except Exception:
+        pass
     if getattr(cfg, "PAPER_TRADING", False):
         return
     try:
@@ -81,16 +1102,20 @@ def _make_broker(user):
         # once the account has grown or shrunk. See /tptarget.
         TP_TARGET_PCT    = float(user.get("tp_target_pct", 0) or 0),
         RISK_PER_TRADE   = float(user.get("risk", 0.025)),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
-        # Crypto CFDs are leveraged far lower than FX (retail ~2-5x vs 30x), so
-        # the margin cap must assume less leverage or it sizes positions the
-        # account can't actually margin.
-        LEVERAGE         = float(user.get("leverage", 5 if _appcfg.PRODUCT == "crypto" else 30)),
+        LEVERAGE         = float(user.get("leverage", 30)),
+        # Whether the number above is the CLIENT'S or just our default. Without
+        # this, leverage_for_symbol() cannot tell a deliberate 30 from the
+        # fallback 30, so it ignored the setting entirely (see its docstring).
+        LEVERAGE_EXPLICIT = "leverage" in user,
         MARGIN_CAP       = 0.5,
-        MAX_SPREAD_PIPS  = 3.0,
-        PRODUCT          = _appcfg.PRODUCT,  # so the loop's crypto branches fire
-        # Asset-class-aware spread/volatility guards (crypto uses a %-of-price
-        # spread limit + higher flash-spike bar; forex keeps the pip limit).
-        # Pulled from the global product config so PRODUCT=crypto takes effect.
+        # Hard-coded 3.0 here overrode the product config, so the strict scalp
+        # ceiling (1.2p) never reached a live account — every entry was admitted
+        # up to 3 pips. On a 15-pip stop that is a 24.7% cost-to-stop toll and
+        # pushes the break-even win rate from 37.1% to 41.6%.
+        MAX_SPREAD_PIPS  = float(user.get(
+            "max_spread_pips", getattr(_appcfg, "MAX_SPREAD_PIPS", 3.0))),
+        PRODUCT          = _appcfg.PRODUCT,  # Redis namespace only — always "forex"
+        # Spread/volatility guards, operator-tunable, never build-derived.
         MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
         FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
         MIN_CONFIDENCE   = int(user.get("min_confidence", 70)),
@@ -102,7 +1127,15 @@ def _make_broker(user):
         EXIT_MODE        = (user.get("exit_mode") or "fixed").lower(),
         TRAILING_STOP    = bool(user.get("trailing", True)),      # move SL behind price — ON by default
         BREAKEVEN_AT_R   = float(user.get("breakeven_r", 1.0)),   # move SL to entry at +1R
-        NEWS_FILTER      = bool(user.get("news_filter", _appcfg.PRODUCT != "crypto")),
+        NEWS_FILTER      = bool(user.get("news_filter", True)),
+        # How many minutes before a high-impact release an ALREADY-OPEN
+        # position is closed. Same warning as the EV block below: a key missing
+        # from this object is unreachable from inside the loop, so
+        # NEWS_EXIT_MIN in the environment would silently do nothing.
+        NEWS_EXIT_MIN    = float(getattr(_appcfg, "NEWS_EXIT_MIN", 15)),
+        # Without this key the loop reads the module default and
+        # NEWS_EXIT_SKIP_MANUAL in the environment does nothing.
+        NEWS_EXIT_SKIP_MANUAL = getattr(_appcfg, "NEWS_EXIT_SKIP_MANUAL", False),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
         MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
         # Caps scaled with RISK_PER_TRADE above (2.5x risk) so the bot still
@@ -112,8 +1145,40 @@ def _make_broker(user):
         # risk-tier progression in builder.py).
         MAX_DD_PCT       = float(user.get("max_dd_pct", 25)),
         MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 4)),
+        # EV gate. The loop reads its config off THIS object, not the global
+        # module, so keys missing here are silently unreachable: without them
+        # `getattr(cfg, "EV_GATE_MODE", "shadow")` returned "shadow" forever and
+        # EV_GATE_MODE=enforce in the environment did nothing on any account.
+        EV_GATE_MODE       = getattr(_appcfg, "EV_GATE_MODE", "shadow"),
+        EV_MIN_PROBABILITY = float(user.get(
+            "ev_min_probability", getattr(_appcfg, "EV_MIN_PROBABILITY", 0.55))),
+        EV_MIN_SAMPLES     = int(getattr(_appcfg, "EV_MIN_SAMPLES", 30)),
+        AI_VISION          = bool(getattr(_appcfg, "AI_VISION", False)),
+        STRUCTURAL_STOPS   = bool(user.get(
+            "structural_stops", getattr(_appcfg, "STRUCTURAL_STOPS", False))),
+        STRUCTURAL_MIN_RR  = float(getattr(_appcfg, "STRUCTURAL_MIN_RR", 1.3)),
+        # Sentinel. Same warning as the EV block above: absent here means the
+        # env var is unreachable from inside the loop.
+        SENTINEL_MODE      = getattr(_appcfg, "SENTINEL_MODE", "shadow"),
+        SENTINEL_MIN_CONFIDENCE = getattr(_appcfg, "SENTINEL_MIN_CONFIDENCE", None),
+        SENTINEL_TTL_S     = int(getattr(_appcfg, "SENTINEL_TTL_S", 0) or 0),
+        INSTITUTIONAL_GATE = getattr(_appcfg, "INSTITUTIONAL_GATE", "shadow"),
+        # Regime entry gate. Same warning again: a key absent here is a key the
+        # loop cannot read, and REGIME_GATE=off in the environment would do
+        # nothing while looking like it had worked.
+        REGIME_GATE        = getattr(_appcfg, "REGIME_GATE", "enforce"),
     )
-    return _CtraderBroker(fake_cfg), fake_cfg
+    broker = _CtraderBroker(fake_cfg)
+    # Refine the LEVERAGE guess with the broker's real, per-instrument value
+    # (regulated brokers cap some instruments below the FX-major tier — see
+    # CtraderBroker.leverage_for) — but only when the client didn't set one
+    # explicitly and we're actually margining real money against it.
+    if not paper and ct_token and ct_account and "leverage" not in user:
+        try:
+            fake_cfg.LEVERAGE = broker.leverage_for(fake_cfg.SYMBOL)
+        except Exception as e:
+            print(f"[UserLoop] leverage_for failed, keeping default {fake_cfg.LEVERAGE}: {e}")
+    return broker, fake_cfg
 
 
 def _broker_label(user, cfg):
@@ -166,11 +1231,195 @@ def _refresh_ctrader_token(user_id, cfg) -> bool:
         return False
 
 
-def _manage_trailing(broker, cfg, pos, symbol, price):
+def drop_broker_connection(user) -> bool:
+    """Close this account's pooled cTrader socket. True when there was one.
+
+    Lives here rather than in the caller because the import graph is an
+    enforced invariant: nothing outside the trading core may reach a broker
+    module, so the session watcher asks the core to do it instead of importing
+    one itself (tests/test_failure_matrix.py, item 15).
+
+    Safe to call at any time — the pool recreates and re-authenticates on the
+    next request, which is exactly how the weekend reopen path repairs itself.
+    """
+    ctid = (user or {}).get("ctrader_account_id")
+    if not ctid:
+        return False
+    from apex.brokers import ctrader as _ct
+    _ct._drop_conn(user.get("ctrader_env", "demo"), ctid)
+    return True
+
+
+def _write_thesis(user_id, open_pos, symbol, action, entry_price,
+                  stop_price, target_price, signal):
+    """Record why this trade was taken, from the setup that justified it.
+
+    Built from the scanner's own proposal when one exists, so the conditions
+    are the ones that were actually measured before the order. When the entry
+    came from somewhere else — a manual /buy, or a scan that predates this —
+    the thesis is built from the recorded levels alone rather than composed
+    from whatever looks reasonable now. §24 forbids the reconstruction, and a
+    thesis with invented conditions would evaluate as valid forever.
+
+    Fail-soft: a position without a thesis is managed by its broker stop, which
+    is what happens today. Losing one must never cost the trade.
+    """
+    try:
+        from apex import setups as _st, thesis as _th
+        prop, cand = _last_proposal.get(_nrm(symbol)) or (None, None)
+        # Only the setup that produced THIS entry may write the thesis. A
+        # proposal for a different direction is a different trade, and reusing
+        # it would attach conditions nobody measured for the position that
+        # actually opened.
+        if cand is not None and cand.direction != action:
+            prop, cand = None, None
+        if cand is None:
+            cand = _st.SetupCandidate(
+                symbol=symbol, direction=action,
+                timeframe=getattr(signal, "get", lambda *_: None)("timeframe"),
+                strategy_id=(signal or {}).get("strategy_id"),
+                strategy_version=(signal or {}).get("strategy_version"),
+                features={"htfTrend": (signal or {}).get("htfTrend"),
+                          "structureTrend": (signal or {}).get("structureTrend")},
+                status=_st.CANDIDATE)
+        th = _th.from_candidate(cand, entry_price=entry_price,
+                                initial_stop=stop_price,
+                                initial_target=target_price,
+                                decision_id=getattr(prop, "id", None))
+        open_pos["thesis"] = th.to_dict()
+        try:
+            from apex import trade_events as _te
+            _te.record(user_id, _te.THESIS_CREATED, symbol=symbol,
+                       position_id=open_pos.get("positionId"),
+                       strategy_id=th.strategy_id,
+                       strategy_version=th.strategy_version,
+                       payload=th.to_dict())
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] thesis write failed: {e}")
+
+
+def _strategy_version(strategy_id=None):
+    """The version of the strategy that is about to decide, or None.
+
+    None rather than a placeholder: §23 says a historical decision must stay
+    reproducible, and a decision stamped with a version nobody can resolve is
+    worse than one that admits it does not know which version ran.
+    """
+    try:
+        from apex import strategy_api as _sapi
+        s = _sapi.get(strategy_id) if strategy_id else None
+        return getattr(s, "strategy_version", None) if s else None
+    except Exception:
+        return None
+
+
+# The proposal the scanner produced for a symbol on the most recent pass, kept
+# so the entry path can write the thesis from the setup that justified the
+# trade rather than reconstructing one at order time. Process-local and
+# bounded: a lost entry here costs a thesis, never a trade.
+_last_proposal = {}
+
+
+def _remember_proposal(symbol, proposal, candidate=None):
+    _last_proposal[symbol] = (proposal, candidate)
+    if len(_last_proposal) > 64:
+        for k in list(_last_proposal)[:32]:
+            _last_proposal.pop(k, None)
+
+
+def _shadow_pm_on():
+    """Whether the shadow position manager runs. Off unless switched on.
+
+    §72: safe defaults. This writes journal events on every managed tick, so
+    an operator who has not asked for it does not silently start paying for
+    the storage.
+    """
+    return (os.getenv("SHADOW_POSITION_MANAGER", "").strip().lower()
+            in ("1", "true", "yes", "on"))
+
+
+def _shadow_manage(user_id, pos, symbol, price, initial_risk, dash, cfg):
+    """Record what a thesis-driven manager would have proposed. Never acts.
+
+    Wrapped whole: this decorates the journal, and a bug in it must not be
+    able to take a trading loop down or delay a real stop amendment.
+    """
+    try:
+        from apex import position_manager as _pm, thesis as _th
+        from apex import trade_events as _te
+
+        th = _th.Thesis.from_dict(pos.get("thesis")) if pos.get("thesis") else None
+        if th is None:
+            # Reconstructing a thesis for a position that predates one would be
+            # the retrospective invention §24 forbids. Build it from what was
+            # RECORDED at entry, or record nothing.
+            entry = pos.get("entryPrice")
+            stop = pos.get("initialStop") or pos.get("stopLoss") or pos.get("sl")
+            if entry is None or stop is None:
+                return
+            th = _th.Thesis(
+                symbol=symbol, direction=pos.get("side"),
+                conditions=[_th.Condition(_th.LEVEL, stop,
+                                          detail="stop recorded at entry")],
+                strategy_id=(dash or {}).get("strategyId"),
+                strategy_version=None, entry_price=entry, initial_stop=stop,
+                initial_target=pos.get("takeProfit") or pos.get("tp"))
+
+        mkt = (dash or {}).get("market") or {}
+        obs = {"price": price,
+               "htfTrend": mkt.get("htfTrend"),
+               "structureTrend": mkt.get("trend"),
+               "regime": ((dash or {}).get("regime") or {}).get("regime")}
+        if obs["regime"]:
+            from apex import regime as _rg
+            obs["regime"] = _rg.from_legacy((dash or {}).get("regime")).regime
+
+        prop = _pm.evaluate(pos, th, obs, policy={
+            "protect_from_r": float(getattr(cfg, "SHADOW_PROTECT_FROM_R", 1.0)),
+            "protect_trail_r": float(getattr(cfg, "SHADOW_PROTECT_TRAIL_R", 1.5)),
+        })
+        # HOLD is the common case and recording every one would bury the
+        # journal. What is worth keeping is a proposal that DIFFERS from what
+        # the live policy is doing — that is the evidence the comparison needs.
+        if not prop.acts and prop.reason != _pm.THESIS_INVALIDATED:
+            return
+        _te.record(user_id, _te.MANAGEMENT_SHADOW, symbol=symbol,
+                   position_id=pos.get("positionId"),
+                   payload={**prop.to_dict(), "livePolicy": "trailing+breakeven",
+                            "shadow": True})
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] shadow position manager: {e}")
+
+
+def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None,
+                     user_id=None):
     """Trailing stop + break-even (Strategy Builder exit modes). Moves the SL
     only in the favourable direction — never loosens it, never closes the trade.
     Real-broker only (needs a live positionId + amend_sltp). Returns the new SL
-    if it moved, else None. Fail-soft everywhere."""
+    if it moved, else None. Fail-soft everywhere.
+
+    initial_risk is the trade's ORIGINAL entry-to-stop distance and must stay
+    constant for its lifetime. It has to be supplied by the caller because the
+    broker only ever reports the CURRENT stop: deriving R from
+    abs(entry - cur_sl) — as this did — silently stops measuring risk the
+    moment the stop ratchets past entry, because from then on that distance is
+    locked profit. The first ratchet past breakeven collapsed R toward zero and
+    pinned the trail a few pips behind price, where ordinary spread-sized noise
+    closed the trade:
+
+        BUY entry 1.1000, stop 1.0975 (25p risk), price walking up
+          1.1030 -> R 25.0p -> stop 1.1005   trail 25p, as intended
+          1.1040 -> R  5.0p -> stop 1.1035   trail 5p, inside the noise
+          1.1045 -> R 35.0p -> stop 1.1035   trail 10p, and now loose again
+
+    Winners were cut at noise distance while losers still ran the full stop.
+
+    None keeps the old derivation. That is the fallback for a position whose
+    opening this process never saw (adopted mid-life after a restart with no
+    snapshot, or opened before this change shipped) — those keep today's
+    behaviour rather than trailing off a risk figure we cannot know."""
     try:
         if not pos or not price or not hasattr(broker, "amend_sltp"):
             return None
@@ -184,7 +1433,8 @@ def _manage_trailing(broker, cfg, pos, symbol, price):
         side = pos.get("side")
         if not (pid and entry and cur_sl and side in ("BUY", "SELL")):
             return None
-        risk = abs(float(entry) - float(cur_sl))
+        risk = (abs(float(initial_risk)) if initial_risk
+                else abs(float(entry) - float(cur_sl)))
         if risk <= 0:
             return None
         profit = (price - entry) if side == "BUY" else (entry - price)
@@ -200,7 +1450,27 @@ def _manage_trailing(broker, cfg, pos, symbol, price):
             new_sl = max(new_sl, trail) if side == "BUY" else min(new_sl, trail)
         improved = (new_sl - cur_sl) if side == "BUY" else (cur_sl - new_sl)
         if improved > risk * 0.05:  # only amend on a meaningful move
-            if broker.amend_sltp(pid, sl=new_sl, instrument=symbol):
+            # Pass the CURRENT take-profit through. An amend replaces both
+            # sides, so omitting it deletes the target — the position could
+            # then only exit by stop, by a discretionary exit, or by the
+            # weekend flatten. See CtraderBroker.amend_sltp.
+            if broker.amend_sltp(pid, sl=new_sl,
+                                 tp=(pos.get("takeProfit") or pos.get("tp")),
+                                 instrument=symbol):
+                # A stop that moved is part of the trade's story: on replay it
+                # is the difference between "it ran" and "it was managed".
+                try:
+                    from apex import trade_events as _te5
+                    if user_id is None:
+                        # Better silent than filed under a user this function
+                        # was never told about.
+                        raise RuntimeError("no user_id passed to _manage_trailing")
+                    _te5.record(user_id, _te5.STOP_UPDATED, symbol=symbol,
+                                position_id=pid,
+                                payload={"from": cur_sl, "to": new_sl,
+                                         "side": side, "price": price})
+                except Exception as _e5:
+                    print(f"[Trailing] decision log (stop) failed: {_e5}")
                 return new_sl
     except Exception as e:
         print(f"[Trailing] manage failed: {e}")
@@ -210,17 +1480,20 @@ def _manage_trailing(broker, cfg, pos, symbol, price):
 def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
 
-    # Self-heal cross-product pollution AT THE SOURCE. When crypto & forex shared
-    # one Redis namespace, a user record could keep the OTHER product's symbols
-    # (a forex account trading SOLUSD, etc.). Scrub them out of every stored field
-    # — symbol, watchlist, autopilot_universe — and PERSIST, so the terminal, the
-    # status card and the scanner all reflect a clean, single-product account
-    # without the user running any command.
-    _block = getattr(cfg_mod, "CROSS_PRODUCT_BLOCK", set())
-
+    # Self-heal untradeable symbols AT THE SOURCE, against the ALLOWLIST rather
+    # than against a list of things to remove. A stored record can carry a
+    # symbol the order path now refuses — a coin left over from the merged
+    # build, an index, a cross with no USD leg — and every one of them is a
+    # dead slot in the scan budget that silently never trades.
+    #
+    # Asking `is_tradeable` instead of consulting a blocklist means the scrub
+    # can never drift from the gate: there is exactly one definition of what
+    # this bot accepts, and both the entry path and this cleanup read it.
+    # Scrubbed out of every stored field — symbol, watchlist,
+    # autopilot_universe — and PERSISTED, so the terminal, the status card and
+    # the scanner all agree without the client running any command.
     def _foreign(sym):
-        return bool(sym) and (sym.upper().replace("_", "").replace("/", "").replace("-", "")
-                              in _block)
+        return bool(sym) and not forex.is_tradeable(sym)
 
     _patch = {}
     if _foreign(user.get("symbol")):
@@ -250,17 +1523,20 @@ def _loop(user_id, alert_fn, gen=None):
     # own /symbol or /watch basket is used.
     autopilot = bool(user.get("autopilot"))
     if autopilot and user.get("autopilot_universe"):
-        watchlist = [w for w in user["autopilot_universe"] if w][:8]
+        # A cap on WORK, not a preference: the broker connection is a
+        # single socket with a lock held across each round-trip, so every extra
+        # symbol lengthens the tick. Twelve keeps a scan comfortably inside the
+        # interval; going much past it makes the loop slower than the signals
+        # it is looking for.
+        watchlist = [w for w in user["autopilot_universe"] if w][:12]
     else:
         watchlist = [w for w in (user.get("watchlist") or []) if w][:6]
-    if getattr(cfg, "PRODUCT", "forex") == "crypto":
-        watchlist = [w for w in watchlist if forex.is_crypto(w)]
-        if not forex.is_crypto(symbol):
-            symbol = watchlist[0] if watchlist else "BTCUSD"
-    else:
-        watchlist = [w for w in watchlist if forex.is_tradeable(w)]
-        if not forex.is_tradeable(symbol):
-            symbol = watchlist[0] if watchlist else "EUR_USD"
+    # Strip anything the order path would refuse — a stored watchlist can
+    # still carry a coin from the merged build, and a basket entry that can
+    # never trade is a silent dead slot in the scan budget.
+    watchlist = [w for w in watchlist if forex.is_tradeable(w)]
+    if not forex.is_tradeable(symbol):
+        symbol = watchlist[0] if watchlist else "EUR_USD"
     paper_balance = cfg.PAPER_BALANCE
     # REAL mode: the stored seed goes stale the moment a trade closes — read
     # the broker's actual balance BEFORE the first status can be asked for,
@@ -268,11 +1544,19 @@ def _loop(user_id, alert_fn, gen=None):
     if not cfg.PAPER_TRADING:
         try:
             paper_balance = broker.get_balance()
+            # Money moved while the loop was DOWN. If we were flat when it went
+            # down, no trade can account for it, so it is a deposit or a
+            # withdrawal and the drawdown peak has to follow it. (A position
+            # that closed during the outage is the other case, and the restart
+            # recovery below journals that as a real trade instead.)
+            _prev_seed = float(cfg.PAPER_BALANCE or 0)
+            _flat_when_down = not (user.get("open_position_snapshot") or {}).get("symbol")
+            if _prev_seed and _flat_when_down and abs(paper_balance - _prev_seed) >= 0.01:
+                strategies.rescale_peak(_prev_seed, paper_balance, user_id=user_id)
             user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
         except Exception as e:
             print(f"[UserLoop:{user_id}] initial balance read failed: {e}")
     open_pos = None  # tracked locally for paper mode
-    _crypto_build = getattr(cfg, "PRODUCT", "forex") == "crypto"
     tick = 0
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_refresh_at = 0.0  # throttle cTrader token-refresh/reconnect attempts
@@ -283,7 +1567,42 @@ def _loop(user_id, alert_fn, gen=None):
     # exactly the moment they mattered most — right after losses.
     last_loss_at = float(user.get("last_loss_at") or 0)   # entry cooldown anchor (any losing close)
     last_close_at = float(user.get("last_close_at") or 0) # re-entry lock after ANY close — kills open/close churn
-    loss_streak = int(user.get("loss_streak") or 0)       # adaptive risk ladder: 2 losses → half risk, 3+ → quarter
+    loss_streak = int(user.get("loss_streak") or 0)       # counted and reported only — the risk ladder it used to drive was removed
+    # The ladder is a within-session brake, but nothing ever cleared it: a
+    # streak survived indefinitely, so losses from days ago still quartered
+    # today's position size and the only escape was a winning trade. Everything
+    # else that counts losses (dailyTrades, dailyPnL, consecutiveLosses) resets
+    # on a new trading day; this now does too. Longer-horizon protection is
+    # already covered by max_dd_pct and max_daily_loss_pct.
+    def _clear_stale_streak():
+        """Drop a loss streak carried over from a previous trading day.
+
+        MUST be called every tick, not once at startup. It used to run only
+        here in the setup, which meant the check was evaluated exactly once
+        per process: a loop that stayed up across midnight kept a streak from
+        the day before FOREVER, and the only escape was a winning trade or a
+        redeploy. Observed live — a streak of 2 entered on 19 Aug was still
+        halving position size on 20 Aug on a loop that had never restarted,
+        while strategy_session had rolled over to the new day as designed.
+        Two counters for the same thing, disagreeing, because only one of them
+        was ever re-read.
+        """
+        nonlocal loss_streak
+        if not (loss_streak and last_loss_at):
+            return False
+        day = datetime.fromtimestamp(last_loss_at).strftime("%Y-%m-%d")
+        if day == datetime.now().strftime("%Y-%m-%d"):
+            return False
+        print(f"[UserLoop:{user_id}] loss streak of {loss_streak} was from "
+              f"{day} — cleared for the new trading day")
+        loss_streak = 0
+        return True
+
+    # Cleared at startup too — but the persist has to wait until
+    # _persist_risk_state exists a few lines below, or the record keeps saying 2
+    # while the running loop believes 0. That gap is not cosmetic: the value is
+    # what every restart re-reads, and what the operator sees when they look.
+    _cleared_at_start = _clear_stale_streak()
 
     def _persist_risk_state():
         try:
@@ -293,12 +1612,42 @@ def _loop(user_id, alert_fn, gen=None):
         except Exception as e:
             print(f"[UserLoop:{user_id}] risk-state persist failed: {e}")
 
+    if _cleared_at_start:
+        _persist_risk_state()
+
     def _persist_open_snapshot(pos):
         _persist_open_position(user_id, cfg, pos)
+
+    def _with_initial_stop(pos, sym):
+        """Re-persist a broker-read position without losing its original stop.
+
+        The broker only ever reports the CURRENT stop, so any snapshot rebuilt
+        from a broker read would drop the original one and the next restart
+        would fall back to noise-tight trailing. Reconstruct it from the risk
+        this process pinned at entry."""
+        out = {**pos, "symbol": sym}
+        r = entry_risk_by_sym.get(_nrm(sym))
+        if r and pos.get("entryPrice") and not out.get("initialStop"):
+            e = float(pos["entryPrice"])
+            out["initialStop"] = e - r if pos.get("side") == "BUY" else e + r
+        return out
+    # nrm(symbol) -> the trade's ORIGINAL entry-to-stop distance. Keyed by
+    # symbol because the focus can move between ticks (maxpos=1 adopts a
+    # position found on another pair), and a trail sized off the wrong pair's
+    # risk is worse than no trail at all. See _manage_trailing's initial_risk.
+    entry_risk_by_sym = {}
+    # nrm(symbol) -> the trade's decision snapshot (confidence, regime, ATR,
+    # SL/TP, EV probability, spread at entry). Kept out-of-band for the same
+    # reason as entry_risk_by_sym: the live position dict is re-read from the
+    # broker every tick and comes back stripped of everything the broker
+    # doesn't store. Without this the calibrator never gets a labelled trade.
+    # Restored from the store, so a restart does not orphan the decision
+    # snapshot of a position the loop is not currently focused on.
+    entry_meta_by_sym = _load_entry_meta(user_id)
     prev_open_syms = set()  # multi-position: detect broker-side closes tick-to-tick
     pos_details = {}    # nrm(symbol) -> {symbol, side, entry, units} for P&L on close
     spread_blocked = {}  # nrm(symbol) -> retry_ts: Auto-Pilot avoids symbols whose
-                         # spread is blown out (weekend crypto) instead of camping on them
+                         # spread is blown out (weekend/illiquid) instead of camping on them
     rate_limit_until = 0.0  # while > now, do only the minimal 1-symbol fetch
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
@@ -306,8 +1655,42 @@ def _loop(user_id, alert_fn, gen=None):
     was_weekend_closed = market.is_weekend_close_window()  # fire the Telegram
                          # notice only on the Fri→closed and Sun→open EDGE,
                          # not every tick for the whole weekend
+    weekend_failed = set()   # symbols the weekend flatten could not close, as
+                             # last reported. Re-alert when this CHANGES — a
+                             # position still open going into the gap is worth
+                             # a second message, but not one every tick.
     was_stopped = False  # fire the "Trading paused" alert once per stop, not
                          # every tick for the rest of the day it stays true
+
+    # Confidence → P(win) map, measured from this account's own closed trades.
+    # Rebuilt periodically rather than every tick: it only moves when a trade
+    # closes, and re-reading the journal on each tick is pointless I/O.
+    # Sentinel: this loop's persistent, expiring view of every symbol it
+    # watches. Per-loop rather than global — two users on the same pair have
+    # different accounts, risk and strategy, so they do not share an opinion.
+    _signals = sentinel.SignalStore()
+    _sentinel_mode = str(getattr(cfg, "SENTINEL_MODE", "shadow")).lower()
+    _inst_mode = str(getattr(cfg, "INSTITUTIONAL_GATE", "shadow")).lower()
+    # nrm(symbol) -> the features and verdict of the last ACTUAL AI call.
+    # Deliberately not the last published state: the state is republished every
+    # tick with the current price, so comparing against it would reset the
+    # "price moved" test on every pass and let price drift arbitrarily far
+    # without ever triggering a refresh.
+    _last_ai = {}
+
+    ev_calibration = None
+    ev_cal_tick = -10 ** 9
+
+    def _refresh_ev_calibration():
+        """(Re)build the calibration table. Returns it, or None when there is
+        not yet enough labelled history to say anything honest."""
+        try:
+            return ev_engine.calibrate(
+                user_store.load_trades(user_id),
+                min_total=getattr(cfg, "EV_MIN_SAMPLES", 30))
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] EV calibration failed: {e}")
+            return None
 
     acct_env = (user.get("ctrader_env") or "demo").lower()
     mode_label = ("📝 Simulation" if cfg.PAPER_TRADING
@@ -316,7 +1699,7 @@ def _loop(user_id, alert_fn, gen=None):
     dash = {
         "broker": _broker_label(user, cfg),
         "mode": mode_label,
-        "strategy": ai.STRATEGY_MODES.get(cfg.STRATEGY, ai.STRATEGY_MODES["mean_reversion"])["label"],
+        "strategy": _strategy_label(cfg.STRATEGY),
         "balance": paper_balance,
         "startBalance": paper_balance,
         "symbol": symbol,
@@ -380,26 +1763,49 @@ def _loop(user_id, alert_fn, gen=None):
                           f"(attempt {_attempt + 1}/3): {e}")
                     if _attempt < 2:
                         time.sleep(2)
-            if _live:
+            _verdict = recovery_verdict(_live, _got_answer)
+            if _verdict == ADOPT:
                 symbol = _snap["symbol"]
                 open_pos = _live
+                # The persisted snapshot is the only surviving record of WHY
+                # this trade was taken — the broker read that just replaced it
+                # carries none of it. A redeploy mid-trade must not cost us the
+                # label.
+                entry_meta_by_sym[_nrm(symbol)] = _entry_meta(_snap)
+                _persist_entry_meta(user_id, entry_meta_by_sym)
+                _reattach_entry_meta(open_pos, entry_meta_by_sym[_nrm(symbol)])
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
                 # Still open — re-persist it (don't clear!). If we wiped the
                 # snapshot here, a SECOND restart while this same position is
                 # still open would find nothing to compare against and we'd
                 # be back to the exact bug this is fixing.
-                _persist_open_snapshot({**open_pos, "symbol": symbol})
-                print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position")
-            elif not _got_answer:
+                # Carry the ORIGINAL stop across the restart, not the live one:
+                # if this position has already trailed, its current stop is no
+                # longer its risk, and re-deriving R from it would resume the
+                # noise-tight trailing this fix removes.
+                _init_stop = _snap.get("initialStop")
+                _risk = _risk_from_snapshot(open_pos.get("entryPrice"), _init_stop)
+                if _risk is not None:
+                    entry_risk_by_sym[_nrm(symbol)] = _risk
+                _persist_open_snapshot({**open_pos, "symbol": symbol,
+                                        "initialStop": _init_stop})
+                print(f"[UserLoop:{user_id}] restart recovery: adopted still-open {symbol} position"
+                      f"{'' if _init_stop else ' (no initial stop on record — trailing falls back to the live stop)'}")
+            elif _verdict == KEEP_TRACKED:
                 # Never got a definitive answer from the broker — don't guess
                 # "closed." Keep tracking it from the snapshot; the very next
                 # tick's own position-sync (which is allowed to keep retrying)
                 # will resolve the real state either way.
                 symbol = _snap["symbol"]
                 open_pos = dict(_snap)
+                entry_meta_by_sym[_nrm(symbol)] = _entry_meta(_snap)
+                _persist_entry_meta(user_id, entry_meta_by_sym)
                 dash["symbol"] = symbol
                 dash["openPosition"] = open_pos
+                if _snap.get("initialStop") and _snap.get("entryPrice"):
+                    entry_risk_by_sym[_nrm(symbol)] = abs(
+                        float(_snap["entryPrice"]) - float(_snap["initialStop"]))
                 _persist_open_snapshot(open_pos)
                 print(f"[UserLoop:{user_id}] restart recovery: broker unreachable at startup — "
                       f"keeping {symbol} tracked pending the next tick")
@@ -430,12 +1836,21 @@ def _loop(user_id, alert_fn, gen=None):
                     units_ = _snap.get("units") or _snap.get("quantity", 0)
                     net = None
                     if exit_price and _snap.get("entryPrice") and units_:
-                        net = round(forex.pnl_usd(_snap.get("side", "BUY"), _snap["entryPrice"],
-                                                  exit_price, units_, _snap["symbol"]), 2)
+                        if _plausible_exit_price(_snap["entryPrice"], exit_price):
+                            net = round(forex.pnl_usd(_snap.get("side", "BUY"), _snap["entryPrice"],
+                                                      exit_price, units_, _snap["symbol"]), 2)
+                        else:
+                            print(f"[UserLoop:{user_id}] BROKER_CLOSE fallback rejected implausible "
+                                  f"exit_price={exit_price} vs entryPrice={_snap['entryPrice']} "
+                                  f"for {_snap['symbol']}")
+                            exit_price = None
                     gross_pnl = net
                     cost_usd = 0.0
                     reasoning = ("closed at the broker during a restart — exact fill "
-                                 "unknown, priced against the next available quote")
+                                 "unknown, priced against the next available quote"
+                                 if net is not None else
+                                 "closed at the broker during a restart — exact P&L "
+                                 "couldn't be verified safely, check cTrader history")
                 result = {"action": "BROKER_CLOSE", "symbol": _snap["symbol"],
                           "side": _snap.get("side", ""), "price": exit_price,
                           "entryPrice": _snap.get("entryPrice"), "netPnl": net,
@@ -444,21 +1859,30 @@ def _loop(user_id, alert_fn, gen=None):
                           "openedAt": _snap.get("openedAt"),
                           "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                           "reasoning": reasoning}
-                _log_trade(user_id, result)
-                dash["trades"].insert(0, result)
-                dash["trades"] = dash["trades"][:50]
-                if net is not None and net < 0:
-                    last_loss_at = time.time()
-                    loss_streak += 1
-                elif net is not None and net > 0:
-                    loss_streak = 0
-                last_close_at = time.time()
-                _persist_risk_state()
-                if net is not None:
-                    strategies.record_trade(net > 0, net, dash.get("startBalance") or paper_balance,
-                                            user_id=user_id, symbol=_snap["symbol"])
-                if alert_fn:
-                    alert_fn(user_id, result)
+                # _snap is the persisted open-position snapshot, which carries
+                # the entry decision fields — so a trade closed during a
+                # restart still lands in the journal labelled.
+                # Gate every side effect on the journal actually accepting this
+                # close. The in-loop detection below can reach the same close a
+                # few seconds later; counting it twice pushes loss_streak to 3
+                # after two real losses and cuts risk to a quarter for no
+                # reason, and double-counts the day's P&L.
+                _fresh = _log_trade(user_id, result, _snap)
+                if _fresh:
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if net is not None and net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    elif net is not None and net > 0:
+                        loss_streak = 0
+                    last_close_at = time.time()
+                    _persist_risk_state()
+                    if net is not None:
+                        strategies.record_trade(net > 0, net, dash.get("startBalance") or paper_balance,
+                                                user_id=user_id, symbol=_snap["symbol"])
+                    if alert_fn:
+                        alert_fn(user_id, result)
                 print(f"[UserLoop:{user_id}] restart recovery: journaled a close missed during the outage on {_snap['symbol']}")
                 _persist_open_snapshot(None)
 
@@ -470,11 +1894,9 @@ def _loop(user_id, alert_fn, gen=None):
 
     def _health_check(lat=None, spread=None):
         """Broker Health Monitor (premium spec #8): when latency blows past the
-        broker's own recent norm, suspend entries and say so. The spread-based
-        check is skipped for crypto — the Auto-Pilot scans a basket whose per-
-        coin spreads differ 10x (SOL 600p vs BTC 5p), so a shared spread median
-        is meaningless and would flip-flop degraded/recovered every scan (spam).
-        The per-entry %-spread guard already blocks wide-spread entries."""
+        broker's own recent norm, suspend entries and say so. The spread check
+        needs at least 8 samples before it trusts its own median, so a thin
+        history never trips it."""
         if lat is not None:
             health["lats"] = (health["lats"] + [lat])[-30:]
         if spread is not None and spread > 0:
@@ -485,7 +1907,7 @@ def _loop(user_id, alert_fn, gen=None):
             med = sorted(lats)[len(lats) // 2]
             if lats[-1] > max(8.0, med * 5):
                 bad = f"data latency {lats[-1]:.1f}s (normal ~{med:.1f}s)"
-        if not bad and not _crypto_build and len(sps) >= 8 and spread is not None:
+        if not bad and len(sps) >= 8 and spread is not None:
             med = sorted(sps)[len(sps) // 2]
             if spread > max(med * 4, med + 2):
                 bad = f"spread {spread:.1f}p vs normal ~{med:.1f}p"
@@ -506,26 +1928,200 @@ def _loop(user_id, alert_fn, gen=None):
                                    "symbol": symbol})
         return health["degraded"]
 
-    def _skip(reason):
+    def _recent_spread():
+        """Median of recently observed spreads, or None.
+
+        The AI runs before the entry block fetches bid/ask, so the live spread
+        does not exist yet at that point — reading it there would be a stale
+        value from some earlier tick, or an unbound name on the first one. The
+        health monitor already keeps a rolling window of real observations,
+        which is both available and more representative than one quote.
+        """
+        sps = sorted(health.get("spreads") or [])
+        if not sps:
+            return None
+        return sps[len(sps) // 2]
+
+    def _focus(sym):
+        """Move the Auto-Pilot focus, and persist it.
+
+        The rotation only ever wrote dash["symbol"], which is in-memory. Every
+        Telegram command reads the STORED user["symbol"] instead, so the two
+        drifted apart the moment Auto-Pilot moved: the dashboard and heartbeat
+        showed XAUUSD while /status, /chart and — worst — a bare /buy still
+        used whatever pair the record was last left on. A manual buy would open
+        a position on an instrument the bot had not looked at in hours.
+
+        Written only on an actual change, so this costs one store write per
+        rotation rather than one per tick.
+        """
+        nonlocal symbol
+        symbol = sym
+        dash["symbol"] = sym
+        if _nrm(user_store.load(user_id).get("symbol")) != _nrm(sym):
+            try:
+                user_store.update(user_id, {"symbol": sym})
+            except Exception as e:
+                print(f"[UserLoop:{user_id}] focus persist failed: {e}")
+
+    _skip_alerted = {}   # (symbol, reason) -> when it was last sent
+
+    def _skip(reason, alert=True):
         """Journal every rejected entry (premium spec #12) — clients see the
-        discipline, not just the trades: 'refused 14 weak setups today'."""
+        discipline, not just the trades: 'refused 14 weak setups today'.
+
+        This wrote to the dashboard and nowhere else, so of the 25 places that
+        refuse an entry only six ever reached Telegram, and the HTF gate — the
+        one doing most of the refusing — was not among them. A client watching
+        their phone saw the bot go quiet for a day with no explanation.
+
+        Those six also shared ONE `last_warn_tick`, so a "market too quiet"
+        notice at 08:00 silenced a spread warning at 08:05 and an EV veto at
+        08:10 for the next three hours. Throttling is per (symbol, reason)
+        instead: each distinct refusal gets through once, and only the identical
+        one repeating on the next tick is suppressed. The HTF gate fired eight
+        times on one symbol with one reason today — that is one message, not
+        eight, and not zero.
+
+        `alert=False` is for the two sites that send their own richer message
+        (flash-crash, news) and would otherwise double up.
+
+        The cooldown is held in REDIS, not in this dict. Holding it in memory
+        looked equivalent and was not: every restart emptied it, and the next
+        tick re-sent everything it had already sent. Three deploys inside six
+        minutes produced three identical "Holding off on XAUUSD" messages —
+        the throttle was working perfectly and being reset out from under it.
+        Deploys are not the only restarts either; the watchdog restarts loops
+        too, and during a deploy two instances run at once and would each
+        notify. A shared key with a TTL fixes all three at once, and is the
+        same primitive the order ledger uses. The dict stays as the fallback
+        for when there is no Redis configured.
+        """
         today = datetime.now().strftime("%Y-%m-%d")
         if dash.get("skipsDay") != today:
+            # Day rolled over. Send yesterday's recap BEFORE the counters are
+            # cleared — a summary is only worth sending while the day it
+            # describes still exists.
+            _prev = dash.get("skipsDay")
             dash["skipsDay"], dash["skipsToday"] = today, 0
+            _skip_alerted.clear()
+            if _prev:
+                try:
+                    from apex import telegram as _tg
+                    _tg.send_daily_summary(user_id)
+                except Exception as e:
+                    print(f"[UserLoop:{user_id}] daily summary failed: {e}")
         dash["skipsToday"] = dash.get("skipsToday", 0) + 1
         lst = dash.setdefault("skips", [])
         lst.insert(0, {"time": datetime.now().strftime("%H:%M"), "reason": str(reason)[:120]})
         del lst[30:]
+
+        # The dashboard copy above is in memory, last thirty, and carries no
+        # symbol — a restart erased the answer to "why didn't it trade this
+        # morning". This writes the same refusal to the persistent decision log
+        # WITH the symbol and the strategy version that refused it, which is
+        # what "Why didn't APEX trade?" is answered from.
+        #
+        # Wrapped and swallowed on purpose: journalling must never be able to
+        # interfere with a trading decision. A lost event costs an explanation;
+        # a raised exception here would cost an execution.
+        try:
+            from apex import trade_events as _te
+            _sid = getattr(cfg, "STRATEGY", None)
+            # The version is looked up from the registry rather than assumed.
+            # An event that names a version it did not verify is worse than one
+            # that leaves it unknown — replay reads these as provenance.
+            _sver = None
+            try:
+                from apex import strategy_api as _sapi
+                _s = _sapi.get(_sid) if _sid else None
+                _sver = getattr(_s, "strategy_version", None) if _s else None
+            except Exception:
+                pass
+            _te.record(user_id, _te.DECISION_DECLINED, symbol=symbol,
+                       strategy_id=_sid, strategy_version=_sver,
+                       payload={"reason": str(reason)[:400],
+                                "skipsToday": dash.get("skipsToday")})
+        except Exception as _e:
+            print(f"[UserLoop:{user_id}] decision log (skip) failed: {_e}")
+
+        # Every refusal goes to stdout too. The dashboard keeps the last 30 and
+        # Telegram deliberately shows each distinct reason once per three
+        # hours — both are the right behaviour for a person, and both make the
+        # logs useless for debugging: searching Render for why the bot went
+        # quiet returned nothing at all, because no refusal was ever written
+        # there. This line is NOT throttled; the log is where the full,
+        # unsummarised sequence belongs.
+        print(f"[UserLoop:{user_id}] SKIP {symbol}: {reason} "
+              f"(#{dash['skipsToday']} today)")
+
+        if not (alert and alert_fn):
+            return
+        try:
+            key = f"{_nrm(symbol)}|{str(reason)[:60]}"
+            shared = user_store.claim(f"skipalert:{user_id}:{key}",
+                                      ttl_s=_SKIP_ALERT_COOLDOWN_S)
+            if shared is False:
+                return                      # already announced, still cooling
+            if shared is None:              # no shared store — in-memory only
+                now_s = time.time()
+                if now_s - _skip_alerted.get(key, 0) < _SKIP_ALERT_COOLDOWN_S:
+                    return
+                _skip_alerted[key] = now_s
+                if len(_skip_alerted) > 200:
+                    for k in sorted(_skip_alerted, key=_skip_alerted.get)[:100]:
+                        _skip_alerted.pop(k, None)
+            alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
+                               "reason": str(reason)[:200],
+                               "countToday": dash.get("skipsToday", 1)})
+        except Exception as e:
+            print(f"[UserLoop:{user_id}] skip alert failed: {e}")
 
     while True:
         with _lock:
             entry = _loops.get(user_id, {})
             if not entry.get("running") or (gen is not None and entry.get("gen") != gen):
                 break  # stopped, or replaced by a newer loop (restart race)
+
+        # Ownership. The generation check above only sees threads in THIS
+        # process; the lease is what sees the other container.
+        #
+        # Renewal does NOT happen here. This tick is five minutes long and can
+        # block far longer inside a broker read, so renewing from the top of
+        # the tick left the lease expired for most of its life — and the next
+        # renewal then read the missing key as a takeover and shut the loop
+        # down on a single uncontended container. A dedicated thread renews on
+        # wall-clock time; this only reacts to a takeover it has confirmed.
+        if ownership.was_lost(user_id):
+            # Another instance genuinely holds the lease — not "the key
+            # expired", which the renewer re-acquires instead. Stand down
+            # rather than trade alongside the new owner, which has already
+            # read the broker's real positions for itself.
+            print(f"[UserLoop:{user_id}] lease taken over — standing down")
+            try:
+                if alert_fn:
+                    alert_fn(user_id, {"action": "OWNERSHIP_LOST",
+                                       "reason": "another instance took over"})
+            except Exception:
+                pass
+            # This path leaves the loop WITHOUT going through stop(), so it has
+            # to clean up after itself. Leaving the renewer registered and the
+            # lost-flag set made the next watchdog restart alert and break on
+            # its first tick, forever.
+            try:
+                ownership.stop_renewer(user_id)
+            except Exception:
+                pass
+            break
         try:
             if not forex.is_market_open():
                 time.sleep(60)
                 continue
+
+            # The day can roll over under a loop that never restarts, so the
+            # streak has to be re-checked here rather than only at startup.
+            if _clear_stale_streak():
+                _persist_risk_state()
 
             # ── MULTI-POSITION: how many concurrent trades, and total-risk cap.
             # Live-only (paper stays single). Total exposure is bounded by
@@ -535,9 +2131,6 @@ def _loop(user_id, alert_fn, gen=None):
             maxpos = max(1, min(maxpos, 8))
             max_total_risk = float(user_store.load(user_id).get("max_total_risk", 0.05))
             per_trade_risk = min(cfg.RISK_PER_TRADE, max_total_risk / maxpos)
-
-            def _nrm(x):
-                return (x or "").upper().replace("_", "").replace("/", "").replace("-", "")
 
             rate_ok = time.time() >= rate_limit_until
             all_positions = None
@@ -567,7 +2160,8 @@ def _loop(user_id, alert_fn, gen=None):
                     # Only journal positions WE opened (have details for). Without
                     # this, a position opened by another bot sharing the account
                     # is journaled here with mismatched data — e.g. a gold entry
-                    # reported as BTCUSD — corrupting P&L and the tax journal.
+                    # reported under the wrong symbol — corrupting P&L and the
+                    # tax journal.
                     if not det or not det.get("entry"):
                         continue
                     # Ask the broker for this position's actual closed-deal
@@ -589,23 +2183,61 @@ def _loop(user_id, alert_fn, gen=None):
                         est_pnl = _deal["netPnl"]
                         gross_pnl = _deal["grossPnl"]
                         cost_usd = _deal["commissionUsd"]
+                        # The exit price came back with the P&L and was being
+                        # thrown away: `xp` was only ever set in the fallback
+                        # branch below, so every trade closed the NORMAL way
+                        # (the broker's own SL/TP) was journalled with no exit
+                        # at all — and therefore no R multiple, and no exit
+                        # marker on its replay.
+                        xp = _deal.get("exitPrice") or xp
                     else:
                         try:
                             if det.get("entry") and det.get("units"):
                                 xc = broker.get_candles(det["symbol"], cfg.TIMEFRAME, 2)
                                 xp = xc[-1]["close"] if xc else None
-                                if xp:
+                                if xp and _plausible_exit_price(det["entry"], xp):
                                     est_pnl = round(forex.pnl_usd(det["side"], det["entry"], xp,
                                                                   det["units"], det["symbol"]), 2)
                                     gross_pnl = est_pnl
+                                elif xp:
+                                    print(f"[UserLoop:{user_id}] BROKER_CLOSE_MULTI fallback rejected "
+                                          f"implausible exit_price={xp} vs entry={det['entry']} "
+                                          f"for {det['symbol']}")
+                                    xp = None
                         except Exception:
                             est_pnl = None
+                    # cTrader's own balance after this close. Every OTHER close
+                    # path does `paper_balance += net` before journalling; this
+                    # one never did, so each broker-closed trade was filed with
+                    # the balance from before its own P&L, and the running
+                    # figure stayed stale until some later read corrected it.
+                    # Taking the broker's number rather than adding our own is
+                    # also the only version that cannot drift.
+                    _bal_after = (_deal or {}).get("balance")
+                    if _bal_after is not None:
+                        paper_balance = float(_bal_after)
+                    elif est_pnl is not None:
+                        paper_balance += float(est_pnl)
                     now2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     rec = {"action": "CLOSE", "symbol": det.get("symbol", cs),
                            "entryPrice": det.get("entry"), "price": xp,
+                           # Direction, from the position we recorded when it
+                           # opened. It was absent here, and the journal reader
+                           # renders a missing side as LONG — so a losing SELL
+                           # closed by its stop was shown to the client as a
+                           # long trade. pos_details has carried it all along.
+                           "side": det.get("side"),
+                           "positionId": det.get("positionId"),
                            "grossPnl": gross_pnl, "costUsd": cost_usd, "netPnl": est_pnl,
                            "balance": round(paper_balance, 2), "time": now2}
-                    _log_trade(user_id, rec)
+                    # These are the SL/TP hits — the single most informative
+                    # label the calibrator can get, and the one path that was
+                    # journalling them unlabelled because the position object
+                    # is long gone by the time the broker reports it closed.
+                    # The out-of-band snapshot is still here.
+                    _meta = entry_meta_by_sym.get(cs)
+                    _log_trade(user_id, rec,
+                               {**_meta, "symbol": det.get("symbol", cs)} if _meta else None)
                     dash["trades"].insert(0, {**rec, "reasoning": "closed at broker (target/stop)"})
                     dash["trades"] = dash["trades"][:50]
                     if est_pnl is not None and est_pnl < 0:
@@ -624,6 +2256,23 @@ def _loop(user_id, alert_fn, gen=None):
                         alert_fn(user_id, {"action": "BROKER_CLOSE_MULTI", "symbol": det.get("symbol", cs),
                                            "netPnl": est_pnl, "balance": round(paper_balance, 2)})
                 prev_open_syms = set(open_syms)
+                # Drop pinned risk for anything no longer open, so a later
+                # trade on the same pair never trails off a dead position's R.
+                # Done here, against the broker's own list, rather than at each
+                # close site — SL/TP, manual /close, weekend flatten and the
+                # protective stop all converge on this one truth.
+                for _gone in [k for k in entry_risk_by_sym if k not in open_syms]:
+                    entry_risk_by_sym.pop(_gone, None)
+                # Same for the decision snapshot — but only AFTER the close has
+                # been journalled above, which is why this sits at the end of
+                # the reconciliation block and not beside the broker read.
+                _dropped = [k for k in entry_meta_by_sym if k not in open_syms]
+                for _gone in _dropped:
+                    entry_meta_by_sym.pop(_gone, None)
+                if _dropped:
+                    # Only on an actual change. Writing every tick would put a
+                    # store round trip on the hot path for nothing.
+                    _persist_entry_meta(user_id, entry_meta_by_sym)
             open_count = len(open_syms)
             dash["openCount"] = open_count
             dash["maxpos"] = maxpos
@@ -636,46 +2285,81 @@ def _loop(user_id, alert_fn, gen=None):
             # in paper, which used to freeze the scanner and pin the focus).
             slot_free = ((open_pos is None) if cfg.PAPER_TRADING
                          else ((all_positions is not None) and (open_count < maxpos)))
-            # Scan cadence: forex every 3 ticks (~15 min); crypto every 2 (~10
-            # min) because setups rotate faster across the coin basket and only
-            # the focus symbol is entered per tick, so scanning too rarely misses
-            # most setups. Requests are spaced 0.35s to respect cTrader's limit.
+            # Scan cadence: every 3 ticks (~15 min). Requests are spaced 0.35s
+            # to respect cTrader's rate limit.
             # Also rescan immediately when the focus is spread-blocked so the bot
             # doesn't camp on a dead symbol.
-            _scan_every = 1 if _crypto_build else 3
+            _scan_every = max(1, round(_SCAN_INTERVAL_S / max(1, _LOOP_INTERVAL)))
             due_to_scan = (tick % _scan_every == 0) or (
                 spread_blocked.get(_nrm(symbol), 0) > time.time())
             if watchlist and slot_free and due_to_scan and rate_ok:
+                # ── APEX scanner + decision engine ───────────────────
+                #
+                # This replaces a loop that read every instrument, kept the
+                # one with the highest confidence, and discarded the rest.
+                # Ranking by confidence alone compares one strategy's opinion
+                # of its own trigger against another's as if they were one
+                # scale, and the discarded readings were why "why didn't APEX
+                # trade GBPUSD" had no answer for six of seven instruments.
+                #
+                # The focus behaviour is unchanged: the best eligible
+                # candidate becomes the focused symbol and then goes through
+                # the SAME full pipeline below. Nothing here opens a position,
+                # and gates.authorize_order still authorises every order.
                 best = None
-                for ws in watchlist:
-                    if _nrm(ws) in open_syms:
-                        continue  # already holding this one
-                    if spread_blocked.get(_nrm(ws), 0) > time.time():
-                        continue  # spread blown out recently — try others first
-                    try:
-                        time.sleep(0.35)  # space out trendbar requests — cTrader rate-limits bursts
-                        c2 = broker.get_candles(ws, cfg.TIMEFRAME, 160)
-                        if not c2 or len(c2) < 130:
-                            continue
-                        ind2 = indicators.analyze(c2)
-                        st2 = strategies.analyze(c2)
-                        m2 = cfg.STRATEGY
-                        if m2 == "auto":
-                            reg2 = strategies.detect_regime(c2)
-                            if reg2["regime"] == "quiet":
-                                continue
-                            m2 = {"trending": "trend", "ranging": "mean_reversion",
-                                  "volatile": "breakout"}.get(reg2["regime"], "mean_reversion")
-                        s2 = ai.signal_for_mode(m2, ind2, st2, None)
-                        if (s2.get("action") in ("BUY", "SELL")
-                                and s2.get("confidence", 0) >= cfg.MIN_CONFIDENCE
-                                and (not best or s2["confidence"] > best[1])):
-                            best = (ws, s2["confidence"])
-                    except Exception as e:
-                        print(f"[UserLoop:{user_id}] scan {ws}: {e}")
+                try:
+                    from apex import decision as _dec, ranking as _rank
+                    from apex import scanner as _scan
+                    # NOT `_skip`: that name is the skip-reason logger
+                    # defined for this loop, and `_loop` holds the tick loop,
+                    # so rebinding it here made it a set for the LIFE of the
+                    # loop. Every later _skip(reason) then raised "'set'
+                    # object is not callable" — seen live four times on
+                    # 2026-09-04. Refusals still took effect (every call site
+                    # sets entry_ok = False first), but the client-facing
+                    # record of WHY was lost and, at the seven call sites
+                    # without a local try/except, the rest of the tick went
+                    # with it.
+                    _scan_skip = {k for k in open_syms} | {
+                        k for k, until in spread_blocked.items()
+                        if until > time.time()}
+                    _cands = _scan.scan(
+                        broker, cfg, watchlist, forex=forex, skip=_scan_skip,
+                        context={"exposureCount": open_count,
+                                 "maxPositions": maxpos,
+                                 "openSymbols": sorted(open_syms),
+                                 "strategyVersion": _strategy_version()})
+                    _policy = {
+                        "min_confidence": cfg.MIN_CONFIDENCE,
+                        "max_spread_ratio": float(
+                            getattr(cfg, "MAX_SPREAD_RATIO", 0) or 0.25),
+                        "require_htf": bool(getattr(cfg, "HTF_FILTER", False)),
+                        "allow_unknown_regime": True,
+                    }
+                    _rc = {"halted": bool((dash.get("riskGuard") or {}).get("halted"))}
+                    _ranked = _rank.rank(_cands)
+                    _decisions, _proposals = _dec.evaluate_all(
+                        _ranked, policy=_policy, risk_context=_rc,
+                        slots_free=max(0, maxpos - open_count),
+                        account_env=dash.get("mode"))
+                    _scan.record(user_id, _cands, _decisions, ranked=_ranked)
+                    if _proposals:
+                        _top = _proposals[0]
+                        best = (_top.symbol, _top.rank_score)
+                        # Keep the CANDIDATE beside the decision. The thesis is
+                        # written from the setup that justified the trade, and
+                        # the decision alone does not carry the measured
+                        # features it was built from.
+                        _remember_proposal(
+                            _nrm(_top.symbol), _top,
+                            next((c for c in _ranked if c.id == _top.setup_id),
+                                 None))
+                except Exception as e:
+                    # The scan is how the bot finds work. A failure here must
+                    # leave the focus where it was, not stand the loop down.
+                    print(f"[UserLoop:{user_id}] APEX scan failed: {e}")
                 if best:
-                    symbol = best[0]
-                    dash["symbol"] = symbol
+                    _focus(best[0])
                 elif (spread_blocked.get(_nrm(symbol), 0) > time.time()
                       or _nrm(symbol) in open_syms):
                     # Nothing signalled this scan AND the current focus is
@@ -687,8 +2371,7 @@ def _loop(user_id, alert_fn, gen=None):
                             continue
                         if spread_blocked.get(_nrm(ws), 0) > time.time():
                             continue
-                        symbol = ws
-                        dash["symbol"] = symbol
+                        _focus(ws)
                         break
 
             # Data fetch is the loop's lifeline — if it fails silently the user
@@ -700,6 +2383,23 @@ def _loop(user_id, alert_fn, gen=None):
                 data_err = None if candles else "broker returned no candles"
             except Exception as e:
                 candles, data_err = None, str(e)
+            # Observe the spread every tick, not only when an entry is being
+            # attempted. The only other caller of _health_check(spread=...)
+            # sits inside the entry block, past every gate — so on a tick the
+            # HTF gate refuses, no spread is ever recorded. `health` is rebuilt
+            # per process, so after each restart liquidity_quality was missing
+            # from the institutional read until the first entry attempt, which
+            # can be hours. That is 0.6 of 6.9 weight lost for no reason,
+            # dragging the composite toward UNUSABLE while the quote sat one
+            # call away. Fail-soft: a bad quote just leaves the window as it is.
+            try:
+                _b, _a = broker.get_bid_ask(symbol)
+                _sp = forex.spread_pips(_b, _a, symbol)
+                if _sp and _sp > 0:
+                    _health_check(spread=_sp)
+            except Exception:
+                pass
+
             if not candles:
                 data_fails += 1
                 print(f"[UserLoop:{user_id}] data error ({data_fails}): {data_err}")
@@ -740,8 +2440,8 @@ def _loop(user_id, alert_fn, gen=None):
 
             # ── Frozen-feed detection ──────────────────────────────────────
             # If the newest candle's timestamp stops advancing, the broker isn't
-            # quoting this symbol (many brokers freeze crypto-CFD feeds on
-            # weekends / off-hours). A frozen feed never produces a signal, so
+            # quoting this symbol (brokers freeze feeds outside market hours).
+            # A frozen feed never produces a signal, so
             # the bot would sit silent forever. Detect it, mark the symbol so
             # Auto-Pilot rotates to a live one, and tell the user once.
             _bt = candles[-1]["time"]
@@ -781,7 +2481,7 @@ def _loop(user_id, alert_fn, gen=None):
                         "action": "DATA_ERROR",
                         "reason": ("the broker's price feed stopped sending new candles — "
                                    "reconnecting to the broker now. If it persists the broker "
-                                   "may be having a data issue; the bot resumes when prices move."),
+                                   "may be having a data issue; the platform resumes when prices move."),
                         "symbol": symbol,
                         "broker": dash.get("broker", "your broker"),
                     })
@@ -797,6 +2497,10 @@ def _loop(user_id, alert_fn, gen=None):
                     # SL/TP. In single-position mode (maxpos 1) fall back to
                     # whatever symbol currently holds the one position.
                     open_pos = broker.get_open_position(symbol)
+                    # The broker's dict has no idea why we took this trade.
+                    # Put the decision snapshot back before anything reads it,
+                    # or it is lost for good the moment the position closes.
+                    _reattach_entry_meta(open_pos, entry_meta_by_sym.get(_nrm(symbol)))
                     if maxpos == 1 and watchlist and not open_pos:
                         for ws in watchlist:
                             if ws == symbol:
@@ -805,7 +2509,8 @@ def _loop(user_id, alert_fn, gen=None):
                             if p_:
                                 symbol = ws
                                 dash["symbol"] = symbol
-                                open_pos = p_
+                                open_pos = _reattach_entry_meta(
+                                    p_, entry_meta_by_sym.get(_nrm(ws)))
                                 candles = broker.get_candles(symbol, cfg.TIMEFRAME, cfg.CANDLES) or candles
                                 # `price` must move with the symbol switch — it's
                                 # compared against THIS position's stop/entry a few
@@ -836,17 +2541,128 @@ def _loop(user_id, alert_fn, gen=None):
                     # watchlist fallback above finding it on another symbol) —
                     # keep the restart-recovery snapshot current so a redeploy
                     # right after this tick can still find it.
-                    _persist_open_snapshot({**open_pos, "symbol": symbol})
+                    if _nrm(symbol) not in entry_risk_by_sym:
+                        # force_trade (/buy, /sell, MCP open_trade) records the
+                        # original stop in the snapshot from a different call
+                        # path, so adopt it instead of falling back to the live
+                        # stop — a manual entry deserves the same exit quality.
+                        _s = (user_store.load(user_id) or {}).get("open_position_snapshot") or {}
+                        if _nrm(_s.get("symbol")) == _nrm(symbol):
+                            _risk = _risk_from_snapshot(_s.get("entryPrice"), _s.get("initialStop"))
+                            if _risk is not None:
+                                entry_risk_by_sym[_nrm(symbol)] = _risk
+                    _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
+
+                # ── Position manager, in SHADOW (§46) ────────────────
+                #
+                # The live exit policy below is unchanged. This records what a
+                # thesis-driven manager WOULD have proposed for the same
+                # position at the same moment, so the exit policy can be
+                # changed on evidence instead of on an argument.
+                #
+                # Why that matters here: the live policy produces a 60% win
+                # rate at a profit factor of 1.10, because break-even at 1R
+                # plus a 1R trail caps winners near 1R while losers run the
+                # full stop. Switching it on an argument would be replacing
+                # one untested policy with another. Switching it after reading
+                # a fortnight of these events is a decision.
+                #
+                # It proposes into the journal and nowhere else. It cannot
+                # amend a stop, and it cannot close anything.
+                if open_pos and _shadow_pm_on():
+                    _shadow_manage(user_id, open_pos, symbol, price,
+                                   entry_risk_by_sym.get(_nrm(symbol)),
+                                   dash, cfg)
 
                 # Trailing-stop / break-even management for the open position
                 # (Strategy Builder exit modes). Fail-soft; real-broker only.
                 if open_pos and not cfg.PAPER_TRADING:
-                    moved = _manage_trailing(broker, cfg, open_pos, symbol, price)
+                    moved = _manage_trailing(
+                        broker, cfg, open_pos, symbol, price,
+                        initial_risk=entry_risk_by_sym.get(_nrm(symbol)),
+                        user_id=user_id)
                     if moved is not None:
                         open_pos["stopLoss"] = open_pos["sl"] = moved
+                        # A trailing stop moves many times per trade — nine
+                        # times on one position yesterday, nine near-identical
+                        # messages. Exactly ONE of those moves is worth
+                        # telling the client about: the one that takes the
+                        # stop past the entry, after which the trade cannot
+                        # lose. Announce that once; the rest are diagnostic.
+                        try:
+                            _entry_px = float(open_pos.get("entryPrice") or 0)
+                        except (TypeError, ValueError):
+                            _entry_px = 0.0
+                        _side = open_pos.get("side")
+                        _safe = bool(_entry_px) and (
+                            (_side == "BUY" and moved >= _entry_px)
+                            or (_side == "SELL" and moved <= _entry_px))
+                        _already = open_pos.get("breakevenAnnounced")
+                        if _safe and not _already:
+                            open_pos["breakevenAnnounced"] = True
+                            _meta = entry_meta_by_sym.setdefault(_nrm(symbol), {})
+                            _meta["breakevenAnnounced"] = True
+                            _act = "STOP_BREAKEVEN"
+                        else:
+                            _act = "STOP_MOVED"
                         if alert_fn:
-                            alert_fn(user_id, {"action": "STOP_MOVED", "symbol": symbol,
-                                               "sl": moved, "side": open_pos.get("side")})
+                            alert_fn(user_id, {"action": _act, "symbol": symbol,
+                                               "sl": moved, "side": _side})
+
+                # ── Every OTHER open position gets the same management ──
+                #
+                # _manage_trailing above only ever sees the FOCUSED symbol, and
+                # the focus cannot move while the account is at max positions:
+                # the rescan that re-picks it is gated on `slot_free`, which is
+                # `open_count < maxpos`. So with maxpos=2 and two positions
+                # open, the second one had no trailing stop and no break-even
+                # for as long as both were open. Its original stop was still at
+                # the broker — the loss was bounded — but a winner never
+                # ratcheted, never moved to break-even, and gave its gains back.
+                #
+                # Only positions THIS process opened are touched: entry_risk_by_sym
+                # is the record of that. A position belonging to another bot on
+                # the same account is left entirely alone.
+                if (not cfg.PAPER_TRADING) and all_positions:
+                    for _op in all_positions:
+                        _osym = _op.get("symbol")
+                        if not _osym or _nrm(_osym) == _nrm(symbol):
+                            continue
+                        _orisk = entry_risk_by_sym.get(_nrm(_osym))
+                        if _orisk is None:
+                            continue
+                        try:
+                            _ob, _oa = broker.get_bid_ask(_osym)
+                            _opx = (_ob + _oa) / 2 if (_ob and _oa) else None
+                            if not _opx:
+                                continue
+                            _omoved = _manage_trailing(broker, cfg, _op, _osym,
+                                                       _opx, initial_risk=_orisk,
+                                                       user_id=user_id)
+                        except Exception as _oe:
+                            print(f"[UserLoop:{user_id}] trailing {_osym}: {_oe}")
+                            continue
+                        if _omoved is None:
+                            continue
+                        _od = pos_details.setdefault(_nrm(_osym), {})
+                        _oentry = _op.get("entryPrice") or _od.get("entry")
+                        _oside = _op.get("side")
+                        try:
+                            _oentry = float(_oentry or 0)
+                        except (TypeError, ValueError):
+                            _oentry = 0.0
+                        _osafe = bool(_oentry) and (
+                            (_oside == "BUY" and _omoved >= _oentry)
+                            or (_oside == "SELL" and _omoved <= _oentry))
+                        _ometa = entry_meta_by_sym.setdefault(_nrm(_osym), {})
+                        if _osafe and not _ometa.get("breakevenAnnounced"):
+                            _ometa["breakevenAnnounced"] = True
+                            _oact = "STOP_BREAKEVEN"
+                        else:
+                            _oact = "STOP_MOVED"
+                        if alert_fn:
+                            alert_fn(user_id, {"action": _oact, "symbol": _osym,
+                                               "sl": _omoved, "side": _oside})
                 prev_balance = paper_balance
                 try:
                     paper_balance = broker.get_balance()
@@ -864,10 +2680,22 @@ def _loop(user_id, alert_fn, gen=None):
                 # Shift the baseline so profit % keeps measuring TRADING only.
                 if (abs(paper_balance - prev_balance) >= 0.01
                         and not (prev_pos and not open_pos)):
-                    dash["startBalance"] = dash.get("startBalance", prev_balance) + (paper_balance - prev_balance)
+                    _cash_delta = paper_balance - prev_balance
+                    dash["startBalance"] = dash.get("startBalance", prev_balance) + _cash_delta
+                    # The drawdown breaker reads strategy_session["peakBalance"],
+                    # which this used to leave untouched — so a withdrawal made
+                    # the account look like it had crashed and halted the bot
+                    # with no way to clear it.
+                    strategies.rescale_peak(prev_balance, paper_balance, user_id=user_id)
                 # cTrader executed the SL/TP server-side: the position we were
                 # managing vanished between ticks. Tell the client — silence
                 # here made broker-side exits invisible in Telegram.
+                if (prev_pos and not open_pos
+                        and _position_still_open(broker, prev_pos, symbol, user_id)):
+                    # Focus rotated off a live position. Not a close — keep
+                    # managing it and leave the journal, the risk ladder and
+                    # the persisted snapshot alone.
+                    prev_pos = None
                 if prev_pos and not open_pos:
                     last_close_at = time.time()  # re-entry lock (churn guard)
                     # Ask the broker for THIS position's actual closed-deal
@@ -891,28 +2719,56 @@ def _loop(user_id, alert_fn, gen=None):
                         pnl_est = round(paper_balance - prev_balance, 2) if not dash.get("balStale") else None
                         gross_pnl = pnl_est
                         cost_usd = 0.0
-                    if pnl_est is not None and pnl_est < 0:
-                        last_loss_at = time.time()
-                        loss_streak += 1
-                    elif pnl_est is not None and pnl_est > 0:
-                        loss_streak = 0
-                    _persist_risk_state()
-                    if pnl_est is not None:
-                        strategies.record_trade(pnl_est > 0, pnl_est,
-                                                dash.get("startBalance") or paper_balance,
-                                                user_id=user_id, symbol=symbol)
-                    result = {"action": "BROKER_CLOSE", "symbol": symbol,
-                              "side": prev_pos.get("side", ""), "price": price,
+                    # The closed position's OWN symbol and price — never the
+                    # loop's current focus. Auto-Pilot rotates between ticks, so
+                    # by the time a broker-side close is noticed the focus can
+                    # already be on a different instrument, and this recorded
+                    # the close under it. Live proof from last night:
+                    #
+                    #   symbol AUDUSD · entry 0.81169 (USDCHF) · exit 0.70484
+                    #
+                    # A +$24.99 USDCHF win filed as an AUDUSD trade with one
+                    # pair's entry and another's exit. _log_trade's symbol guard
+                    # caught the contradiction and dropped the entry fields, so
+                    # it never poisoned the calibrator — but the label was lost
+                    # too, which is why a clean win left the sample count where
+                    # it was. `price` belongs to the focus instrument, so it is
+                    # only a valid exit when the two agree; the P&L itself comes
+                    # from the broker's own closed-deal record either way.
+                    _closed_sym = prev_pos.get("symbol") or symbol
+                    _exit_px = price if _nrm(_closed_sym) == _nrm(symbol) else None
+                    if _exit_px is None:
+                        print(f"[UserLoop:{user_id}] {_closed_sym} closed at the broker "
+                              f"while focus moved to {symbol} — logging without an "
+                              f"exit price rather than {symbol}'s")
+                    result = {"action": "BROKER_CLOSE", "symbol": _closed_sym,
+                              "side": prev_pos.get("side", ""), "price": _exit_px,
                               "entryPrice": prev_pos.get("entryPrice"),
                               "netPnl": pnl_est, "balance": round(paper_balance, 2),
                               "grossPnl": gross_pnl, "costUsd": cost_usd,
                               "openedAt": prev_pos.get("openedAt"), "time": now_str}
-                    _log_trade(user_id, result)
-                    dash["trades"].insert(0, result)
-                    dash["trades"] = dash["trades"][:50]
+                    # Journal FIRST, then apply the side effects only if it was
+                    # a new close. The restart recovery can already have booked
+                    # this same close moments earlier; the risk ladder and the
+                    # daily P&L must each see it exactly once.
+                    _fresh = _log_trade(user_id, result, prev_pos)
+                    if _fresh:
+                        if pnl_est is not None and pnl_est < 0:
+                            last_loss_at = time.time()
+                            loss_streak += 1
+                        elif pnl_est is not None and pnl_est > 0:
+                            loss_streak = 0
+                        _persist_risk_state()
+                        if pnl_est is not None:
+                            strategies.record_trade(pnl_est > 0, pnl_est,
+                                                    dash.get("startBalance") or paper_balance,
+                                                    user_id=user_id, symbol=_closed_sym)
+                        dash["trades"].insert(0, result)
+                        dash["trades"] = dash["trades"][:50]
+                        if alert_fn:
+                            alert_fn(user_id, result)
+                    # Clear the snapshot either way — the position is gone.
                     _persist_open_snapshot(None)
-                    if alert_fn:
-                        alert_fn(user_id, result)
 
                 # Client-side protective stop: if the broker somehow holds the
                 # position without a stop — or price already crossed it — close
@@ -946,8 +2802,8 @@ def _loop(user_id, alert_fn, gen=None):
                         # broker reports one) — cost was silently always $0
                         # before, since a live open_pos read straight from the
                         # broker never carries an "entrySpreadPips" estimate.
-                        cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                                   + (_close_res or {}).get("commissionUsd", 0.0))
+                        cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                                     units_, cfg.PAPER_TRADING)
                         net = gross - cost_usd
                         if cfg.PAPER_TRADING:
                             paper_balance += net
@@ -972,11 +2828,13 @@ def _loop(user_id, alert_fn, gen=None):
                                                 user_id=user_id, symbol=symbol)
                         result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
                                   "entryPrice": open_pos.get("entryPrice"),
+                                  "side": open_pos.get("entrySide") or open_pos.get("side"),
+                                  "initialStop": open_pos.get("initialStop"),
                                   "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                                   "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                                   "openedAt": open_pos.get("openedAt"), "time": now_str,
                                   "reasoning": "protective stop — closed at market"}
-                        _log_trade(user_id, result)
+                        _log_trade(user_id, result, open_pos)
                         if cfg.PAPER_TRADING:
                             user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                         dash["trades"].insert(0, result)
@@ -994,7 +2852,46 @@ def _loop(user_id, alert_fn, gen=None):
                 # hand — otherwise the loop's local state clobbers it next tick.
                 dash_pos = dash.get("openPosition")
                 if dash_pos and not open_pos:
-                    open_pos = dash_pos
+                    # The adopted position may belong to a DIFFERENT pair than
+                    # the one being scanned — a manual /buy on another symbol,
+                    # or a stale entry left in the dash by an earlier tick.
+                    # Adopting it without moving the loop's focus leaves
+                    # `symbol` and `open_pos` describing two different
+                    # instruments, and every close built from that pair reports
+                    # THIS symbol with the OTHER one's entry price. That is what
+                    # put rows like "USDJPY entry 0.81256 exit 158.377" in the
+                    # journal: the exit is right, the entry belongs to AUDUSD.
+                    # It corrupts realised P&L and the daily-loss tracker too,
+                    # because pnl_usd() then prices one pair's move with the
+                    # other pair's pip size.
+                    #
+                    # The symbol reconciliation above runs BEFORE this adoption,
+                    # so it never sees the mismatch. Switch focus here instead,
+                    # exactly as the single-position sync does, and re-read the
+                    # price so stop/target comparisons run against the right
+                    # instrument (a stale price always reads as "breached").
+                    _dp_sym = dash_pos.get("symbol")
+                    if _dp_sym and _nrm(_dp_sym) != _nrm(symbol):
+                        _c = None
+                        try:
+                            _c = broker.get_candles(_dp_sym, cfg.TIMEFRAME, cfg.CANDLES)
+                        except Exception as e:
+                            print(f"[UserLoop:{user_id}] adopt {_dp_sym}: "
+                                  f"candle re-read failed: {e}")
+                        if _c:
+                            symbol = _dp_sym
+                            dash["symbol"] = symbol
+                            candles = _c
+                            price = candles[-1]["close"]
+                            open_pos = dash_pos
+                        else:
+                            # No fresh price for that pair — skip the adoption
+                            # this tick rather than manage a position using
+                            # another instrument's price. The next tick retries.
+                            print(f"[UserLoop:{user_id}] deferred adopting {_dp_sym} "
+                                  f"position — no fresh candles while scanning {symbol}")
+                    else:
+                        open_pos = dash_pos
                 elif open_pos and dash_pos is None and dash.get("_manualClose"):
                     open_pos = None
                     dash["_manualClose"] = False
@@ -1005,7 +2902,97 @@ def _loop(user_id, alert_fn, gen=None):
                     dash["_manualBal"] = False
 
             dash["balance"] = paper_balance
-            dash["openPosition"] = open_pos
+            # Price the position before publishing it: /status and the web
+            # terminal both show floating P&L, and both read it off this dict.
+            dash["openPosition"] = _price_open_position(open_pos, symbol, price)
+
+            # ── The account's money, published once ──────────────────────
+            #
+            # This block replaces a floating figure that was the FOCUSED
+            # position's P&L alone. Every reader of the dash — Telegram's
+            # /status, the SSE stream, the risk screen's exposure list, the
+            # symbol chart's entry lines, and the copilot's "what is open?"
+            # — took that as the account's number. With two trades open, the
+            # client was shown one trade's P&L labelled as the account's, and
+            # `dash["positions"]` was never written at all, so the stream
+            # published an empty list that blanked the Mini App's position
+            # panel between polls and the copilot answered "you have no open
+            # positions" as a FACT while holding two.
+            #
+            # The figures now come from cTrader itself. netUnrealizedPnL is
+            # net of swap and commission, which is why a locally multiplied
+            # number could never match the client's own terminal no matter
+            # how carefully it was computed.
+            _pos_rows = list(all_positions or [])
+            if not _pos_rows and open_pos:
+                _pos_rows = [dict(open_pos, symbol=open_pos.get("symbol") or symbol)]
+            _pnl_by_id, _pnl_source = {}, None
+            if _pos_rows and not cfg.PAPER_TRADING:
+                try:
+                    _pnl_by_id = broker.get_positions_pnl()
+                    _pnl_source = "broker"
+                except Exception as e:
+                    # Never fatal: this decorates the dashboard. The fallback
+                    # is the old local estimate, but it is LABELLED as one so
+                    # no screen presents it as the broker's own figure.
+                    print(f"[UserLoop:{user_id}] unrealised P&L read: {e}")
+                    _pnl_source = None
+
+            _priced, _unpriced, _float = [], 0, 0.0
+            for _p in _pos_rows:
+                _row = dict(_p)
+                _net = _pnl_by_id.get(str(_p.get("positionId")))
+                if _net is None:
+                    # No broker figure for this position — fall back to the
+                    # local estimate, and only for the symbol we have a fresh
+                    # price for. An unpriced position is reported as unpriced;
+                    # counting it as zero would understate the client's
+                    # exposure in the one direction that matters.
+                    # Drop any P&L already on the row before estimating:
+                    # _price_open_position returns the input untouched when it
+                    # cannot price, and a stale figure surviving that would be
+                    # read as a fresh one.
+                    _row.pop("pnlUsd", None)
+                    _est = _price_open_position(
+                        _row, _row.get("symbol") or symbol,
+                        price if _nrm(_row.get("symbol") or symbol) == _nrm(symbol) else None)
+                    _net = (_est or {}).get("pnlUsd")
+                    if _net is not None:
+                        _row["pnlPips"] = (_est or {}).get("pnlPips")
+                        _row["pnlSource"] = "estimated"
+                else:
+                    _row["pnlSource"] = "broker"
+                if _net is None:
+                    _unpriced += 1
+                    _row["pnlUsd"] = None
+                else:
+                    _row["pnlUsd"] = round(float(_net), 2)
+                    _float += float(_net)
+                _priced.append(_row)
+
+            dash["positions"] = _priced
+            dash["floatingPnl"] = round(_float, 2)
+            dash["equityLive"] = round(float(paper_balance or 0) + _float, 2)
+            # What the equity figure is worth. "broker" means every open
+            # position carried cTrader's own net P&L and the number matches
+            # the client's terminal. "estimated" means it was multiplied here
+            # and will differ by swap and commission. "partial" means at least
+            # one position could not be priced at all, so the figure is a
+            # floor, not the account's equity — a screen must say so rather
+            # than print it as fact.
+            dash["equitySource"] = (
+                "partial" if _unpriced else (_pnl_source or
+                ("broker" if not _pos_rows else "estimated")))
+            dash["unpricedPositions"] = _unpriced
+            # openCount is read off the broker at the top of the tick; a close
+            # that happens later in the SAME tick clears openPosition but
+            # leaves the count at 1, and /status falls through to "1 position
+            # open — managed by their broker stops" for a position that no
+            # longer exists. Only correct it when a single slot is in play:
+            # with maxpos > 1 an unfocused position is a real state, not a
+            # leftover.
+            if dash["openPosition"] is None and dash.get("openCount", 0) <= 1:
+                dash["openCount"] = 0
 
             # ── Paper SL/TP enforcement ──
             # In LIVE mode the broker holds the stop/target server-side, so a hit
@@ -1033,7 +3020,9 @@ def _loop(user_id, alert_fn, gen=None):
                     gross = forex.pnl_usd(pside, open_pos["entryPrice"],
                                           exit_price, units_, symbol)
                     pv = forex.pip_value_per_unit(symbol, exit_price)
-                    cost_usd = open_pos.get("entrySpreadPips", 0.0) * pv * units_
+                    # Paper-only: exit_price is the SL/TP LEVEL, a mid price with
+                    # no spread in it, so the estimate is the real cost here.
+                    cost_usd = realized_cost_usd(open_pos, None, pv, units_, True)
                     net = gross - cost_usd
                     paper_balance += net
                     if net < 0:
@@ -1047,7 +3036,7 @@ def _loop(user_id, alert_fn, gen=None):
                               "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                               "reason": hit, "openedAt": open_pos.get("openedAt"),
                               "time": now_str}
-                    _log_trade(user_id, result)
+                    _log_trade(user_id, result, open_pos)
                     # Persist so the simulated balance survives a restart.
                     user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     last_close_at = time.time()
@@ -1065,25 +3054,108 @@ def _loop(user_id, alert_fn, gen=None):
                     time.sleep(_LOOP_INTERVAL)
                     continue
 
-            ind = indicators.analyze(candles)
+            ind = indicators.analyze(candles, symbol)
             strat_data = strategies.analyze(candles)
 
             # Market regime → in AUTO mode it picks the engine, halves risk in
             # violent markets and stands aside in dead ones (premium spec #1).
-            regime = strategies.detect_regime(candles)
+            regime = strategies.detect_regime(candles, symbol)
             dash["regime"] = regime
+
+            # Refresh the probability calibration roughly every 60 ticks (and
+            # once on the first pass), so newly closed trades feed back into
+            # the gate without re-reading the journal every few seconds.
+            if tick - ev_cal_tick >= 60:
+                ev_cal_tick = tick
+                ev_calibration = _refresh_ev_calibration()
+                # Report the real labelled count even before the threshold is
+                # reached — otherwise the operator sees a flat 0 the whole time
+                # the bot is collecting and cannot tell progress from a fault.
+                _need = getattr(cfg, "EV_MIN_SAMPLES", 30)
+                try:
+                    _have = ev_engine.labelled_count(user_store.load_trades(user_id))
+                except Exception:
+                    _have = 0
+                dash["evCalibration"] = (
+                    {"ready": True, "samples": ev_calibration["samples"],
+                     "overall": ev_calibration["overall"], "needed": _need,
+                     "mode": getattr(cfg, "EV_GATE_MODE", "shadow")}
+                    if ev_calibration else
+                    {"ready": False, "samples": _have, "needed": _need,
+                     "overall": None,
+                     "mode": getattr(cfg, "EV_GATE_MODE", "shadow"),
+                     "note": f"collecting labelled trades ({_have}/{_need})"})
             active_mode = cfg.STRATEGY
             regime_block = False
             if active_mode == "auto":
                 picked = {"trending": "trend", "ranging": "mean_reversion",
                           "volatile": "breakout"}.get(regime["regime"])
                 regime_block = regime["regime"] == "quiet"
-                # Neutral default: crypto trends more than it ranges, so a
-                # warming-up/unknown regime should default to trend-following,
-                # not fading (the forex default).
-                _default_mode = "trend" if _crypto_build else "mean_reversion"
+                # Neutral default while the regime read is warming up: fade
+                # rather than chase. FX majors range more than they trend.
+                #
+                # Decided per SYMBOL, not per build. The bot now holds both
+                # asset classes on one account, so "what kind of thing is
+                # this" is a question about the instrument in front of it —
+                # a build-level flag would fade BTC because the process
+                # happens to be the forex one.
+                _default_mode = "mean_reversion"
                 active_mode = picked or _default_mode
-                dash["strategy"] = f"Auto → {ai.STRATEGY_MODES[active_mode]['label']}"
+                dash["strategy"] = f"Auto → {_strategy_label(active_mode)}"
+
+            # ── The strategy module for this tick (blueprint §3/§14) ──
+            # The decision now goes through the registry rather than straight
+            # into ai.signal_for_mode. The module is a thin adapter over that
+            # same engine — equivalence is asserted across 644 comparisons in
+            # tests/test_strategy_equivalence.py — so this changes WHERE the
+            # decision is made, not WHAT it decides. What it buys is §14:
+            # every signal now carries the strategy_id and strategy_version
+            # that produced it, so a trade can be traced back to an exact
+            # version of an exact strategy.
+            #
+            # NOT named `market`: that is the apex.market module, used a few
+            # lines below for the Market Pulse read.
+            _strategy, _frame = None, None
+            try:
+                _strategy = strategy_api.get(active_mode)
+                if _strategy is not None:
+                    _frame = strategy_api.Market(
+                        candles, symbol=symbol, indicators=ind,
+                        strat=strat_data, open_position=open_pos, price=price,
+                        balance=paper_balance, timeframe=cfg.TIMEFRAME)
+            except Exception as e:
+                # Market() validates its inputs and can raise. A registry
+                # problem must never stop a live account from trading — fall
+                # through to the engine call this replaced.
+                print(f"[UserLoop:{user_id}] strategy module unavailable for "
+                      f"{active_mode} ({e}) — using the engine directly")
+                _strategy, _frame = None, None
+            _provenance = strategy_api.provenance_for(active_mode) or {}
+
+            def _rule_signal():
+                """This tick's rule verdict, through the module when there is one."""
+                if _strategy is not None and _frame is not None:
+                    try:
+                        return _strategy.signal(_frame)
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] strategy module "
+                              f"{active_mode} signal() failed ({e})")
+                        # ai.signal_for_mode() answers an UNKNOWN mode with
+                        # mean_reversion. For a registry-only strategy that
+                        # turns "my strategy broke" into "silently trade a
+                        # different strategy", which is worse than not
+                        # trading: the client picked one method and would get
+                        # another, journalled under the name they chose.
+                        if active_mode not in ai.STRATEGY_MODES:
+                            return {"action": "HOLD", "confidence": 0,
+                                    "criteriaScore": 0, "riskLevel": "LOW",
+                                    "reasoning": f"{active_mode} module failed "
+                                                 f"({str(e)[:80]}) — holding "
+                                                 f"rather than trading a "
+                                                 f"different strategy",
+                                    "keyFactors": []}
+                        print(f"[UserLoop:{user_id}] using the engine directly")
+                return ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
 
             # Market Pulse: store a plain-language read for /market, and ping the
             # user (throttled) when the market gets notable (elevated volatility).
@@ -1094,36 +3166,71 @@ def _loop(user_id, alert_fn, gen=None):
                     last_mkt_tick = tick
 
             # Weekend gap protection: this CFD feed goes quiet Fri evening to
-            # Sun evening (crypto included — it's 24/5 here, not 24/7). A
+            # Sun evening. A
             # position ridden into the gap can reopen Sunday far past its own
             # stop-loss, so force-close before the close and stand aside
             # (the unconditional `continue` below also blocks new entries)
             # until the market is back.
             in_weekend_window = market.is_weekend_close_window()
-            if in_weekend_window and not was_weekend_closed:
-                was_weekend_closed = True
-                if alert_fn:
-                    alert_fn(user_id, {"action": "WEEKEND_CLOSE", "symbol": symbol})
-            elif not in_weekend_window and was_weekend_closed:
+            if not in_weekend_window and was_weekend_closed:
                 was_weekend_closed = False
+                weekend_failed = set()
                 if alert_fn:
                     alert_fn(user_id, {"action": "WEEKEND_REOPEN", "symbol": symbol})
 
             if in_weekend_window:
-                if open_pos:
+                # Flatten EVERY open position, then report what ACTUALLY
+                # happened. This block used to announce "any open position was
+                # closed" before attempting anything, close only the FOCUSED
+                # symbol, and swallow a broker failure with a bare `pass` while
+                # still journalling the trade as closed. The result on a live
+                # account: the client is told they are flat for the weekend
+                # while the position sits open at the broker, carrying exactly
+                # the Sunday-gap risk this feature exists to remove.
+                _wk_targets = []
+                if cfg.PAPER_TRADING:
+                    if open_pos:
+                        _wk_targets = [{**open_pos,
+                                        "symbol": open_pos.get("symbol") or symbol}]
+                else:
+                    try:
+                        _wk_targets = list(broker.get_all_positions() or [])
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] weekend: position list failed "
+                              f"({e}) — falling back to the tracked position")
+                        if open_pos:
+                            _wk_targets = [{**open_pos,
+                                            "symbol": open_pos.get("symbol") or symbol}]
+                _wk_failed, _wk_closed = set(), 0
+                for _wp in _wk_targets:
+                    _wsym = _wp.get("symbol") or symbol
                     _close_res = None
                     if not cfg.PAPER_TRADING:
                         try:
-                            _close_res = broker.close_position(symbol)
-                        except Exception:
-                            pass
-                    exit_price = (_close_res or {}).get("fillPrice") or price
+                            _close_res = broker.close_position(_wsym)
+                        except Exception as e:
+                            # Do NOT book a close that did not happen. The
+                            # position is still live and still exposed, and
+                            # saying otherwise is the whole bug.
+                            print(f"[UserLoop:{user_id}] weekend flatten of "
+                                  f"{_wsym} FAILED: {e}")
+                            _wk_failed.add(_wsym)
+                            continue
+                        if (_close_res or {}).get("status") == "FLAT":
+                            continue   # already gone — nothing to journal
+                    _wk_closed += 1
+                    open_pos = _wp
+                    # `price` belongs to the focused instrument; for any other
+                    # position it is the wrong number to value a fill with.
+                    exit_price = ((_close_res or {}).get("fillPrice")
+                                  or (price if _nrm(_wsym) == _nrm(symbol)
+                                      else _wp.get("entryPrice")))
                     units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
                     gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                          exit_price, units_, symbol)
-                    pv = forex.pip_value_per_unit(symbol, exit_price)
-                    cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                               + (_close_res or {}).get("commissionUsd", 0.0))
+                                          exit_price, units_, _wsym)
+                    pv = forex.pip_value_per_unit(_wsym, exit_price)
+                    cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                                 units_, cfg.PAPER_TRADING)
                     net = gross - cost_usd
                     if cfg.PAPER_TRADING:
                         paper_balance += net
@@ -1140,20 +3247,32 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     else:
                         loss_streak = 0
-                    result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
+                    result = {"action": "CLOSE", "symbol": _wsym, "price": exit_price,
                               "entryPrice": open_pos.get("entryPrice"),
+                              "side": open_pos.get("entrySide") or open_pos.get("side"),
+                              "initialStop": open_pos.get("initialStop"),
                               "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                               "netPnl": round(net, 2), "balance": round(paper_balance, 2),
                               "openedAt": open_pos.get("openedAt"), "time": now_str,
                               "reasoning": "Closed before the weekend — avoiding gap risk over Sat/Sun."}
-                    _log_trade(user_id, result)
+                    # The PERSISTED snapshot, not the position dict. Anything read back
+                    # from broker.get_all_positions() carries symbol, side, entryPrice,
+                    # stopLoss and units — a broker does not record WHY a trade was
+                    # taken — so passing it here journalled every Friday close
+                    # unlabelled and dropped a whole day of the week out of
+                    # ev.calibrate(). Live on 2026-09-05 the journal went 82 -> 84 rows
+                    # while `labelled` stayed at 42. Falls back to the position for one
+                    # this loop opened and still holds in full.
+                    _wmeta = entry_meta_by_sym.get(_nrm(_wsym))
+                    _log_trade(user_id, result,
+                               {**_wmeta, "symbol": _wsym} if _wmeta else open_pos)
                     if cfg.PAPER_TRADING:
                         user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                     last_close_at = time.time()
                     _persist_risk_state()
                     strategies.record_trade(net > 0, net,
                                             dash.get("startBalance") or paper_balance,
-                                            user_id=user_id, symbol=symbol)
+                                            user_id=user_id, symbol=_wsym)
                     open_pos = None
                     dash["openPosition"] = None
                     _persist_open_snapshot(None)
@@ -1162,8 +3281,209 @@ def _loop(user_id, alert_fn, gen=None):
                     dash["trades"] = dash["trades"][:50]
                     if alert_fn:
                         alert_fn(user_id, result)
+                # Now — and only now — say what happened. Re-announce when the
+                # set of positions we could NOT close changes: still being
+                # exposed to the gap is worth a second message, and so is
+                # finally getting flat. Neither is worth one every tick.
+                if alert_fn and (not was_weekend_closed
+                                 or _wk_failed != weekend_failed):
+                    alert_fn(user_id, {"action": "WEEKEND_CLOSE", "symbol": symbol,
+                                       "closed": _wk_closed,
+                                       "failed": sorted(_wk_failed)})
+                was_weekend_closed = True
+                weekend_failed = _wk_failed
                 time.sleep(_LOOP_INTERVAL)
                 continue
+
+            # ── News gap protection for OPEN positions ───────────────────
+            #
+            # The same idea as the weekend flatten above, for the other gap
+            # this account keeps being carried into. The news guard further
+            # down sets entry_ok = False and stops there — it has never looked
+            # at a position that is already open. On 2026-09-04 the bot
+            # announced Non-Farm Payrolls at 12:05:38 with 'guarded': True,
+            # then held EURUSD and USDCHF (opened just after midnight) straight
+            # through the 12:30:00 print. EURUSD's stop had trailed to 21.6
+            # pips below entry; it filled 32.7 below — 11.1 pips PAST the stop,
+            # a 51% overshoot — for a combined -116.67, 34% of the account's
+            # recent losses. Refusing to open into a release while riding one
+            # through it is not a policy, it is half of one.
+            #
+            # Fail-open everywhere. `all_positions` is None when this tick's
+            # position read failed, and "unknown" is not "flat": acting on it
+            # would be guessing with real money. No event, an unreadable
+            # calendar or any exception at all leaves every position exactly
+            # where it is.
+            #
+            # Scope is the whole ACCOUNT, like the weekend flatten and unlike
+            # the multi-position trailing above, which deliberately touches
+            # only what this process opened. The difference is what is being
+            # protected: a trail is management of our own trade, while the
+            # exposure to a USD print is the account's whether the bot or the
+            # client opened the position. A client who does not want that turns
+            # news_filter off, which switches this off with it.
+            _news_closed, _news_failed, _news_event = [], [], None
+            try:
+                _news_targets = []
+                if cfg.PAPER_TRADING:
+                    if open_pos:
+                        _news_targets = [{**open_pos,
+                                          "symbol": open_pos.get("symbol") or symbol}]
+                elif all_positions:
+                    _news_targets = list(all_positions)
+                # The client's own /buy or /sell is theirs to hold through a
+                # release, the same line the strategy exit already draws
+                # ("trades belong to the USER"). Off by default: the weekend
+                # flatten closes everything regardless of origin because a gap
+                # does not care who opened the trade, and neither does NFP.
+                #
+                # `manualHold` is not a per-position marker and cannot be one —
+                # broker.get_all_positions() carries no origin. This skips the
+                # TRACKED position only; a hand-opened trade the loop is not
+                # focused on is still closed, and the setting must not be read
+                # as a wider promise than that.
+                _mh_before = len(_news_targets)
+                _news_targets = _news_skip_manual(
+                    _news_targets,
+                    (open_pos or {}).get("symbol") or symbol,
+                    dash.get("manualHold"),
+                    getattr(cfg, "NEWS_EXIT_SKIP_MANUAL", False))
+                if len(_news_targets) != _mh_before:
+                    print(f"[UserLoop:{user_id}] news exit: leaving the "
+                          f"client's own trade alone (NEWS_EXIT_SKIP_MANUAL)")
+                # Ask the calendar first and load the user once, rather than
+                # per position: on the overwhelming majority of ticks nothing
+                # is due and this costs one cached lookup per open trade.
+                _news_due = []
+                for _np in _news_targets:
+                    _nev = _news_exit_due(cfg, _np.get("symbol") or symbol)
+                    if _nev:
+                        _news_due.append((_np, _nev))
+                _news_user = user_store.load(user_id) if _news_due else None
+                for _np, _nev in _news_due:
+                    _nsym = _np.get("symbol") or symbol
+                    _news_event = _nev
+                    # EVERY close passes the gate — ownership so two containers
+                    # cannot both close this position, and idempotency so a
+                    # timed-out close is not retried into closing whatever was
+                    # reopened after it. Not `emergency`: a scheduled release
+                    # is the opposite of "get me out now at any cost", and a
+                    # coordination outage is a good reason to leave this to the
+                    # instance that actually owns the account.
+                    _nd, _nrid = gates.authorize_close(
+                        user_id, position_id=_np.get("positionId"),
+                        symbol=_nsym, origin="news_exit", user=_news_user)
+                    gates.audit(user_id, "CLOSE", _nd, origin="news_exit",
+                                rid=_nrid)
+                    if not _nd:
+                        # Refused is not closed. Say so rather than journalling
+                        # an exit that never happened.
+                        print(f"[UserLoop:{user_id}] news exit of {_nsym} "
+                              f"refused by the gate: {_nd.reason}")
+                        _news_failed.append(_nsym)
+                        continue
+                    _nclose = None
+                    if not cfg.PAPER_TRADING:
+                        try:
+                            _nclose = broker.close_position(_nsym)
+                        except Exception as _nce:
+                            # Do NOT book a close that did not happen. The
+                            # position is still live, still exposed, and the
+                            # broker-side stop is still the only thing holding
+                            # it. The next tick tries again while the release
+                            # is still ahead.
+                            print(f"[UserLoop:{user_id}] news exit of {_nsym} "
+                                  f"FAILED: {_nce} — position stays open")
+                            _news_failed.append(_nsym)
+                            continue
+                        if (_nclose or {}).get("status") == "FLAT":
+                            continue   # already gone — nothing to journal
+                    ledger.record(_nrid, {"closed": True, "symbol": _nsym})
+                    # The broker-side close detector at the top of the next
+                    # tick would otherwise rediscover this as a mystery close
+                    # and re-journal it from an estimate.
+                    prev_open_syms.discard(_nrm(_nsym))
+                    _news_closed.append(_nsym)
+                    # `price` belongs to the focused instrument; for any other
+                    # position it is the wrong number to value a fill with.
+                    exit_price = ((_nclose or {}).get("fillPrice")
+                                  or (price if _nrm(_nsym) == _nrm(symbol)
+                                      else _np.get("entryPrice")))
+                    units_ = _np.get("units") or _np.get("quantity", 1000)
+                    gross = forex.pnl_usd(_np["side"], _np["entryPrice"],
+                                          exit_price, units_, _nsym)
+                    pv = forex.pip_value_per_unit(_nsym, exit_price)
+                    cost_usd = realized_cost_usd(_np, _nclose, pv, units_,
+                                                 cfg.PAPER_TRADING)
+                    net = gross - cost_usd
+                    if cfg.PAPER_TRADING:
+                        paper_balance += net
+                    else:
+                        # LIVE: read the real post-close balance — same fix as
+                        # every other close path, same bug otherwise (a stale
+                        # balance printed next to a fresh P&L for the trade
+                        # that supposedly just moved it).
+                        try:
+                            paper_balance = broker.get_balance()
+                        except Exception:
+                            paper_balance += net
+                    if net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    else:
+                        loss_streak = 0
+                    result = {"action": "CLOSE", "symbol": _nsym, "price": exit_price,
+                              "entryPrice": _np.get("entryPrice"),
+                              "side": _np.get("entrySide") or _np.get("side"),
+                              "initialStop": _np.get("initialStop"),
+                              "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                              "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                              "openedAt": _np.get("openedAt"), "time": now_str,
+                              "reasoning": (
+                                  f"Closed ahead of {_nev.get('currency', '')} "
+                                  f"{_nev.get('title', 'a high-impact release')} "
+                                  f"(~{_nev.get('mins', 0)} min away) — a stop is "
+                                  f"not reliable through a release.")}
+                    # The PERSISTED snapshot, not the position from the broker's list.
+                    # `_np` came from get_all_positions(), which reports what is open and
+                    # never why it was taken, so passing it labels nothing and the row is
+                    # skipped by ev.calibrate(). Same defect the weekend flatten had.
+                    _nmeta = entry_meta_by_sym.get(_nrm(_nsym))
+                    _log_trade(user_id, result,
+                               {**_nmeta, "symbol": _nsym} if _nmeta else _np)
+                    if cfg.PAPER_TRADING:
+                        user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                    last_close_at = time.time()
+                    _persist_risk_state()
+                    strategies.record_trade(net > 0, net,
+                                            dash.get("startBalance") or paper_balance,
+                                            user_id=user_id, symbol=_nsym)
+                    if open_pos and _nrm(_nsym) == _nrm(open_pos.get("symbol") or symbol):
+                        open_pos = None
+                        dash["openPosition"] = None
+                        _persist_open_snapshot(None)
+                    dash["balance"] = paper_balance
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
+            except Exception as _ne:
+                # Loud, and open. Nothing in this block may take a trading tick
+                # down with it, and nothing in it may close a position by
+                # accident on the way out.
+                print(f"[UserLoop:{user_id}] news exit check failed ({_ne}) — "
+                      f"open positions left as they are")
+            # One message for the reason, after the attempts — never before,
+            # and never claiming more than actually happened. Deliberately
+            # OUTSIDE the try: a close that reached the broker has to be
+            # reported even if the accounting after it raised, because the
+            # client's money moved either way. Both lists are empty on a tick
+            # where nothing was due, so the quiet case stays quiet.
+            if alert_fn and (_news_closed or _news_failed):
+                alert_fn(user_id, {"action": "NEWS_FLATTEN", "symbol": symbol,
+                                   "event": _news_event,
+                                   "closed": sorted(_news_closed),
+                                   "failed": sorted(_news_failed)})
 
             # Check risk limits (per-user, from the Strategy Builder)
             # user_id makes the circuit breakers PER-USER. Without it every
@@ -1175,6 +3495,14 @@ def _loop(user_id, alert_fn, gen=None):
                 max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
                 max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
                 user_id=user_id, symbol=symbol)
+            # Publish the verdict for the UI. strategies.should_stop() advances
+            # the peak-balance and daily-reset state as a side effect, so the
+            # Telegram screens must NEVER call it themselves just to draw a
+            # badge — they read this instead. Observability only: nothing
+            # downstream branches on it.
+            dash["riskGuard"] = {"halted": bool(stop_check["stop"]),
+                                 "reasons": list(stop_check["reasons"]),
+                                 "ts": time.time()}
             if stop_check["stop"]:
                 print(f"[UserLoop:{user_id}] Strategy stop: {stop_check['reasons']}")
                 # Alert once on the edge into the stop, not every tick for the
@@ -1200,17 +3528,84 @@ def _loop(user_id, alert_fn, gen=None):
                     "posInfo": pos_info,
                 })
 
+            # Calendar push. NEWS_WARN, further down, only speaks when a setup
+            # was actually refused — so on a day the bot finds no trade, a
+            # release the client cares about passes in silence. This reaches
+            # out on the release itself: a heads-up while it is still ahead,
+            # and the all-clear once it passes.
+            #
+            # The tick is five minutes, which is the natural rate limit; the
+            # module claims each event so a message cannot repeat across
+            # containers or restarts. It scans the currencies this client
+            # actually trades, and never raises — a notification path must not
+            # be able to break the loop that carries it.
+            if alert_fn:
+                _news_ccy = set()
+                for _w in (list(watchlist) + [symbol]):
+                    _news_ccy.update(_currency_legs(_w))
+                for _msg in news_alerts.due(
+                        user_id, _news_ccy,
+                        user=user_store.load(user_id),
+                        guard_on=bool(getattr(cfg, "NEWS_FILTER", True))):
+                    alert_fn(user_id, _msg)
+
             # AI signal with rule-based fallback. The client chooses via
             # /aiconfirm: ON = every rule entry is double-checked by the AI
             # (can block weak setups, costs a few seconds per candidate);
             # OFF = pure rule engine — instant, zero API cost.
             _sig_t0 = time.time()
+            _ai_reused = False
             try:
                 if getattr(cfg, "AI_CONFIRM", True):
-                    signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
-                                           mode=active_mode)
+                    # get_signal already returns early on CLOSE/HOLD without
+                    # touching the model, so the only call worth avoiding is a
+                    # repeat on a candidate that has not changed — the rule
+                    # engine saying BUY on the same bar, at the same price,
+                    # tick after tick while some other gate holds the entry.
+                    _rule_pre = _rule_signal()
+                    _rule_act = _rule_pre.get("action", "HOLD")
+                    _now_feat = {
+                        "price": price, "atr": (ind or {}).get("atr"),
+                        "spread_pips": _recent_spread(),
+                        "regime": (regime or {}).get("regime"),
+                        "bar_time": candles[-1].get("time") if candles else None,
+                        "expires_at": time.time() + max(
+                            60, sentinel.default_ttl(cfg.TIMEFRAME)),
+                    }
+                    _prev_ai = _last_ai.get(_nrm(symbol))
+                    _need, _why = (True, "no_prior")
+                    if _prev_ai and _prev_ai.get("rule_action") == _rule_act:
+                        _need, _why = sentinel.should_refresh(
+                            _prev_ai.get("features"), _now_feat)
+                    if _rule_act not in ("BUY", "SELL"):
+                        signal = _rule_pre          # no AI call would happen
+                    elif not _need:
+                        signal = dict(_prev_ai["signal"])
+                        _ai_reused = True
+                        print(f"[UserLoop:{user_id}] AI read reused for {symbol} "
+                              f"({_rule_act}, nothing changed) — no API call")
+                    else:
+                        signal = ai.get_signal(ind, paper_balance, open_pos, strat_data,
+                                           mode=active_mode,
+                                           symbol=symbol,
+                                           timeframe=cfg.TIMEFRAME,
+                                           sl_pips=cfg.STOP_LOSS_PIPS,
+                                           tp_pips=cfg.TAKE_PROFIT_PIPS,
+                                           risk_pct=cfg.RISK_PER_TRADE,
+                                           min_confidence=cfg.MIN_CONFIDENCE,
+                                           candles=candles,
+                                           regime=regime,
+                                           # So a model reply rejected by the
+                                           # schema is journalled against the
+                                           # account it was asked for, rather
+                                           # than only printed to a log.
+                                           user_id=user_id,
+                                           spread_pips=_recent_spread())
+                        _last_ai[_nrm(symbol)] = {
+                            "features": _now_feat, "signal": dict(signal),
+                            "rule_action": _rule_act}
                 else:
-                    signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+                    signal = _rule_signal()
             except Exception as e:
                 print(f"[UserLoop:{user_id}] AI error: {e}")
                 if tick - last_ai_error_tick >= _AI_ERROR_THROTTLE and alert_fn:
@@ -1220,11 +3615,118 @@ def _loop(user_id, alert_fn, gen=None):
                         "symbol": symbol,
                     })
                     last_ai_error_tick = tick
-                signal = ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+                signal = _rule_signal()
+
+            # §14: whichever branch produced this verdict — the module, a
+            # reused AI read, or the AI-enhanced path through ai.get_signal —
+            # it carries the strategy that produced it. Stamped here rather
+            # than in each branch so a new branch cannot forget to.
+            if _provenance:
+                signal = {**signal, **_provenance}
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
 
+            # ── Publish the Sentinel's view of this symbol ──
+            # Until now the AI's opinion existed only for the duration of the
+            # call above. Storing it — with an expiry — is what makes "what
+            # does the bot currently think about EURUSD" a question with an
+            # answer, and what stops a stale read being acted on later.
+            if _sentinel_mode != "off":
+                try:
+                    _ttl = (getattr(cfg, "SENTINEL_TTL_S", 0)
+                            or sentinel.default_ttl(cfg.TIMEFRAME))
+                    _bar = candles[-1].get("time") if candles else None
+                    # Institutional read: one composite number per symbol,
+                    # carrying the coverage that produced it. Attached to the
+                    # Sentinel state so the AI's verdict and the data behind it
+                    # travel together and expire together.
+                    _inst = institutional.build(symbol,
+                        _institutional_observations(
+                            symbol, ind, regime, _recent_spread()))
+                    dash["institutional"] = institutional.describe(_inst)
+                    _state = sentinel.build_state(
+                        symbol=symbol, action=action, confidence=confidence,
+                        regime=(regime or {}).get("regime"),
+                        reasoning=signal.get("reasoning", ""),
+                        ttl_s=_ttl,
+                        price=price, atr=(ind or {}).get("atr"),
+                        spread_pips=_recent_spread(), bar_time=_bar,
+                        institutional_proxy=_inst.get("institutional_proxy"),
+                        data_quality=_inst.get("data_quality"),
+                        institutional_usable=_inst.get("usable"))
+                    # Alert on a CHANGE of mind, never on the state itself.
+                    # This loop ticks every few minutes; a message per tick
+                    # would be a notification every 5 minutes forever, and the
+                    # useful signal — "the AI just flipped on EURUSD" — would
+                    # be buried in it. Compare against the previous published
+                    # action for this symbol, before overwriting it.
+                    _prev = _signals.get(symbol)
+                    _prev_act = (_prev or {}).get("action")
+                    _signals.publish(_state)
+                    dash["sentinel"] = sentinel.describe(_state)
+                    if (alert_fn and _prev_act and _prev_act != action
+                            and "HOLD" not in (_prev_act, action)):
+                        # HOLD↔BUY/SELL churns constantly as indicators wobble
+                        # around their thresholds. Only a genuine reversal —
+                        # BUY→SELL or SELL→BUY — is worth interrupting someone.
+                        alert_fn(user_id, {
+                            "action": "SENTINEL_FLIP", "symbol": symbol,
+                            "from": _prev_act, "to": action,
+                            "conf": _state.get("confidence"),
+                            "regime": _state.get("regime"),
+                            "reasoning": signal.get("reasoning", ""),
+                        })
+                except Exception as e:
+                    print(f"[UserLoop:{user_id}] sentinel publish failed: {e}")
+
+            # ── Refused setups: follow what we did NOT take ──
+            # A filter is invisible from outside. Recording the blocked entry
+            # as a phantom and following it on the same prices turns "the AI
+            # blocked 14 trades" into "those 14 would have lost 9R" — the only
+            # way to tell a filter that saves money from one that is removing
+            # the profitable setups.
+            if signal.get("blockedAction") and not open_pos:
+                try:
+                    _psl, _ptp = _phantom_levels(
+                        price, signal["blockedAction"], ind, symbol)
+                    _ph = shadow.open_shadow(
+                        user_id, symbol, signal["blockedAction"], price,
+                        _psl, _ptp,
+                        blocked_by=signal.get("blockedBy", "filter"),
+                        reasoning=signal.get("blockedReasoning", ""),
+                        confidence=signal.get("blockedConfidence"))
+                    if _ph and alert_fn:
+                        alert_fn(user_id, {"action": "SHADOW_OPEN", **_ph})
+                except Exception as e:
+                    print(f"[UserLoop:{user_id}] shadow open failed: {e}")
+
+            # Advance any phantom on this symbol against the latest bar.
+            try:
+                _bar = candles[-1] if candles else {}
+                for _evt in shadow.update(user_id, symbol, _bar.get("high"),
+                                          _bar.get("low"), price):
+                    if not alert_fn:
+                        continue
+                    _p = _evt["phantom"]
+                    if _evt["kind"] == "milestone":
+                        alert_fn(user_id, {"action": "SHADOW_MOVE",
+                                           "symbol": _p["symbol"], "r": _evt["r"]})
+                    else:
+                        alert_fn(user_id, {"action": "SHADOW_RESULT", **_p,
+                                           "scoreboard": shadow.scoreboard(user_id)})
+            except Exception as e:
+                print(f"[UserLoop:{user_id}] shadow update failed: {e}")
+
+            # NOTE on MIN_CONFIDENCE: this gate is weaker than it looks. The
+            # rule engine only emits BUY/SELL at |score| >= 3, which maps to
+            # confidence 76 (ai.py: 52 + 8*score); the AI paths adjust that to
+            # 84 when they agree and 71 when neutral. So the LOWEST confidence
+            # any firing signal can carry is 71 — at the default threshold of
+            # 68 this comparison never rejects anything. It only starts
+            # filtering above 71, and only bites the pure rule path above 76.
+            # Real entry quality control lives in the EV gate below, which
+            # scores on a measured probability instead of an indicator count.
             entry_ok = action in ("BUY", "SELL") and not open_pos and confidence >= cfg.MIN_CONFIDENCE
             # Signal TTL: if analysis took too long the market moved on. The AI
             # confirmation itself takes 2-8s when it runs (only on BUY/SELL
@@ -1236,31 +3738,98 @@ def _loop(user_id, alert_fn, gen=None):
                 entry_ok = False
                 _skip(f"signal TTL expired ({_sig_age:.1f}s > 12s)")
             # ── Multi-position gates (live) ──
+            #
+            # The position cap and the correlation guard used to be written out
+            # here. They were correct, and they only ever ran on THIS path — so
+            # a manual /buy skipped both. They now live in apex/portfolio.py and
+            # `gates.authorize_order` calls them for every path.
+            #
+            # This block still runs, and is not a duplicate: it calls the same
+            # function. It is here to produce the DECLINE RECORD — the reason a
+            # setup was passed over, which §61 needs and which a denial inside
+            # gates would reach too late to attribute to this candidate. Gates
+            # remains the authority; this is the explanation.
             if entry_ok and not cfg.PAPER_TRADING:
                 if all_positions is None:
                     entry_ok = False  # couldn't read positions — don't stack blind
-                elif open_count >= maxpos:
-                    entry_ok = False
-                    _skip(f"at max positions ({open_count}/{maxpos})")
-                elif _nrm(symbol) in open_syms:
-                    entry_ok = False  # already holding this symbol
                 else:
-                    # Correlation guard: cap how many positions share the same
-                    # USD direction, so 5 trades aren't secretly one USD bet.
-                    new_exp = forex.usd_exposure(symbol, action)
-                    if new_exp != 0:
-                        same_dir = sum(1 for e in open_exposure if e == new_exp)
-                        if same_dir >= 2:
-                            entry_ok = False
-                            _skip(f"correlation guard — already {same_dir} {'USD-long' if new_exp>0 else 'USD-short'} positions")
+                    from apex import portfolio as _pf
+                    _exp = {"openCount": open_count, "maxPositions": maxpos,
+                            "symbols": sorted(open_syms),
+                            "usdBias": list(open_exposure)}
+                    _pok, _pcode, _pwhy = _pf.check(
+                        symbol, action, _exp,
+                        limits={"max_positions": maxpos,
+                                "max_same_usd_side": int(
+                                    getattr(cfg, "MAX_SAME_USD_SIDE", 0)
+                                    or _pf.DEFAULT_MAX_SAME_USD_SIDE)})
+                    if not _pok:
+                        entry_ok = False
+                        # Already holding the instrument is an ordinary state,
+                        # not a refusal worth telling the client about on every
+                        # tick it stays true.
+                        if _pcode != _pf.SYMBOL_ALREADY_OPEN:
+                            _skip(f"{_pf.deny_text(_pcode)}"
+                                  + (f" ({_pwhy})" if _pwhy else ""))
+            # Daily trade cap. The Strategy Builder shows every client a
+            # "Max trades/day" figure and bakes one into each risk preset
+            # (Low 6 / Medium 10 / High 15), but nothing read the setting —
+            # someone who picked Low risk was told 6 and got unlimited.
+            #
+            # Enforced HERE rather than in strategies.should_stop(): a trade
+            # count is a reason to stop OPENING, not to halt the account. The
+            # breaker there fires a STOP alert and stands the whole loop down,
+            # which would also abandon management of an open position.
+            # 0 = unlimited, so the cap can be switched off deliberately
+            # instead of by accident.
+            if entry_ok:
+                _max_td = int(getattr(cfg, "MAX_TRADES_DAY", 0) or 0)
+                if _max_td > 0:
+                    _done = strategies.get_session(user_id).get("dailyTrades", 0)
+                    if _done >= _max_td:
+                        entry_ok = False
+                        _skip(f"daily trade cap reached ({_done}/{_max_td})")
             # Quiet regime (AUTO): no edge, no trade.
             if entry_ok and regime_block:
                 entry_ok = False
                 _skip(regime.get("label", "market too quiet"))
-                if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                    last_warn_tick = tick
-                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                       "reason": regime.get("label", "market too quiet")})
+
+            # ── Regime entry gate (apex/regime_gate.py) ──
+            # The block above only runs in AUTO. A PINNED strategy never sees
+            # the regime→engine mapping at all, so a retracement engine trades
+            # every regime including the one it fades. On this account's own
+            # labelled journal, 42 trades:
+            #   fibonacci in ranging   n=14  net +132.52  win 71.4%  ← kept
+            #   fibonacci in trending  n= 7  net -180.47  win 28.6%  ← refused
+            # 59% of recent losses sat in that second row, five straight SELLs
+            # into strength. The gate refuses the entry and nothing else — it
+            # cannot close, cannot order, and never reaches authorize_order.
+            #
+            # `active_mode` and not cfg.STRATEGY: in AUTO that is the engine
+            # the regime already chose, so the gate is a no-op there by
+            # construction rather than by luck.
+            if entry_ok:
+                try:
+                    _rg_mode = getattr(cfg, "REGIME_GATE", "enforce")
+                    _rg_refuse, _rg_why = regime_gate.decide(
+                        active_mode, regime.get("regime"), _rg_mode)
+                    dash["regimeGate"] = (
+                        _rg_why if regime_gate.mode(_rg_mode) == "enforce"
+                        else f"{_rg_why} ({regime_gate.mode(_rg_mode)})")
+                    if _rg_refuse:
+                        entry_ok = False
+                        _skip(f"regime gate: {_rg_why}")
+                    elif regime_gate.mode(_rg_mode) == "shadow" and not \
+                            regime_gate.entry_allowed(
+                                active_mode, regime.get("regime"))[0]:
+                        print(f"[UserLoop:{user_id}] regime gate shadow: "
+                              f"WOULD BLOCK {action} {symbol} — {_rg_why}")
+                except Exception as e:
+                    # Seven trades is a small sample; a bug in the correction
+                    # must never be able to stand a live account down. Fail
+                    # OPEN, like the sentinel and institutional gates below.
+                    print(f"[UserLoop:{user_id}] regime gate error: {e}")
+
             if entry_ok and getattr(cfg, "HTF_CONFIRM", False):
                 htf_c = None
                 try:
@@ -1279,10 +3848,6 @@ def _loop(user_id, alert_fn, gen=None):
                 left = int((_LOSS_COOLDOWN_MIN * 60 - (time.time() - last_loss_at)) / 60) + 1
                 entry_ok = False
                 _skip(f"post-loss cooldown ({left}m left)")
-                if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                    last_warn_tick = tick
-                    alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                       "reason": f"cooling down after a loss — entries resume in ~{left}m"})
             if entry_ok and last_close_at and last_loss_at and last_close_at == last_loss_at and \
                time.time() - last_close_at < _CLOSE_COOLDOWN_MIN * 60:
                 left = int((_CLOSE_COOLDOWN_MIN * 60 - (time.time() - last_close_at)) / 60) + 1
@@ -1311,11 +3876,10 @@ def _loop(user_id, alert_fn, gen=None):
                 if health["degraded"]:
                     entry_ok = False
                     _skip(f"broker health: {dash.get('brokerHealth', 'degraded')}")
-                # Spread guard — crypto uses a %-of-price limit (pip-count limits
-                # are meaningless across crypto's varied pip sizes); forex keeps
-                # the pip limit.
+                # Spread guard — the pip limit is the real one here; the
+                # %-of-price ceiling is off unless an operator sets it.
                 max_spread = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
-                max_spread_pct = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                max_spread_pct = max_spread_pct_for(cfg, symbol)
                 spread_pct = ((ask - bid) / price * 100) if price > 0 else 0.0
                 if not entry_ok:
                     pass
@@ -1330,11 +3894,6 @@ def _loop(user_id, alert_fn, gen=None):
                     if not was_blocked:  # arm ONCE — don't renew the 30-min TTL every tick
                         spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread_pct:.2f}% > {max_spread_pct:g}%)")
-                    if alert_fn and not was_blocked and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                        last_warn_tick = tick
-                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                           "reason": f"spread is unusually wide ({spread_pct:.2f}%) — "
-                                                     "entering now would hand the edge to the broker"})
                 elif max_spread_pct <= 0 and spread > max_spread:
                     print(f"[UserLoop:{user_id}] skip entry — spread {spread:.1f}p > {max_spread}p limit")
                     entry_ok = False
@@ -1342,32 +3901,26 @@ def _loop(user_id, alert_fn, gen=None):
                     if not was_blocked:
                         spread_blocked[_nrm(symbol)] = time.time() + 1800
                     _skip(f"spread too wide ({spread:.1f}p > {max_spread:g}p)")
-                    if alert_fn and not was_blocked and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
-                        last_warn_tick = tick
-                        alert_fn(user_id, {"action": "SKIP_WARN", "symbol": symbol,
-                                           "reason": f"spread is unusually wide ({spread:.1f} pips) — "
-                                                     "entering now would hand the edge to the broker"})
-                # Break-even guard (pip-based) only applies to the forex pip model;
-                # crypto's %-spread guard above already ensures the edge clears costs.
+                # Break-even guard (pip-based). Skipped when an operator has set
+                # a %-of-price ceiling instead, which already bounds the cost.
                 elif max_spread_pct <= 0 and cfg.TAKE_PROFIT_PIPS <= (spread + comm_pips) * 1.5:
                     print(f"[UserLoop:{user_id}] skip entry — TP {cfg.TAKE_PROFIT_PIPS:g}p doesn't clear costs {spread + comm_pips:.1f}p")
                     entry_ok = False
                     _skip(f"edge too thin: TP {cfg.TAKE_PROFIT_PIPS:g}p vs real costs {spread + comm_pips:.1f}p (spread+commission)")
 
             # Flash-crash circuit breaker: skip entry when the latest candle's
-            # range is extreme (>1.2% for FX majors; crypto is far more volatile,
-            # so the threshold is raised via FLASH_SPIKE_PCT).
-            if entry_ok and _flash_spike(candles, getattr(cfg, "FLASH_SPIKE_PCT", 0.012)):
+            # range is extreme (>1.2% for FX majors, via FLASH_SPIKE_PCT).
+            if entry_ok and _flash_spike(candles, flash_spike_pct_for(cfg, symbol)):
                 entry_ok = False
-                _skip("flash-crash guard: extreme candle range")
+                _skip("flash-crash guard: extreme candle range", alert=False)
                 if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                     last_warn_tick = tick
                     alert_fn(user_id, {"action": "FLASH_WARN", "symbol": symbol})
 
             # Session filter (Strategy Builder): only trade the sessions the user
-            # picked. [] = all sessions. Crypto ignores this (runs 24/5 on the CFD
-            # feed). Forex reacts to session opens, so honouring it is real.
-            if entry_ok and not _crypto_build:
+            # picked. [] = all sessions. Forex reacts to session opens, so
+            # honouring it is real.
+            if entry_ok:
                 want_sess = getattr(cfg, "SESSION_FILTER", []) or []
                 if want_sess:
                     try:
@@ -1382,55 +3935,142 @@ def _loop(user_id, alert_fn, gen=None):
             # currency in the pair. Fail-open (no event / feed down → trades).
             # Gated by the user's news_filter toggle (Strategy Builder).
             if entry_ok and getattr(cfg, "NEWS_FILTER", True):
-                ev = news.high_impact_window(symbol.split("_"))
+                # The calendar matches on ISO currency codes ("USD", "EUR"), so
+                # the symbol has to be split into its two legs. split("_") only
+                # does that for an underscore symbol like EUR_USD — every
+                # Auto-Pilot symbol is written EURUSD, where it returns
+                # ["EURUSD"], matches no currency, and the guard silently passed
+                # every high-impact release. A 15-pip stop on 1m bars is exactly
+                # what NFP/CPI/FOMC destroys, so this guard was doing nothing
+                # precisely where it mattered most.
+                ev = news.high_impact_window(_currency_legs(symbol))
                 if ev:
                     entry_ok = False
-                    _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}")
+                    _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}",
+                          alert=False)
                     if alert_fn and tick - last_warn_tick >= _SKIP_WARN_THROTTLE:
                         last_warn_tick = tick
                         alert_fn(user_id, {"action": "NEWS_WARN", "symbol": symbol, "event": ev})
 
-            # Copilot mode: propose the trade and wait for approval instead of
-            # auto-executing. Re-read the flag each time so /copilot takes effect
-            # without a restart (entry_ok is rare, so the extra load is cheap).
-            if entry_ok and user_store.load(user_id).get("copilot"):
-                _suggest_trade(user_id, signal, symbol, price, alert_fn)
-                entry_ok = False
+            # Automation level: how much this client lets the bot do alone.
+            # Re-read it each time so a change takes effect without a restart
+            # (entry_ok is rare, so the extra load is cheap).
+            #
+            # Both non-full levels REFUSE the entry — they can only ever stop
+            # an order that would otherwise have gone out, never cause one.
+            #   approval → propose it and wait for a tap  (the old copilot)
+            #   signals  → post the setup and place nothing at all
+            if entry_ok:
+                _auto = automation.mode(user_store.load(user_id))
+                if _auto == "approval":
+                    _suggest_trade(user_id, signal, symbol, price, alert_fn)
+                    entry_ok = False
+                elif _auto == "signals":
+                    _signal_only(user_id, signal, symbol, price, alert_fn)
+                    entry_ok = False
 
+            # A shadow gate needs candidates, and every candidate was being
+            # thrown away before it got one. The Sentinel and institutional
+            # checks live inside `if entry_ok:` below — deliberately, since in
+            # enforce mode they must be the last word before an order goes
+            # out. The side effect is that in SHADOW mode they only ever saw
+            # setups that had already cleared every other gate. The HTF gate
+            # refuses most candidates long before that (eight in a row on one
+            # symbol today), so the shadow sample was a single verdict.
+            #
+            # Evaluate the verdict on refused candidates too, for the record
+            # only: entry_ok is already False, nothing downstream reads this,
+            # and no Telegram message is sent — these fire on ordinary refused
+            # ticks and would be pure noise. The log is the right home for a
+            # sample you intend to count later.
+            if (not entry_ok and _sentinel_mode != "off"
+                    and action in ("BUY", "SELL")):
+                try:
+                    _sig_sh = _signals.get(symbol)
+                    _sok_sh, _sreason_sh = sentinel.decide(
+                        _sig_sh, action,
+                        min_confidence=getattr(
+                            cfg, "SENTINEL_MIN_CONFIDENCE", None),
+                        min_ev_r=None, risk_ok=True)
+                    dash["sentinelGate"] = (f"{_sreason_sh} "
+                                            f"(moot — entry already refused)")
+                    print(f"[UserLoop:{user_id}] Sentinel shadow on a refused "
+                          f"candidate: would "
+                          f"{'ALLOW' if _sok_sh else 'BLOCK'} {action} "
+                          f"{symbol} — {_sreason_sh} "
+                          f"({sentinel.describe(_sig_sh)})")
+                except Exception as e:
+                    # Observability must never be able to break a live loop.
+                    print(f"[UserLoop:{user_id}] sentinel shadow error: {e}")
+
+            ev_verdict = None
             if entry_ok:
                 pip = forex.pip_size(symbol, price)
-                _crypto = _crypto_build
                 stop_pips_eff = cfg.STOP_LOSS_PIPS
                 # Dynamic ATR stops (premium spec #10): SL = 1.5×ATR, TP = 3×ATR
                 # — distances that breathe with the instrument's volatility.
+                # ── Structural stops: let the setup define the trade ──
+                # The fibonacci swing on M1 is a median ~17 pips wide, so a flat
+                # 15/30 stop-and-target is 0.9x and 1.8x the ENTIRE swing the
+                # signal came from, while the setup's own objective — price
+                # returning to the swing extreme — sits a median 6 pips away.
+                # The trade is asked to do something the signal never predicted.
+                # Here the stop goes a buffer beyond the swing origin and the
+                # target to the swing extreme, so RR is whatever the structure
+                # actually offers rather than a number picked in advance.
+                _structural = False
+                if getattr(cfg, "STRUCTURAL_STOPS", False):
+                    _fib = (ind or {}).get("fibonacci") or {}
+                    _tgt = _fib.get("target")
+                    _rng = _fib.get("swingRange") or 0
+                    if _tgt and _rng > 0:
+                        # Stop beyond the swing origin the level retraced from,
+                        # plus room for spread and noise — a stop sitting exactly
+                        # on structure gets taken by the wick that confirms it.
+                        _buf = max(4.0 * spread * pip, 0.15 * _rng)
+                        if action == "BUY":
+                            _sl = min(_fib.get("swingLow", price), price) - _buf
+                            _sl_d, _tp_d = price - _sl, _tgt - price
+                        else:
+                            _sl = max(_fib.get("swingHigh", price), price) + _buf
+                            _sl_d, _tp_d = _sl - price, price - _tgt
+                        _min_rr = float(getattr(cfg, "STRUCTURAL_MIN_RR", 1.3))
+                        if _sl_d > 0 and _tp_d > 0 and (_tp_d / _sl_d) >= _min_rr:
+                            sl_dist, tp_dist = _sl_d, _tp_d
+                            stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
+                            _structural = True
+                        else:
+                            # No room between the level and its objective. Skip
+                            # rather than fall back to a target the structure
+                            # does not support.
+                            entry_ok = False
+                            _skip(f"structural RR too low "
+                                  f"({(_tp_d / _sl_d) if _sl_d > 0 else 0:.2f} "
+                                  f"< {_min_rr})")
+
+                # Structure already set the levels; ATR and the fixed-pip
+                # fallbacks below only run when it did not.
                 atr_v = 0.0
-                if getattr(cfg, "ATR_STOPS", False):
+                if not _structural and getattr(cfg, "ATR_STOPS", False):
                     try:
                         atr_v = float(ind.get("atr") or 0)
                     except (TypeError, ValueError):
                         atr_v = 0.0
-                if atr_v > 0:
+                if _structural:
+                    pass
+                elif atr_v > 0:
                     # Wider stop + far target so trades breathe and profits run.
                     sl_dist, tp_dist = 2.5 * atr_v, 5.0 * atr_v
                     # FLOOR: on a 5-min candle the ATR of a calm FX pair is only
                     # ~2 pips, so 1.5×ATR is a sub-noise stop that the spread
                     # alone triggers instantly — the churn that bled the account.
                     # Never let the stop sit inside spread+noise: at least 4×
-                    # the current spread and a sane per-class pip floor.
-                    # Crypto's magnitude pip makes 10×pip a 0.01-0.1% sub-noise
-                    # floor; use a %-of-price floor (~0.4%) so the stop clears
-                    # crypto tick noise. Forex keeps the 10-pip floor.
-                    floor_abs = (0.004 * price) if _crypto else (20.0 * pip)
+                    # the current spread and a 20-pip floor.
+                    floor_abs = 20.0 * pip
                     min_stop = max(4.0 * spread * pip, floor_abs)
                     if sl_dist < min_stop:
                         sl_dist = min_stop
                         tp_dist = 2.0 * sl_dist  # keep RR ≥ 1:2
-                    stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
-                elif _crypto:
-                    # No ATR available on crypto → %-of-price stop, not the
-                    # sub-noise fixed-pip default (20 pips = 0.02% on SOL).
-                    sl_dist = 0.012 * price   # ~1.2% stop
-                    tp_dist = 0.024 * price   # ~2.4% target (RR 1:2)
                     stop_pips_eff = forex.to_pips(sl_dist, symbol, price)
                 else:
                     sl_dist = cfg.STOP_LOSS_PIPS * pip
@@ -1447,13 +4087,168 @@ def _loop(user_id, alert_fn, gen=None):
                 # 0.7017249999999999-style prices in orders and alerts.
                 sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
                 tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
+
+                # ── EV gate (V2 decision core) ──
+                # Placed HERE, after the stop and target are decided, so it
+                # scores the trade the bot is actually about to send. Run
+                # earlier it had to invent its own SL/TP, and its internal
+                # model produces a ~4-pip stop where this loop places 15 —
+                # which quadruples the cost in R and made the gate demand a
+                # 52% win rate for a trade that breaks even at 38%.
+                #
+                # Shadow by default: it records the verdict it WOULD have
+                # reached without changing behaviour, so the filter can be
+                # judged on real data before it may block a live trade.
+                _ev_mode = getattr(cfg, "EV_GATE_MODE", "shadow")
+                if _ev_mode != "off":
+                    try:
+                        _atr_pips = 0.0
+                        try:
+                            _atr_raw = float(ind.get("atr") or 0)
+                            if _atr_raw > 0:
+                                _atr_pips = forex.to_pips(_atr_raw, symbol, price)
+                        except (TypeError, ValueError):
+                            _atr_pips = 0.0
+                        _dd_pct = 0.0
+                        try:
+                            _peak = float(strategies.get_session(user_id).get("peakBalance") or 0)
+                            if _peak > 0:
+                                _dd_pct = (paper_balance - _peak) / _peak * 100.0
+                        except Exception:
+                            _dd_pct = 0.0
+                        ev_verdict = ev_engine.evaluate(
+                            confidence=confidence,
+                            calibration=ev_calibration,
+                            atr_pips=_atr_pips,
+                            spread_pips=spread,
+                            regime=(regime or {}).get("regime"),
+                            equity=paper_balance,
+                            drawdown_pct=_dd_pct,
+                            sl_pips=stop_pips_eff,
+                            tp_pips=forex.to_pips(tp_dist, symbol, price),
+                            min_probability=getattr(cfg, "EV_MIN_PROBABILITY", None),
+                        )
+                        if not ev_verdict["approved"]:
+                            if _ev_mode == "enforce":
+                                entry_ok = False
+                                _skip(f"EV gate: {ev_verdict['reason']} "
+                                      f"(p={ev_verdict['probability']}, "
+                                      f"EV={ev_verdict['ev_r']}R)")
+                            else:
+                                print(f"[UserLoop:{user_id}] EV shadow: WOULD BLOCK "
+                                      f"{action} {symbol} — {ev_verdict['reason']} "
+                                      f"(conf={confidence}, p={ev_verdict['probability']}, "
+                                      f"need>{ev_verdict['min_probability']}, "
+                                      f"EV={ev_verdict['ev_r']}R, "
+                                      f"cost={ev_verdict['cost_r']}R, "
+                                      f"BE={ev_verdict['breakeven_p']})")
+                        else:
+                            print(f"[UserLoop:{user_id}] EV {_ev_mode}: allow {action} "
+                                  f"{symbol} p={ev_verdict['probability']} "
+                                  f"EV={ev_verdict['ev_r']}R")
+                    except Exception as e:
+                        # A gate that crashes must never take the bot down with
+                        # it; in enforce mode a broken gate means stand aside,
+                        # not trade blind.
+                        print(f"[UserLoop:{user_id}] EV gate error: {e}")
+                        if _ev_mode == "enforce":
+                            entry_ok = False
+                            _skip("EV gate unavailable")
+
+                # ── Sentinel decision gate ──
+                # The last word before the order goes out: is there a FRESH AI
+                # read for this symbol, and does it agree with what we are
+                # about to send? Without the freshness half, a verdict computed
+                # against a chart that has since moved on is indistinguishable
+                # from one computed a second ago.
+                if _sentinel_mode != "off":
+                    try:
+                        _sig = _signals.get(symbol)
+                        _sok, _sreason = sentinel.decide(
+                            _sig, action,
+                            min_confidence=getattr(
+                                cfg, "SENTINEL_MIN_CONFIDENCE", None),
+                            min_ev_r=None,   # the EV gate above owns this
+                            risk_ok=True)    # and the risk engine owns this
+                        dash["sentinelGate"] = _sreason
+                        if not _sok:
+                            if _sentinel_mode == "enforce":
+                                entry_ok = False
+                                _skip(f"Sentinel: {_sreason} "
+                                      f"({sentinel.describe(_sig)})")
+                            else:
+                                print(f"[UserLoop:{user_id}] Sentinel shadow: "
+                                      f"WOULD BLOCK {action} {symbol} — "
+                                      f"{_sreason} ({sentinel.describe(_sig)})")
+                            # A refusal is rare (it needs an entry candidate)
+                            # and always tells you something, so unlike the
+                            # state itself it is worth a message every time.
+                            if alert_fn:
+                                alert_fn(user_id, {
+                                    "action": "SENTINEL_BLOCK", "symbol": symbol,
+                                    "wanted": action, "reason": _sreason,
+                                    "mode": _sentinel_mode,
+                                    "state": sentinel.describe(_sig),
+                                })
+                    except Exception as e:
+                        # A broken gate must never stop a live account.
+                        print(f"[UserLoop:{user_id}] sentinel gate error: {e}")
+
+                # ── Institutional contradiction check ──
+                # Separate from the Sentinel gate and separately switchable,
+                # because it answers a different question: not "is the AI's
+                # read fresh and in agreement" but "does the wider picture —
+                # positioning, rates, macro, liquidity — point the other way".
+                # It only ever fires on a CONTRADICTION from a state that is
+                # itself usable. Thin coverage is already handled inside
+                # institutional.build(); refusing on low data quality here
+                # would stop trading whenever a feed hiccups, which is a
+                # denial of service dressed up as caution.
+                if _inst_mode != "off":
+                    try:
+                        _ib = institutional.action_bias(_inst)
+                        if (_inst.get("usable") and _ib in ("BUY", "SELL")
+                                and _ib != action):
+                            _imsg = (f"institutional read is {_ib} "
+                                     f"({institutional.describe(_inst)})")
+                            if _inst_mode == "enforce":
+                                entry_ok = False
+                                _skip(f"Institutional: {_imsg}")
+                            else:
+                                print(f"[UserLoop:{user_id}] Institutional shadow: "
+                                      f"WOULD BLOCK {action} {symbol} — {_imsg}")
+                            if alert_fn:
+                                alert_fn(user_id, {
+                                    "action": "SENTINEL_BLOCK", "symbol": symbol,
+                                    "wanted": action, "reason": "AI_DISAGREES",
+                                    "mode": _inst_mode,
+                                    "state": institutional.describe(_inst),
+                                })
+                    except Exception as e:
+                        print(f"[UserLoop:{user_id}] institutional gate error: {e}")
+
                 risk_mult = strategies.druckenmiller_multiplier(
                     confidence, signal.get("criteriaScore", 0),
                     strat_data.get("livermore"), strat_data.get("turtle"))
-                if loss_streak >= 3:
-                    risk_mult *= 0.25
-                elif loss_streak == 2:
-                    risk_mult *= 0.5
+                # The loss-streak risk ladder (2 losses → half size, 3+ →
+                # quarter) is REMOVED at the owner's instruction, after it
+                # quartered his positions for two days on a demo account and
+                # then produced winners worth two or three dollars.
+                #
+                # The argument for it was real: after a run of losses you are
+                # either in a market that does not suit the strategy or you
+                # are about to revenge-trade, and both are cheaper at quarter
+                # size. The argument against it is also real, and it is his to
+                # weigh: it cuts size hardest exactly when the account is
+                # already down, so the recovery is slowest at the worst
+                # moment, and a streak counted off a mis-journaled close
+                # shrinks real trades for a reason that never happened.
+                #
+                # What still limits size, and is NOT this: the per-trade risk
+                # setting (/risk), max_daily_loss_pct, max_dd_pct, and the
+                # volatile-regime cut below — that last one reads the market
+                # in front of it rather than the last three results, which is
+                # why it stays.
                 if regime.get("regime") == "volatile":
                     risk_mult *= 0.5
                 # Size off the account's starting balance (adjusted only for
@@ -1466,18 +4261,86 @@ def _loop(user_id, alert_fn, gen=None):
                 # volatile-regime reductions (risk_mult below) still shrink it
                 # when conditions call for it — that's a safety cut, not drift.
                 sizing_balance = dash.get("startBalance") or paper_balance
+                _lev = leverage_for_symbol(broker, cfg, symbol)
                 units = forex.calc_units(sizing_balance, per_trade_risk,
                                          stop_pips_eff, symbol, price,
-                                         leverage=cfg.LEVERAGE, mult=risk_mult)
+                                         leverage=_lev, mult=risk_mult)
                 floor = forex.safe_min_units(symbol, paper_balance, price,
-                                             cfg.LEVERAGE, cfg.MARGIN_CAP)
+                                             _lev, cfg.MARGIN_CAP)
+                # The BROKER's own minimum, when it will tell us. place_order
+                # raises anything below it up to that minimum — correct for the
+                # wire, but it happens after sizing, so without asking here the
+                # risk check below validates a number the broker will replace.
+                # 0.5% of $3,221 over a $48 stop is 0.33 oz of gold; the broker
+                # minimum is 1 oz, and the account has been trading gold at
+                # ~1.5% risk with nothing reporting it.
+                floor = max(floor, broker_min_units(broker, symbol, floor))
                 if floor == 0:
                     _skip("account too small for minimum lot on this instrument")
                     entry_ok = False
+                else:
+                    # The floor may be BIGGER than the risk-correct size (wide
+                    # stop, small account). Taking it anyway silently spends
+                    # more than the configured risk per trade, without limit.
+                    # This has to be decided HERE, before the branch below that
+                    # actually places the order — setting entry_ok inside that
+                    # branch would be read too late to stop anything.
+                    units = forex.round_units(max(units, floor), symbol)
+                    _budget = sizing_balance * per_trade_risk
+                    # The client's OWN hard limit, not a multiple of the sizing
+                    # target. A broker minimum is not negotiable, so refusing
+                    # everything above the target refused gold outright — and
+                    # 1 oz risks 1.49% of this account against a 4% daily stop
+                    # the client set themselves. What must never happen is a
+                    # single trade that can trip that stop on its own.
+                    _hard = sizing_balance * (
+                        float(getattr(cfg, "MAX_DAILY_LOSS_PCT", 4.0)) / 100.0)
+                    if not forex.floor_risk_ok(units, symbol, price,
+                                               stop_pips_eff, _budget,
+                                               hard_ceiling_usd=_hard):
+                        # Name the numbers. "Minimum lot too big" alone leaves
+                        # the client with a symbol that silently never trades
+                        # and no way to tell whether that is a bug, a market
+                        # condition, or something they can act on. It is the
+                        # third, and the two levers are in the message.
+                        try:
+                            _would = forex.floor_risk_at(units, symbol, price,
+                                                         stop_pips_eff)
+                            _pct = (_would / sizing_balance * 100) if sizing_balance else 0
+                            _skip(f"{symbol}: broker minimum is "
+                                  f"{units:g} {forex.unit_label(symbol)}, which risks "
+                                  f"${_would:.2f} ({_pct:.2f}% of the account) — past "
+                                  f"your {getattr(cfg, 'MAX_DAILY_LOSS_PCT', 4.0):g}% "
+                                  f"daily-loss limit, so one trade could stop the day "
+                                  f"by itself")
+                        except Exception:
+                            _skip("minimum lot on this instrument would risk more "
+                                  "than the daily-loss limit")
+                        entry_ok = False
+                    else:
+                        # Allowed, but the size is NOT what the risk setting
+                        # asked for. Saying so is the whole difference between
+                        # this and the bug it replaces, which did exactly the
+                        # same thing without telling anyone.
+                        try:
+                            _would = forex.floor_risk_at(units, symbol, price,
+                                                         stop_pips_eff)
+                            if _would > _budget * 1.10:
+                                dash["minLotNotice"] = {
+                                    "symbol": symbol, "units": units,
+                                    "riskUsd": round(_would, 2),
+                                    "pct": round(_would / sizing_balance * 100, 2)
+                                    if sizing_balance else None,
+                                    "targetUsd": round(_budget, 2)}
+                                print(f"[UserLoop:{user_id}] {symbol}: broker minimum "
+                                      f"{units:g} {forex.unit_label(symbol)} risks "
+                                      f"${_would:.2f} vs the ${_budget:.2f} target "
+                                      f"— allowed, under the daily-loss limit")
+                        except Exception:
+                            pass
                 if not entry_ok:
                     pass  # margin too small — skip to CLOSE handling below
                 else:
-                    units = forex.round_units(max(units, floor), symbol)
 
                     # Balance-relative TP: instead of a fixed pip count that
                     # means less and less as the account grows (or more and
@@ -1505,7 +4368,7 @@ def _loop(user_id, alert_fn, gen=None):
                         _rb, _ra = broker.get_bid_ask(symbol)
                         _rs = forex.spread_pips(_rb, _ra, symbol)
                         _rs_pct = ((_ra - _rb) / price * 100) if price > 0 else 0.0
-                        _msp = getattr(cfg, "MAX_SPREAD_PCT", 0)
+                        _msp = max_spread_pct_for(cfg, symbol)
                         _msp_pip = getattr(cfg, "MAX_SPREAD_PIPS", 3.0)
                         if _msp > 0 and _rs_pct > _msp:
                             _skip_exec = True
@@ -1514,7 +4377,16 @@ def _loop(user_id, alert_fn, gen=None):
                             _skip_exec = True
                             _skip(f"spread widened before exec ({_rs:.1f}p > {_msp_pip:g}p)")
                         else:
-                            price = round((_rb + _ra) / 2, 6)
+                            # Anchor to the side we actually fill on, not the
+                            # mid. A cTrader long fills at the ASK and its
+                            # SL/TP trigger on the BID, so a stop placed
+                            # sl_dist below the mid is really sl_dist + half a
+                            # spread away, and the target is half a spread
+                            # nearer than intended. That silently turns a 30/15
+                            # trade into ~29/16 — RR 2.00 becomes 1.82 and the
+                            # break-even win rate moves 33.3% → 35.4%. Same
+                            # trade, same win rate, strictly better expectancy.
+                            price = round(_ra if action == "BUY" else _rb, 6)
                             sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
                             tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
                     except Exception:
@@ -1530,13 +4402,89 @@ def _loop(user_id, alert_fn, gen=None):
                             pass
                         order_ok = True
                         _order_res = None
+                        # Ownership, revalidated at the last possible moment.
+                        # The lease is renewed on a timer, so between that
+                        # renewal and this order another container may have
+                        # taken over — the deploy overlap is measured in
+                        # seconds and so is this gap. On a real-money account
+                        # an unreadable lease counts as NOT owned: a second
+                        # container managing the same positions is worse than
+                        # a missed entry.
+                        # The automatic path uses the SAME gate as manual, AI
+                        # and control-plane orders. One definition of a safe
+                        # order, entered from four places.
+                        _decision, _rid = gates.authorize_order(
+                            user_id, symbol=symbol, side=action, units=units,
+                            sl=sl_price, tp=tp_price, origin="signal",
+                            dash=dash)
+                        gates.audit(user_id, f"{action} {symbol}", _decision,
+                                    origin="signal", rid=_rid)
+                        # The gate's verdict, either way. Swallowed on purpose:
+                        # journalling must never affect execution.
                         try:
-                            _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
-                        except Exception as oe:
+                            from apex import trade_events as _te2
+                            _te2.record(
+                                user_id,
+                                _te2.ORDER_AUTHORIZED if _decision else _te2.ORDER_REJECTED,
+                                symbol=symbol,
+                                strategy_id=signal.get("strategy_id"),
+                                strategy_version=signal.get("strategy_version"),
+                                payload={"side": action, "units": units,
+                                         "sl": sl_price, "tp": tp_price,
+                                         "reason": getattr(_decision, "reason", None),
+                                         "detail": str(getattr(_decision, "detail", ""))[:200],
+                                         "rid": _rid})
+                        except Exception as _e2:
+                            print(f"[UserLoop:{user_id}] decision log (gate) failed: {_e2}")
+                        if not _decision:
                             order_ok = False
-                            print(f"[UserLoop:{user_id}] place_order error: {oe}")
+                            print(f"[UserLoop:{user_id}] BLOCKED {action} {symbol}: "
+                                  f"{_decision.reason} — {_decision.detail}")
+                            _skip(f"{_decision.reason}")
+                            if alert_fn:
+                                alert_fn(user_id, {
+                                    "action": ("DUPLICATE_BLOCKED"
+                                               if "DUPLICATE" in _decision.reason
+                                               else "OWNERSHIP_BLOCKED"),
+                                    "symbol": symbol, "side": action,
+                                    "units": units, "reason": _decision.reason})
+                        else:
+                            try:
+                                try:
+                                    from apex import trade_events as _te3
+                                    _te3.record(user_id, _te3.ORDER_SUBMITTED,
+                                                symbol=symbol,
+                                                strategy_id=signal.get("strategy_id"),
+                                                strategy_version=signal.get("strategy_version"),
+                                                payload={"side": action, "units": units,
+                                                         "sl": sl_price, "tp": tp_price,
+                                                         "rid": _rid})
+                                except Exception as _e3:
+                                    print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")
+                                _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
+                                ledger.record(_rid, _order_res)
+                            except Exception as oe:
+                                order_ok = False
+                                # The claim stands. A submit that raised may
+                                # still have reached the broker, and retrying
+                                # in the next few seconds is exactly how one
+                                # intent becomes two positions. The next tick
+                                # reads the real position list and settles it.
+                                print(f"[UserLoop:{user_id}] place_order error: {oe}")
 
-                        if _order_res and _order_res.get("status") == "SAFETY_CLOSED":
+                        if _order_res and _order_res.get("status") == "UNPROTECTED":
+                            # Open at the broker with no stop attached, and the
+                            # safety close did not go through. Nothing here can
+                            # fix it remotely — the client has to be told, now,
+                            # and told exactly what to do.
+                            order_ok = False
+                            print(f"[UserLoop:{user_id}] {symbol} is OPEN AND "
+                                  f"UNPROTECTED — alerting the client")
+                            if alert_fn:
+                                alert_fn(user_id, {"action": "UNPROTECTED",
+                                                   "symbol": symbol,
+                                                   "price": _order_res.get("fillPrice")})
+                        elif _order_res and _order_res.get("status") == "SAFETY_CLOSED":
                             # A real position opened and was immediately closed
                             # at the broker because the stop-loss couldn't be
                             # attached — this used to vanish as a swallowed
@@ -1571,7 +4519,7 @@ def _loop(user_id, alert_fn, gen=None):
                                       "balance": round(paper_balance, 2), "time": now_str,
                                       "reasoning": "broker rejected the stop-loss attach — "
                                                    "position closed immediately for safety"}
-                            _log_trade(user_id, result)
+                            _log_trade(user_id, result, open_pos)
                             if cfg.PAPER_TRADING:
                                 user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
                             last_close_at = time.time()
@@ -1604,8 +4552,98 @@ def _loop(user_id, alert_fn, gen=None):
                                                         "quantity": units, "stopLoss": sl_price,
                                                         "takeProfit": tp_price, "openedAt": now_str}
 
+                            # Decision snapshot — what was true when we decided
+                            # to enter. _log_trade copies these onto the closed
+                            # trade so ev.calibrate() has labelled examples to
+                            # learn from; without it every closed trade is an
+                            # unlabelled accounting row and the probability
+                            # model can never be built.
+                            #
+                            # entrySpreadPips also feeds the realised-cost
+                            # calculation on close. A live position read back
+                            # from the broker never carries it, so before this
+                            # the cost of every live trade was booked as 0.
+                            try:
+                                open_pos.setdefault("entrySpreadPips", spread)
+                                open_pos.update({
+                                    "entryConfidence": confidence,
+                                    "entryRegime": (regime or {}).get("regime"),
+                                    "entryAtr": atr_v or None,
+                                    "entrySlPips": round(float(stop_pips_eff), 2),
+                                    "entryTpPips": round(
+                                        forex.to_pips(tp_dist, symbol, price), 2),
+                                    "entrySide": action,
+                                    "entryProbability": (ev_verdict or {}).get("probability"),
+                                    "entryEvR": (ev_verdict or {}).get("ev_r"),
+                                    # §14: read off the signal rather than
+                                    # active_mode, so what is recorded is what
+                                    # actually decided — including the case
+                                    # where the verdict came from a reused AI
+                                    # read taken under an earlier mode.
+                                    "entryStrategyId": signal.get("strategy_id"),
+                                    "entryStrategyVersion": signal.get("strategy_version"),
+                                })
+                                # The same facts, appended to the decision log
+                                # as an immutable event. The snapshot above is
+                                # attached to a position and disappears when it
+                                # closes; this is what a replay timeline and
+                                # "why did APEX enter?" read months later, with
+                                # the strategy version that actually decided it.
+                                try:
+                                    from apex import trade_events as _te
+                                    _te.record(
+                                        user_id, _te.ORDER_FILLED, symbol=symbol,
+                                        position_id=open_pos.get("positionId"),
+                                        strategy_id=signal.get("strategy_id"),
+                                        strategy_version=signal.get("strategy_version"),
+                                        payload={
+                                            "side": action,
+                                            "entryPrice": open_pos.get("entryPrice"),
+                                            "stopLoss": open_pos.get("stopLoss"),
+                                            "takeProfit": open_pos.get("takeProfit"),
+                                            "units": open_pos.get("units"),
+                                            "confidence": confidence,
+                                            "regime": (regime or {}).get("regime"),
+                                            "slPips": round(float(stop_pips_eff), 2),
+                                            "spreadPips": spread,
+                                            "probability": (ev_verdict or {}).get("probability"),
+                                            "evR": (ev_verdict or {}).get("ev_r"),
+                                            "reasoning": str(signal.get("reasoning") or "")[:400],
+                                        })
+                                except Exception as _ee:
+                                    print(f"[UserLoop:{user_id}] decision log (fill) failed: {_ee}")
+                                # Keep a copy OUTSIDE the position dict. The
+                                # next tick throws this dict away and replaces
+                                # it with a fresh broker read; without the copy
+                                # the snapshot lives for one tick and every
+                                # closed trade is journalled unlabelled.
+                                entry_meta_by_sym[_nrm(symbol)] = _entry_meta(open_pos)
+                                # Straight to the store. Everything above this
+                                # line lives in one process; the trade it
+                                # labels can close hours later, in another.
+                                _persist_entry_meta(user_id, entry_meta_by_sym)
+                                # §17: the thesis, written HERE and nowhere
+                                # else. This is the only moment the real fill
+                                # and the stop that was actually sent are both
+                                # known — from the next tick the broker reports
+                                # the CURRENT stop, which starts moving as soon
+                                # as the trail engages, and a thesis composed
+                                # from that would measure R against a number
+                                # that is no longer the trade's risk.
+                                _write_thesis(user_id, open_pos, symbol, action,
+                                              price, sl_price, tp_price, signal)
+                            except Exception as _e:
+                                print(f"[UserLoop:{user_id}] entry snapshot failed: {_e}")
+
                             dash["openPosition"] = open_pos
-                            _persist_open_snapshot(open_pos)
+                            # Pin R now, off the REAL fill and the stop we sent.
+                            # This is the only moment both are known: from the
+                            # next tick on the broker reports the current stop,
+                            # which starts moving as soon as the trail engages.
+                            _fill = open_pos.get("entryPrice") or price
+                            entry_risk_by_sym[_nrm(symbol)] = abs(float(_fill) - float(sl_price))
+                            _persist_open_snapshot({**open_pos, "symbol": symbol,
+                                                    "initialStop": sl_price})
                             result = {"action": action, "symbol": symbol, "confidence": confidence,
                                       "price": price, "spreadPips": round(spread, 1), "time": now_str,
                                       "stopLoss": sl_price, "takeProfit": tp_price,
@@ -1621,72 +4659,102 @@ def _loop(user_id, alert_fn, gen=None):
                 # must not close them (a mean-reversion bot would instantly
                 # exit a manual entry placed near the mean). SL/TP rule them.
                 pass
+            elif action == "CLOSE" and open_pos and _profit_too_small_to_take(
+                    open_pos, price, symbol, entry_risk_by_sym.get(_nrm(symbol)),
+                    user_id):
+                # Winner cut short. Hold instead — see _profit_too_small_to_take.
+                pass
+            elif action == "CLOSE" and open_pos and _ride_instead_of_close(
+                    broker, cfg, open_pos, symbol, price,
+                    entry_risk_by_sym.get(_nrm(symbol)), ind, user_id):
+                # Running hard with the trend behind it — the stop has been
+                # pulled up to protect the gain and the trade keeps running.
+                dash["openPosition"] = open_pos
+                _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
             elif action == "CLOSE" and open_pos:
                 # A strategy exit is NOT always a win — label it honestly.
-                _close_res = None
+                # And a close the broker never confirmed is not an exit at
+                # all: this used to swallow the error with a bare `pass`,
+                # then journal the trade, move the balance and alert the
+                # client for a position still open at the broker. Same
+                # defect the weekend flatten had, on the path that runs far
+                # more often.
+                _close_res, _close_ok = None, True
                 try:
                     _close_res = broker.close_position(symbol)
-                except Exception:
-                    pass
-                # Use the broker's actual execution price when it gives us one —
-                # the last fetched candle close is a stale proxy and can differ
-                # from the real fill by real spread/slippage, quietly
-                # misreporting P&L (this is why a client's own broker showed a
-                # different result than what the bot logged for the same trade).
-                exit_price = (_close_res or {}).get("fillPrice") or price
-                units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
-                gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
-                                      exit_price, units_, symbol)
-                pv = forex.pip_value_per_unit(symbol, exit_price)
-                # Spread estimate + real broker commission — a live open_pos
-                # read straight from the broker never carries an
-                # "entrySpreadPips" estimate, so cost silently read $0 on
-                # every real close; commissionUsd (best-effort, see
-                # ctrader._extract_commission) closes that gap when the
-                # broker reports one.
-                cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                           + (_close_res or {}).get("commissionUsd", 0.0))
-                net = gross - cost_usd
-                if cfg.PAPER_TRADING:
-                    paper_balance += net
+                except Exception as _ce:
+                    _close_ok = False
+                    print(f"[UserLoop:{user_id}] strategy exit on {symbol} "
+                          f"FAILED: {_ce} — position stays open, retrying next tick")
+                if not _close_ok:
+                    # Keep managing it. The next tick tries again, and the
+                    # broker-side stop is still in force meanwhile.
+                    dash["openPosition"] = open_pos
+                    _persist_open_snapshot(_with_initial_stop(open_pos, symbol))
+                    if alert_fn:
+                        alert_fn(user_id, {"action": "EXIT_FAILED", "symbol": symbol})
                 else:
-                    # LIVE: this is the exact bug behind a client seeing a
-                    # "Net P&L +$X, Balance $Y" message where Y didn't move
-                    # by X at all — this branch bumped paper_balance only in
-                    # PAPER mode, so a live close reported the balance from
-                    # BEFORE the trade closed. Read the real one instead.
-                    try:
-                        paper_balance = broker.get_balance()
-                    except Exception:
+                    # Use the broker's actual execution price when it gives us one —
+                    # the last fetched candle close is a stale proxy and can differ
+                    # from the real fill by real spread/slippage, quietly
+                    # misreporting P&L (this is why a client's own broker showed a
+                    # different result than what the bot logged for the same trade).
+                    exit_price = (_close_res or {}).get("fillPrice") or price
+                    units_ = open_pos.get("units") or open_pos.get("quantity", 1000)
+                    gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"],
+                                          exit_price, units_, symbol)
+                    pv = forex.pip_value_per_unit(symbol, exit_price)
+                    # Spread estimate + real broker commission — a live open_pos
+                    # read straight from the broker never carries an
+                    # "entrySpreadPips" estimate, so cost silently read $0 on
+                    # every real close; commissionUsd (best-effort, see
+                    # ctrader._extract_commission) closes that gap when the
+                    # broker reports one.
+                    cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                                 units_, cfg.PAPER_TRADING)
+                    net = gross - cost_usd
+                    if cfg.PAPER_TRADING:
                         paper_balance += net
-                if net < 0:
-                    last_loss_at = time.time()
-                    loss_streak += 1
-                elif net > 0:
-                    loss_streak = 0
-                result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
-                          "entryPrice": open_pos.get("entryPrice"),
-                          "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
-                          "netPnl": round(net, 2), "balance": round(paper_balance, 2),
-                          "openedAt": open_pos.get("openedAt"), "time": now_str,
-                          "reasoning": signal.get("reasoning", "")}
-                _log_trade(user_id, result)
-                if cfg.PAPER_TRADING:
-                    # Persist so the simulated balance survives a restart.
-                    user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
-                last_close_at = time.time()
-                _persist_risk_state()
-                strategies.record_trade(net > 0, net,
-                                        dash.get("startBalance") or paper_balance,
-                                        user_id=user_id, symbol=symbol)
-                open_pos = None
-                dash["openPosition"] = None
-                _persist_open_snapshot(None)
-                dash["balance"] = paper_balance
-                dash["trades"].insert(0, result)
-                dash["trades"] = dash["trades"][:50]
-                if alert_fn:
-                    alert_fn(user_id, result)
+                    else:
+                        # LIVE: this is the exact bug behind a client seeing a
+                        # "Net P&L +$X, Balance $Y" message where Y didn't move
+                        # by X at all — this branch bumped paper_balance only in
+                        # PAPER mode, so a live close reported the balance from
+                        # BEFORE the trade closed. Read the real one instead.
+                        try:
+                            paper_balance = broker.get_balance()
+                        except Exception:
+                            paper_balance += net
+                    if net < 0:
+                        last_loss_at = time.time()
+                        loss_streak += 1
+                    elif net > 0:
+                        loss_streak = 0
+                    result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
+                              "entryPrice": open_pos.get("entryPrice"),
+                              "side": open_pos.get("entrySide") or open_pos.get("side"),
+                              "initialStop": open_pos.get("initialStop"),
+                              "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
+                              "netPnl": round(net, 2), "balance": round(paper_balance, 2),
+                              "openedAt": open_pos.get("openedAt"), "time": now_str,
+                              "reasoning": signal.get("reasoning", "")}
+                    _log_trade(user_id, result, open_pos)
+                    if cfg.PAPER_TRADING:
+                        # Persist so the simulated balance survives a restart.
+                        user_store.update(user_id, {"paper_balance": round(paper_balance, 2)})
+                    last_close_at = time.time()
+                    _persist_risk_state()
+                    strategies.record_trade(net > 0, net,
+                                            dash.get("startBalance") or paper_balance,
+                                            user_id=user_id, symbol=symbol)
+                    open_pos = None
+                    dash["openPosition"] = None
+                    _persist_open_snapshot(None)
+                    dash["balance"] = paper_balance
+                    dash["trades"].insert(0, result)
+                    dash["trades"] = dash["trades"][:50]
+                    if alert_fn:
+                        alert_fn(user_id, result)
 
         except Exception as e:
             print(f"[UserLoop:{user_id}] Error: {e}")
@@ -1694,8 +4762,67 @@ def _loop(user_id, alert_fn, gen=None):
         time.sleep(_LOOP_INTERVAL)
 
 
+def _entitled(user_id):
+    """May this user have a live trading loop at all?
+
+    Access was enforced on the COMMAND path and nowhere else. A chat that is not
+    entitled got "🔒 Activation required" for every command it sent — while
+    start_all() on boot and the watchdog every 180s happily kept its trading
+    loop alive off `active: True`, sending "Bot alive" heartbeats and taking
+    positions. Observed live: a chat whose /terminal and /restart were both
+    refused was still receiving heartbeats for a $27k account.
+
+    Two independent reasons a legitimate client can look unlisted, and neither
+    may cost them their bot:
+      • the access store is unreachable (Redis hiccup) → allowed_state says
+        "unknown", never "denied";
+      • the local-JSON backend is wiped on every redeploy → fall back to the
+        stored license_key, exactly as _license_ok does on the command path.
+
+    Only a definite "denied" with no license on file stops a loop.
+    """
+    user_id = str(user_id)
+    try:
+        state = access.allowed_state(user_id)
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] access check failed ({e}) — allowing")
+        return True
+    if state == "allowed":
+        return True
+    if state == "unknown":
+        print(f"[UserLoop:{user_id}] access store unreachable — allowing "
+              f"(a store outage must not stop a paying client's bot)")
+        return True
+    try:
+        if user_store.load(user_id).get("license_key"):
+            return True     # returning customer, access store wiped by a redeploy
+    except Exception:
+        pass
+    return False
+
+
 def start(user_id, alert_fn=None):
     user_id = str(user_id)
+    if not _entitled(user_id):
+        # Clear `active` too, or the watchdog resurrects this every 180s.
+        print(f"[UserLoop] REFUSED start for {user_id}: not entitled "
+              f"(no access grant and no license on file)")
+        try:
+            user_store.update(user_id, {"active": False})
+        except Exception:
+            pass
+        stop(user_id)
+        return False
+    # Take the cross-container lease BEFORE spawning anything. A deploy overlaps
+    # the old and new containers, and without this both start a loop for the
+    # same cTrader account — the generation token below cannot see the other
+    # process. None means no shared backend: uncontended, so carry on.
+    if ownership.acquire(user_id) is False:
+        print(f"[UserLoop] REFUSED start for {user_id}: another instance owns it")
+        return False
+    # Renew on a thread of its own, not from the trading tick.
+    ownership.start_renewer(user_id, on_lost=ownership.mark_lost)
+
     with _lock:
         if user_id in _loops and _loops[user_id]["running"]:
             return False
@@ -1723,6 +4850,14 @@ def stop(user_id):
             return False
         _loops[user_id]["running"] = False
     user_store.update(user_id, {"active": False})
+    # Hand the lease back rather than making a replacement wait out the TTL.
+    # release_claim only deletes a key that is still ours, so a stop() racing
+    # a takeover cannot revoke the new owner's lease.
+    try:
+        ownership.stop_renewer(user_id)
+        ownership.release(user_id)
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] lease release failed (expires on its own): {e}")
     print(f"[UserLoop] Stopped for user {user_id}")
     return True
 
@@ -1760,7 +4895,12 @@ def get_dash(user_id):
 
 
 def start_all(alert_fn=None):
-    """Restart loops for all previously active users (after server reboot)."""
+    """Restart loops for all previously active users (after server reboot).
+
+    start() does the entitlement check, so a chat that lost access is not
+    resurrected here either — a redeploy used to hand every stale `active: True`
+    record a fresh trading loop regardless of whether the chat could still use
+    the bot."""
     for uid in user_store.all_active():
         start(uid, alert_fn)
 
@@ -1775,6 +4915,22 @@ def start_watchdog(alert_fn=None, interval=180):
             time.sleep(interval)
             try:
                 for uid in (user_store.all_active() or []):
+                    # Enforcement sweep. start() refuses new loops for chats
+                    # that lost access, but a loop ALREADY running when the
+                    # grant was revoked kept trading forever — nothing ever
+                    # re-checked it. This is the only place that notices.
+                    if not _entitled(uid):
+                        print(f"[Watchdog] {uid} is no longer entitled — "
+                              f"stopping its loop")
+                        try:
+                            stop(uid)
+                            user_store.update(uid, {"active": False})
+                            from apex import control as _ctl
+                            _ctl.event("watchdog", "stopped unentitled loop",
+                                       user_id=uid)
+                        except Exception as e:
+                            print(f"[Watchdog] stop failed for {uid}: {e}")
+                        continue
                     if not is_running(uid):
                         print(f"[Watchdog] active loop for {uid} is down — restarting")
                         try:
@@ -1818,6 +4974,36 @@ def _suggest_trade(user_id, signal, symbol, price, alert_fn):
                            "keyFactors": signal.get("keyFactors", [])})
 
 
+_SIGNAL_REPEAT_S = 300
+
+
+def _signal_only(user_id, signal, symbol, price, alert_fn):
+    """Signals-Only mode: report the setup and place NOTHING.
+
+    Deliberately not a copilot suggestion with the buttons removed. A pending
+    suggestion is a promise the bot will act when tapped; here there is nothing
+    to tap and nothing is stored to execute later, so the record must not grow
+    a `pending_suggestion` that a stale ✅ Approve button could still redeem.
+
+    Throttled per (symbol, side): a setup that stays valid re-qualifies on
+    every tick, and a client who asked for signals wants the setup once, not
+    once every five minutes for an hour.
+    """
+    side = signal.get("action")
+    now = time.time()
+    last = user_store.load(user_id).get("last_signal") or {}
+    if (last.get("symbol") == symbol and last.get("side") == side
+            and now - float(last.get("ts") or 0) < _SIGNAL_REPEAT_S):
+        return
+    user_store.update(user_id, {"last_signal": {"symbol": symbol, "side": side,
+                                                "ts": now}})
+    if alert_fn:
+        alert_fn(user_id, {"action": "SIGNAL", "symbol": symbol, "side": side,
+                           "price": price, "confidence": signal.get("confidence"),
+                           "reasoning": signal.get("reasoning", ""),
+                           "keyFactors": signal.get("keyFactors", [])})
+
+
 def pending_suggestion(user_id):
     """Return the user's pending copilot suggestion ({side,symbol,ts}) or None."""
     return user_store.load(str(user_id)).get("pending_suggestion")
@@ -1828,21 +5014,61 @@ def clear_suggestion(user_id):
     user_store.update(str(user_id), {"pending_suggestion": None})
 
 
+# A broker that answered "no" and a broker that did not answer are not the
+# same event, and collapsing them into `{"ok": False}` is how a client gets
+# told their order failed when it is sitting open in their account.
+#
+# The distinction is drawn on the transport, not on the message text: a
+# rejection arrives as a reply, while a timeout, a dropped socket or a
+# half-written frame means the request may well have been executed and the
+# answer is what went missing. Anything we cannot place in either category is
+# treated as AMBIGUOUS, because that is the reading that cannot cause a second
+# order to be sent.
+_DEFINITE_REJECTIONS = (
+    "insufficient", "not enough", "rejected", "invalid", "not found",
+    "no such", "market closed", "not tradeable", "not tradable",
+    "position not open", "forbidden", "unauthor", "denied",
+)
+_AMBIGUOUS_MARKERS = (
+    "timed out", "timeout", "connection", "reset by peer", "broken pipe",
+    "eof", "unreachable", "temporarily", "no response", "closed socket",
+    "ssl",
+)
+
+
+def broker_result_ambiguous(err) -> bool:
+    """True when the broker's answer does not establish whether it executed."""
+    text = str(err or "").lower()
+    if not text:
+        return True
+    if any(m in text for m in _DEFINITE_REJECTIONS):
+        return False
+    if any(m in text for m in _AMBIGUOUS_MARKERS):
+        return True
+    return True
+
+
 def force_trade(user_id, side, symbol=None, lots=None):
     """Open a manual trade immediately (called from AI assistant or /buy /sell commands).
     If lots is specified, use that lot size instead of auto-calculating from risk."""
     user_id = str(user_id)
     user = user_store.load(user_id)
+
+    # Every order origin converges here, on the same financial safety layer the
+    # automatic path uses. Manual trades do not have to invent a strategy
+    # signal — but they do have to clear the same entitlement, risk, ownership
+    # and idempotency checks, because an order is an order whoever asked.
+    # (Sizing happens below; the gate is re-entered with the real units.)
     broker, cfg = _make_broker(user)
     sym = (symbol or cfg.SYMBOL).upper()
-    if getattr(cfg, "PRODUCT", "forex") == "crypto":
-        if not forex.is_crypto(sym):
-            return {"ok": False, "error": f"{sym} isn't a crypto instrument — this is a "
-                                          "crypto bot. Try e.g. BTCUSD or ETHUSD."}
-    else:
-        if not forex.is_tradeable(sym):
-            return {"ok": False, "error": f"{sym} isn't a forex/metal instrument — this is a "
-                                          "forex bot. Try e.g. EUR_USD or XAUUSD."}
+    # Crypto, indices, stocks, ETFs and USD-less FX crosses are all refused,
+    # each for a concrete reason — see forex.is_tradeable. Accepting one would
+    # not fail loudly: it would size a position in the wrong currency, or trade
+    # an exchange this bot has no calendar for.
+    if not forex.is_tradeable(sym):
+        return {"ok": False, "error": f"{sym} isn't tradeable here — this platform trades "
+                                      "forex majors and metals. Try e.g. EUR_USD, "
+                                      "USD_JPY or XAUUSD."}
     try:
         candles = broker.get_candles(sym, cfg.TIMEFRAME, 5)
         price = candles[-1]["close"] if candles else 0.0
@@ -1884,13 +5110,29 @@ def force_trade(user_id, side, symbol=None, lots=None):
     dash = get_dash(user_id)
     if dash:
         balance = dash.get("balance", balance)
+    # Size off the SAME baseline the automatic path uses. Reading the live
+    # balance here meant a manual /buy compounded: the identical setup produced
+    # a different lot size depending on where the account happened to stand,
+    # which is exactly the drift the autonomous path documents refusing.
+    sizing_balance = (dash or {}).get("startBalance") or balance
 
     if lots is not None and lots > 0:
         units = forex.lots_to_units(lots, sym)
     else:
-        units = forex.calc_units(balance, cfg.RISK_PER_TRADE, stop_pips_eff, sym, price,
-                                 leverage=cfg.LEVERAGE)
+        # Same per-instrument leverage as the automatic path.
+        units = forex.calc_units(sizing_balance, cfg.RISK_PER_TRADE, stop_pips_eff,
+                                 sym, price,
+                                 leverage=leverage_for_symbol(broker, cfg, sym))
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
+    # Same unbounded-floor defect the automatic path had: when the risk-correct
+    # size lands below the minimum lot, taking the lot anyway spends more than
+    # the configured risk, without limit. An explicit `lots` is the client
+    # overriding sizing on purpose and is left alone.
+    if lots is None and not forex.floor_risk_ok(units, sym, price, stop_pips_eff,
+                                                sizing_balance * cfg.RISK_PER_TRADE):
+        return {"ok": False, "side": side, "symbol": sym,
+                "error": "minimum lot on this instrument would risk more than "
+                         "your configured risk per trade"}
 
     try:
         from apex import control as _ctl
@@ -1898,14 +5140,51 @@ def force_trade(user_id, side, symbol=None, lots=None):
                    f"SL={sl_price} TP={tp_price} (manual)", user_id=user_id)
     except Exception:
         pass
+    # Same ownership gate as the automatic path. A manual order from the
+    # control plane is still a real order, and the instance handling the HTTP
+    # request is not necessarily the one that owns this user's account.
+    _own_ok, _own_why = ownership.may_trade(
+        user_id, live=not user.get("paper", True))
+    if not _own_ok:
+        print(f"[UserLoop:{user_id}] manual {side} {sym} refused: {_own_why}")
+        return {"ok": False, "error": f"not the owning instance ({_own_why})"}
+
+    _decision, _rid = gates.authorize_order(
+        user_id, symbol=sym, side=side, units=units, sl=sl_price, tp=tp_price,
+        origin="manual", user=user)
+    gates.audit(user_id, f"{side} {sym}", _decision, origin="manual", rid=_rid)
+    _claim_ok, _claim_why = _decision.allowed, _decision.reason
+    if not _claim_ok:
+        # Manual /buy and the MCP open_trade land here. A double-tap on the
+        # Telegram button is the everyday version of the same bug — but it is
+        # only ONE of the reasons this gate refuses. This used to report every
+        # refusal as "an identical order was sent moments ago", so a client
+        # whose licence had lapsed (NOT_ENTITLED), who was halted by the
+        # drawdown guard (RISK_HALTED), whose ownership lease could not be
+        # read (NOT_OWNER) or whose coordination backend was down
+        # (COORDINATION_UNAVAILABLE) was told a duplicate had been sent — a
+        # statement that was simply untrue, and that hid the real problem.
+        # Pass the gate's own reason up; the caller names it in plain words.
+        return {"ok": False, "error": _claim_why or "ORDER_REFUSED",
+                "side": side, "symbol": sym}
     try:
-        broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
+        ledger.record(_rid, broker.place_order(side, units, sym,
+                                               sl=sl_price, tp=tp_price))
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        # The idempotency claim STANDS. It was taken before the broker was
+        # called, so an identical retry is refused by the ledger rather than
+        # reaching the broker a second time — which is the whole reason the
+        # claim is taken first.
+        return {"ok": False, "error": str(e), "side": side, "symbol": sym,
+                "ambiguous": broker_result_ambiguous(e)}
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     open_pos = {"side": side, "entryPrice": price, "symbol": sym,
                 "units": units, "stopLoss": sl_price, "takeProfit": tp_price,
+                # Record the original stop so the loop trails this manual trade
+                # off its real R too — a /buy gets the same exit quality as an
+                # autonomous entry.
+                "initialStop": sl_price,
                 "entrySpreadPips": spread, "openedAt": now_str}
     _persist_open_position(user_id, cfg, open_pos)
 
@@ -1926,17 +5205,82 @@ def force_trade(user_id, side, symbol=None, lots=None):
             "sl": round(sl_price, 5), "tp": round(tp_price, 5)}
 
 
-def force_close(user_id):
-    """Close the open position immediately (called from AI assistant or /close command)."""
+def list_broker_accounts(user):
+    """The broker's own answer to "which accounts does this token hold, and is
+    each one real money" — exposed here rather than imported by the caller.
+
+    The UI layer has to be able to re-establish the environment from the
+    account itself rather than from a stored flag, and this is the same call
+    the OAuth callback makes to build that list in the first place. Putting it
+    here keeps the architectural invariant intact: broker construction lives in
+    the trading core, and everything else asks the core.
+
+    Returns [] rather than raising for a missing token; a broker that refuses
+    or times out still raises, because "we could not confirm" is a fact the
+    caller must be able to tell its client apart from "there are none".
+    """
+    token = (user or {}).get("ctrader_access_token")
+    if not token:
+        return []
+    from apex.brokers import ctrader as _ct
+    if not _ct.is_configured():
+        raise RuntimeError("broker connection is not configured")
+    return _ct.list_accounts(token) or []
+
+
+def read_candles(user_id, symbol=None, count=50, timeframe=None):
+    """Market data for one user, without handing the caller their credentials.
+
+    The AI assistant used to assemble its own broker config — access token,
+    refresh token and account id copied out of the user record into a local
+    namespace — twice, in two places, purely to read candles. That is a direct
+    broker credential path inside the module that talks to a language model,
+    and it is the kind that later grows an order call. Broker construction
+    already lives here; this exposes the read and nothing else.
+
+    Returns [] rather than raising: a chat reply degrades, it does not crash.
+    """
+    try:
+        user = user_store.load(str(user_id))
+        broker, bcfg = _make_broker(user)
+        sym = (symbol or bcfg.SYMBOL).upper()
+        return broker.get_candles(sym, timeframe or bcfg.TIMEFRAME, int(count)) or []
+    except Exception as e:
+        print(f"[UserLoop:{user_id}] read_candles failed: {e}")
+        return []
+
+
+def force_close(user_id, origin="manual", emergency=False):
+    """Close the open position immediately (AI assistant, /close, control plane).
+
+    Routed through gates.authorize_close so every close origin gets the same
+    controls. Before this it reached the broker with none: a non-owning
+    instance could close a position the owner was managing, and a timed-out
+    close could be retried into closing a position that had been reopened in
+    between — the response was lost, not the execution.
+
+    `emergency=True` is a deliberate, audited override of the ownership check
+    for the operator's emergency path. It does not remove idempotency.
+    """
     user_id = str(user_id)
     user = user_store.load(user_id)
-    broker, cfg = _make_broker(user)
 
     with _lock:
         dash = _loops.get(user_id, {}).get("dash", {})
     open_pos = dash.get("openPosition")
     if not open_pos:
         return {"ok": False, "error": "No open position to close"}
+
+    _decision, _close_rid = gates.authorize_close(
+        user_id, position_id=open_pos.get("positionId"),
+        symbol=open_pos.get("symbol"), origin=origin, user=user,
+        emergency=emergency)
+    gates.audit(user_id, "CLOSE", _decision, origin=origin, rid=_close_rid)
+    if not _decision:
+        return {"ok": False, "error": _decision.reason,
+                "detail": _decision.detail}
+
+    broker, cfg = _make_broker(user)
 
     sym = open_pos.get("symbol", cfg.SYMBOL)
     try:
@@ -1948,7 +5292,15 @@ def force_close(user_id):
     try:
         _close_res = broker.close_position(sym)
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        # The claim STANDS. A close that raised may still have reached the
+        # broker, and retrying it seconds later can close a position that was
+        # reopened in between. The next tick re-reads the broker and settles it.
+        return {"ok": False, "error": str(e), "symbol": sym,
+                "ambiguous": broker_result_ambiguous(e)}
+    # Record the outcome against the intent, so a duplicate request is answered
+    # with what actually happened instead of a bare refusal the caller might
+    # respond to by trying again.
+    ledger.record(_close_rid, {"closed": True, "symbol": sym})
     _persist_open_position(user_id, cfg, None)
     # Prefer the broker's actual fill price over the last fetched candle —
     # the candle close is a stale proxy and can diverge from the real
@@ -1960,8 +5312,8 @@ def force_close(user_id):
         units_ = open_pos.get("units", 1000)
         gross = forex.pnl_usd(open_pos["side"], open_pos["entryPrice"], price, units_, sym)
         pv = forex.pip_value_per_unit(sym, price)
-        cost_usd = (open_pos.get("entrySpreadPips", 0.0) * pv * units_
-                   + (_close_res or {}).get("commissionUsd", 0.0))
+        cost_usd = realized_cost_usd(open_pos, _close_res, pv,
+                                     units_, cfg.PAPER_TRADING)
         net = gross - cost_usd
 
     with _lock:
@@ -1986,7 +5338,7 @@ def force_close(user_id):
                   "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
                   "netPnl": round(net, 2), "balance": new_bal,
                   "openedAt": open_pos.get("openedAt"), "time": now_str}
-        _log_trade(user_id, result)
+        _log_trade(user_id, result, open_pos)
         if cfg.PAPER_TRADING:
             # Persist so the simulated balance survives a restart.
             user_store.update(user_id, {"paper_balance": new_bal})
@@ -2001,3 +5353,96 @@ def force_close(user_id):
     return {"ok": True, "symbol": sym, "price": price,
             "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
             "netPnl": round(net, 2)}
+
+
+def open_position_count(user_id):
+    """How many positions are open RIGHT NOW, or None when it cannot be known.
+
+    None is not zero. The emergency screen asks the client to confirm closing
+    "N positions", and printing 0 because the loop has not ticked yet — or
+    because the account is not the tracked one — would be a lie at the exact
+    moment it is most expensive. The caller shows "unknown" instead.
+    """
+    dash = get_dash(user_id) or {}
+    if not dash:
+        return None
+    n = dash.get("openCount")
+    if isinstance(n, int):
+        return n
+    return 1 if dash.get("openPosition") else None
+
+
+def force_close_all(user_id):
+    """Close every open position on this account. The emergency stop.
+
+    Deliberately built on force_close() rather than a fresh order path: that
+    function already prices the exit off the broker's own fill, journals the
+    trade, corrects the balance and clears the persisted snapshot. A second
+    implementation would be a second set of those bugs.
+
+    force_close() only knows the ONE position the loop tracks, so anything
+    else on the account (multi-position mode, or a trade opened by hand in
+    cTrader) is swept afterwards through the broker's existing
+    close_position(). Failures are collected, never swallowed: a position the
+    bot could not close is the single most important thing to say back.
+    """
+    user_id = str(user_id)
+    closed, failed = [], []
+
+    first = force_close(user_id)
+    if first.get("ok"):
+        closed.append(first.get("symbol"))
+    elif "No open position" not in str(first.get("error", "")):
+        failed.append({"symbol": first.get("symbol"), "error": first.get("error")})
+
+    user = user_store.load(user_id)
+    broker, fcfg = _make_broker(user)
+    try:
+        remaining = broker.get_all_positions() or []
+    except Exception as e:
+        return {"ok": not failed, "closed": closed, "failed": failed,
+                "sweepError": str(e)[:160]}
+
+    for pos in remaining:
+        sym = pos.get("symbol")
+        if not sym or sym in closed:
+            continue
+        # EVERY close passes the gate, including the sweep. The first close
+        # above goes through force_close() and was gated; these did not, and
+        # reached the broker directly — the one path in the codebase where a
+        # position was closed without the gate seeing it.
+        #
+        # emergency=True, so this does not weaken the emergency: ownership is
+        # still waived and a coordination outage still lets the operator out.
+        # What it adds is the idempotency claim, keyed on CLOSE:{symbol}. Two
+        # containers sweeping at once — a deploy overlap, or the operator
+        # tapping twice — would otherwise each believe they were first, and the
+        # second close lands on whatever was reopened in between. It also puts
+        # the sweep in the audit, which is where an emergency most needs to be.
+        _d, _rid = gates.authorize_close(user_id, symbol=sym, origin="emergency_sweep",
+                                         user=user, emergency=True)
+        gates.audit(user_id, "CLOSE", _d, origin="emergency_sweep", rid=_rid)
+        if not _d:
+            # A refused claim means somebody else is already closing this
+            # position, not that it is stuck. Say which it is rather than
+            # reporting a failure the operator would answer by trying again.
+            failed.append({"symbol": sym,
+                           "error": f"{_d.reason}: {_d.detail}"[:120],
+                           "gate": _d.reason})
+            continue
+        try:
+            res = broker.close_position(sym) or {}
+        except Exception as e:
+            # The claim STANDS — same rule as force_close(). A close that raised
+            # may still have reached the broker, and retrying it can close a
+            # position that was reopened in between.
+            failed.append({"symbol": sym, "error": str(e)[:120],
+                           "ambiguous": broker_result_ambiguous(e)})
+            continue
+        if str(res.get("status")) in ("FILLED", "FLAT"):
+            closed.append(sym)
+            ledger.record(_rid, {"closed": True, "symbol": sym})
+        else:
+            failed.append({"symbol": sym, "error": str(res.get("reason") or res)[:120]})
+
+    return {"ok": not failed, "closed": closed, "failed": failed}

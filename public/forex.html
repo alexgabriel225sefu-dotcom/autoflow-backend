@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Apex Forex Bot · AI Forex Trading — Controlled from Telegram</title>
+<title>Apex4Traders · Automated Forex Execution — Operated from Telegram</title>
 <meta name="description" content="A fully-hosted AI forex trading bot connected to your cTrader account, controlled entirely from Telegram. Nothing to install. One-time license — $497.">
-<meta property="og:title" content="Apex Forex Bot — AI Forex Trading System">
+<meta property="og:title" content="Apex4Traders — Automated Forex Execution">
 <meta property="og:description" content="Runs 24/7. cTrader practice &amp; live. Paper trading to test risk-free. Fully hosted — control from Telegram. One-time $497.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -413,7 +413,7 @@ footer .disc{max-width:560px}
         <label class="fx-check"><input type="checkbox" id="fxck3" onchange="updateForexBtn()"/><span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>. This is NOT financial advice.</span></label>
       </div>
       <button id="fxBtn" class="btn btn-primary" onclick="gotoCheckout()" style="width:100%;justify-content:center;font-size:16px;padding:16px" disabled>Accept terms to continue</button>
-      <p class="price-fine">Secured by Digistore24 · License key emailed instantly<br>Forex trading involves risk — only trade what you can afford to lose.</p>
+      <p class="price-fine">Secured by Stripe · License key emailed instantly<br>Forex trading involves risk — only trade what you can afford to lose.</p>
     </div>
   </div>
 </section>
@@ -460,20 +460,19 @@ footer .disc{max-width:560px}
     <h2 class="h2 rv">Automate your forex trading today.</h2>
     <p class="rv">Set up in under 10 minutes. Start in paper mode at zero risk. Switch to live when you're confident.</p>
     <div class="rv">
-      <button class="btn btn-primary" onclick="gotoCheckout()" style="font-size:17px;padding:17px 32px;margin-top:8px">Get Apex Forex Bot — $497 →</button>
+      <button class="btn btn-primary" onclick="gotoCheckout()" style="font-size:17px;padding:17px 32px;margin-top:8px">Get Apex4Traders — $497 →</button>
     </div>
-    <p class="rv" style="font:400 12px/1.6 var(--m);color:var(--t2);margin-top:16px">Secure checkout via Digistore24 · Instant license delivery · Forex trading involves risk of loss</p>
+    <p class="rv" style="font:400 12px/1.6 var(--m);color:var(--t2);margin-top:16px">Secure checkout via Stripe · Instant license delivery · Forex trading involves risk of loss</p>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
     <div class="disc">
-      <strong style="color:var(--t1)">Apex Trade Bot — Forex Edition</strong><br>
+      <strong style="color:var(--t1)">Apex4Traders</strong><br>
       Risk Disclosure: Forex trading involves substantial risk of loss and is not suitable for all investors. The bot's performance depends entirely on market conditions and your configuration. Past results in paper mode do not guarantee future live performance. Never trade more than you can afford to lose. This is not financial advice.
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-      <a href="/" style="color:var(--t1)">Crypto Bot ($297)</a>
       <a href="/terms" style="color:var(--t1)">Terms</a>
       <a href="/privacy" style="color:var(--t1)">Privacy</a>
       <a href="/impressum" style="color:var(--t1)">Legal Notice</a>
@@ -492,20 +491,18 @@ footer .disc{max-width:560px}
   });
 })();
 
-// Affiliate ref capture + click beacon (same pattern as index.html)
+// Where the visitor came from, kept for the length of the checkout and passed
+// to Stripe as plain provenance. It is no longer an attribution key: there is
+// no affiliate program, and the click beacon it used to fire pointed at an
+// endpoint that no longer exists.
 (function(){
   var p=new URLSearchParams(window.location.search);
   var code=p.get('ref')||p.get('r_id')||p.get('rfsn');
   if(code) sessionStorage.setItem('rfrsn_ref',code);
-  if(code && !sessionStorage.getItem('ref_click_sent')){
-    sessionStorage.setItem('ref_click_sent','1');
-    try{ fetch('/api/affiliates/click?ref='+encodeURIComponent(code),{keepalive:true}).catch(function(){}); }catch(e){}
-  }
 })();
 
-// Digistore24 checkout redirect — requires consent checkboxes; scrolls to price card if not checked
-var FOREX_CHECKOUT_URL = 'https://www.checkout-ds24.com/product/714638';
-function gotoCheckout(){
+// Stripe checkout — requires consent checkboxes; scrolls to price card if not checked
+async function gotoCheckout(){
   var c1=document.getElementById('fxck1');
   var c2=document.getElementById('fxck2');
   var c3=document.getElementById('fxck3');
@@ -514,15 +511,25 @@ function gotoCheckout(){
     if(card)card.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
-  if(!FOREX_CHECKOUT_URL){ alert('This product is not available for purchase yet — check back soon.'); return; }
-  window.location.href=FOREX_CHECKOUT_URL;
+  try {
+    var ref = sessionStorage.getItem('rfrsn_ref') || '';
+    var r = await fetch('/api/checkout/create-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product: 'apex-forex', ref: ref,
+    });
+    var d = await r.json();
+    if (d.url) { window.location.href = d.url; return; }
+    alert(d.error || 'This product is not available for purchase yet — check back soon.');
+  } catch (err) {
+    alert('Could not start checkout. Please try again.');
+  }
 }
 
 function updateForexBtn(){
   var ok=document.getElementById('fxck1').checked&&document.getElementById('fxck2').checked&&document.getElementById('fxck3').checked;
   var btn=document.getElementById('fxBtn');
   btn.disabled=!ok;
-  btn.textContent=ok?'Get Apex Forex Bot →':'Accept terms to continue';
+  btn.textContent=ok?'Get Apex4Traders →':'Accept terms to continue';
 }
 
 // Scroll reveal

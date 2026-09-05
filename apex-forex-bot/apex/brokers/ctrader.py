@@ -36,6 +36,7 @@ import threading
 import requests
 
 from apex import config as cfg
+from apex import candle_cache
 
 # Protobuf message definitions come from the official package. We use ONLY the
 # generated message classes — not the Twisted-based Client.
@@ -56,9 +57,12 @@ try:
         ProtoOAClosePositionReq, ProtoOAErrorRes, ProtoOAOrderErrorEvent,
         ProtoOASymbolByIdReq, ProtoOASymbolByIdRes, ProtoOAAmendPositionSLTPReq,
         ProtoOADealListReq, ProtoOADealListRes,
+        ProtoOAGetDynamicLeverageByIDReq, ProtoOAGetDynamicLeverageByIDRes,
+        ProtoOAGetPositionUnrealizedPnLReq, ProtoOAGetPositionUnrealizedPnLRes,
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
+        ProtoOAExecutionType,
     )
     _SDK_OK = True
     _SDK_ERR = ""
@@ -139,6 +143,40 @@ def refresh_access_token(refresh_token: str) -> dict:
     })
 
 
+
+# ── Execution-event filtering ────────────────────────────────────────────────
+# One order produces several ExecutionEvents. ORDER_ACCEPTED arrives first and
+# carries no executionPrice and no position, so treating it as the fill means
+# reporting a price of None and then hunting for a position the broker has not
+# opened yet — during which the position is live with no stop attached. Wait
+# for a frame that actually settles the order.
+_TERMINAL_EXEC = {"ORDER_FILLED", "ORDER_PARTIAL_FILL",
+                  "ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"}
+
+
+def _exec_name(value):
+    """Name of an ProtoOAExecutionType value, or '' when it cannot be resolved."""
+    if value is None:
+        return ""
+    try:
+        return ProtoOAExecutionType.Name(value)
+    except Exception:
+        return ""
+
+
+def _is_terminal_execution(evt):
+    """True once this event settles the order one way or the other.
+
+    Unknown or unresolvable types are accepted rather than skipped: an enum we
+    do not recognise must not make the caller wait out the full timeout on an
+    order that has already filled.
+    """
+    name = _exec_name(getattr(evt, "executionType", None))
+    if not name:
+        return True
+    return name in _TERMINAL_EXEC
+
+
 # ── Synchronous protobuf client ──────────────────────────────────────────────
 
 class _Conn:
@@ -191,7 +229,7 @@ class _Conn:
             raise ConnectionError("cTrader connection closed")
         return chunk
 
-    def _await(self, want_client_id, res_cls, timeout=15):
+    def _await(self, want_client_id, res_cls, timeout=15, accept=None):
         """Read frames until the response for want_client_id arrives. Raises on
         ProtoOAErrorRes. Transparently skips heartbeats and spot/exec events the
         caller did not ask for (caller handles those explicitly when needed)."""
@@ -230,13 +268,21 @@ class _Conn:
             if pm.payloadType == res_cls().payloadType:
                 out = res_cls()
                 out.ParseFromString(pm.payload)
+                # A single request can produce several frames of the same type.
+                # An order emits ORDER_ACCEPTED before ORDER_FILLED, and taking
+                # the first one means reporting a fill that has not happened:
+                # no executionPrice, no positionId, and the caller then hunts
+                # for a position that may not exist yet. `accept` lets the
+                # caller keep reading until the frame it actually needs.
+                if accept is not None and not accept(out):
+                    continue
                 return out
         raise TimeoutError(f"cTrader: no response for {res_cls.__name__}")
 
-    def _request(self, req, res_cls, timeout=15):
+    def _request(self, req, res_cls, timeout=15, accept=None):
         with self._lock:
             cid = self._send(req)
-            return self._await(cid, res_cls, timeout)
+            return self._await(cid, res_cls, timeout, accept=accept)
 
     # -- lifecycle ------------------------------------------------------------
     def connect(self):
@@ -356,6 +402,8 @@ class CtraderBroker:
             self._vol_cache = {}
         if not hasattr(self, "_digits_cache"):
             self._digits_cache = {}
+        if not hasattr(self, "_leverageid_cache"):
+            self._leverageid_cache = {}
         if sid in self._vol_cache:
             return self._vol_cache[sid]
         req = ProtoOASymbolByIdReq()
@@ -366,10 +414,79 @@ class CtraderBroker:
         mn = int(getattr(sym, "minVolume", 0) or 0) or 100_000
         st = int(getattr(sym, "stepVolume", 0) or 0) or mn
         dg = int(getattr(sym, "digits", 0) or 0)
+        lev_id = int(getattr(sym, "leverageId", 0) or 0)
         self._vol_cache[sid] = (mn, st)
         if dg:
             self._digits_cache[sid] = dg
+        if lev_id:
+            self._leverageid_cache[sid] = lev_id
         return mn, st
+
+    def min_units(self, instrument=None):
+        """The broker's real minimum order size for `instrument`, IN UNITS.
+
+        The risk layer has to know this. `place_order` raises any order below
+        it up to the minimum (`max(mn, ...)`), which is correct for the wire —
+        the broker would reject a smaller one — but it happens AFTER position
+        sizing, so a size chosen to risk 0.5% could arrive at the broker
+        several times larger with nothing checking it again.
+
+        That is live, not hypothetical: 0.5% of $3,221 over a $48 stop is
+        0.33 oz of gold, the broker's minimum is 1 oz, and the account has
+        been trading gold at ~1.5% risk instead of the configured 0.5%.
+        forex.min_units() cannot see this — it returns a generic per-class
+        guess (0.01 for metals), so the risk check passed on a number the
+        broker was never going to accept.
+
+        Returns None when the broker cannot be asked, so the caller falls back
+        to the generic floor rather than treating "unknown" as "no minimum".
+        """
+        try:
+            sid = self._symbol_id(instrument)
+            mn, _st = self._vol_rules(sid)
+            return (mn or 0) / 100.0 or None
+        except Exception as e:
+            print(f"[cTrader] min_units({instrument}) unavailable: {e}")
+            return None
+
+    def leverage_for(self, instrument=None) -> float:
+        """Real leverage the broker allows on `instrument`, in the account's
+        actual currency — NOT a flat assumption. Regulated brokers (e.g.
+        CySEC/ESMA) cap some instruments well below the FX-major tier
+        (~1:30), so sizing every instrument off one global
+        LEVERAGE constant can ask for far more margin than the broker will
+        actually give, especially for EU clients on FP Markets' Cyprus
+        entity. Picks the most conservative (lowest) tier when the symbol
+        has volume-tiered leverage. Raises on any failure — callers must
+        catch and fall back to the existing static default; this is a
+        best-effort refinement, never a hard dependency."""
+        sid = self._symbol_id(instrument)
+        self._vol_rules(sid)  # populates _leverageid_cache for this symbol
+        lev_id = self._leverageid_cache.get(sid)
+        leverage = None
+        if lev_id:
+            lreq = ProtoOAGetDynamicLeverageByIDReq()
+            lreq.ctidTraderAccountId = self._ctid()
+            lreq.leverageId = lev_id
+            lres = self._rpc(lreq, ProtoOAGetDynamicLeverageByIDRes)
+            tiers = list(lres.leverage.tiers)
+            if tiers:
+                leverage = min(t.leverage for t in tiers)
+        if not leverage:
+            # No per-symbol tier data — fall back to the account's own
+            # nominal leverage rather than a hard-coded guess.
+            treq = ProtoOATraderReq()
+            treq.ctidTraderAccountId = self._ctid()
+            tres = self._rpc(treq, ProtoOATraderRes)
+            leverage = (getattr(tres.trader, "leverageInCents", 0) or 0) / 100
+        # Documented as a plain multiplier (unlike *InCents fields); a value
+        # in the hundreds/thousands means it's actually scaled by 100 and we
+        # misread it — recover rather than size positions off a bogus number.
+        if leverage and leverage > 500:
+            leverage = leverage / 100
+        if not leverage or leverage <= 0:
+            raise ValueError(f"no usable leverage from broker for {instrument}")
+        return leverage
 
     def _symbol_id(self, instrument):
         self._load_symbols()
@@ -381,9 +498,10 @@ class CtraderBroker:
     def _digits(self, instrument):
         """Price decimal places for rounding SL/TP, taken from the broker's
         symbol details. A hard-coded 5 makes cTrader reject the SL/TP amend on
-        instruments with fewer digits (BTCUSD is 2) as 'invalid precision' —
-        the position then reads back unprotected and gets closed 'for safety',
-        so EVERY crypto trade opens and instantly closes."""
+        any instrument with fewer digits as 'invalid precision' — the position
+        then reads back unprotected and gets closed 'for safety', so every
+        trade on such a symbol opens and instantly closes. Metals quote to 2-3
+        digits, so this is live for XAUUSD today."""
         if not hasattr(self, "_digits_cache"):
             self._digits_cache = {}
         try:
@@ -441,7 +559,35 @@ class CtraderBroker:
         bid, ask = self.get_bid_ask(instrument)
         return round((bid + ask) / 2, 6)
 
-    def get_candles(self, instrument=None, interval=None, limit=None):
+    def get_candles(self, instrument=None, interval=None, limit=None, to_ts=None):
+        """Trendbars, oldest first. Shared across accounts — see apex/candle_cache.
+
+        Trendbars are public market data: EURUSD M5 bars are the same for every
+        account, and the only per-account part of the request is which socket it
+        travels down. cTrader allows 5 historical requests per second PER
+        CONNECTION regardless of how many accounts are authorised through it, so
+        one copy per user put a ceiling of roughly 187 concurrent clients on the
+        whole product. The cache collapses those into one fetch.
+
+        The live quote (`get_price`) is deliberately NOT cached: the spread
+        check depends on it being current.
+        """
+        return candle_cache.get(
+            lambda: self._get_candles_uncached(instrument, interval, limit, to_ts),
+            instrument=instrument or self._c.SYMBOL,
+            interval=interval or self._c.TIMEFRAME,
+            limit=limit, to_ts=to_ts)
+
+    def _get_candles_uncached(self, instrument=None, interval=None, limit=None,
+                              to_ts=None):
+        """The real fetch. Called on a cache miss, and by nothing else.
+
+        `to_ts` (unix seconds) ends the window somewhere other than now, which
+        is what lets a caller page backwards through history: fetch, then ask
+        again ending one second before the oldest bar received. Without it the
+        window is always anchored to the present and only ever returns the most
+        recent `limit` bars, so no amount of calling could build a corpus.
+        """
         sym = _to_ct_symbol(instrument or self._c.SYMBOL)
         sid = self._symbol_id(instrument)
         period_name = _period().get(interval or self._c.TIMEFRAME, "M5")
@@ -452,12 +598,13 @@ class CtraderBroker:
         req.period = getattr(ProtoOATrendbarPeriod, period_name)
         req.count = count
         # fromTimestamp/toTimestamp are REQUIRED protobuf fields — omitting
-        # `from` rejects every request. Window = count bars back from now.
+        # `from` rejects every request. Window = count bars back from `to_ts`
+        # (default now).
         period_sec = {"M1": 60, "M5": 300, "M15": 900, "M30": 1800,
                       "H1": 3600, "H4": 14400, "D1": 86400}.get(period_name, 300)
-        now_ms = int(time.time() * 1000)
-        req.toTimestamp = now_ms
-        req.fromTimestamp = now_ms - (count + 5) * period_sec * 1000
+        end_ms = int((to_ts if to_ts else time.time()) * 1000)
+        req.toTimestamp = end_ms
+        req.fromTimestamp = end_ms - (count + 5) * period_sec * 1000
         res = self._rpc(req, ProtoOAGetTrendbarsRes, timeout=20)
         scale = self._scale(sym)
         out = []
@@ -521,13 +668,167 @@ class CtraderBroker:
                 swap = cpd.swap / scale
                 commission = abs(cpd.commission) / scale
                 net = round(gross + swap - commission, 2)
+                # Everything else the close already told us, and that the
+                # journal was leaving blank while making this very call.
+                #
+                # `exitPrice` is the deal's own execution price — the trade
+                # journal was recording None for it on this path, so a closed
+                # trade showed no exit, no R multiple and no exit marker on the
+                # replay, all while the exact number sat in this response.
+                #
+                # `balance` is cTrader's OWN post-close account balance. The
+                # loop was recording its local running figure instead, which on
+                # this path is never advanced — so every broker-closed trade
+                # was filed with the balance from BEFORE its own P&L.
+                _exit = None
+                try:
+                    _exit = float(d.executionPrice) or None
+                except Exception:
+                    pass
+                _entry = None
+                try:
+                    _entry = float(cpd.entryPrice) or None
+                except Exception:
+                    pass
+                _bal = None
+                try:
+                    if cpd.HasField("balance"):
+                        _bal = cpd.balance / scale
+                except Exception:
+                    pass
+                _closed_at = None
+                try:
+                    _closed_at = int(d.executionTimestamp) // 1000 or None
+                except Exception:
+                    pass
                 print(f"[cTrader] closed-deal pnl positionId={position_id} "
                       f"gross={gross:.2f} swap={swap:.2f} commission={commission:.2f} -> net={net:.2f}")
                 return {"netPnl": net, "grossPnl": round(gross, 2),
-                        "swap": round(swap, 2), "commissionUsd": round(commission, 2)}
+                        "swap": round(swap, 2), "commissionUsd": round(commission, 2),
+                        "exitPrice": _exit, "entryPrice": _entry,
+                        "balance": _bal, "closedAt": _closed_at}
         except Exception as e:
             print(f"[cTrader] get_closed_deal_pnl lookup failed: {e}")
         return None
+
+    def get_deal_history(self, from_ts, to_ts, max_pages=40):
+        """Every CLOSING deal between two unix timestamps, keyed by position id.
+
+        This exists for the journal backfill. `get_closed_deal_pnl` answers for
+        one position inside a 20-minute window, which is the right shape while
+        the loop is running and the wrong one for reconstructing months of
+        history — it would be one request per trade, against a 5/s historical
+        budget shared by every user on the connection.
+
+        Pages on `hasMore`, oldest window first, and stops at `max_pages` so a
+        wide range can never turn into an unbounded scan.
+
+        SIDE IS DERIVED FROM ARITHMETIC, NOT FROM THE DEAL'S OWN tradeSide.
+        A closing deal's trade side is the OPPOSITE of the position it closes —
+        a long is closed by a sell — and a backfill that got that backwards
+        would silently invert the direction of every historical trade, which is
+        far worse than leaving it blank. Price and profit cannot be misread the
+        same way: a position was long exactly when the exit moved the same way
+        as the profit. When entry, exit or gross is missing, or the price did
+        not move, the side stays None and the caller leaves the gap alone.
+
+        Returns {"ok": bool, "deals": {positionId(str): {...}}}. `ok` is what
+        separates "the account had no trades" from "we could not ask" — a
+        caller that writes to a journal must never confuse the two.
+        """
+        out, opened, ok = {}, {}, False
+        if getattr(self._c, "PAPER_TRADING", True):
+            return {"ok": True, "deals": out}
+        self._load_symbols()
+        id2name = {v: k for k, v in self._sym_id.items()}
+        cur = int(from_ts) * 1000
+        end = int(to_ts) * 1000
+        try:
+            for _ in range(max_pages):
+                if cur >= end:
+                    break
+                req = ProtoOADealListReq()
+                req.ctidTraderAccountId = self._ctid()
+                req.fromTimestamp = cur
+                req.toTimestamp = end
+                req.maxRows = 500
+                res = self._rpc(req, ProtoOADealListRes)
+                ok = True
+                newest = cur
+                for d in res.deal:
+                    try:
+                        newest = max(newest, int(d.executionTimestamp))
+                    except Exception:
+                        pass
+                    if not d.HasField("closePositionDetail"):
+                        # The OPENING leg. Its execution time is when the trade
+                        # actually started, which is the one thing the journal
+                        # needs for a duration and cannot derive from anything
+                        # else. Keep the earliest, since a position can be
+                        # built from several fills.
+                        try:
+                            _pid = str(d.positionId)
+                            _t = int(d.executionTimestamp) // 1000
+                            if _t and (_pid not in opened or _t < opened[_pid]):
+                                opened[_pid] = _t
+                        except Exception:
+                            pass
+                        continue
+                    cpd = d.closePositionDetail
+                    digits = (getattr(cpd, "moneyDigits", 0)
+                              or getattr(d, "moneyDigits", 0) or 2)
+                    scale = 10 ** digits
+                    gross = cpd.grossProfit / scale
+                    swap = cpd.swap / scale
+                    comm = abs(cpd.commission) / scale
+                    entry = exit_ = None
+                    try:
+                        entry = float(cpd.entryPrice) or None
+                    except Exception:
+                        pass
+                    try:
+                        exit_ = float(d.executionPrice) or None
+                    except Exception:
+                        pass
+                    side = None
+                    if entry and exit_ and gross and exit_ != entry:
+                        side = "BUY" if ((exit_ - entry) > 0) == (gross > 0) else "SELL"
+                    bal = None
+                    try:
+                        if cpd.HasField("balance"):
+                            bal = cpd.balance / scale
+                    except Exception:
+                        pass
+                    out[str(d.positionId)] = {
+                        "positionId": str(d.positionId),
+                        "symbol": id2name.get(d.symbolId, str(d.symbolId)),
+                        "netPnl": round(gross + swap - comm, 2),
+                        "grossPnl": round(gross, 2),
+                        "swap": round(swap, 2),
+                        "commissionUsd": round(comm, 2),
+                        "entryPrice": entry,
+                        "exitPrice": exit_,
+                        "side": side,
+                        "balance": bal,
+                        "closedAt": int(d.executionTimestamp) // 1000,
+                    }
+                if not getattr(res, "hasMore", False):
+                    break
+                if newest <= cur:
+                    break              # no forward progress; stop rather than spin
+                cur = newest + 1
+        except Exception as e:
+            print(f"[cTrader] deal history {from_ts}..{to_ts} failed: {e}")
+            return {"ok": ok, "deals": out, "error": str(e)[:200]}
+        # Attach the open time to the close it belongs to. Only where the
+        # opening leg was inside the same window — a position opened before it
+        # has no recoverable start, and an absent duration is the honest answer.
+        for _pid, _row in out.items():
+            if _pid in opened:
+                _row["openedAt"] = opened[_pid]
+                if _row.get("closedAt"):
+                    _row["durationS"] = max(0, _row["closedAt"] - opened[_pid])
+        return {"ok": ok, "deals": out}
 
     # -- positions ------------------------------------------------------------
     def get_open_position(self, instrument=None):
@@ -551,7 +852,7 @@ class CtraderBroker:
             return {
                 "instrument": sym,
                 "side": side,
-                "units": round(td.volume / 100.0, 8),  # cTrader volume = units × 100; fractional for crypto
+                "units": round(td.volume / 100.0, 8),  # cTrader volume = units × 100; fractional allowed
                 "symbol": instrument or self._c.SYMBOL,
                 # position price/SL/TP are plain doubles (unlike trendbar ints)
                 "entryPrice": p.price if p.price else None,
@@ -580,7 +881,7 @@ class CtraderBroker:
             out.append({
                 "symbol": id2name.get(td.symbolId, str(td.symbolId)),
                 "side": "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL",
-                "units": round(td.volume / 100.0, 8),  # fractional for crypto (0.34 BTC)
+                "units": round(td.volume / 100.0, 8),  # fractional allowed
                 "entryPrice": p.price if p.price else None,
                 "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
                 "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
@@ -588,14 +889,76 @@ class CtraderBroker:
             })
         return out
 
+    def get_positions_pnl(self):
+        """cTrader's OWN unrealised P&L per open position.
+
+        This is the number the client sees in their cTrader terminal, and it is
+        the reason this method exists. Everything else here priced a position by
+        re-reading candles and multiplying — which drifts from the broker for
+        three reasons no amount of care fixes locally: the candle close is not
+        the bid/ask the position is actually marked at, swap accrues daily and
+        is invisible to us, and the entry commission is already deducted on the
+        broker's side. A client comparing the two screens sees two different
+        numbers for the same trade and has no way to know which is real.
+
+        `netUnrealizedPnL` is net of swap and commission, so summing it over
+        every position gives exactly cTrader's
+
+            Equity = Balance + Unrealised P&L
+
+        Cost is ONE non-historical request. That matters: cTrader allows 50/s
+        for these against 5/s for historical data, so this is far cheaper than
+        the per-symbol candle reads it replaces, not more expensive.
+
+        Returns {positionId(str): net_pnl_float} — empty dict when the account
+        is flat. Raises on a broker failure, because a caller must be able to
+        tell "no positions" from "we could not ask"; silently returning {} would
+        turn an outage into a confident report of zero.
+        """
+        if getattr(self._c, "PAPER_TRADING", True):
+            return {}
+        req = ProtoOAGetPositionUnrealizedPnLReq()
+        req.ctidTraderAccountId = self._ctid()
+        res = self._rpc(req, ProtoOAGetPositionUnrealizedPnLRes)
+        # moneyDigits is REQUIRED on this response, but defaulting to 2 rather
+        # than trusting that keeps a malformed reply from moving the decimal
+        # point on a client's equity by two places.
+        digits = getattr(res, "moneyDigits", 2) or 2
+        scale = 10 ** digits
+        out = {}
+        for row in res.positionUnrealizedPnL:
+            try:
+                out[str(row.positionId)] = row.netUnrealizedPnL / scale
+            except Exception:
+                continue
+        return out
+
     def get_open_trades(self):
         pos = self.get_open_position(self._c.SYMBOL)
         return [pos] if pos else []
 
     def amend_sltp(self, position_id, sl=None, tp=None, instrument=None):
-        """Move SL/TP on an existing position — used by the trailing-stop /
-        break-even manager. Fail-soft: a failed amend never raises into the loop
-        (the existing stop stays attached), so it can't close a good trade."""
+        """REPLACE the SL and TP on an existing position. Both of them.
+
+        This is not a partial update. ProtoOAAmendPositionSLTPReq carries
+        `stopLoss` and `takeProfit` as proto2 OPTIONAL fields, so a value the
+        caller omits is genuinely absent from the wire message — and the server
+        treats absent as "no protection", not as "leave it alone". Amending
+        only the stop therefore DELETES the take-profit.
+
+        Confirmed on the owner's live account, not inferred:
+
+            order    BUY GBPUSD units=5848 @~1.36441 SL=1.36138 TP=1.37047
+            trail    STOP_MOVED GBPUSD sl=1.36168        (amend, sl only)
+            broker   position now reports takeProfit: None
+
+        The position could no longer reach its own target; only the stop, a
+        discretionary exit or the weekend flatten could close it. Every caller
+        must pass BOTH values — pass the position's current tp to keep it —
+        and tests/test_trailing_keeps_tp.py enforces that at every call site.
+
+        Fail-soft: a failed amend never raises into the loop (the existing
+        stop stays attached), so it can't close a good trade."""
         try:
             am = ProtoOAAmendPositionSLTPReq()
             am.ctidTraderAccountId = self._ctid()
@@ -630,10 +993,11 @@ class CtraderBroker:
         try:
             mn, st = self._vol_rules(sid)
         except Exception:
-            # Fail SAFE per class: the FX 0.01-lot floor (100k) on a crypto
-            # symbol would turn a 0.34 BTC order into 1,000 BTC (~$100M) if the
-            # symbol-details RPC hiccups. For non-FX never inflate — use the
-            # requested size and let the broker reject a sub-minimum order.
+            # Fail SAFE per class: applying the FX 0.01-lot floor (100k) to a
+            # fractional-unit instrument would inflate the order by orders of
+            # magnitude if the symbol-details RPC hiccups. For non-FX never
+            # inflate — send the requested size and let the broker reject a
+            # sub-minimum order.
             from apex import forex as _fx
             if _fx._is_fx(_fx._norm(instrument or self._c.SYMBOL)):
                 mn, st = 100_000, 100_000
@@ -645,7 +1009,11 @@ class CtraderBroker:
         # the relative value fails 'invalid precision'). Instead the position
         # is amended with ABSOLUTE prices (rounded to the symbol's digits)
         # immediately after the fill, then verified — see below.
-        res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
+        res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
+                                    accept=_is_terminal_execution)
+        _et = _exec_name(getattr(res, "executionType", None))
+        if _et in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
+            raise RuntimeError(f"cTrader rejected the order: {_et}")
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
@@ -674,7 +1042,7 @@ class CtraderBroker:
                     try:
                         if _try > 0:
                             time.sleep(0.5 * _try)
-                            # Fast-moving crypto can cross the intended stop
+                            # A fast market can cross the intended stop
                             # during the retry delay — the broker then rejects
                             # the amend as an invalid price every time, and we
                             # burn the rest of the retry budget (and exposure
@@ -722,11 +1090,26 @@ class CtraderBroker:
                 # this real open+forced-close round trip (and its P&L) never
                 # reached the trade log or the user. Return it as a completed
                 # trade instead so the caller can price and report it.
-                close_res = None
+                close_res, close_err = None, None
                 try:
                     close_res = self.close_position(instrument)
-                except Exception:
-                    pass
+                except Exception as ce:
+                    close_err = ce
+                if close_err is not None or not close_res:
+                    # The safety close ITSELF failed. Swallowing this and
+                    # still returning SAFETY_CLOSED was the worst reachable
+                    # state in the codebase: a real position, open at the
+                    # broker with NO stop-loss attached, reported upstream as
+                    # safely closed — so nothing retried it and nothing told
+                    # the client. Name it for what it is.
+                    print(f"[cTrader] {sym}: stop-loss attach failed AND the "
+                          f"safety close failed ({close_err}) — position is "
+                          f"OPEN AND UNPROTECTED")
+                    return {"orderId": str(getattr(res.order, "orderId", "")),
+                            "status": "UNPROTECTED", "fillPrice": fill,
+                            "reason": "the broker rejected the stop-loss and the "
+                                      "safety close did not go through — the "
+                                      "position is open with no stop"}
                 return {"orderId": str(getattr(res.order, "orderId", "")),
                         "status": "SAFETY_CLOSED", "fillPrice": fill,
                         "exitFillPrice": (close_res or {}).get("fillPrice"),
@@ -746,7 +1129,7 @@ class CtraderBroker:
         req = ProtoOAClosePositionReq()
         req.ctidTraderAccountId = self._ctid()
         req.positionId = pos["positionId"]
-        req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 BTC → 34)
+        req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 oz → 34)
         res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
@@ -834,6 +1217,63 @@ def account_balance(access_token: str, ctid, env: str = "demo") -> float:
         res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
     money_digits = getattr(res.trader, "moneyDigits", 2) or 2
     return res.trader.balance / (10 ** money_digits)
+
+
+def account_balance_retry(access_token: str, ctid, env: str = "demo",
+                          attempts: int = 2, pause: float = 2.0):
+    """account_balance() with a cold-start retry. Returns (balance, error).
+
+    Right after a link or re-auth the pooled socket does not exist yet, so a
+    single call has to complete connect + TLS + app auth + account auth + the
+    request. That chain has been seen timing out twice in a row in production
+    (account_balance already retries once internally) while the trading loop
+    read the same balance fine seconds later, and the client was shown
+    "Balance unavailable: timed out".
+
+    Every caller that links an account needs exactly this, and there were
+    three of them, each with its own wording and its own idea of whether to
+    retry. One of the three had no retry at all.
+    """
+    err = None
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            return account_balance(access_token, ctid, env), None
+        except Exception as e:
+            err = str(e)
+            print(f"[cTrader] balance attempt {attempt}/{attempts} failed "
+                  f"for {ctid}: {e}")
+            if attempt < attempts:
+                time.sleep(pause)
+    return None, err
+
+
+def get_broker_name(access_token: str, ctid, env: str = "demo") -> str:
+    """The broker name cTrader has on file for this account (e.g. 'FP Markets
+    LLC') — used to gate onboarding to a specific partner broker. Not present
+    on the account-list response; only ProtoOATraderRes carries it."""
+    req = ProtoOATraderReq()
+    req.ctidTraderAccountId = int(ctid)
+    try:
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+    except (ConnectionError, OSError, TimeoutError):
+        _drop_conn(env, int(ctid))
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+    return getattr(res.trader, "brokerName", "") or ""
+
+
+def available_symbol_names(access_token: str, ctid, env: str = "demo") -> set:
+    """Normalized (no '/' or '_', uppercase) symbol names this account's
+    broker actually lists — e.g. {"EURUSD", "XAUUSD", ...}. Used to filter
+    the onboarding quick-pick buttons down to what will actually place an
+    order, instead of guessing which CFDs a given broker/account offers."""
+    req = ProtoOASymbolsListReq()
+    req.ctidTraderAccountId = int(ctid)
+    try:
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOASymbolsListRes)
+    except (ConnectionError, OSError, TimeoutError):
+        _drop_conn(env, int(ctid))
+        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOASymbolsListRes)
+    return {s.symbolName.replace("/", "").replace("_", "").upper() for s in res.symbol}
 
 
 def list_accounts(access_token: str) -> list:

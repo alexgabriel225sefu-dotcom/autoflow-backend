@@ -15,7 +15,6 @@
 ## What this project is
 - **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, Romania).
 - Two Telegram trading bots sold as one-time licenses + a sales site + affiliate program.
-  - `apex-crypto-bot/` — Python, Binance, **$297** crypto bot.
   - `apex-forex-bot/` — Python, **$497** forex bot.
 
 > **⚠️ BROKER — read this, don't get confused:** the forex bot uses **cTrader**
@@ -34,7 +33,6 @@
 ## Render services (deploys from the working branch)
 - `autoflow-backend` — the Node site (`server.js`). `/api/health` → `sale_ready:true`.
 - `autoflow-backend-2` — the **forex** bot (Python). Callback: `/api/ctrader/callback`.
-- (crypto bot + affiliate bot are the other Python services.)
 - Free tier: ~3 weeks/month uptime, suspends late-month, auto-resumes on the 1st.
 
 ## What is BUILT & live (all committed + tested)
@@ -42,8 +40,8 @@
 - **Security**: payment-authoritative `/verify-license`; `/api/health` diagnostic.
 - **Client onboarding** (both bots): welcome, Binance referral link, paper vs real, per-user AI keys (Groq/Gemini/Claude), any-coin/any-pair.
 - **cTrader integration** (forex): OAuth onboarding (`/ctrader`, `/ctaccount`), sync protobuf connector, `_make_broker` wiring. OAuth hardened (query-param token exchange + `state` fallback). Scope configurable via `CTRADER_SCOPE`.
-- **10 "copilot" features** (both bots): per-trade explanations in alerts; copilot mode (`/copilot on|off`, approve/reject buttons); smart "don't-trade" alerts; volatility-aware sizing (crypto); news guard + `/news`; flash-crash breaker.
-- **Market Pulse** (`/market`): crypto = volatility/volume/trend/momentum + funding/long-short (Binance futures); forex = same + **session awareness** (Sydney/Tokyo/London/NY from UTC clock).
+- **10 "copilot" features**: per-trade explanations in alerts; copilot mode (`/copilot on|off`, approve/reject buttons); smart "don't-trade" alerts; news guard + `/news`; flash-crash breaker.
+- **Market Pulse** (`/market`): volatility/volume/trend/momentum + **session awareness** (Sydney/Tokyo/London/NY from UTC clock).
 - **News**: FMP economic calendar support (set `NEWS_API_KEY`); default Forex Factory feed is blocked on Render datacenter IPs.
 - **Marketing**: `public/promo.html` — on-brand animated 9:16 promo (bg `#060608`, red `#ff2d4f`, Clash Display + JetBrains Mono). Affiliate recruitment DMs + UGC scripts written (in chat history).
 - **Lead funnel** (`public/free.html` + `POST /api/lead`): cold-DM traffic → free offer → email capture → shows promo → buy CTA. Preserves affiliate ref. **Owner's plan: send ~10k DMs pointing to `aicashsystem.space/free`** (NOT the $297 page directly).
@@ -83,7 +81,7 @@
 ## Business plan / strategy
 - Growth model = **affiliate-driven** (like 3Commas), 30% commission — infra already built (`public/affiliate.html`, affiliate API, affiliate bot).
 - Ads: `public/promo.html` screen-recorded for TikTok/Reels. Compliance: never promise guaranteed returns; say "risk-free paper testing", "you control the risk".
-- Crypto bot is fully ready to sell now; forex live waits on cTrader KYC.
+- Forex is the only product. Live trading waits on cTrader KYC.
 
 ## Conventions
 - Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` + `Claude-Session:` line.

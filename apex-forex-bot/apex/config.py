@@ -1,8 +1,33 @@
 """Configuration loaded from environment (.env supported)."""
 import os
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
+# Snapshot what the PLATFORM handed us before a .env file can add to it.
+# Without this there is no way to answer "where did this credential come
+# from", and that question came up for real: the bot was trading on a Groq
+# key the account owner could not find in Render's environment variables or
+# in Telegram. A key of unknown origin is a key nobody can rotate, revoke, or
+# reason about — the provenance matters even when the value is fine.
+#
+# Render mounts Secret Files onto the filesystem, and they are listed in a
+# different place from environment variables; load_dotenv() picks one up
+# silently. So "not in the env var list" does not mean "not configured".
+_PLATFORM_ENV = frozenset(os.environ)
+_DOTENV_PATH = ""
+try:
+    _DOTENV_PATH = find_dotenv(usecwd=True)
+except Exception:
+    pass
 load_dotenv()
+
+
+def secret_provenance(name):
+    """Where the value of `name` came from. Never returns the value itself."""
+    if not os.getenv(name):
+        return "unset"
+    if name in _PLATFORM_ENV:
+        return "platform environment (Render env var / env group)"
+    return f"file on disk: {_DOTENV_PATH or 'a .env found by python-dotenv'}"
 
 
 def _truthy(v: str) -> bool:
@@ -10,8 +35,35 @@ def _truthy(v: str) -> bool:
 
 
 # ─── Broker ─────────────────────────────────────────────
-BROKER = (os.getenv("BROKER") or "ctrader").lower()
 SUPPORTED_BROKERS = ["ctrader"]
+
+
+class UnsupportedBroker(RuntimeError):
+    """BROKER names an execution path this build does not have.
+
+    SUPPORTED_BROKERS said ["ctrader"] and one Telegram command checked it, but
+    nothing stopped the environment from setting BROKER=mt or BROKER=oanda —
+    the engine simply took a different branch. That is the wrong shape for a
+    trading system: an unsupported broker is not a degraded mode, it is a
+    configuration that cannot place a correct order, and starting anyway means
+    finding out from the account.
+
+    Refusing at import makes the failure appear in the deploy log instead.
+    """
+
+
+def _resolve_broker() -> str:
+    raw = (os.getenv("BROKER") or "ctrader").strip().lower()
+    if raw not in SUPPORTED_BROKERS:
+        raise UnsupportedBroker(
+            f"BROKER={raw!r} is not supported. This build executes through "
+            f"{', '.join(SUPPORTED_BROKERS)} only — the MT bridge, Twelve Data, "
+            "OANDA and MetaAPI paths are gone. Set BROKER=ctrader or remove the "
+            "variable.")
+    return raw
+
+
+BROKER = _resolve_broker()
 
 # ─── cTrader Open API (BROKER=ctrader) ──────────────────
 # App credentials (per business, once) from openapi.ctrader.com/apps:
@@ -28,20 +80,39 @@ CTRADER_SCOPE         = (os.getenv("CTRADER_SCOPE") or "trading").lower()
 # Where cTrader redirects after the client authorizes (OAuth callback):
 CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "")
 
-# ─── MetaTrader bridge (BROKER=mt) ──────────────────────
-MT_BRIDGE_SECRET = os.getenv("MT_BRIDGE_SECRET", "")
-
-# ─── Twelve Data (BROKER=td) ────────────────────────────
-TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_KEY", "")
-
-# ─── MetaAPI (BROKER=metaapi) ───────────────────────────
-METAAPI_TOKEN      = os.getenv("METAAPI_TOKEN", "")
-METAAPI_ACCOUNT_ID = os.getenv("METAAPI_ACCOUNT_ID", "")
+# The MetaTrader bridge, Twelve Data and MetaAPI settings used to be declared
+# here. Their brokers are refused by _resolve_broker() above and unreachable
+# through apex.brokers.get_broker(), so a credential in the production config
+# read like one the product still uses. Each now lives in the module that reads
+# it — apex/brokers/{mtbridge,twelvedata,metaapi}.py — which is also the only
+# place it can have any effect.
 
 # ─── AI providers ───────────────────────────────────────
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# ── AI gateway (OmniRoute or any OpenAI-compatible router) ──
+# One endpoint in front of many providers, so a single quota is no longer the
+# ceiling: every client shares one Groq key today, and the trading signal
+# draws on that same quota. Unset = the chain behaves exactly as before.
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "").strip()
+
+# The iCloud link to the ready-made voice Shortcut, once one exists.
+#
+# Apple refuses to import an unsigned .shortcut file, and only an Apple device
+# can sign one — so the first copy has to be built on an iPhone and shared,
+# which produces a permanent signed https://www.icloud.com/shortcuts/... link.
+# From then on every client installs it with one tap.
+#
+# Until it is set, the same button walks a client through building it. The flow
+# is identical either way; this only decides whether they tap a link or follow
+# three steps, so setting it later upgrades every client at once.
+VOICE_SHORTCUT_URL = os.getenv("VOICE_SHORTCUT_URL", "").strip()
+AI_GATEWAY_KEY = os.getenv("AI_GATEWAY_KEY", "").strip()
+AI_GATEWAY_MODEL = os.getenv("AI_GATEWAY_MODEL", "").strip() or "auto"
+# Generous: on a free-tier host the gateway sleeps and a cold start eats most
+# of a minute. Falling through to Gemini meanwhile is the designed behaviour.
+AI_GATEWAY_TIMEOUT_S = float(os.getenv("AI_GATEWAY_TIMEOUT_S", "20"))
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ─── Telegram ───────────────────────────────────────────
@@ -63,67 +134,223 @@ def _scalp(name, scalp_default, normal_default):
     return v if v is not None else (scalp_default if SCALP_MODE else normal_default)
 
 
-# ─── Product / branding (one engine serves Forex and Crypto builds) ──
-# PRODUCT flips the asset-class defaults: "forex" (24/5, FX universe) or
-# "crypto" (24/7, crypto-CFD universe). Each is overridable individually below,
-# so a deployment can fine-tune without changing code.
+# ─── Product identity ───────────────────────────────────
+# FOREX ONLY. This engine had a second "crypto" build selected by PRODUCT;
+# that product is retired and its code is gone. PRODUCT is still read and
+# still REQUIRED, because it namespaces Redis keys and a wrong value would
+# read another deployment's state — but "forex" is now the only accepted
+# value, and anything else refuses to start rather than silently running a
+# half-configured bot.
 PRODUCT = (os.getenv("PRODUCT") or "forex").lower()
-_IS_CRYPTO = PRODUCT == "crypto"
-BOT_NAME = os.getenv("BOT_NAME") or ("Apex Crypto Bot" if _IS_CRYPTO else "Apex Forex Bot")
-ASSET_EMOJI = os.getenv("ASSET_EMOJI") or ("₿" if _IS_CRYPTO else "💱")
-ASSET_NOUN = os.getenv("ASSET_NOUN") or ("crypto" if _IS_CRYPTO else "forex")
-# Market hours: crypto trades 24/7, forex 24/5 (closed weekends).
-MARKET_24_7 = _truthy(os.getenv("MARKET_24_7") or ("true" if _IS_CRYPTO else "false"))
-LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or ("apex-crypto" if _IS_CRYPTO else "apex-forex")
-LICENSE_KEY_PREFIX = (os.getenv("LICENSE_KEY_PREFIX") or ("CRPT" if _IS_CRYPTO else "FORX")).upper()
+if PRODUCT != "forex":
+    raise RuntimeError(
+        f"PRODUCT={PRODUCT!r} is not supported. This is the Forex product and "
+        "it is the only one: the crypto build was removed. Set PRODUCT=forex."
+    )
+# The product name, and the positioning that goes with it.
+#
+# "Apex Forex Bot" described the thing accurately in 2025 and describes it
+# badly now. Two reasons, and the second matters more than the first:
+#
+#   * the market is saturated with "trading bots" — the word itself now reads
+#     as a signal about the seller rather than the software;
+#   * "bot" invites the reading that this trades FOR the customer with THEIR
+#     money, which is not what happens. Apex4Traders is automation
+#     infrastructure: the customer keeps their funds, their broker account and
+#     their relationship with the broker, and the broker executes.
+#
+# That distinction is not marketing. It is enforced by the architecture and
+# verifiable: the cTrader Open API exposes no withdrawal request at all, so
+# fund movement is not something this software could do if it wanted to.
+# CTRADER_SCOPE below is "trading" — place and manage orders, nothing else.
+BOT_NAME = os.getenv("BOT_NAME") or "Apex4Traders"
+# The inbox every client-facing message points at. It is still the address
+# that actually receives mail; set SUPPORT_EMAIL the day an @apex4traders
+# one exists and every message follows.
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL") or "supportaicashsystem@gmail.com"
+# The bot's @username, used to build the deep link an ad click is redirected
+# into. Wrong value here sends every paid click to a bot that is not this one,
+# so it is configurable rather than guessed.
+TELEGRAM_BOT_USERNAME = (os.getenv("TELEGRAM_BOT_USERNAME") or "FOREX_APEX_BOT").lstrip("@")
+ASSET_EMOJI = os.getenv("ASSET_EMOJI") or "💱"
+ASSET_NOUN = os.getenv("ASSET_NOUN") or "forex"
+LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or "apex-forex"
+LICENSE_KEY_PREFIX = (os.getenv("LICENSE_KEY_PREFIX") or "FORX").upper()
 
 # ─── Trading ────────────────────────────────────────────
-SYMBOL = os.getenv("TRADE_SYMBOL") or ("BTCUSD" if _IS_CRYPTO else "EUR_USD")
+SYMBOL = os.getenv("TRADE_SYMBOL") or "EUR_USD"
 TIMEFRAME = _scalp("TIMEFRAME", "1m", "5m")
 CANDLES = 200
 
 # ─── Scanner ────────────────────────────────────────────
-_DEFAULT_SCAN = "BTCUSD,ETHUSD,SOLUSD" if _IS_CRYPTO else "NZD_USD"
+_DEFAULT_SCAN = "NZD_USD"
 SCAN_SYMBOLS = (os.getenv("SCAN_SYMBOLS") or _DEFAULT_SCAN).split(",")  # tuning r9: NZD-only (EUR/AUD/JPY/CAD all negative; NZD edge is signal-specific)
 MULTI_SYMBOL = os.getenv("MULTI_SYMBOL") != "false"
 
 # Curated liquid universe the Auto-Pilot scans (comma-separated env override).
-# FX majors + gold are on every cTrader broker; crypto CFDs are the liquid
-# majors. Non-FX candidates are validated per account before use.
-_DEFAULT_UNIVERSE = ("BTCUSD,ETHUSD,SOLUSD,XRPUSD,LTCUSD,ADAUSD,DOGEUSD,DOTUSD,"
-                     "LINKUSD,BCHUSD" if _IS_CRYPTO else
-                     "EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,"
-                     "XAUUSD,US30,NAS100,US500,GER40")
+# FX majors + gold are on every cTrader broker. Every entry has a USD leg:
+# forex.is_tradeable refuses crosses without one, because sizing has no
+# quote-currency conversion (see docs/ASSETS.md).
+_FX_CANDIDATES = ("EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,NZDUSD,XAUUSD")
+_DEFAULT_UNIVERSE = _FX_CANDIDATES
+
+FX_UNIVERSE = [s.strip().upper() for s in _FX_CANDIDATES.split(",") if s.strip()]
 AUTOPILOT_UNIVERSE = [s.strip().upper() for s in
                       (os.getenv("AUTOPILOT_UNIVERSE") or _DEFAULT_UNIVERSE).split(",") if s.strip()]
 
-# Symbols that belong to the OTHER product. Used to self-heal a user record that
-# picked up cross-product symbols back when crypto & forex shared one Redis
-# namespace (e.g. a forex account trading SOLUSD). Gold (XAUUSD) is shared and
-# never blocked. Compared normalised (no separators, upper-case).
-_CRYPTO_ONLY = {"BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "LTCUSD", "ADAUSD",
-                "DOGEUSD", "DOTUSD", "LINKUSD", "BCHUSD"}
-_FOREX_ONLY = {"EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF",
-               "NZDUSD", "US30", "NAS100", "US500", "GER40"}
-CROSS_PRODUCT_BLOCK = _FOREX_ONLY if _IS_CRYPTO else _CRYPTO_ONLY
 
 # ─── Risk ───────────────────────────────────────────────
 RISK_PER_TRADE = float(_scalp("RISK_PER_TRADE", 0.025, 0.0125))  # scalp: 2.5% · swing: 1.25% (was 1%/0.5%)
 STOP_LOSS_PIPS = float(_scalp("STOP_LOSS_PIPS", 15, 25))        # scalp: 15p · swing: 25p — room to breathe past spread+noise
 TAKE_PROFIT_PIPS = float(_scalp("TAKE_PROFIT_PIPS", 30, 50))   # scalp: 30p (RR 1:2) · swing: 50p (RR 2:1)
 MIN_CONFIDENCE = int(os.getenv("MIN_CONFIDENCE") or 68)
+
+# ─── EV gate (V2 decision core — see apex/ev.py) ─────────
+# The signal engine's "confidence" is an indicator count (52 + 8×score), not a
+# probability, and at the default MIN_CONFIDENCE=68 it gates nothing: the
+# lowest confidence any firing signal can carry is 71. The EV engine replaces
+# that with a probability measured from the account's own closed trades, and
+# refuses entries whose expected value is negative after real costs.
+#
+#   off     — engine never runs (pre-V2 behaviour)
+#   shadow  — engine runs and logs its verdict, but never blocks a trade.
+#             Use this first: it shows what WOULD have been filtered, with no
+#             risk to a live account.
+#   enforce — engine can veto entries.
+EV_GATE_MODE = (os.getenv("EV_GATE_MODE") or "shadow").strip().lower()
+# The win-rate dial. Higher = fewer trades, a higher share of them winners.
+# Set too high the bot simply stops trading, so raise it in small steps and
+# read the shadow log before enforcing.
+EV_MIN_PROBABILITY = float(os.getenv("EV_MIN_PROBABILITY") or 0.55)
+# Minimum labelled closed trades before calibration is trusted at all. Below
+# this the engine reports NO_PROBABILITY and (in enforce mode) stands aside.
+EV_MIN_SAMPLES = int(os.getenv("EV_MIN_SAMPLES") or 30)
+
+# Smallest profit, as a multiple of the trade's own risk, that a strategy is
+# allowed to take voluntarily. Measured on the live account: winners were being
+# closed at ~1 pip by mean_reversion's midline rule while losers ran the full
+# 15-pip stop — a realised 1:5 that needs an 83% win rate to break even. This
+# is the floor that stops it. Only ever blocks exits that are IN PROFIT; a
+# strategy bailing out of a losing trade is never held. 0 disables.
+MIN_EXIT_R = float(os.getenv("MIN_EXIT_R") or 1.0)
+
+# The other half of the same problem: MIN_EXIT_R stops winners being cut short,
+# these let them RUN. Once a trade is this many R in profit and the trend still
+# agrees with it, a strategy's discretionary exit is converted into a stop
+# ratchet instead of a close — the bot keeps RIDE_LOCK of the open profit and
+# lets the market end the trade. Requires TRAILING_STOP; if the stop cannot be
+# moved the trade is closed as before, never held unprotected.
+RIDE_AT_R = float(os.getenv("RIDE_AT_R") or 2.0)
+RIDE_LOCK = float(os.getenv("RIDE_LOCK") or 0.6)
+
+# ─── News exit for OPEN positions (see user_loop._news_exit_due) ─────
+# The news guard kept the bot from OPENING into a high-impact release and did
+# nothing about a position that was already open, so a trade taken hours
+# earlier was carried straight through the print. Measured on the live account
+# on 2026-09-04: EURUSD and USDCHF, both opened just after midnight, both still
+# open when Non-Farm Payrolls landed at 12:30:00 — a release the bot had itself
+# announced at 12:05:38. EURUSD's stop sat 21.6 pips below entry and it filled
+# 32.7 below: 11.1 pips THROUGH the stop, a 51% overshoot. Combined -116.67,
+# which was 34% of the account's recent losses.
+#
+# This is the lead time, in minutes, at which an open position is closed ahead
+# of a release affecting either of its currencies. 15 because the calendar gave
+# 24 minutes of warning that day and the loop ticks every 1-5 minutes, so it
+# leaves at least three attempts to get flat while keeping the flat period
+# short — a position is not held hostage for an hour by a release that has not
+# happened yet. 0 switches the behaviour off entirely, with no deploy.
+#
+# It never acts on its own: the client's `news_filter` toggle gates it too, so
+# somebody who turned the news guard off keeps the bot they asked for.
+NEWS_EXIT_MIN = float(os.getenv("NEWS_EXIT_MIN") or 15)
+
+# Leave the client's OWN trade alone when a release is due.
+#
+# `manualHold` is a single flag meaning "the position this loop is TRACKING was
+# opened by hand" — it is NOT a per-position marker and cannot become one, since
+# the account-wide list comes from broker.get_all_positions() and a broker does
+# not record which software placed an order. So this skips the TRACKED position
+# only; a hand-opened trade the loop is not focused on is indistinguishable from
+# a bot one and is still closed.
+#
+# OFF by default. The weekend flatten this exit was modelled on closes every
+# position regardless of origin, because a gap does not care who opened the
+# trade — and neither does NFP: a hand-opened XAUUSD is blown through its stop
+# exactly the way the bot's EURUSD was on 2026-09-04, 11.1 pips past a 21.6-pip
+# stop. Protection is the safer default; skipping it is a deliberate choice.
+NEWS_EXIT_SKIP_MANUAL = (os.getenv("NEWS_EXIT_SKIP_MANUAL") or "").strip().lower() in (
+    "1", "true", "yes", "on")
+
+# ─── Permanent Market Sentinel (see apex/sentinel.py) ────
+# A persistent, EXPIRING view of each symbol, so "what the AI thinks about
+# EURUSD" outlives the single function call that produced it — and so a stale
+# opinion is never acted on. Same three modes as the EV gate, same reason:
+#   off     — no sentinel state is kept
+#   shadow  — state is published and the gate's verdict logged, never blocking
+#   enforce — an entry the Sentinel refuses does not go through
+SENTINEL_MODE = (os.getenv("SENTINEL_MODE") or "shadow").strip().lower()
+# Confidence is 0-1 here, not the engine's 0-100 score. None = not enforced.
+SENTINEL_MIN_CONFIDENCE = float(os.getenv("SENTINEL_MIN_CONFIDENCE") or 0.0) or None
+# Signal lifetime. 0 = derive it from the timeframe (one candle), which is what
+# you want: a fixed 60s TTL on a 15m chart leaves every signal stale on arrival
+# and the bot stops trading entirely.
+SENTINEL_TTL_S = int(os.getenv("SENTINEL_TTL_S") or 0)
+
+# Institutional contradiction gate (see apex/institutional.py). Separately
+# switchable from SENTINEL_MODE because it answers a different question: not
+# "is the AI's read fresh and in agreement" but "does the wider picture point
+# the other way". Only fires on a contradiction from a state that is itself
+# usable — thin coverage is handled inside institutional.build().
+INSTITUTIONAL_GATE = (os.getenv("INSTITUTIONAL_GATE") or "shadow").strip().lower()
+
+# Regime entry gate (see apex/regime_gate.py). Refuses ENTRIES for a
+# mean-reversion-shaped strategy in the regime it is built to lose in. Same
+# three modes as the gates above, but the only one that defaults to `enforce`:
+# those are models whose refusals cannot be predicted without watching them
+# first, this is a fixed strategy→regime table whose answer shadow mode would
+# only read back. Measured on the live account (42 labelled trades):
+#   fibonacci in ranging   n=14  net +132.52  win 71.4%   ← kept
+#   fibonacci in trending  n= 7  net -180.47  win 28.6%   ← refused
+# 59% of recent losses came from that second row. Seven trades is a small
+# sample, so the retreat is this variable and no deploy: shadow to watch, off
+# to remove.
+REGIME_GATE = (os.getenv("REGIME_GATE") or "enforce").strip().lower()
+
+# Show the AI the actual chart, not just indicator values. Structure — where
+# price keeps failing, whether a level was tested once or five times, whether
+# the approach looks impulsive or exhausted — does not survive being flattened
+# into a list of numbers. Costs image tokens on every candidate entry (never on
+# an idle tick, the AI is only consulted on a BUY/SELL candidate), so it is
+# opt-in. Falls back to text-only if rendering fails or the fallback provider
+# is used.
+
+# Derive the stop and target from the structure the signal was built on,
+# instead of a fixed pip count that has nothing to do with it. On M1 the
+# fibonacci swing is a median ~17 pips wide, so a flat 15-pip stop is 0.9x the
+# entire swing and a 30-pip target is 1.8x it — while the setup's own objective
+# (price returning to the swing extreme) sits a median 6 pips away. The trade
+# is asked to do something the signal never predicted.
+#
+# On: stop goes a buffer beyond the swing origin, target to the swing extreme,
+# and the RR that comes out is whatever the structure actually offers. Off: the
+# fixed sl_pips/tp_pips behaviour. Reversible, because it changes both trade
+# frequency and average R.
+STRUCTURAL_STOPS = _truthy(os.getenv("STRUCTURAL_STOPS"))
+# Never accept a structural trade worse than this — a level sitting right next
+# to its target offers no room and should simply be skipped.
+STRUCTURAL_MIN_RR = float(os.getenv("STRUCTURAL_MIN_RR") or 1.3)
+
 LEVERAGE = float(os.getenv("LEVERAGE") or 30)
 MARGIN_CAP = float(os.getenv("MARGIN_CAP") or 0.5)             # use ≤50% of available margin
 MAX_SPREAD_PIPS = float(_scalp("MAX_SPREAD_PIPS", 1.2, 3.0))   # scalp: strict 1.2p — wide spread kills tight targets
-# Crypto's pip conventions make spreads huge in pip terms (SOL pip=$0.01 → a
-# $0.30 spread = 30 pips), so a fixed pip limit blocks every crypto trade. For
-# crypto use a %-of-price spread limit instead: normal crypto CFD spread is
-# ~0.05-0.3%, and brokers blow it out to 1-3% on weekends (correctly skipped).
-# 0 = disabled (forex keeps the pip limit).
-MAX_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT") or (0.35 if _IS_CRYPTO else 0))
+# Optional %-of-price spread ceiling, on top of the pip limit above. It exists
+# for instruments whose pip conventions make a pip count meaningless; every FX
+# major and metal this product trades has a sane pip size, so it defaults OFF
+# and the pip limit is the real guard. Operator-settable, never build-derived.
+MAX_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT") or 0)
 # Flash-crash guard: an FX major moving >1.2% in one M5 candle is a violent
-# spike; crypto routinely moves that much normally, so raise the bar for crypto.
-FLASH_SPIKE_PCT = float(os.getenv("FLASH_SPIKE_PCT") or (0.05 if _IS_CRYPTO else 0.012))
+# spike and the bot stands aside.
+FLASH_SPIKE_PCT = float(os.getenv("FLASH_SPIKE_PCT") or 0.012)
 
 # ─── Trailing stop ──────────────────────────────────────
 TRAILING_STOP = os.getenv("TRAILING_STOP") != "false"  # ON by default — let winners run, exit on reversal
@@ -155,3 +382,13 @@ PAPER_BALANCE = float(os.getenv("PAPER_BALANCE") or 1000)
 # ─── License ────────────────────────────────────────────
 LICENSE_KEY = os.getenv("LICENSE_KEY", "")
 LICENSE_SERVER = os.getenv("LICENSE_SERVER") or "https://aicashsystem.space"
+# Signing secret for the Stripe webhook endpoint registered against THIS bot's
+# own /api/stripe/webhook (separate from the main site's /stripe-webhook —
+# each registered endpoint in the Stripe Dashboard gets its own secret).
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+# ─── Storage encryption ─────────────────────────────────
+# Fernet key (Fernet.generate_key()) used to encrypt broker tokens and
+# user-supplied AI keys at rest in Redis/Upstash. If unset, those fields are
+# stored in plaintext (logged loudly at startup) — set this in production.
+TOKEN_ENCRYPTION_KEY = os.getenv("TOKEN_ENCRYPTION_KEY", "")

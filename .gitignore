@@ -18,3 +18,11 @@ web/node_modules/
 __pycache__/
 *.pyc
 *.pyo
+
+# Collected OHLC history — rebuildable from the provider, not source.
+apex-forex-bot/data/history/
+
+# Subagent git worktrees. Each is a full second checkout of THIS repo (~34MB)
+# created and locked while an agent runs, then removed. Committing one nests a
+# working copy inside the repo it was cut from.
+.claude/worktrees/

@@ -5,18 +5,16 @@ understands the user's intent, fetches live market data, and can execute trades
 directly. Falls back gracefully when AI providers are unavailable.
 
 Provider priority (shared owner key covers ALL clients):
-  1. Claude (Anthropic) — full tool-use + execution
   2. Gemini              — FREE, full tool-use + execution
   3. Groq               — free chat + analysis only
   4. Local status       — always works, no AI needed
 """
 import json
+import os
 import threading
+from apex import chat_memory
 from apex import config as cfg
 
-_conv: dict = {}       # user_id → [{"role", "content"}]
-_clients: dict = {}    # api_key → anthropic.Anthropic client (cached)
-_MAX_HISTORY = 10
 _lock = threading.Lock()
 
 _TOOLS = [
@@ -57,7 +55,7 @@ _TOOLS = [
     },
     {
         "name": "set_symbol",
-        "description": "Change which forex pair the bot auto-trades.",
+        "description": "Change which forex pair the platform auto-trades.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -79,7 +77,7 @@ _TOOLS = [
     },
     {
         "name": "pause_trading",
-        "description": "Pause auto-trading (bot stops opening new positions).",
+        "description": "Pause automation (no new positions are opened).",
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
@@ -89,15 +87,19 @@ _TOOLS = [
     },
 ]
 
-_SYSTEM = """You are Apex, an intelligent forex trading assistant inside a Telegram bot.
+_SYSTEM = """You are Apex, the assistant of a hosted forex execution platform, operated through Telegram.
 
 You help users trade: analyze forex markets, execute trades, explain P&L, manage settings.
 
 RULES:
 - Be concise — Telegram messages, 2-4 sentences max unless analysis is requested
-- LANGUAGE: Detect the user's language and ALWAYS reply in that EXACT language.
-  Romanian, English, Spanish, French, Italian, Portuguese, German, Arabic, Russian — any.
-  Never default to a fixed language; mirror whatever the user wrote.
+- LANGUAGE: ALWAYS reply in English, whatever language the user writes in.
+  The platform's own messages (buttons, trade alerts, the daily summary) are all
+  English, so mirroring the user's language made a single chat bilingual —
+  an English "Position closed" next to a Romanian answer about it. One
+  language throughout is clearer than each message being individually
+  well-matched. If the user writes in another language, understand it fully
+  and answer in English.
 - Trade execution: show a brief analysis, then execute immediately without asking for confirmation.
   The user can always close manually. Do NOT ask "are you sure?" — just do it.
 - Always cite real numbers: RSI, price, balance, P&L — never invent them
@@ -112,34 +114,22 @@ Current account context is injected after this system prompt."""
 
 
 def _load_history(user_id: str):
-    with _lock:
-        return list(_conv.get(user_id, []))
+    """Bounded history for this user, from the shared store (spec §8).
+
+    Was a process-local dict: every deploy wiped every client's conversation,
+    and during a deploy two instances answered the same user from two
+    different halves of the history.
+    """
+    return chat_memory.load(user_id)
 
 
 def _save_exchange(user_id: str, user_msg: str, assistant_msg: str):
-    with _lock:
-        conv = list(_conv.get(user_id, []))
-        conv.append({"role": "user", "content": user_msg})
-        conv.append({"role": "assistant", "content": assistant_msg})
-        _conv[user_id] = conv[-_MAX_HISTORY:]
-
-
-def _get_anthropic_client(api_key: str):
-    with _lock:
-        client = _clients.get(api_key)
-    if client is None:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        with _lock:
-            _clients[api_key] = client
-    return client
+    chat_memory.save_exchange(user_id, user_msg, assistant_msg)
 
 
 def _build_context(user_id: str) -> str:
     """Inject live account state so the AI talks with real numbers."""
     from apex import user_loop, user_store, forex, indicators
-    from apex.brokers.ctrader import CtraderBroker
-    import types
 
     user = user_store.load(user_id)
     dash = user_loop.get_dash(user_id) or {}
@@ -164,22 +154,11 @@ def _build_context(user_id: str) -> str:
         lines.append(f"Last price: {last_price:.5f}")
 
     try:
-        fake_cfg = types.SimpleNamespace(
-            CTRADER_ACCESS_TOKEN=user.get("ctrader_access_token", ""),
-            CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
-            CTRADER_ACCOUNT_ID=user.get("ctrader_account_id", ""),
-            CTRADER_ENV=ct_env,
-            SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME, CANDLES=50,
-            PAPER_TRADING=paper, PAPER_BALANCE=balance,
-            STOP_LOSS_PIPS=float(user.get("sl_pips", cfg.STOP_LOSS_PIPS)),
-            TAKE_PROFIT_PIPS=float(user.get("tp_pips", cfg.TAKE_PROFIT_PIPS)),
-            RISK_PER_TRADE=float(user.get("risk", cfg.RISK_PER_TRADE)),
-            LEVERAGE=float(user.get("leverage", cfg.LEVERAGE)),
-            MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0,
-            MIN_CONFIDENCE=int(user.get("min_confidence", cfg.MIN_CONFIDENCE)),
-        )
-        broker = CtraderBroker(fake_cfg)
-        candles = broker.get_candles(symbol, cfg.TIMEFRAME, 50)
+        # Market data via user_loop, which owns broker construction. This module
+        # must not handle broker credentials: it is the one that talks to a
+        # language model, and a credential path here is the kind that later
+        # grows an order call.
+        candles = user_loop.read_candles(user_id, symbol, 50)
         if candles:
             ind = indicators.analyze(candles)
             lines.append(
@@ -210,30 +189,34 @@ def _build_context(user_id: str) -> str:
     return "\n".join(lines)
 
 
-def _run_tool(name: str, inp: dict, user_id: str, send_status) -> str:
+def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None) -> str:
+    """Run one tool for this account.
+
+    `guard`, when given, is a callable (name, input) -> str | None. Returning a
+    string means "do not run this; hand the model that answer instead", which
+    is how the voice channel holds a trade back for confirmation without this
+    module needing to know a voice channel exists. Returning None runs the tool
+    exactly as before, so the Telegram path is unchanged.
+    """
     from apex import user_loop, user_store, forex, indicators
     send_status = send_status or (lambda _: None)
 
+    if guard is not None:
+        held = guard(name, inp or {})
+        if held is not None:
+            return held
+
     if name == "analyze_market":
         symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
-        send_status(f"🔍 Analyzing <b>{symbol}</b>…")
+        # Show it the way every other message spells it. The status
+        # line said "EUR_USD" one bubble above a reply saying
+        # "EURUSD" — same instrument, two names, consecutive
+        # messages. The underscore form stays internally because the
+        # broker lookup wants it.
+        send_status(f"🔍 Analyzing <b>{symbol.replace(chr(95), '')}</b>…")
         try:
-            from apex.brokers.ctrader import CtraderBroker
-            import types
-            user = user_store.load(user_id)
-            fake_cfg = types.SimpleNamespace(
-                CTRADER_ACCESS_TOKEN=user.get("ctrader_access_token", ""),
-                CTRADER_REFRESH_TOKEN=user.get("ctrader_refresh_token", ""),
-                CTRADER_ACCOUNT_ID=user.get("ctrader_account_id", ""),
-                CTRADER_ENV=user.get("ctrader_env", "demo"),
-                SYMBOL=symbol, TIMEFRAME=cfg.TIMEFRAME,
-                CANDLES=100, PAPER_TRADING=user.get("paper", True), PAPER_BALANCE=1000,
-                STOP_LOSS_PIPS=cfg.STOP_LOSS_PIPS, TAKE_PROFIT_PIPS=cfg.TAKE_PROFIT_PIPS,
-                RISK_PER_TRADE=cfg.RISK_PER_TRADE, LEVERAGE=cfg.LEVERAGE,
-                MARGIN_CAP=0.5, MAX_SPREAD_PIPS=3.0, MIN_CONFIDENCE=cfg.MIN_CONFIDENCE,
-            )
-            broker = CtraderBroker(fake_cfg)
-            candles = broker.get_candles(symbol, cfg.TIMEFRAME, 100)
+            # Same rule as above: no broker credentials in this module.
+            candles = user_loop.read_candles(user_id, symbol, 100)
             if not candles:
                 return json.dumps({"error": "No market data available"})
             ind = indicators.analyze(candles)
@@ -310,47 +293,6 @@ class _ProviderDown(Exception):
     pass
 
 
-def _chat_anthropic(user_id: str, message: str, api_key: str, send_fn, send_status) -> str:
-    client = _get_anthropic_client(api_key)
-    context = _build_context(user_id)
-    system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
-
-    history = _load_history(user_id)
-    history.append({"role": "user", "content": message})
-    messages = history[-_MAX_HISTORY:]
-
-    for _ in range(5):
-        try:
-            response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=600,
-                system=system,
-                messages=messages,
-                tools=_TOOLS,
-            )
-        except Exception as e:
-            raise _ProviderDown(f"claude: {e}")
-
-        if response.stop_reason != "tool_use":
-            text = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
-            _save_exchange(user_id, message, text)
-            return text
-
-        tool_results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                result = _run_tool(block.name, block.input, user_id, send_status)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                })
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
-    return "⚠️ Could not complete request. Please try again."
-
-
 def _to_gemini_tools():
     decls = []
     for t in _TOOLS:
@@ -362,7 +304,8 @@ def _to_gemini_tools():
     return [{"function_declarations": decls}]
 
 
-def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> str:
+def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None,
+                 guard=None) -> str:
     import requests
     send_status = send_status or (lambda _: None)
     model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
@@ -375,7 +318,7 @@ def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> 
     history.append({"role": "user", "content": message})
 
     contents = []
-    for m in history[-_MAX_HISTORY:]:
+    for m in history[-chat_memory.MAX_HISTORY:]:
         role = "model" if m["role"] == "assistant" else "user"
         contents.append({"role": role, "parts": [{"text": m["content"]}]})
 
@@ -418,7 +361,7 @@ def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> 
         for fc in fcalls:
             name = fc.get("name", "")
             args = fc.get("args", {}) or {}
-            result = _run_tool(name, args, user_id, send_status)
+            result = _run_tool(name, args, user_id, send_status, guard)
             resp_parts.append({
                 "functionResponse": {"name": name, "response": {"result": result}}
             })
@@ -427,29 +370,38 @@ def _chat_gemini(user_id: str, message: str, api_key: str, send_status=None) -> 
     return "⚠️ Could not complete the request. Please try again."
 
 
-def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
+def _chat_openai_compatible(user_id, message, *, url, key, model, label,
+                            timeout=15) -> str:
+    """One chat turn against any OpenAI-compatible /chat/completions endpoint.
+
+    Groq speaks this, and so does OmniRoute — which is the whole point of
+    putting a gateway in front: it is the same wire format, so adding it costs
+    a URL rather than a second copy of this function. A near-duplicate is how
+    /ctaccount ended up with three formatters that slowly disagreed.
+    """
     import requests
-    key = api_key or cfg.GROQ_API_KEY
-    if not key:
-        raise _ProviderDown("no groq key")
+    if not url:
+        raise _ProviderDown(f"no {label} url")
 
     context = _build_context(user_id)
     system = f"{_SYSTEM}\n\n--- ACCOUNT STATE ---\n{context}"
 
     history = _load_history(user_id)
     history.append({"role": "user", "content": message})
-    messages = [{"role": "system", "content": system}] + history[-_MAX_HISTORY:]
+    messages = [{"role": "system", "content": system}] + history[-chat_memory.MAX_HISTORY:]
 
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
     try:
         r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile", "messages": messages,
+            url,
+            json={"model": model, "messages": messages,
                   "max_tokens": 400, "temperature": 0.3},
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            timeout=15,
+            headers=headers, timeout=timeout,
         )
         if r.status_code == 429:
-            raise _ProviderDown("groq quota")
+            raise _ProviderDown(f"{label} quota")
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
         _save_exchange(user_id, message, reply)
@@ -457,11 +409,45 @@ def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
     except _ProviderDown:
         raise
     except Exception as e:
-        raise _ProviderDown(f"groq {e}")
+        raise _ProviderDown(f"{label} {e}")
 
 
-def _local_status(user_id: str) -> str:
-    """Rule-based reply from real state — always works, no AI needed."""
+def _chat_groq(user_id: str, message: str, api_key: str = "") -> str:
+    key = api_key or cfg.GROQ_API_KEY
+    if not key:
+        raise _ProviderDown("no groq key")
+    return _chat_openai_compatible(
+        user_id, message,
+        url="https://api.groq.com/openai/v1/chat/completions",
+        key=key, model=groq_model(), label="groq")
+
+
+def _chat_gateway(user_id: str, message: str) -> str:
+    """OmniRoute (or any OpenAI-compatible gateway) in front of everything else.
+
+    It fans one request out across hundreds of providers and re-routes on a
+    quota or an outage, which is the problem this bot actually has: every
+    client shares one Groq key, and the trading signal draws on the same quota.
+
+    The longer timeout is deliberate. On Render's free plan the gateway sleeps
+    after fifteen idle minutes and a cold start takes most of a minute — but a
+    failure here is not a failure for the client, it just falls through to
+    Gemini while the gateway wakes up behind them.
+    """
+    return _chat_openai_compatible(
+        user_id, message,
+        url=cfg.AI_GATEWAY_URL, key=cfg.AI_GATEWAY_KEY,
+        model=cfg.AI_GATEWAY_MODEL, label="gateway",
+        timeout=float(getattr(cfg, "AI_GATEWAY_TIMEOUT_S", 20)))
+
+
+def _local_status(user_id: str, voice: bool = False) -> str:
+    """Rule-based reply from real state — always works, no AI needed.
+
+    `voice` drops everything that only makes sense on a screen. Command
+    syntax is the obvious case: "Close with slash close" read aloud is noise
+    to someone who is holding a phone and talking to it, not typing.
+    """
     from apex import user_loop, user_store, forex
     user = user_store.load(user_id)
     dash = user_loop.get_dash(user_id) or {}
@@ -477,25 +463,79 @@ def _local_status(user_id: str) -> str:
         f"💱 <b>Pair:</b> {symbol} | {market}",
     ]
     if open_pos:
-        entry = open_pos.get("entryPrice", 0)
-        side = open_pos.get("side", "?")
-        sl = open_pos.get("stopLoss", 0)
-        tp = open_pos.get("takeProfit", 0)
-        lines.append(
-            f"📈 <b>Position:</b> {side} @ {entry:.5f}\n"
-            f"   SL: {sl:.5f}  TP: {tp:.5f}\n"
-            f"   Close with <code>/close</code>"
-        )
+        # `.get(key, 0)` only falls back when the key is ABSENT. These keys are
+        # present and null the moment the trade starts trailing — ride-winners
+        # clears the fixed take profit on purpose — so the default never
+        # applied and f"{None:.5f}" raised. That crash landed in the last
+        # fallback of `chat`, which calls this function again, fails again, and
+        # answers "Assistant error. Please try again." So the one reply that is
+        # supposed to work without any AI at all was the one guaranteed to fail
+        # on a winning trade.
+        def _px(v):
+            try:
+                return f"{float(v):.5f}"
+            except (TypeError, ValueError):
+                return None
+
+        side = open_pos.get("side") or "?"
+        entry, sl, tp = _px(open_pos.get("entryPrice")), \
+            _px(open_pos.get("stopLoss")), _px(open_pos.get("takeProfit"))
+        head = f"📈 <b>Position:</b> {side}"
+        if entry:
+            head += f" @ {entry}"
+        # What it is actually doing right now, which is what anyone asking out
+        # loud wants first.
+        pips, usd = open_pos.get("pnlPips"), open_pos.get("pnlUsd")
+        if pips is not None:
+            head += f" — {float(pips):+.1f} pips"
+            if usd is not None:
+                head += f" ({float(usd):+.2f} USD)"
+        levels = f"   SL: {sl or '—'}  TP: {tp or 'none — trailing'}"
+        tail = "" if voice else "\n   Close with <code>/close</code>"
+        lines.append(f"{head}\n{levels}{tail}")
     else:
-        lines.append("📭 <b>No open position.</b> Bot is scanning automatically.")
-        lines.append(f"<i>Force entry:</i> <code>/buy {symbol}</code> or <code>/sell {symbol}</code>")
+        lines.append("📭 <b>No open position.</b> The platform is scanning for a setup.")
+        if not voice:
+            lines.append(f"<i>Force entry:</i> <code>/buy {symbol}</code> "
+                         f"or <code>/sell {symbol}</code>")
     return "\n".join(lines)
 
 
-def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
-    """Route to the best available AI, execute tools, send reply."""
+# Providers that can actually CALL a tool. `_chat_openai_compatible` — which
+# is both Groq and the gateway — sends plain chat completions with no function
+# declarations, so on those paths the model can describe placing a trade and
+# never place one. A control channel has to know the difference.
+TOOL_CAPABLE = ("Gemini",)
+
+
+def chat(user_id: str, message: str, send_fn, send_status=None, guard=None,
+         prefer_tools=False, voice=False) -> None:
+    """Route to the best available AI, execute tools, send reply.
+
+    `guard` is passed through to `_run_tool` — see there. Telegram passes
+    nothing and behaves exactly as it always has.
+
+    `prefer_tools` puts the tool-capable providers first. The chain is
+    normally ordered by resilience — the gateway leads because it survives one
+    provider's quota — but the gateway cannot call a tool, and it answers
+    first, so on a gateway-configured deployment "close my position" would come
+    back as a fluent sentence with nothing behind it. For a channel whose
+    purpose is to ACT, being able to act outranks surviving a quota.
+    """
     send_status = send_status or (lambda _: None)
     user_id = str(user_id)
+
+    # Spec §10/§11: "unlimited" is a promise to the client, not to the
+    # hardware. Every provider here draws on a shared free-tier quota, and the
+    # trading signal draws on the same one — so an unbounded chat loop does
+    # not just spam the assistant, it can starve the bot of its ability to
+    # decide. Checked before any provider is touched, and before the work is
+    # handed to a thread, so a flood costs one Redis INCR rather than a
+    # thread and an API call.
+    ok, why = chat_memory.allow(user_id)
+    if not ok:
+        send_fn(why)
+        return
 
     def _run():
         try:
@@ -506,17 +546,23 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
                 u = user_store.load(user_id)
             except Exception:
                 u = {}
-            anthropic_key = u.get("anthropic_key") or cfg.ANTHROPIC_API_KEY
             gemini_key = u.get("gemini_key") or cfg.GEMINI_API_KEY
             groq_key = u.get("groq_key") or cfg.GROQ_API_KEY
 
             chain = []
-            if anthropic_key:
-                chain.append(("Claude", lambda: _chat_anthropic(user_id, message, anthropic_key, send_fn, send_status)))
+            # The gateway goes first when configured: it is the only link that
+            # can survive one provider's quota without the client noticing.
+            # Everything below it stays as the backstop, so a gateway that is
+            # down, cold or misconfigured costs a few seconds, never an answer.
+            if cfg.AI_GATEWAY_URL:
+                chain.append(("Gateway", lambda: _chat_gateway(user_id, message)))
             if gemini_key:
-                chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status)))
+                chain.append(("Gemini", lambda: _chat_gemini(user_id, message, gemini_key, send_status, guard)))
             if groq_key:
                 chain.append(("Groq", lambda: _chat_groq(user_id, message, groq_key)))
+
+            if prefer_tools:
+                chain.sort(key=lambda c: c[0] not in TOOL_CAPABLE)
 
             reply = None
             for name, prov in chain:
@@ -532,76 +578,99 @@ def chat(user_id: str, message: str, send_fn, send_status=None) -> None:
                     continue
 
             if not reply:
+                if voice:
+                    # Spoken aloud, the sign-up pitch below is a paragraph of
+                    # URLs and provider names read out by Siri after a
+                    # one-sentence answer. Reported live: "it reads all the
+                    # example messages". Someone talking to their phone gets
+                    # the facts and nothing else; the pitch belongs in the
+                    # chat, where it is skimmable and tappable.
+                    send_fn(_local_status(user_id, voice=True))
+                    return
                 reply = (_local_status(user_id) +
                          "\n\n🧠 <b>Want AI chat to help you trade?</b>\n"
                          "It needs an API key — <b>your choice</b>, free or paid:\n"
                          "🥇 <b>Gemini</b> (free, 1,500/day) → aistudio.google.com/apikey\n"
                          "🥈 <b>Groq</b> (free, fast) → console.groq.com/keys\n"
-                         "🥉 <b>Claude</b> (paid, smartest) → console.anthropic.com\n"
+
                          "Then send <code>/ai</code> and paste your key. "
                          "<i>Trading runs fine without it — this only powers the chat.</i>")
             send_fn(reply)
         except Exception as e:
             print(f"[ForexAssistant:{user_id}] error: {e}")
             try:
-                send_fn(_local_status(user_id))
+                send_fn(_local_status(user_id, voice=voice))
             except Exception:
                 send_fn("⚠️ Assistant error. Please try again.")
 
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _gemini_model_name() -> str:
+    return (os.getenv("GEMINI_MODEL") or getattr(cfg, "GEMINI_MODEL", "")
+            or "gemini-2.5-flash").strip()
+
+
 def _gemini_url() -> str:
-    model = getattr(cfg, "GEMINI_MODEL", "") or "gemini-2.5-flash"
     return (f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent")
+            f"{_gemini_model_name()}:generateContent")
 
 
-def test_key(key: str):
-    """Quick liveness check for a client's Anthropic key. Returns (ok, message)."""
-    if not key or not key.startswith("sk-ant-"):
-        return False, "Key must start with sk-ant-"
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=key)
-        client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=5,
-            messages=[{"role": "user", "content": "Reply with the single word OK."}],
-        )
-        return True, "Key works"
-    except Exception as e:
-        status = getattr(e, "status_code", None)
-        if status == 401:
-            return False, "Key rejected (401) — copy it again from console.anthropic.com"
-        if status == 429:
-            return False, "Key is valid but out of credits/rate-limited"
-        return False, f"Could not verify key ({e})"
+# Groq retires models on its own schedule, so the chat model is a setting
+# rather than a literal. Changing it must never require a deploy.
+GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
+
+
+def groq_model() -> str:
+    return (os.getenv("GROQ_MODEL") or getattr(cfg, "GROQ_MODEL", "")
+            or GROQ_DEFAULT_MODEL).strip()
 
 
 def test_groq_key(key: str):
-    """Quick liveness check for a Groq key. Returns (ok, message)."""
+    """Liveness check for a Groq key. Returns (ok, message).
+
+    Checked against /models, which is authentication-only, NOT against a chat
+    completion on a named model. The old check sent a completion to a
+    hard-coded model, so the day Groq retired that model every valid key
+    started failing — and the failure was reported as "key rejected", which
+    sends people off to regenerate a key that was fine all along. A key check
+    must test the key and nothing else.
+
+    A live key whose configured chat model has since been retired still
+    passes, and says so: that is a deployment setting to change, not a reason
+    to refuse a working credential.
+    """
     import requests
     key = (key or "").strip()
     if not key.startswith("gsk_"):
         return False, "Groq keys start with gsk_ — copy it from console.groq.com/keys"
     try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile",
-                  "messages": [{"role": "user", "content": "Reply with the single word OK."}],
-                  "max_tokens": 5},
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            timeout=12,
-        )
+        r = requests.get(
+            "https://api.groq.com/openai/v1/models",
+            headers={"Authorization": f"Bearer {key}"}, timeout=12)
         if r.status_code == 401:
             return False, "Key rejected — recreate it at console.groq.com/keys"
         if r.status_code == 429:
             return True, "Key valid (was briefly rate-limited, that's fine)"
-        r.raise_for_status()
+        if not r.ok:
+            # Say what the API actually said. "Could not verify" on its own is
+            # indistinguishable from a bad key to the person reading it.
+            detail = ""
+            try:
+                detail = str((r.json().get("error") or {}).get("message") or "")[:120]
+            except Exception:
+                detail = (r.text or "")[:120]
+            return False, f"Groq answered {r.status_code}{': ' + detail if detail else ''}"
+        ids = [m.get("id") for m in (r.json().get("data") or [])
+               if isinstance(m, dict) and m.get("id")]
+        want = groq_model()
+        if ids and want not in ids:
+            alt = next((m for m in ids if "llama" in m.lower()), ids[0])
+            return True, (f"Key works — but the chat model {want} is no longer "
+                          f"available. Set GROQ_MODEL={alt} on the service.")
         return True, "Key works"
     except Exception as e:
-        return False, f"Could not verify key ({e})"
+        return False, f"Could not reach Groq ({e})"
 
 
 def test_gemini_key(key: str):
@@ -630,6 +699,14 @@ def test_gemini_key(key: str):
                 return False, "Google says the key is invalid. Recreate it at aistudio.google.com/apikey and copy the WHOLE key (starts with AIza)."
             if reason in ("SERVICE_DISABLED", "PERMISSION_DENIED"):
                 return False, "The Generative Language API isn't enabled for this key's project. Create the key in a NEW project at aistudio.google.com/apikey."
+            # A retired model answers 404 AFTER the key has been accepted, so
+            # this is a working credential pointed at a name that no longer
+            # exists. Same trap the Groq check used to fall into: reporting it
+            # as a bad key sends people off to regenerate a good one.
+            if r.status_code == 404 and "model" in (msg or "").lower():
+                return True, (f"Key works — but the chat model "
+                              f"{_gemini_model_name()} is no longer available. "
+                              f"Set GEMINI_MODEL on the service.")
             return False, f"Google rejected the key: {msg or reason or r.status_code}"
         r.raise_for_status()
         return True, "Key works"
@@ -638,6 +715,4 @@ def test_gemini_key(key: str):
 
 
 def clear_history(user_id: str) -> None:
-    user_id = str(user_id)
-    with _lock:
-        _conv.pop(user_id, None)
+    chat_memory.clear(user_id)

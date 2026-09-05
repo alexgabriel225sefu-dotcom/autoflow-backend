@@ -6,21 +6,254 @@ const Anthropic = require('@anthropic-ai/sdk');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
+// A correlation id for an error the client must not see the inside of.
+//
+// Routes used to return the driver's own message — `detail: error.message` —
+// which hands out schema, table names, constraint names, internal hostnames
+// and sometimes a connection string to anyone who can provoke a failure. The
+// client now gets a generic sentence plus this id; the log gets the real
+// exception under the same id, so an operator can still find it in one grep.
+function _errId(e) {
+  const id = crypto.randomBytes(6).toString('hex');
+  try {
+    console.error(`[ERR ${id}]`, (e && (e.stack || e.message)) || String(e));
+  } catch (_) { /* logging must never be the thing that fails a request */ }
+  return id;
+}
+
+// ── Owner-secret gate ───────────────────────────────────
+// Routes were gated by `?secret=<BOT_EMAIL_SECRET>`.
+//
+// BOT_EMAIL_SECRET is not an ordinary password: _licSecrets() derives the
+// licence-signing key from it. Anything that learns it can MINT licence keys
+// that verify. Putting it in a query string put it in every proxy log, access
+// log and browser history along the way — and one of those routes sends email
+// to an address the caller chooses, so a leaked secret is also a mail relay.
+//
+// It moves to a header, the comparison becomes constant-time, and a request
+// that still carries it in the URL is refused rather than accepted, because
+// such a request has already leaked it.
+function _ownerSecretPresentInUrl(req) {
+  return Boolean(req.query && req.query.secret);
+}
+
+function _ownerSecretOk(req) {
+  const expected = process.env.BOT_EMAIL_SECRET || '';
+  if (!expected) return false;               // unset is a misconfiguration, not permission
+  if (_ownerSecretPresentInUrl(req)) return false;
+  const supplied = String((req.headers && req.headers['x-owner-secret']) || '');
+  if (!supplied) return false;
+  const a = Buffer.from(supplied, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  // Length is compared separately because timingSafeEqual throws on a
+  // mismatch; the length of this secret is not the part worth protecting.
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function _denyOwner(req, res) {
+  if (_ownerSecretPresentInUrl(req)) {
+    return res.status(403).json({
+      error: 'A secret in the URL is not accepted.',
+      code: 'SECRET_IN_URL',
+      detail: 'Send it as the X-Owner-Secret header. A URL reaches proxy logs, access logs and browser history.',
+    });
+  }
+  return res.status(403).json({ error: 'Forbidden' });
+}
+
+// ── Outbound URL safety (SSRF) ──────────────────────────
+// A user-supplied callback URL is a request this server makes on the caller's
+// behalf, from inside the private network. Checking the hostname STRING
+// against a list of private prefixes lets through everything that is
+// 127.0.0.1 without spelling it that way:
+//
+//     http://2130706433/          decimal integer
+//     http://0177.0.0.1/          octal
+//     http://[::ffff:127.0.0.1]/  IPv4-mapped IPv6
+//     http://metadata.internal/   a NAME that resolves privately
+//
+// The last is the general case: no string inspection can tell where a hostname
+// points. So this RESOLVES the name and requires every resolved address to be
+// public, which also disposes of the numeric encodings.
+//
+// LIMITATION, stated rather than implied: this does not defeat DNS rebinding.
+// Between this lookup and the request the name can be re-answered privately;
+// closing that needs the socket pinned to the checked address, which fetch()
+// does not expose.
+const _dnsp = require('dns').promises;
+const _net = require('net');
+
+function _isPublicIp(ip) {
+  if (_net.isIPv4(ip)) {
+    const p = ip.split('.').map(Number);
+    if (p[0] === 0 || p[0] === 10 || p[0] === 127) return false;
+    if (p[0] === 169 && p[1] === 254) return false;                // link-local + cloud metadata
+    if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return false;
+    if (p[0] === 192 && p[1] === 168) return false;
+    if (p[0] === 192 && p[1] === 0 && p[2] === 0) return false;
+    if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return false;   // CGNAT
+    if (p[0] >= 224) return false;                                  // multicast + reserved
+    return true;
+  }
+  if (_net.isIPv6(ip)) {
+    const a = ip.toLowerCase();
+    if (a === '::' || a === '::1') return false;
+    if (a.startsWith('fe8') || a.startsWith('fe9') ||
+        a.startsWith('fea') || a.startsWith('feb')) return false;   // link-local
+    if (a.startsWith('fc') || a.startsWith('fd')) return false;     // unique local
+    if (a.startsWith('ff')) return false;                           // multicast
+    // IPv4-mapped IPv6 — judge the embedded IPv4. BOTH spellings matter:
+    // `new URL()` rewrites ::ffff:127.0.0.1 into ::ffff:7f00:1, so a check
+    // that understood only the dotted form let the loopback straight through.
+    const dotted = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (dotted) return _isPublicIp(dotted[1]);
+    const hex = a.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hex) {
+      const hi = parseInt(hex[1], 16), lo = parseInt(hex[2], 16);
+      return _isPublicIp([hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join('.'));
+    }
+    return true;
+  }
+  return false;
+}
+
+async function assertPublicHttpUrl(raw) {
+  let u;
+  try { u = new URL(String(raw)); }
+  catch (e) { throw new Error('callback URL is not a URL'); }
+
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    throw new Error('callback URL must be http or https');
+  }
+  if (u.username || u.password) {
+    throw new Error('callback URL must not carry credentials');
+  }
+
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  if (_net.isIP(host)) {
+    if (!_isPublicIp(host)) throw new Error('callback URL points at a private address');
+    return u;
+  }
+
+  let addrs;
+  try { addrs = await _dnsp.lookup(host, { all: true }); }
+  catch (e) { throw new Error('callback URL host does not resolve'); }
+  if (!addrs.length) throw new Error('callback URL host does not resolve');
+  // EVERY address, not the first: a name answering with one public and one
+  // private address must not be usable to reach the private one.
+  for (const { address } of addrs) {
+    if (!_isPublicIp(address)) throw new Error('callback URL resolves to a private address');
+  }
+  return u;
+}
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+
 process.on('uncaughtException', err => console.error('UNCAUGHT EXCEPTION:', err.stack || err));
 process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION:', err));
 
 const app = express();
 app.set('trust proxy', 1);
 const rateLimit = require('express-rate-limit');
+// ── Brand ───────────────────────────────────────────────
+// One place decides what the product is called, where a buyer goes to get it,
+// and which inbox answers them. These used to be literals scattered across
+// email bodies, licence refusals and an OG card, which is how a customer could
+// pay for Apex4Traders and receive mail from "AI Cash Systems" pointing at a
+// domain that no longer resolves.
+//
+// There is no website right now. The Telegram bot IS the product surface, so
+// every "where do I get this" answer points at the bot, not at a domain.
+const BRAND         = process.env.BRAND_NAME || 'Apex4Traders';
+const BOT_HANDLE    = process.env.TELEGRAM_BOT_USERNAME || 'FOREX_APEX_BOT';
+const ACCESS_URL    = `https://t.me/${BOT_HANDLE}`;
+// Kept as the default because it is the inbox that actually receives mail
+// today. Set SUPPORT_EMAIL the day an @apex4traders address exists — nothing
+// else has to change.
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'supportaicashsystem@gmail.com';
+
+const _ALLOWED_ORIGINS = new Set([
+  'https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'
+]);
+// req.headers.origin is client-controlled — never use it directly to build a
+// redirect URL. Restrict to the known site origins before it feeds success/
+// return/cancel URLs (checkout, Stripe Connect onboarding, etc).
+function _safeOrigin(req) {
+  const requested = req.headers.origin || '';
+  if (_ALLOWED_ORIGINS.has(requested)) return requested;
+  // Fall back to the host actually serving this request, not to a hard-coded
+  // domain. The old fallback sent a buyer who had just paid to a site that no
+  // longer resolves; this app serves /thank-you itself, so its own host is the
+  // one origin guaranteed to be reachable.
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+  const host  = req.get('host');
+  return host ? `${proto}://${host}` : ACCESS_URL;
+}
 app.use(cors({
+  // An explicit allowlist, and credentials:true — which is exactly why it must
+  // never become '*'. A wildcard with credentials is rejected by browsers, and
+  // a reflected origin with credentials lets any site read authenticated
+  // responses. These three, or nothing.
   origin: ['https://aicashsystem.onrender.com', 'https://aicashsystem.space', 'https://www.aicashsystem.space'],
   credentials: true
 }));
-// Skip JSON body parsing for the Digistore24 webhook — it posts form-urlencoded.
+
+// ── Security headers ────────────────────────────────────
+// There were none. A site that renders licence keys, a configurator that
+// collects broker credentials, and JSON endpoints returning account data were
+// all served with no CSP, no nosniff, no referrer policy and no frame
+// protection.
+//
+// The referrer policy matters most: every page that ever carried a token or a
+// licence key in its URL handed that URL to any third-party destination the
+// user clicked through to.
+//
+// The CSP reflects what these pages actually load — dozens of them carry
+// inline <script>, so 'unsafe-inline' is present because removing it means
+// rewriting the pages, which is a deliberate piece of work rather than a side
+// effect of adding a header. It still shuts the doors that cost nothing: no
+// object, no <base> rewriting, no arbitrary form target, no framing.
+const _CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://js.stripe.com https://s3.tradingview.com https://telegram.org",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com",
+  "font-src 'self' data: https://fonts.gstatic.com https://api.fontshare.com https://cdn.fontshare.com",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https://api.stripe.com",
+  "frame-src https://js.stripe.com https://hooks.stripe.com",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self' https://checkout.stripe.com",
+  "frame-ancestors 'none'",
+].join('; ');
+
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(self)');
+  res.set('Content-Security-Policy', _CSP);
+  // Render terminates TLS; the header says so. Two years with subdomains, and
+  // deliberately not preload — that is a one-way door for the whole domain and
+  // belongs to whoever owns it, not to this middleware.
+  if ((req.headers['x-forwarded-proto'] || 'https') !== 'http') {
+    res.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
+  }
+  // Anything under /api is either authenticated or a one-shot answer. Neither
+  // belongs in a shared cache.
+  if (req.path.startsWith('/api/')) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+  }
+  next();
+});
+// Skip JSON body parsing where a webhook needs its untouched raw body.
 // The Meta webhook needs the raw body preserved too (HMAC signature check in
 // _metaVerifySignature can't hash a body that's already been re-serialized).
 app.use((req, res, next) => {
-  if (req.path === '/digistore24-webhook') return next();
+  // Stripe needs the untouched raw body Buffer to verify its signature —
+  // skip JSON parsing entirely here; the route below applies express.raw() itself.
+  if (req.path === '/stripe-webhook') return next();
   if (req.path === '/webhooks/meta') {
     return express.json({ verify: (req2, res2, buf) => { req2.rawBody = buf; } })(req, res, next);
   }
@@ -57,27 +290,48 @@ app.get('/api/health', async (req, res) => {
     (has('BREVO_SMTP_USER') && has('BREVO_SMTP_PASS')) ||
     (has('GMAIL_USER') && has('GMAIL_APP_PASSWORD'));
 
+  // Reads the ERROR, not just whether the call threw. supabase-js reports a
+  // missing table in `error` and does not raise, so this used to set
+  // dbConnect = true for a database with no `licenses` table at all — and
+  // sale_ready with it. The one probe meant to warn that the licence store is
+  // unusable was blind to the most complete way for it to be unusable.
+  //
+  // A real Supabase project in this account has no tables whatsoever; if
+  // SUPABASE_URL ever points at it, every activation fails and this endpoint
+  // said everything was fine.
   let dbConnect = false;
+  let dbFault = null;
   if (supabase) {
-    try { await supabase.from('licenses').select('*', { count: 'exact', head: true }); dbConnect = true; }
-    catch (e) { dbConnect = false; }
+    try {
+      const { error } = await supabase.from('licenses')
+        .select('*', { count: 'exact', head: true });
+      if (error) { dbFault = _licenceStoreFault(error); }
+      else { dbConnect = true; }
+    } catch (e) { dbFault = _licenceStoreFault(e); }
   }
 
   const checks = {
     // CRITICAL — purchase → license → email flow cannot work without these
-    digistore24_ipn_passphrase: has('DIGISTORE24_IPN_PASSPHRASE'),
     license_signing_key:  has('BOT_EMAIL_SECRET'),
     supabase_url:         has('SUPABASE_URL'),
     supabase_key:         has('SUPABASE_SERVICE_KEY'),
     supabase_connects:    dbConnect,
+    // Named separately because the two need opposite responses: SCHEMA means
+    // the deployment points at the wrong or unmigrated database and will not
+    // fix itself; UNREACHABLE clears on its own.
+    supabase_fault:       dbFault,
     email_delivery:       emailReady,
     // RECOMMENDED — degraded experience if missing, but sale still completes
     ai_fallback:          has('GROQ_API_KEY') || has('ANTHROPIC_API_KEY') || has('GOOGLE_AI_API_KEY'),
-    affiliate_bot:        has('AFFILIATE_BOT_TOKEN'),
+    // Still read: it is the Telegram transport _notifyAdminAlert falls back to
+    // for OWNER alerts. The affiliate program it was named after is gone.
+    admin_alert_bot:      has('AFFILIATE_BOT_TOKEN'),
+    stripe_secret_key:         has('STRIPE_SECRET_KEY'),
+    stripe_webhook_secret:     has('STRIPE_WEBHOOK_SECRET'),
     session_secrets:      has('JWT_SECRET') && has('COOKIE_SECRET'),
   };
 
-  const critical = ['digistore24_ipn_passphrase','license_signing_key','supabase_url','supabase_key','supabase_connects','email_delivery'];
+  const critical = ['license_signing_key','supabase_url','supabase_key','supabase_connects','email_delivery'];
   const missing = critical.filter(k => !checks[k]);
   const saleReady = missing.length === 0;
 
@@ -94,27 +348,30 @@ app.get('/api/health', async (req, res) => {
 const _setupChatLimiter = rateLimit({ windowMs: 60*1000, max: 15, standardHeaders: true, legacyHeaders: false,
   message: { error: 'Too many messages — please wait a minute.' } });
 
-const SETUP_SYSTEM = `You are a concise support assistant for Apex Trade Bot — a crypto trading bot deployed on Railway.
-Help users set up their bot. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
-IMPORTANT: Always reply in the SAME language the user wrote in. If they write in English, reply in English. If Romanian, reply in Romanian. If Spanish, reply in Spanish. Detect the language automatically.
+const SETUP_SYSTEM = `You are a concise support assistant for ${BRAND} — a hosted
+platform that executes forex strategies on the client's own cTrader account and
+is operated through Telegram.
+Help users get started. Be short and direct (2-4 sentences max). No markdown headers. Use plain text.
+IMPORTANT: Always reply in English, whatever language the question was written in.
+The whole platform speaks one language, and support is part of the platform.
+
+THERE IS NOTHING TO DEPLOY. No Railway, no Docker, no exchange API key. The
+platform is hosted and managed; the client only opens Telegram.
 
 SETUP STEPS:
-1. Railway → New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest
-2. Add 2 Variables: LICENSE_KEY (from their email) and GROQ_API_KEY (free from console.groq.com → API Keys)
-3. Go to aicashsystem.space/configurator → enter license key + Groq key + exchange → Save Config
-4. Set up Telegram (optional): @BotFather for token, @userinfobot for chat ID → add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to Railway → send /resume
+1. Open the Telegram link from the purchase email (it carries the licence key).
+2. Connect the cTrader account when the bot asks — a demo account is the default.
+3. Answer the short setup questions (instrument, style, risk).
+4. The bot starts in DEMO. Going live is a separate, explicit step.
+
+WHAT IT TRADES: forex majors with a USD leg, plus metals. Crypto, indices and
+stock CFDs are not supported.
 
 COMMON ERRORS:
-- "Invalid license key" → They must go to the configurator (aicashsystem.space/configurator) and save settings first, then restart Railway.
-- "No AI key found" → Add GROQ_API_KEY to Railway Variables. Get it free at console.groq.com.
-- "No exchange API key" → Bot auto-switches to Paper Trading (safe, no real funds). Normal for first setup.
-- "Bot is paused" → Needs Telegram /resume command. Set up Telegram first.
-- Bot restarting in loop → Normal during first deploy. Stabilizes in 1-2 min after variables are added.
-
-BINANCE API: Profile → API Management → Create API → enable Spot Trading only, Withdrawals OFF.
-GROQ: console.groq.com → Sign up free → API Keys → Create Key. No credit card.
-PAPER TRADING: Simulated mode, no real funds. Safe to test. Switch to live via configurator.
-SUPPORT EMAIL: supportaicashsystem@gmail.com`;
+- "Invalid license key" -> open the key via the Telegram link from the email.
+- "Not activated" -> still in demo; live activation is deliberate and separate.
+- No trades yet -> normal, forex moves at macro pace (0-3 trades a day).
+SUPPORT EMAIL: ${SUPPORT_EMAIL}`;
 
 app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
   const { message, history = [] } = req.body || {};
@@ -125,34 +382,24 @@ app.post('/api/setup-chat', _setupChatLimiter, async (req, res) => {
   // Detects language (EN/RO) and responds accordingly
   function staticFallback(msg) {
     const m = msg.toLowerCase();
-    const isEN = /\b(the|is|are|do|can|how|what|where|when|why|i|you|my|your|help|please|and|or|not|have|get|set|need|want|does)\b/.test(m);
-    const T = (ro, en) => isEN ? en : ro;
-
-    if (m.includes('license') || m.includes('licenta') || m.includes('cheie') || (m.includes('key') && !m.includes('api key') && !m.includes('groq') && !m.includes('binance')))
-      return T('LICENSE_KEY-ul l-ai primit pe email dupa cumparare. Daca nu l-ai primit, verifica Spam sau scrie la supportaicashsystem@gmail.com.', 'Your LICENSE_KEY was sent by email after purchase. If you didn\'t receive it, check your Spam folder or email supportaicashsystem@gmail.com.');
-    if (m.includes('groq') || m.includes('llama') || m.includes('ai key'))
-      return T('GROQ_API_KEY e gratuit: console.groq.com → Sign up → API Keys → Create. Nu necesita card bancar.', 'GROQ_API_KEY is free: go to console.groq.com → Sign up → API Keys → Create a new key. No credit card needed.');
-    if (m.includes('paused') || m.includes('pause') || m.includes('pornit') || m.includes('resume') || m.includes('start the bot'))
-      return T('Botul porneste in modul PAUSED. Trimite /resume pe Telegram dupa ce ai configurat TELEGRAM_BOT_TOKEN si TELEGRAM_CHAT_ID in Railway.', 'The bot starts in PAUSED mode for safety. Send /resume on Telegram after setting TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Railway Variables.');
-    if (m.includes('invalid') || m.includes('403') || m.includes('license error'))
-      return T('Mergi la aicashsystem.space/configurator, introdu LICENSE_KEY-ul si apasa Save Config. Dupa, reporneste in Railway.', 'Go to aicashsystem.space/configurator, enter your LICENSE_KEY and click Save Config. Then restart the Railway service.');
-    if (m.includes('telegram') || m.includes('botfather') || m.includes('bot token'))
-      return T('Setup Telegram: 1) @BotFather → /newbot → copiaza tokenul. 2) @userinfobot → copiaza ID-ul. 3) Adauga TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in Railway Variables.', 'Telegram setup: 1) @BotFather → /newbot → copy the token. 2) @userinfobot → copy your ID. 3) Add TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in Railway Variables.');
-    if (m.includes('binance') || m.includes('exchange') || m.includes('api key') || m.includes('trading key'))
-      return T('Binance: Profile → API Management → Create API → activeaza Spot Trading, dezactiveaza Withdrawals. Adauga BINANCE_API_KEY + BINANCE_SECRET in Railway.', 'Binance: Profile → API Management → Create API → enable Spot Trading only, disable Withdrawals. Add BINANCE_API_KEY + BINANCE_SECRET in Railway Variables.');
-    if (m.includes('paper') || m.includes('bani reali') || m.includes('real money') || m.includes('live trading'))
-      return T('Fara cheia Binance, botul ruleaza in Paper Trading (bani virtuali, zero risc). Ca sa treci pe live, adauga cheile Binance in Railway.', 'Without a Binance key, the bot runs in Paper Trading mode (simulated funds, zero risk). To go live, add your Binance keys in Railway Variables.');
-    if (m.includes('railway') || m.includes('deploy') || m.includes('docker') || m.includes('image'))
-      return T('Railway: New Project → New Service → Docker Image → lipeste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest → Deploy. Adauga LICENSE_KEY si GROQ_API_KEY in Variables.', 'Railway: New Project → New Service → Docker Image → paste: ghcr.io/alexgabriel225sefu-dotcom/apex-crypto:latest → Deploy. Add LICENSE_KEY and GROQ_API_KEY in Variables.');
-    if (m.includes('crash') || m.includes('restart') || m.includes('loop') || m.includes('eroare') || m.includes('error'))
-      return T('Daca botul tot restarteaza: 1) Verifica LICENSE_KEY. 2) Adauga GROQ_API_KEY in Railway. 3) Asteapta 2 minute — primele deploy-uri pot restart de 2-3 ori.', 'If the bot keeps restarting: 1) Check LICENSE_KEY is correct. 2) Add GROQ_API_KEY in Railway Variables. 3) Wait 2 minutes — first deploys can restart 2-3 times.');
+    // Keyword matching still accepts Romanian words, because visitors type them
+    // — but every answer comes back in English, like the rest of the platform.
+    if (m.includes('license') || m.includes('licenta') || m.includes('cheie') || m.includes('key'))
+      return `Your licence key is emailed the moment payment clears. Opening the Telegram link in that email activates your account — there is nothing to copy by hand. If it never arrived, check Spam, then email ${SUPPORT_EMAIL}.`;
+    if (m.includes('ctrader') || m.includes('broker') || m.includes('cont') || m.includes('account'))
+      return 'You connect your cTrader account from inside the platform, when it asks. A demo account is the default and is enough to see everything working.';
+    if (m.includes('demo') || m.includes('live') || m.includes('real money') || m.includes('bani reali'))
+      return 'Every account starts in demo. Moving to live money is a separate, deliberate step that you take yourself — nothing switches on its own.';
+    if (m.includes('crypto') || m.includes('bitcoin') || m.includes('btc') || m.includes('stock'))
+      return 'Execution covers forex pairs with a USD leg, plus metals. Crypto, indices and stock CFDs are not supported.';
+    if (m.includes('deploy') || m.includes('railway') || m.includes('docker') || m.includes('server'))
+      return 'There is nothing to deploy. The platform is hosted and managed — you open Telegram, and that is the whole setup.';
+    if (m.includes('trade') || m.includes('tranzac') || m.includes('no trades'))
+      return 'Normal early on. Forex moves at macro pace, so 0-3 positions a day is the expected rate — a quiet day is the strategy working, not a fault.';
     if (m.includes('hello') || m.includes('hi') || m.includes('hey') || m.includes('salut') || m.includes('buna') || m.includes('help'))
-      return T('Salut! Sunt asistentul Apex Trade Bot. Te pot ajuta cu: Railway setup, Telegram, erori, chei API. Ce problema ai?', 'Hi! I\'m the Apex Trade Bot assistant. I can help with: Railway setup, Telegram config, errors, API keys. What\'s your issue?');
+      return `This is the ${BRAND} assistant. I can help with activation, connecting your cTrader account, and moving from demo to live.`;
     if (m.includes('support') || m.includes('contact') || m.includes('email') || m.includes('suport'))
-      return T('Suport direct: supportaicashsystem@gmail.com. Include screenshot-uri cu erorile din Railway Logs.', 'Direct support: supportaicashsystem@gmail.com. Include screenshots of the errors from Railway Logs.');
-    if (m.includes('english') || m.includes('engleza') || m.includes('language') || m.includes('limba'))
-      return 'Yes, I speak English too! Ask me anything about the bot setup — Railway, Telegram, license key, Binance API, errors.';
-    return T('Pentru aceasta intrebare, contacteaza supportaicashsystem@gmail.com. Pot ajuta cu: Railway, Telegram, license key, Groq API, Binance.', 'For this question, contact supportaicashsystem@gmail.com. I can help with: Railway, Telegram, license key, Groq API, Binance setup.');
+      return `Direct support: ${SUPPORT_EMAIL}.`;
   }
 
   try {
@@ -189,7 +436,6 @@ app.get('/api/app-status', auth, (req, res) => res.json({
   ai_anthropic:    !!process.env.ANTHROPIC_API_KEY,
   ai_works:        !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY),
   email_works:     !!(process.env.BREVO_API_KEY || (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_PASS)),
-  digistore24_ipn: !!process.env.DIGISTORE24_IPN_PASSPHRASE,
   supabase:        !!process.env.SUPABASE_URL,
   verdict: !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) ? '✅ Aplicatia functioneaza complet' : '❌ Lipseste cheia AI — Wizard/Chat/Email nu merg'
 }));
@@ -210,16 +456,47 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY;
 const HEYGEN_KEY = process.env.HEYGEN_API_KEY;
 const CREATIFY_API_ID  = process.env.CREATIFY_API_ID  || '';
 const CREATIFY_API_KEY = process.env.CREATIFY_API_KEY || '';
+const _IS_PROD = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+
+// Every secret whose ABSENCE is unsafe or silently destructive, checked in ONE
+// pass so a failed boot names all of them at once. Failing on the first would
+// mean discovering the list one deploy at a time, with the service down in
+// between — which is precisely the outage this is meant to prevent.
+//
+// Deliberately NOT everything the service uses. A missing Stripe key breaks
+// checkout loudly and the site still serves; refusing to boot over it would
+// turn a degraded service into no service. These two are different: without
+// them the service keeps working while being WRONG.
+function _requireProductionSecrets() {
+  const required = [
+    ['JWT_SECRET',
+     'signs sessions AND derives the key that encrypts client bot configs at ' +
+     'rest (_botConfigKey). Generating one per process silently orphans every ' +
+     'stored config on restart and across instances.'],
+    ['BOT_EMAIL_SECRET',
+     'signs licence keys. Without it they are signed with a constant published ' +
+     'in this repository, so anyone reading the source can mint a valid ' +
+     'signature.'],
+  ];
+  const missing = required.filter(([k]) => !String(process.env[k] || '').trim());
+  if (!_IS_PROD || missing.length === 0) return;
+  console.error('\n[FATAL] This is production and required secrets are missing:\n');
+  for (const [k, why] of missing) console.error(`  • ${k} — ${why}\n`);
+  console.error('Set them in the Render dashboard, then redeploy. render.yaml\n' +
+                'already declares JWT_SECRET with generateValue: true.\n');
+  process.exit(1);
+}
+_requireProductionSecrets();
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   const fallback = require('crypto').randomBytes(32).toString('hex');
-  console.warn('[WARN] JWT_SECRET not set — generated random secret for this session. Sessions will reset on restart. Set JWT_SECRET in Render env vars.');
+  console.warn('[WARN] JWT_SECRET not set — generated a random secret for this DEV session. Sessions reset on restart and stored bot configs will not decrypt.');
   return fallback;
 })();
 const COOKIE_SECRET = process.env.COOKIE_SECRET || JWT_SECRET + '-cookie';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || 'supportaicashsystem@gmail.com';
-const SENDER_NAME  = process.env.SENDER_NAME  || 'AI Cash Systems';
+const SENDER_EMAIL = process.env.SENDER_EMAIL || process.env.BREVO_SMTP_USER || SUPPORT_EMAIL;
+const SENDER_NAME  = process.env.SENDER_NAME  || BRAND;
 
 // ── UNIVERSAL EMAIL SENDER ──────────────────────────────────
 // Priority: Resend → Brevo API → SMTP transporter
@@ -229,7 +506,8 @@ async function _sendEmail({ to, subject, html, fromName }) {
 
   // 1. Resend (fastest, works immediately)
   if (RESEND_API_KEY) {
-    // RESEND_FROM must be set to a verified Resend sender, e.g. "Apex Bot <bot@aicashsystem.space>"
+    // RESEND_FROM must be set to a verified Resend sender on the domain
+    // registered with Resend, e.g. "Apex4Traders <bot@your-verified-domain>"
     // Without it, emails may be blocked. Set RESEND_FROM in Render env vars.
     const resendFrom = process.env.RESEND_FROM;
     if (!resendFrom) { console.warn('[WARN] RESEND_FROM not set — Resend will likely reject the send. Set it to a verified sender.'); }
@@ -287,30 +565,7 @@ function _parseCookies(req) {
   });
   return out;
 }
-function _signAccess(plan) {
-  const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex');
-  return plan + '.' + sig;
-}
-function _verifyAccess(signed) {
-  if (!signed || !signed.includes('.')) return null;
-  const dot = signed.lastIndexOf('.');
-  const plan = signed.slice(0, dot);
-  const sig = signed.slice(dot + 1);
-  const expected = crypto.createHmac('sha256', COOKIE_SECRET).update(plan).digest('hex');
-  try {
-    if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
-  } catch { return null; }
-  return plan;
-}
-function requireCourse(minPlan) {
-  return (req, res, next) => {
-    const cookies = _parseCookies(req);
-    const plan = _verifyAccess(cookies.af_access || '');
-    if (!plan) return res.redirect('/access.html');
-    if (minPlan === 'pro' && plan !== 'pro') return res.redirect('/access.html');
-    next();
-  };
-}
+
 
 // ── CLIENTS (wrapped in try-catch so a bad key never crashes the server) ──
 let supabase = null;
@@ -335,7 +590,7 @@ try {
 } catch(e) { console.error('Nodemailer init error:', e.message); }
 
 // ── RECENT CLICK DEDUPE (ref|ip → ts) — collapse refreshes within 30 min so a
-// single visitor reloading the page doesn't inflate an affiliate's click count. ──
+// single visitor reloading the page doesn't inflate the visit count. ──
 const _recentClicks = new Map();
 const _CLICK_DEDUPE_MS = 30 * 60 * 1000;
 
@@ -344,6 +599,37 @@ const logs = [];
 function addLog(msg, type = 'info', status = 'success') {
   logs.unshift({ msg, type, status, time: new Date().toISOString() });
   if (logs.length > 200) logs.pop();
+}
+// Mask a customer email before it goes into the (dashboard-readable) log store.
+// A licence key is an entitlement credential: whoever holds one can claim the
+// product. It was being written into addLog() on grant, trial, activation,
+// sale and revocation — and those lines reach Render's log stream, any log
+// aggregator in front of it, support exports and screenshots. A log store is
+// not a credential store, and treating it as one means every future log leak
+// is also a licence leak.
+//
+// What is kept is enough to correlate an operational event with a customer:
+// the product prefix and the first group. For the current 26-character format
+// that discloses 25 bits and leaves 105 unguessable; for a legacy key it
+// discloses 20 of 60. Neither is usable as a credential, and both are
+// distinctive enough to answer "which licence was that" in a log.
+//
+// Deliberately NOT a hash: a stable SHA of the key is itself a durable
+// identifier an attacker can correlate across systems, and it invites someone
+// to build a rainbow table over a keyspace we control the format of.
+function _maskLicence(key) {
+  const s = String(key || '').trim();
+  if (!s) return '(none)';
+  const parts = s.split('-');
+  if (parts.length < 3) return s.slice(0, 4) + '****';     // unrecognised shape
+  return [parts[0], parts[1], ...parts.slice(2).map(() => '****')].join('-');
+}
+
+function _maskEmail(email) {
+  const s = String(email || '');
+  const at = s.indexOf('@');
+  if (at <= 0) return s ? '***' : '';
+  return `${s[0]}***${s.slice(at)}`;
 }
 
 // ── SIGNED TOKEN ──
@@ -400,7 +686,6 @@ const _licenseLimiter = rateLimit({ windowMs: 60*1000, max: 10, standardHeaders:
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase();
 const ADMIN_CODE  = process.env.ADMIN_CODE  || '';
-const COURSE_BYPASS_CODE = process.env.COURSE_BYPASS_CODE || '';
 if (!ADMIN_EMAIL || !ADMIN_CODE) console.warn('[WARN] ADMIN_EMAIL or ADMIN_CODE env var not set — admin login disabled');
 
 // POST /api/auth/login
@@ -618,7 +903,7 @@ async function sendNotifyEmail(to, automationName, userMsg, aiMsg) {
       <p style="font-size:11px;text-transform:uppercase;color:#E53E2E;margin-bottom:6px">AI Reply</p>
       <p style="font-size:14px;color:#222;line-height:1.6;margin:0">${_he(aiMsg).replace(/\n/g,'<br>')}</p>
     </div>
-    <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">AutoFlow · aicashsystem.space</p>
+    <p style="color:#ccc;font-size:11px;margin-top:18px;text-align:center">${BRAND}</p>
   </div>`;
   await _sendEmail({ to, subject, html });
 }
@@ -813,16 +1098,12 @@ app.post('/webhook/:webhookId', _webhookLimiter, async (req, res) => {
       aiReply = await callAI(automation.system_prompt, userMessage);
       if (automation.config?.callback_url) {
         try {
-          const _cbUrl = new URL(automation.config.callback_url);
-          if (!['http:','https:'].includes(_cbUrl.protocol)) throw new Error('bad protocol');
-          const _h = _cbUrl.hostname;
-          const _b = parseInt((_h.match(/^172\.(\d+)\./) || [])[1] || '0');
-          if (_h === 'localhost' || _h === '127.0.0.1' || _h === '0.0.0.0' || _h === '::1'
-            || _h.startsWith('169.254.') || _h.startsWith('10.') || _h.startsWith('192.168.')
-            || (_b >= 16 && _b <= 31)) throw new Error('private host');
+          await assertPublicHttpUrl(automation.config.callback_url);
           await fetch(automation.config.callback_url, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reply: aiReply, original: body })
+            body: JSON.stringify({ reply: aiReply, original: body }),
+            redirect: 'error',           // a 302 to 127.0.0.1 would bypass the check
+            signal: AbortSignal.timeout(10000),
           });
         } catch(cbErr) { console.error('Callback URL error:', cbErr.message); }
       }
@@ -1136,68 +1417,25 @@ app.get('/api/logs', auth, (req, res) => {
   res.json(logs.slice(0, 100));
 });
 
-// ════════════════════════════════════════
-// COURSE ACCESS ROUTES
-// ════════════════════════════════════════
 
-// POST /api/verify-code — verify course access code
-app.post('/api/verify-code', _codeLimiter, async (req, res) => {
-  const { code } = req.body;
-  if (!code) return res.status(400).json({ error: 'Access code required' });
-
-  // Owner bypass — requires COURSE_BYPASS_CODE env var to be set
-  if (COURSE_BYPASS_CODE && code.toUpperCase() === COURSE_BYPASS_CODE.toUpperCase()) {
-    const maxAge = 60 * 60 * 24 * 30;
-    const secure = process.env.NODE_ENV === 'production' || process.env.RENDER ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `af_access=${_signAccess('pro')}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
-    return res.json({ success: true, plan: 'pro', redirect: '/course-pro.html' });
-  }
-
-  try {
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('purchases')
-        .select('*')
-        .eq('code', code.toUpperCase())
-        .single();
-      if (data) {
-        const plan = data.plan || 'starter';
-        const maxAge = 60 * 60 * 24 * 30; // 30 days
-        const secure = process.env.NODE_ENV === 'production' || process.env.RENDER ? '; Secure' : '';
-        res.setHeader('Set-Cookie', `af_access=${_signAccess(plan)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`);
-        return res.json({ success: true, plan, redirect: plan === 'pro' ? '/course-pro.html' : '/course-starter.html' });
-      }
-    }
-    return res.status(401).json({ error: 'Invalid access code.' });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// GET /api/logout — clear course access cookie
-app.get('/api/logout', (req, res) => {
-  res.setHeader('Set-Cookie', 'af_access=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
-  res.redirect('/access.html');
-});
 
 // ── LICENSE KEY HELPERS ──────────────────────────────────────────────────────
-// Crypto keys:  APEX-XXXX-XXXX-XXXX  (verified by crypto bot only)
-// Forex keys:   FORX-XXXX-XXXX-XXXX  (verified by forex bot only)
-// Both use HMAC-SHA256 with product-specific salt embedded in the prefix.
+// Forex keys: FORX-XXXX-XXXX-XXXX — HMAC-SHA256 over a random body.
+// The retired crypto product's APEX- keys are no longer minted or verified:
+// the bot they unlocked does not exist, so accepting one would authorise
+// access to nothing.
 const _KEY_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars, no 0/O/1/I
-const _LIC_SALT       = 'apex-bot-2025-v1';   // crypto fallback — never changes
-const _FOREX_LIC_SALT = 'apex-forex-2025-v1'; // forex fallback — never changes
+// Pre-BOT_EMAIL_SECRET keys were signed with this constant. It is published in
+// this repository, so anyone reading the source can forge a signature with it —
+// which is why it is NOT usable for signing and startup refuses it in
+// production (see _requireProductionSecrets). It survives only so that a key
+// issued back then can still be RECOGNISED in development; the licences row,
+// not the signature, is what actually authorises anything.
+const _LEGACY_LIC_SALT = 'apex-forex-2025-v1';
 
-function _licSecrets(product = 'apex-bot') {
+function _licSecrets(product = 'apex-forex') {
   const env = process.env.BOT_EMAIL_SECRET;
-  const salt = product === 'apex-forex' ? _FOREX_LIC_SALT : _LIC_SALT;
-  // When BOT_EMAIL_SECRET is set, ONLY the env-derived secret is trusted for
-  // HMAC signing/verification. The hardcoded salt is deliberately dropped so
-  // that anyone who can read this source cannot forge valid keys. Legacy keys
-  // signed with the salt (issued before BOT_EMAIL_SECRET existed) still pass
-  // through the Supabase fallback in /api/verify-license, because every real
-  // buyer's key is stored active in the licenses table.
-  return env ? [`${env}-${product}`] : [salt];
+  return env ? [`${env}-${product}`] : [_LEGACY_LIC_SALT];
 }
 
 function _hmacMac4(data, secret) {
@@ -1205,92 +1443,83 @@ function _hmacMac4(data, secret) {
   return [0, 1, 2, 3].map(i => _KEY_CHARS[mac[i] % 32]).join('');
 }
 
+// How much of a licence key is actually unguessable.
+//
+// The old key carried EIGHT characters of randomness. It looked like 64 bits
+// because it started from crypto.randomBytes(8), but `b % 32` keeps only five
+// bits of each byte and discards the other three — so the real figure was
+// 8 x 5 = 40 BITS. About a trillion keys: too few to rely on, and the sort of
+// number that looks fine until someone counts it.
+//
+// New keys carry 26 characters, which is 130 bits. The alphabet has exactly
+// 32 symbols and a byte has 256 values, so `% 32` divides evenly and every
+// symbol stays equally likely — a modulo that does not divide evenly is how a
+// "random" identifier quietly develops a bias.
+//
+// The trailing four characters are a checksum, not entropy, and are not
+// counted above. They exist so a mistyped key fails immediately rather than
+// after a database round trip.
+const _KEY_RANDOM_CHARS = 26;          // 26 x 5 = 130 bits
+const _KEY_MAC_CHARS = 4;
+
+function _randomKeyChars(n) {
+  // One byte per symbol, straight from the OS CSPRNG. Never Math.random,
+  // never a timestamp, never a counter: all three are predictable to anyone
+  // who knows roughly when a key was issued.
+  return Array.from(crypto.randomBytes(n)).map(b => _KEY_CHARS[b % 32]).join('');
+}
+
+function _groups(str, size) {
+  const out = [];
+  for (let i = 0; i < str.length; i += size) out.push(str.slice(i, i + size));
+  return out;
+}
+
 function _generateKey(prefix, product) {
   const secret = _licSecrets(product)[0];
-  const buf = crypto.randomBytes(8);
-  const rnd8 = Array.from(buf).map(b => _KEY_CHARS[b % 32]).join('');
-  const mac4 = _hmacMac4(rnd8, secret);
-  const full = rnd8 + mac4;
-  return `${prefix}-${full.slice(0, 4)}-${full.slice(4, 8)}-${full.slice(8, 12)}`;
+  const rnd = _randomKeyChars(_KEY_RANDOM_CHARS);
+  const full = rnd + _hmacMac4(rnd, secret);
+  return `${prefix}-${_groups(full, 5).join('-')}`;
 }
 
-function generateLicenseKey() { return _generateKey('APEX', 'apex-bot'); }
 function generateForexKey()   { return _generateKey('FORX', 'apex-forex'); }
 
-// Returns { valid, product } — product is 'apex-bot' | 'apex-forex' | null
+// Constant-time string comparison. `===` on a MAC returns as soon as two
+// characters differ, which leaks how much of a guess was correct.
+function _macEqual(a, b) {
+  const ba = Buffer.from(String(a), 'utf8');
+  const bb = Buffer.from(String(b), 'utf8');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+// Returns { valid, product, legacy } — product is 'apex-forex' | null.
+//
+// Both key lengths are accepted so that keys already issued keep working;
+// `legacy` says which one was presented, so a caller can tell the holder to
+// re-issue. Everything minted from here on is the long form.
 function verifyLicenseKeyHmac(key) {
-  if (!key) return { valid: false, product: null };
-  const k = key.toUpperCase();
-  const prefixMap = { APEX: 'apex-bot', FORX: 'apex-forex' };
+  if (!key) return { valid: false, product: null, legacy: false };
+  const k = String(key).toUpperCase().trim();
+  const prefixMap = { FORX: 'apex-forex' };
   for (const [prefix, product] of Object.entries(prefixMap)) {
-    const re = new RegExp(`^${prefix}-([A-Z2-9]{4})-([A-Z2-9]{4})-([A-Z2-9]{4})$`);
-    const m = k.match(re);
-    if (!m) continue;
-    const full = m[1] + m[2] + m[3];
-    const data = full.slice(0, 8), given = full.slice(8, 12);
-    if (_licSecrets(product).some(s => _hmacMac4(data, s) === given)) return { valid: true, product };
+    if (!k.startsWith(prefix + '-')) continue;
+    const body = k.slice(prefix.length + 1).split('-').join('');
+    if (!/^[A-Z2-9]+$/.test(body)) continue;
+
+    const expected = _KEY_RANDOM_CHARS + _KEY_MAC_CHARS;   // 30, current
+    const legacyLen = 8 + _KEY_MAC_CHARS;                  // 12, pre-2026
+    if (body.length !== expected && body.length !== legacyLen) continue;
+
+    const data = body.slice(0, body.length - _KEY_MAC_CHARS);
+    const given = body.slice(-_KEY_MAC_CHARS);
+    if (_licSecrets(product).some(sec => _macEqual(_hmacMac4(data, sec), given))) {
+      return { valid: true, product, legacy: body.length === legacyLen };
+    }
   }
-  return { valid: false, product: null };
+  return { valid: false, product: null, legacy: false };
 }
 
-// ── AFFILIATE / REFERRAL SYSTEM ──────────────────────────────────────────────
-// Program policy. Bump TERMS_VERSION whenever the affiliate terms change so we
-// can tell who accepted which version.
-const AFFILIATE_TERMS_VERSION = '2026-06-16';
-const REFUND_WINDOW_DAYS = 14;   // commission only matures (becomes payable) after this
-const MIN_PAYOUT_CENTS   = 5000; // $50 minimum before a payout can be requested
-function _generateAffiliateCode(name) {
-  const slug = (name || 'creator').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 10) || 'creator';
-  return `${slug}${crypto.randomBytes(2).toString('hex')}`;
-}
-function _hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
-  return `${salt}:${hash}`;
-}
-function _verifyPassword(password, stored) {
-  if (!stored || !stored.includes(':')) return false;
-  const [salt, hash] = stored.split(':');
-  const check = crypto.scryptSync(String(password), salt, 64).toString('hex');
-  try { return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(check, 'hex')); } catch { return false; }
-}
-function _affiliateLink(code) { return `https://aicashsystem.space/?ref=${code}`; }
-// Resolve the logged-in affiliate code from a Bearer token; null if invalid.
-function _affiliateFromAuth(req) {
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const payload = verifyToken(token);
-  if (!payload || !payload.id) return null;
-  return String(payload.id).toLowerCase().trim();
-}
-
-// GET /api/affiliates/click?ref=CODE — count a referral-link visit.
-// Fired by the landing page when it sees ?ref=. Validates the code exists, then
-// inserts one row (atomic, no lost updates). Deduped per visitor for 30 min.
-app.get('/api/affiliates/click', async (req, res) => {
-  const ref = String(req.query.ref || '').toLowerCase().trim().slice(0, 40);
-  if (!ref || !supabase) return res.json({ ok: false });
-  const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim();
-  const dedupeKey = `${ref}|${ip}`;
-  const now = Date.now();
-  const last = _recentClicks.get(dedupeKey);
-  if (last && now - last < _CLICK_DEDUPE_MS) return res.json({ ok: true, deduped: true });
-  _recentClicks.set(dedupeKey, now);
-  // Opportunistic cleanup so the map doesn't grow unbounded.
-  if (_recentClicks.size > 5000) {
-    for (const [k, t] of _recentClicks) if (now - t > _CLICK_DEDUPE_MS) _recentClicks.delete(k);
-  }
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code').eq('code', ref).maybeSingle();
-    if (aff) await supabase.from('affiliate_clicks').insert([{ affiliate_code: ref }]);
-  } catch (e) { /* clicks are best-effort analytics — never block the visitor */ }
-  res.json({ ok: true });
-});
-
-// POST /api/lead — { email, ref, source } capture a lead from the free funnel.
-// Cold DM traffic rarely buys on the first click; this captures the contact so
-// it can be nurtured to the sale. Best-effort store (leads table may not exist);
-// never blocks the visitor. Affiliate ref is preserved for attribution.
 app.post('/api/lead', _authLimiter, async (req, res) => {
   const email = String((req.body && req.body.email) || '').toLowerCase().trim().slice(0, 200);
   const ref = String((req.body && req.body.ref) || '').toLowerCase().trim().slice(0, 40);
@@ -1303,499 +1532,64 @@ app.post('/api/lead', _authLimiter, async (req, res) => {
       await supabase.from('leads').insert([{ email, ref: ref || null, source }]);
     }
   } catch (e) { /* leads table optional — never block the visitor */ }
-  // Fire the affiliate click too, so a lead from an affiliate link is attributed.
-  try {
-    if (supabase && ref) {
-      const { data: aff } = await supabase.from('affiliates').select('code').eq('code', ref).maybeSingle();
-      if (aff) await supabase.from('affiliate_clicks').insert([{ affiliate_code: ref }]);
-    }
-  } catch (e) { /* best-effort */ }
   console.log(`[LEAD] ${email}${ref ? ' (ref ' + ref + ')' : ''} via ${source}`);
   res.json({ ok: true });
 });
 
-// POST /api/affiliates/apply — { name, email, tiktokHandle } -> { code, link }
-app.post('/api/affiliates/apply', _authLimiter, async (req, res) => {
-  const { name, email, tiktokHandle } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const cleanEmail = email.toLowerCase().trim();
-  try {
-    const { data: existing } = await supabase.from('affiliates').select('code').eq('email', cleanEmail).maybeSingle();
-    if (existing?.code) return res.json({ code: existing.code, link: `https://aicashsystem.space/?ref=${existing.code}` });
-
-    let code;
-    for (let attempts = 0; attempts < 5; attempts++) {
-      code = _generateAffiliateCode(name);
-      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
-      if (!clash) break;
-    }
-    const { error } = await supabase.from('affiliates').insert([{
-      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active'
-    }]);
-    if (error) return res.status(500).json({ error: error.message });
-    addLog(`New affiliate: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
-    res.json({ code, link: `https://aicashsystem.space/?ref=${code}` });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Telegram tracking-bot bridge ─────────────────────────────────────────────
-// Affiliates sign up on the site (name+email) and then open the Telegram bot,
-// which generates their link and tracks sales. The deep-link carries a signed
-// connect token = hmac12(code) + code, so the bot can prove which affiliate it is.
-const AFFILIATE_BOT_USERNAME = process.env.AFFILIATE_BOT_USERNAME || 'AICASHSYSTEM_REF_BOT';
-const AFFILIATE_BOT_SECRET   = process.env.AFFILIATE_BOT_SECRET || process.env.JWT_SECRET || 'apex-affiliate-bridge';
-function _affConnectSig(code) {
-  return crypto.createHmac('sha256', AFFILIATE_BOT_SECRET).update(String(code)).digest('hex').slice(0, 12);
-}
-function _affConnectToken(code) { return _affConnectSig(code) + code; }
-function _affCodeFromToken(token) {
-  const t = String(token || '');
-  if (t.length < 15) return null;            // 12 sig + >=3 code
-  const sig = t.slice(0, 12), code = t.slice(12);
-  return _affConnectSig(code) === sig ? code : null;
-}
-function _affTelegramUrl(code) {
-  return `https://t.me/${AFFILIATE_BOT_USERNAME}?start=${_affConnectToken(code)}`;
-}
-
-// POST /api/affiliates/start — { name, email } -> { code, telegramUrl }
-// Creates (or re-uses) the affiliate, then hands off to the Telegram bot.
-app.post('/api/affiliates/start', _authLimiter, async (req, res) => {
-  const { name, email } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  if (!supabase) return res.status(500).json({ error: 'Affiliate system is not configured yet. Please try again later.' });
-  const cleanEmail = email.toLowerCase().trim();
-  try {
-    let code;
-    const { data: existing } = await supabase.from('affiliates').select('code').eq('email', cleanEmail).maybeSingle();
-    if (existing?.code) {
-      code = existing.code;
-    } else {
-      for (let attempts = 0; attempts < 5; attempts++) {
-        code = _generateAffiliateCode(name);
-        const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
-        if (!clash) break;
-      }
-      const { error } = await supabase.from('affiliates').insert([{
-        code, email: cleanEmail, name: name || '', status: 'active',
-        terms_accepted_at: new Date().toISOString(), terms_version: AFFILIATE_TERMS_VERSION
-      }]);
-      if (error) return res.status(500).json({ error: error.message });
-      addLog(`New affiliate (Telegram flow): ${cleanEmail} — code ${code}`, 'affiliate', 'success');
-    }
-    res.json({ code, telegramUrl: _affTelegramUrl(code), botUsername: AFFILIATE_BOT_USERNAME });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Notify an affiliate on Telegram when one of their referrals buys.
-// Alerts the owner on Telegram when a paying customer might not have gotten
-// their license email — the D24 IPN itself still returns 'OK' in that case
-// (the payment really did go through), so Digistore24 won't retry it and
-// nothing else will surface the failure.
-async function _notifyAdminAlert(text) {
-  const botToken = process.env.AFFILIATE_BOT_TOKEN;
-  const chatId = process.env.ADMIN_CHAT_ID || '7585109158';
-  if (!botToken) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text })
-    });
-  } catch (e) { addLog(`Admin TG alert error: ${e.message}`, 'system', 'warn'); }
-}
-
-async function _notifyAffiliateSale(code, product, commissionCents) {
-  const botToken = process.env.AFFILIATE_BOT_TOKEN;
-  if (!botToken || !supabase) return;
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('telegram_chat_id').eq('code', code).maybeSingle();
-    if (!aff || !aff.telegram_chat_id) return;
-    const prod = product === 'apex-forex' ? 'Forex bot ($497)' : 'Crypto bot ($297)';
-    const text = `🎉 New sale! You just earned $${(commissionCents / 100).toFixed(2)} on the ${prod}.\n\nSend /stats to see your totals.`;
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: aff.telegram_chat_id, text })
-    });
-  } catch (e) { addLog(`Affiliate TG notify error: ${e.message}`, 'affiliate', 'warn'); }
-}
-
-// POST /api/affiliates/telegram-link — bot links a Telegram chat to an affiliate.
-// Body: { token, chatId, secret }. Returns { code, name, link }.
-app.post('/api/affiliates/telegram-link', async (req, res) => {
-  const { token, chatId, secret } = req.body || {};
-  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  if (!supabase) return res.status(500).json({ error: 'not configured' });
-  const code = _affCodeFromToken(token);
-  if (!code) return res.status(400).json({ error: 'invalid token' });
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code,name').eq('code', code).maybeSingle();
-    if (!aff) return res.status(404).json({ error: 'affiliate not found' });
-    const { data: updated, error: updateErr } = await supabase
-      .from('affiliates').update({ telegram_chat_id: String(chatId) }).eq('code', code).select('code');
-    console.log(`[tg-link] code=${code} chatId=${chatId} updated=${JSON.stringify(updated)} err=${updateErr?.message}`);
-    if (updateErr) return res.status(500).json({ error: 'link failed: ' + updateErr.message });
-    if (!updated || updated.length === 0) return res.status(500).json({ error: 'link failed: no rows updated' });
-    addLog(`Affiliate linked Telegram: ${code} -> chat ${chatId}`, 'affiliate', 'success');
-    res.json({ ok: true, code, name: aff.name || '', link: _affiliateLink(code) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST /api/affiliates/telegram-stats — bot fetches a linked affiliate's stats.
-// Body: { chatId, secret }. Returns earnings + recent sales (or { linked:false }).
-app.post('/api/affiliates/telegram-stats', async (req, res) => {
-  const { chatId, secret } = req.body || {};
-  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  if (!supabase) return res.status(500).json({ error: 'not configured' });
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code,name,commission_percent').eq('telegram_chat_id', String(chatId)).maybeSingle();
-    console.log(`[tg-stats] chatId=${chatId} found=${!!aff} code=${aff?.code}`);
-    if (!aff) return res.json({ linked: false });
-    const { data } = await supabase.from('referral_sales').select('commission_amount,paid,refunded,created_at,product').eq('affiliate_code', aff.code).order('created_at', { ascending: false });
-    const rows = data || [];
-    const now = Date.now(), windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    let available = 0, pending = 0, paid = 0, sales = 0;
-    rows.forEach(r => {
-      if (r.refunded) return;
-      sales++;
-      if (r.paid) paid += r.commission_amount;
-      else if (new Date(r.created_at).getTime() + windowMs <= now) available += r.commission_amount;
-      else pending += r.commission_amount;
-    });
-    // Link clicks + conversion rate (best-effort — table may not exist yet).
-    let clicks = 0;
+async function _notifyAdminAlert(text, subject = `${BRAND} — alert`) {
+  const hook = process.env.MAKE_ALERT_WEBHOOK;
+  if (hook) {
     try {
-      const { count } = await supabase.from('affiliate_clicks')
-        .select('id', { count: 'exact', head: true }).eq('affiliate_code', aff.code);
-      clicks = count || 0;
-    } catch (e) { /* clicks table optional */ }
-    const conversionPct = clicks > 0 ? Math.round((sales / clicks) * 1000) / 10 : 0;
-    res.json({
-      linked: true, code: aff.code, name: aff.name || '', link: _affiliateLink(aff.code),
-      commissionPercent: aff.commission_percent, totalSales: sales,
-      clicks, conversionPct,
-      availableCents: available, pendingCents: pending, paidCents: paid,
-      minPayoutCents: MIN_PAYOUT_CENTS, refundWindowDays: REFUND_WINDOW_DAYS,
-      recent: rows.slice(0, 5).map(r => ({ product: r.product, commission: r.commission_amount, paid: r.paid, refunded: !!r.refunded, date: r.created_at }))
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+      const r = await fetch(hook, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, text, site: BRAND, at: new Date().toISOString() }),
+        signal: AbortSignal.timeout(10000)
+      });
+      if (r.ok) return;
+      addLog(`Admin alert: Make webhook rejected (HTTP ${r.status}) — trying next channel`, 'system', 'warn');
+    } catch (e) { addLog(`Admin alert: Make webhook error: ${e.message} — trying next channel`, 'system', 'warn'); }
+  }
 
-// POST /api/affiliates/admin-list — bot fetches all affiliates + their sales for admin view.
-// Body: { secret }. Gated by AFFILIATE_BOT_SECRET; bot enforces admin chat_id check.
-app.post('/api/affiliates/admin-list', async (req, res) => {
-  const { secret } = req.body || {};
-  if (secret !== AFFILIATE_BOT_SECRET) return res.status(403).json({ error: 'forbidden' });
-  if (!supabase) return res.status(500).json({ error: 'not configured' });
+  // No hardcoded operator identity. These used to fall back to one person's
+  // Telegram id and personal email address, which meant an unconfigured
+  // deployment silently delivered another operator's payment and licence
+  // alerts to them — and made ADMIN_CHAT_ID look optional when it is not.
+  const botToken = process.env.AFFILIATE_BOT_TOKEN;
+  const adminChatId = process.env.ADMIN_CHAT_ID;
+  if (botToken && adminChatId) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: adminChatId, text }),
+        signal: AbortSignal.timeout(10000)
+      });
+      if (r.ok) return;
+      addLog(`Admin alert: Telegram rejected (HTTP ${r.status}) — trying email`, 'system', 'warn');
+    } catch (e) { addLog(`Admin alert: Telegram error: ${e.message} — trying email`, 'system', 'warn'); }
+  }
+
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    // Loud, because an alert nobody receives is worse than no alert system:
+    // the operator believes they are being told about failed fulfilments.
+    addLog('Admin alert UNDELIVERABLE — no ADMIN_CHAT_ID and no ADMIN_EMAIL configured. ' +
+           `Alert text: ${text.slice(0, 200)}`, 'system', 'error');
+    return;
+  }
   try {
-    const { data: affs } = await supabase.from('affiliates').select('code,name,email,status,commission_percent,created_at').order('created_at', { ascending: false });
-    const { data: sales } = await supabase.from('referral_sales').select('affiliate_code,commission_amount,paid,refunded,product');
-    const salesByCode = {};
-    (sales || []).forEach(s => {
-      if (!salesByCode[s.affiliate_code]) salesByCode[s.affiliate_code] = { total: 0, paid: 0, pending: 0, refunded: 0 };
-      const b = salesByCode[s.affiliate_code];
-      if (s.refunded) { b.refunded++; return; }
-      b.total++;
-      if (s.paid) b.paid += s.commission_amount;
-      else b.pending += s.commission_amount;
+    const res = await _sendEmail({
+      to: adminEmail, subject, fromName: BRAND,
+      html: `<pre style="font:14px/1.6 -apple-system,Segoe UI,sans-serif;white-space:pre-wrap">${_he(text)}</pre>`
     });
-    res.json({ ok: true, affiliates: (affs || []).map(a => ({ ...a, sales: salesByCode[a.code] || { total: 0, paid: 0, pending: 0, refunded: 0 } })) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Reserved codes that must never become an affiliate handle (they collide with
-// real query-string flags or look like system values).
-const _RESERVED_CODES = new Set(['ref','admin','api','www','direct','intro','affiliate','login','signup','apex','forex','crypto']);
-// Validate a user-chosen affiliate handle. Returns { ok, code } or { ok:false, error }.
-// Pattern: letters, numbers, _ and - only.
-function _validateCustomCode(raw) {
-  const code = String(raw || '').toLowerCase().trim();
-  if (!/^[a-z0-9_-]{3,20}$/.test(code)) return { ok: false, error: 'Your link name must be 3–20 characters: letters, numbers, - or _ only (no spaces).' };
-  if (_RESERVED_CODES.has(code)) return { ok: false, error: 'That name is reserved — please choose another.' };
-  return { ok: true, code };
+    if (!res.ok) addLog(`Admin alert undeliverable on every channel: ${res.error}`, 'system', 'error');
+  } catch (e) { addLog(`Admin alert email error: ${e.message}`, 'system', 'error'); }
 }
 
-// POST /api/affiliates/signup — { name, email, password, code, tiktokHandle, acceptTerms } -> { token, code, link }
-app.post('/api/affiliates/signup', _authLimiter, async (req, res) => {
-  const { name, email, password, tiktokHandle, code: wantCode, acceptTerms } = req.body || {};
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address' });
-  if (!password || String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  if (acceptTerms !== true) return res.status(400).json({ error: 'You must accept the Affiliate Program Terms to continue.' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const cleanEmail = email.toLowerCase().trim();
-  const nowIso = new Date().toISOString();
-  // The affiliate chooses their own link name; fall back to an auto code if none given.
-  let customCode = null;
-  if (wantCode != null && String(wantCode).trim() !== '') {
-    const v = _validateCustomCode(wantCode);
-    if (!v.ok) return res.status(400).json({ error: v.error });
-    customCode = v.code;
-  }
-  try {
-    const { data: existing } = await supabase.from('affiliates').select('code,password_hash').eq('email', cleanEmail).maybeSingle();
-    const pwHash = _hashPassword(password);
-    if (existing?.code) {
-      if (existing.password_hash) return res.status(409).json({ error: 'An account with this email already exists. Please log in.' });
-      // Claim a pre-existing (passwordless) affiliate row created before auth existed.
-      const { data: claimed, error: claimErr } = await supabase.from('affiliates')
-        .update({ password_hash: pwHash, name: name || '', tiktok_handle: tiktokHandle || '', terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION })
-        .eq('code', existing.code).select('code,password_hash');
-      if (claimErr) return res.status(500).json({ error: claimErr.message });
-      if (!claimed || !claimed.length || !claimed[0].password_hash) return res.status(500).json({ error: 'Could not save your password. Please try again or contact support.' });
-      addLog(`Affiliate claimed account: ${cleanEmail} — code ${existing.code}`, 'affiliate', 'success');
-      return res.json({ token: createToken({ id: existing.code, email: cleanEmail }), code: existing.code, link: _affiliateLink(existing.code) });
-    }
-    let code;
-    if (customCode) {
-      const { data: clash } = await supabase.from('affiliates').select('code').eq('code', customCode).maybeSingle();
-      if (clash) return res.status(409).json({ error: 'That link name is already taken — please choose another.' });
-      code = customCode;
-    } else {
-      for (let attempts = 0; attempts < 5; attempts++) {
-        code = _generateAffiliateCode(name);
-        const { data: clash } = await supabase.from('affiliates').select('code').eq('code', code).maybeSingle();
-        if (!clash) break;
-      }
-    }
-    const { error } = await supabase.from('affiliates').insert([{
-      code, email: cleanEmail, name: name || '', tiktok_handle: tiktokHandle || '', status: 'active', password_hash: pwHash,
-      terms_accepted_at: nowIso, terms_version: AFFILIATE_TERMS_VERSION
-    }]);
-    if (error) {
-      if (String(error.message || '').toLowerCase().includes('duplicate')) return res.status(409).json({ error: 'That link name is already taken — please choose another.' });
-      return res.status(500).json({ error: error.message });
-    }
-    addLog(`New affiliate signup: ${cleanEmail} — code ${code}`, 'affiliate', 'success');
-    res.json({ token: createToken({ id: code, email: cleanEmail }), code, link: _affiliateLink(code) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/affiliates/login — { email, password } -> { token, code, link }
-app.post('/api/affiliates/login', _authLimiter, async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const cleanEmail = email.toLowerCase().trim();
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('code,password_hash,status').eq('email', cleanEmail).maybeSingle();
-    if (!aff || !aff.password_hash || !_verifyPassword(password, aff.password_hash)) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-    if (aff.status !== 'active') return res.status(403).json({ error: 'This account is suspended.' });
-    res.json({ token: createToken({ id: aff.code, email: cleanEmail }), code: aff.code, link: _affiliateLink(aff.code) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/affiliates/me — dashboard data for the logged-in affiliate (Bearer token)
-app.get('/api/affiliates/me', async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = _affiliateFromAuth(req);
-  if (!code) return res.status(401).json({ error: 'Not authenticated' });
-  try {
-    const { data: affiliate, error: affErr } = await supabase.from('affiliates').select('code,name,email,commission_percent,status,payout_method,payout_details').eq('code', code).maybeSingle();
-    if (affErr) { addLog(`Affiliate /me lookup error for code "${code}": ${affErr.message}`, 'affiliate', 'error'); return res.status(500).json({ error: affErr.message }); }
-    if (!affiliate) { addLog(`Affiliate /me: no row found for code "${code}"`, 'affiliate', 'warn'); return res.status(404).json({ error: `Affiliate not found (code: ${code})` }); }
-    const { data: pendingReq } = await supabase.from('payout_requests').select('amount_cents,requested_at').eq('affiliate_code', code).eq('status', 'requested').order('requested_at', { ascending: false }).maybeSingle();
-    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,refunded,product,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
-    const rows = data || [];
-    const now = Date.now();
-    const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    // Commission lifecycle: pending (inside refund window) -> available (matured, payable)
-    // -> paid. A refund/chargeback flips the sale to refunded and the commission is clawed back.
-    let availableCents = 0, pendingCents = 0, paidCents = 0, refundedCents = 0, validCount = 0;
-    const sales = rows.map(r => {
-      let status;
-      if (r.refunded) { status = 'refunded'; refundedCents += r.commission_amount; }
-      else {
-        validCount++;
-        if (r.paid) { status = 'paid'; paidCents += r.commission_amount; }
-        else if (new Date(r.created_at).getTime() + windowMs <= now) { status = 'available'; availableCents += r.commission_amount; }
-        else { status = 'pending'; pendingCents += r.commission_amount; }
-      }
-      return { amount: r.amount, commission: r.commission_amount, paid: r.paid, refunded: !!r.refunded, status, product: r.product, date: r.created_at };
-    });
-    res.json({
-      code: affiliate.code, name: affiliate.name, email: affiliate.email,
-      commissionPercent: affiliate.commission_percent, status: affiliate.status,
-      link: _affiliateLink(affiliate.code),
-      totalSales: validCount,
-      availableCommissionCents: availableCents,
-      pendingCommissionCents: pendingCents,
-      paidCommissionCents: paidCents,
-      refundedCommissionCents: refundedCents,
-      totalCommissionCents: availableCents + pendingCents + paidCents,
-      minPayoutCents: MIN_PAYOUT_CENTS,
-      refundWindowDays: REFUND_WINDOW_DAYS,
-      payoutMethod: affiliate.payout_method || '',
-      payoutDetails: affiliate.payout_details || '',
-      pendingPayout: pendingReq ? { amountCents: pendingReq.amount_cents, requestedAt: pendingReq.requested_at } : null,
-      sales
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Compute an affiliate's available (matured, unpaid, non-refunded) commission in cents.
-function _availableFromSales(rows) {
-  const now = Date.now();
-  const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-  let available = 0;
-  (rows || []).forEach(r => {
-    if (!r.refunded && !r.paid && new Date(r.created_at).getTime() + windowMs <= now) available += r.commission_amount;
-  });
-  return available;
-}
-function _validatePayout(method, details) {
-  const m = String(method || '').toLowerCase().trim();
-  if (!['paypal', 'bank', 'crypto'].includes(m)) return { ok: false, error: 'Choose a payout method: PayPal, bank or crypto.' };
-  const d = String(details || '').trim();
-  if (d.length < 3 || d.length > 200) return { ok: false, error: 'Enter valid payout details (3–200 characters).' };
-  return { ok: true, method: m, details: d };
-}
-
-// POST /api/affiliates/payout-method — save where the affiliate wants to be paid
-app.post('/api/affiliates/payout-method', _authLimiter, async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = _affiliateFromAuth(req);
-  if (!code) return res.status(401).json({ error: 'Not authenticated' });
-  const v = _validatePayout(req.body?.method, req.body?.details);
-  if (!v.ok) return res.status(400).json({ error: v.error });
-  try {
-    const { error } = await supabase.from('affiliates').update({ payout_method: v.method, payout_details: v.details }).eq('code', code);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ ok: true, method: v.method, details: v.details });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// POST /api/affiliates/request-payout — request payment of the current available balance
-app.post('/api/affiliates/request-payout', _authLimiter, async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = _affiliateFromAuth(req);
-  if (!code) return res.status(401).json({ error: 'Not authenticated' });
-  try {
-    const { data: aff } = await supabase.from('affiliates').select('payout_method,payout_details,status').eq('code', code).maybeSingle();
-    if (!aff) return res.status(404).json({ error: 'Affiliate not found' });
-    if (aff.status !== 'active') return res.status(403).json({ error: 'This account is suspended.' });
-    if (!aff.payout_method || !aff.payout_details) return res.status(400).json({ error: 'Add your payout method first.' });
-    const { data: pending } = await supabase.from('payout_requests').select('id').eq('affiliate_code', code).eq('status', 'requested').maybeSingle();
-    if (pending) return res.status(409).json({ error: 'You already have a payout request pending.' });
-    const { data: sales } = await supabase.from('referral_sales').select('commission_amount,paid,refunded,created_at').eq('affiliate_code', code);
-    const available = _availableFromSales(sales);
-    if (available < MIN_PAYOUT_CENTS) return res.status(400).json({ error: `You need at least $${(MIN_PAYOUT_CENTS / 100).toFixed(0)} available to request a payout.` });
-    const { error } = await supabase.from('payout_requests').insert([{ affiliate_code: code, amount_cents: available, method: aff.payout_method, details: aff.payout_details, status: 'requested' }]);
-    if (error) return res.status(500).json({ error: error.message });
-    addLog(`Payout requested: ${code} — $${(available / 100).toFixed(2)} via ${aff.payout_method}`, 'affiliate', 'info');
-    res.json({ ok: true, amountCents: available });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── OWNER PAYOUT ADMIN (protected by BOT_EMAIL_SECRET) ──
-function _ownerSecretOk(req) {
-  const secret = req.query.secret || req.headers['x-owner-secret'];
-  return process.env.BOT_EMAIL_SECRET && secret === process.env.BOT_EMAIL_SECRET;
-}
-function _csvCell(v) { const s = (v == null ? '' : String(v)).replace(/"/g, '""'); return /[",\n]/.test(s) ? `"${s}"` : s; }
-
-// GET /api/admin/payout-requests.csv?secret=... — export payout requests for the accountant
-app.get('/api/admin/payout-requests.csv', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const { data: reqs } = await supabase.from('payout_requests').select('*').order('requested_at', { ascending: false });
-  const { data: affs } = await supabase.from('affiliates').select('code,name,email');
-  const map = {}; (affs || []).forEach(a => { map[a.code] = a; });
-  const header = ['id', 'requested_at', 'affiliate_code', 'name', 'email', 'amount_usd', 'method', 'details', 'status', 'processed_at', 'note'];
-  const lines = [header.join(',')];
-  (reqs || []).forEach(r => {
-    const a = map[r.affiliate_code] || {};
-    lines.push([r.id, r.requested_at, r.affiliate_code, a.name || '', a.email || '', (r.amount_cents / 100).toFixed(2), r.method || '', r.details || '', r.status, r.processed_at || '', r.note || ''].map(_csvCell).join(','));
-  });
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="payout-requests.csv"');
-  res.send(lines.join('\n'));
-});
-
-// GET /api/admin/sales.csv?secret=... — export every referral sale for the accountant
-app.get('/api/admin/sales.csv', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const { data } = await supabase.from('referral_sales').select('created_at,affiliate_code,product,amount,commission_amount,paid,refunded,payment_intent_id').order('created_at', { ascending: false });
-  const header = ['date', 'affiliate_code', 'product', 'sale_usd', 'commission_usd', 'paid', 'refunded', 'payment_intent_id'];
-  const lines = [header.join(',')];
-  (data || []).forEach(r => {
-    lines.push([r.created_at, r.affiliate_code, r.product || '', (r.amount / 100).toFixed(2), (r.commission_amount / 100).toFixed(2), r.paid ? 'yes' : 'no', r.refunded ? 'yes' : 'no', r.payment_intent_id || ''].map(_csvCell).join(','));
-  });
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="affiliate-sales.csv"');
-  res.send(lines.join('\n'));
-});
-
-// POST /api/admin/payouts/:id/paid?secret=... — mark a payout request paid + settle the sales
-app.post('/api/admin/payouts/:id/paid', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  try {
-    const { data: pr } = await supabase.from('payout_requests').select('*').eq('id', req.params.id).maybeSingle();
-    if (!pr) return res.status(404).json({ error: 'Payout request not found' });
-    if (pr.status === 'paid') return res.json({ ok: true, already: true });
-    // Settle matured, unpaid, non-refunded sales oldest-first until the paid amount is covered.
-    const { data: sales } = await supabase.from('referral_sales').select('id,commission_amount,created_at')
-      .eq('affiliate_code', pr.affiliate_code).eq('paid', false).eq('refunded', false).order('created_at', { ascending: true });
-    const now = Date.now(); const windowMs = REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-    let acc = 0; const ids = [];
-    for (const s of (sales || [])) {
-      if (new Date(s.created_at).getTime() + windowMs > now) continue;
-      ids.push(s.id); acc += s.commission_amount;
-      if (acc >= pr.amount_cents) break;
-    }
-    if (ids.length) await supabase.from('referral_sales').update({ paid: true }).in('id', ids);
-    await supabase.from('payout_requests').update({ status: 'paid', processed_at: new Date().toISOString() }).eq('id', pr.id);
-    addLog(`Payout marked paid: ${pr.affiliate_code} — $${(pr.amount_cents / 100).toFixed(2)} (${ids.length} sales settled)`, 'affiliate', 'success');
-    res.json({ ok: true, settledSales: ids.length, amountCents: acc });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// GET /api/affiliates/:code/stats — sales + commission summary for one affiliate
-app.get('/api/affiliates/:code/stats', async (req, res) => {
-  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const code = (req.params.code || '').toLowerCase().trim();
-  try {
-    const { data: affiliate } = await supabase.from('affiliates').select('code,name,commission_percent,status').eq('code', code).maybeSingle();
-    if (!affiliate) return res.status(404).json({ error: 'Affiliate code not found' });
-    const { data } = await supabase.from('referral_sales').select('amount,commission_amount,paid,created_at').eq('affiliate_code', code).order('created_at', { ascending: false });
-    const rows = data || [];
-    const totalCommission  = rows.reduce((s, r) => s + r.commission_amount, 0);
-    const paidCommission   = rows.filter(r => r.paid).reduce((s, r) => s + r.commission_amount, 0);
-    res.json({
-      code: affiliate.code, name: affiliate.name, commissionPercent: affiliate.commission_percent, status: affiliate.status,
-      totalSales: rows.length,
-      totalCommissionCents: totalCommission,
-      paidCommissionCents: paidCommission,
-      unpaidCommissionCents: totalCommission - paidCommission,
-      sales: rows.map(r => ({ amount: r.amount, commission: r.commission_amount, paid: r.paid, date: r.created_at }))
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// GET /api/owner-license — generate a license key for the owner (requires BOT_EMAIL_SECRET)
-// ?product=apex-bot (default) or ?product=apex-forex
 app.get('/api/owner-license', async (req, res) => {
-  const secret = req.query.secret || req.headers['x-owner-secret'];
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
-  const product = req.query.product === 'apex-forex' ? 'apex-forex' : 'apex-bot';
-  const key = product === 'apex-forex' ? generateForexKey() : generateLicenseKey();
+  const product = 'apex-forex';
+  const key = generateForexKey();
   let dbStatus = 'skipped';
   try {
     const { error: dbErr } = await supabase.from('licenses').insert([{ key, email: 'owner@aicashsystem.space', name: 'Owner', active: true, product }]);
@@ -1807,6 +1601,88 @@ app.get('/api/owner-license', async (req, res) => {
   res.json({ key, product, message: `Add this as LICENSE_KEY for your ${product} bot`, supabase: dbStatus });
 });
 
+// POST /api/admin/grant-license?secret=... — { email, name?, product: 'apex-forex' }
+// Manually grants full, non-expiring access to anyone the owner chooses — no
+// checkout involved. Mints a real license key per product (same format/
+// verification path as a paid one) and sends the exact same activation email
+// a paying customer gets, so the recipient's experience (license + the
+// "Open your bot on Telegram" button) is identical either way.
+app.post('/api/admin/grant-license', async (req, res) => {
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const email = String(req.body?.email || '').trim().slice(0, 200);
+  const name = String(req.body?.name || 'there').trim().slice(0, 100) || 'there';
+  const want = String(req.body?.product || '').toLowerCase();
+  // FOREX ONLY. This defaulted an unrecognised `product` to the crypto bot, so
+  // a typo minted an APEX- key and emailed a link to a bot that is gone.
+  // Unknown product is a refusal now, not a fallback.
+  if (want && want !== 'apex-forex') {
+    return res.status(400).json({ error: "Unknown product — only 'apex-forex' is sold." });
+  }
+  const products = ['apex-forex'];
+  if (!email) return res.status(400).json({ error: 'email is required' });
+
+  const results = [];
+  for (const product of products) {
+    const key = generateForexKey();
+    const { error } = await supabase.from('licenses').insert([{
+      key, email, name, active: true, activated_at: null, product, trial: false
+    }]);
+    if (error) {
+      addLog(`Grant-license DB error (${product}) for ${_maskEmail(email)}: ${error.message}`, 'license', 'error');
+      results.push({ product, error: error.message });
+      continue;
+    }
+    const html = _buildForexEmailHtml(_he(name), _he(email), key);
+    const subject = `${BRAND} — your licence key and access link`;
+    const sent = await _sendEmail({ to: email, subject, html, fromName: BRAND });
+    const botHandle = 'FOREX_APEX_BOT';
+    addLog(`Granted ${product} license: ${_maskLicence(key)} for ${_maskEmail(email)}${sent.ok ? '' : ' (email FAILED to send)'}`, 'license', sent.ok ? 'success' : 'warn');
+    results.push({ product, key, emailSent: sent.ok, telegramLink: `https://t.me/${botHandle}?start=${key}` });
+  }
+  res.json({ email, results });
+});
+
+// Why the licence store could not be read. A missing TABLE and a missing
+// NETWORK are both "cannot read", but they need opposite responses: one is a
+// deployment pointed at the wrong (or unmigrated) database and will never fix
+// itself, the other clears on its own. Reporting both as "temporarily
+// unavailable" sends the operator hunting a connectivity fault that does not
+// exist — verified by booting this server against a real Supabase project with
+// no `licenses` table: it answered "try again in a few minutes", forever.
+function _licenceStoreFault(err) {
+  const code = String(err?.code || '');
+  const msg = String(err?.message || err || '');
+  const schema = code === '42P01' || code === 'PGRST205'
+    || /does not exist|schema cache|relation .* does not exist/i.test(msg);
+  return schema ? 'SCHEMA' : 'UNREACHABLE';
+}
+
+function _licenceStoreDenial(res, err, where) {
+  const fault = _licenceStoreFault(err);
+  const detail = String(err?.message || err || '').slice(0, 200);
+  if (fault === 'SCHEMA') {
+    addLog(`verify-license: licence store MISCONFIGURED at ${where} — ${detail}`,
+           'license', 'error');
+    _notifyAdminAlert(
+      `🚨 The licence table cannot be read, and this will NOT clear on its own.\n\n` +
+      `Where: ${where}\nError: ${detail}\n\n` +
+      `SUPABASE_URL is pointing at a database with no \`licenses\` table — the ` +
+      `wrong project, or one that was never migrated. Every activation is being ` +
+      `refused until it is fixed.`,
+      'Apex — licence store misconfigured');
+  } else {
+    addLog(`verify-license: licence store unreachable at ${where} — ${detail}`,
+           'license', 'error');
+  }
+  return res.status(503).json({
+    valid: false,
+    message: fault === 'SCHEMA'
+      ? 'Licence checks are unavailable — our team has been alerted. Please contact support.'
+      : 'Licence service temporarily unavailable — please try again in a few minutes.',
+  });
+}
+
 // POST /api/verify-license — called by the bot on every startup
 // Body: { key, product? }  — product is 'apex-bot' | 'apex-forex'
 // Primary: HMAC signature check (no DB). Fallback: Supabase for legacy keys.
@@ -1814,258 +1690,367 @@ app.post('/api/verify-license', _licenseLimiter, async (req, res) => {
   const { key, product: claimedProduct } = req.body || {};
   if (!key) return res.json({ valid: false, message: 'No license key provided' });
 
-  // 1. HMAC check — works without any database
+  // 1. Signature, then the ONLY authority on whether it was paid for.
+  //
+  // A valid HMAC proves this server minted the key. It does NOT prove the key
+  // was paid for, is still paid for, or was not refunded — a refunded
+  // customer, an expired trial and an abandoned checkout all keep a
+  // permanently valid signature. Only the licences row knows, and the payment
+  // webhook is the only thing that writes active:true to it.
+  //
+  // So ALL of these must hold: signature valid, row exists, product matches,
+  // active, not refunded, not expired. Anything missing is a denial, and an
+  // unreadable store is a denial too.
   const hmacResult = verifyLicenseKeyHmac(key);
   if (hmacResult.valid) {
-    // Product mismatch check: FORX- key on crypto bot (or APEX- on forex) → reject
     if (claimedProduct && hmacResult.product && claimedProduct !== hmacResult.product) {
-      return res.json({ valid: false, message: `Wrong license type. This key is for ${hmacResult.product}. Purchase the correct bot at aicashsystem.space` });
+      return res.json({ valid: false, message: `This key unlocks ${hmacResult.product}, not this workspace. Open ${ACCESS_URL} to get access to this one.` });
     }
-    // A valid signature is NOT proof of payment. The Digistore24 IPN handler is the
-    // only place that upserts a license as active:true, on event=on_payment. So: if
-    // the key exists in our DB as not-yet-paid, reject it.
-    if (supabase) {
-      try {
-        const { data: row } = await supabase.from('licenses')
-          .select('active,refunded').eq('key', key).maybeSingle();
-        if (row && row.refunded === true) {
-          return res.json({ valid: false, message: 'This license was refunded and is no longer active. Repurchase at aicashsystem.space' });
-        }
-        if (row && row.active === false) {
-          return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
-        }
-        // row.active === true, or no row at all (legacy/manual key) → allow through.
-      } catch (_) { /* DB hiccup → fall through to fail-open allow below */ }
+    // No database configured at all is not the same as a database that cannot
+    // be read: it is a deployment that never records payments, so there is
+    // nothing to consult and nothing to grant. Refuse rather than invent an
+    // entitlement.
+    if (!supabase) {
+      addLog('verify-license: no licence store configured — DENYING', 'license', 'error');
+      return res.status(503).json({ valid: false, message: 'Licence service is not configured — please contact support.' });
     }
-    if (supabase) {
-      supabase.from('licenses')
-        .upsert([{ key, active: true, activated_at: new Date().toISOString(), product: hmacResult.product }], { onConflict: 'key' })
+    let row, rowErr;
+    try {
+      ({ data: row, error: rowErr } = await supabase.from('licenses')
+        .select('active,refunded,trial,expires_at,product').eq('key', key).maybeSingle());
+    } catch (e) {
+      rowErr = e;
+    }
+    // supabase-js reports a network/permission failure in `error` and does NOT
+    // always throw, so checking only the thrown case left the endpoint
+    // fail-open for the most common outage shape. Verified by booting this
+    // server against an unreachable SUPABASE_URL. maybeSingle() reports no
+    // error for zero rows, so any error here is a real failure to read.
+    // 503 rather than {valid:false}: the bot reads any 5xx as "cannot check
+    // right now", where a false would tell a paying customer their licence is
+    // bad. _licenceStoreDenial also tells the OPERATOR which kind of fault it
+    // is, because a missing table and a missing network need opposite fixes.
+    if (rowErr) return _licenceStoreDenial(res, rowErr, 'signed lookup');
+    if (!row) {
+      // NO ROW = NOT SOLD. This used to fall through to allow, as a
+      // "legacy/manual key". Combined with the auto-upsert that used to sit
+      // below, a signature alone both granted access AND wrote itself an
+      // active licence — verification minting its own entitlement.
+      // This is the ONE denial that might be a real customer rather than an
+      // attacker: every path that mints a key also writes its row, so a signed
+      // key with no row is either forged or predates the licences table. The
+      // operator cannot tell those apart from a log line nobody reads, and the
+      // customer's version of this event is "the bot stopped working", so it
+      // is surfaced rather than merely recorded.
+      addLog(`verify-license: signed key with no licence row — DENYING (${String(key).slice(0, 9)}…)`, 'license', 'warn');
+      _notifyAdminAlert(
+        `⚠️ A correctly-signed licence key was refused because it has no row in ` +
+        `the licences table.\n\nKey: ${String(key).slice(0, 9)}…\n\n` +
+        `Every path that issues a key also writes its row, so this is either a ` +
+        `forged signature (ignore it) or a key issued before that table existed ` +
+        `(a real customer, now locked out — add their row).`
+      );
+      return res.json({ valid: false, message: 'This licence is not registered. If you have just paid, wait a minute and tap the link in your email.' });
+    }
+    if (row.refunded === true) {
+      return res.json({ valid: false, message: `This licence was refunded, so access is closed. Open ${ACCESS_URL} to start again.` });
+    }
+    if (row.active !== true) {
+      return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
+    }
+    if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
+      supabase.from('licenses').update({ active: false }).eq('key', key)
         .then(() => {}).catch(() => {});
+      return res.json({ valid: false, message: row.trial === true
+        ? `Your trial has ended. Open ${ACCESS_URL} to keep your account running.`
+        : `This licence has expired. Open ${ACCESS_URL} to renew it.` });
     }
+    if (claimedProduct && row.product && claimedProduct !== row.product) {
+      return res.json({ valid: false, message: `Wrong license type. This key is for ${row.product}.` });
+    }
+    // Deliberately NO upsert here. Verification must not create or reactivate
+    // an entitlement; the payment webhook is the only writer of active:true.
     return res.json({ valid: true, message: 'License valid', product: hmacResult.product });
   }
 
-  // 2. Supabase fallback — for legacy keys or manual inserts
-  if (supabase) {
-    try {
-      const { data } = await supabase
-        .from('licenses').select('active,product').eq('key', key).eq('active', true).single();
-      if (data?.active) {
-        if (claimedProduct && data.product && claimedProduct !== data.product) {
-          return res.json({ valid: false, message: `Wrong license type. This key is for ${data.product}.` });
-        }
-        return res.json({ valid: true, message: 'License valid (legacy)', product: data.product });
-      }
-    } catch (_) {}
+  // 2. Supabase fallback — for legacy keys or manual inserts.
+  //
+  // First: a key that does not even have this product's shape cannot be a
+  // legacy key of ours, so it is definitively invalid and no database is
+  // needed to say so. Without this short-circuit an outage turned every
+  // typo — and every APEX- key from the retired crypto product — into "try
+  // again in a few minutes", which is both unhelpful and untrue.
+  //
+  // A key that DOES have the shape but fails the signature check may still be
+  // a legacy key issued before BOT_EMAIL_SECRET existed; only the database
+  // knows. That case genuinely cannot be answered while the store is down, so
+  // it gets the 503 below rather than a false "invalid".
+  if (!/^FORX-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(String(key).toUpperCase())) {
+    return res.json({ valid: false, message: `That licence key was not recognised. Open ${ACCESS_URL} to get one.` });
+  }
+  if (!supabase) {
+    addLog('verify-license: no licence store configured — DENYING legacy lookup', 'license', 'error');
+    return res.status(503).json({ valid: false, message: 'Licence service is not configured — please contact support.' });
+  }
+  let lrow, lerr;
+  try {
+    // maybeSingle(), not single(): single() reports "no rows" as an error, so
+    // a genuine read failure and an ordinary miss arrived down the same path
+    // and had to be told apart by an error code. maybeSingle() gives null for
+    // a miss and an error only for a real failure.
+    ({ data: lrow, error: lerr } = await supabase.from('licenses')
+      .select('active,product,refunded,expires_at,trial').eq('key', key).maybeSingle());
+  } catch (e) {
+    // The old code swallowed this with `catch (_) {}` and fell through to
+    // "Invalid license key" — the safe direction, but it told a paying
+    // customer their key was bad and logged nothing for the operator.
+    lerr = e;
+  }
+  if (lerr) return _licenceStoreDenial(res, lerr, 'legacy lookup');
+  if (lrow) {
+    // The legacy path answers the SAME questions as the signed path. Checking
+    // only `active` here would have let a refunded or expired legacy key
+    // through on a route that skips the signature entirely.
+    if (lrow.refunded === true) {
+      return res.json({ valid: false, message: `This licence was refunded, so access is closed. Open ${ACCESS_URL} to start again.` });
+    }
+    if (lrow.active !== true) {
+      return res.json({ valid: false, message: 'Payment not completed yet. If you just paid, wait a minute and tap the link in your email.' });
+    }
+    if (lrow.expires_at && new Date(lrow.expires_at).getTime() <= Date.now()) {
+      supabase.from('licenses').update({ active: false }).eq('key', key)
+        .then(() => {}).catch(() => {});
+      return res.json({ valid: false, message: lrow.trial === true
+        ? `Your trial has ended. Open ${ACCESS_URL} to keep your account running.`
+        : `This licence has expired. Open ${ACCESS_URL} to renew it.` });
+    }
+    if (claimedProduct && lrow.product && claimedProduct !== lrow.product) {
+      return res.json({ valid: false, message: `Wrong license type. This key is for ${lrow.product}.` });
+    }
+    return res.json({ valid: true, message: 'License valid (legacy)', product: lrow.product });
   }
 
-  return res.json({ valid: false, message: 'Invalid license key. Purchase at aicashsystem.space' });
+  return res.json({ valid: false, message: `That licence key was not recognised. Open ${ACCESS_URL} to get one.` });
 });
 
+// POST /api/admin/trial/issue?secret=... — { email, product, days? } -> { key, telegramLink, expiresAt }
+// Issues a free-trial license: same key format/verification path as a paid one,
+// but flagged trial:true with an expires_at that /api/verify-license enforces.
+app.post('/api/admin/trial/issue', async (req, res) => {
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const email = String(req.body?.email || '').trim().slice(0, 200);
+  const product = 'apex-forex';
+  const days = Math.min(Math.max(parseInt(req.body?.days, 10) || 5, 1), 30);
+  const key = generateForexKey();
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase.from('licenses').insert([{
+    key, email, active: true, activated_at: null, product, trial: true, expires_at: expiresAt
+  }]);
+  if (error) return res.status(500).json({ error: 'Request failed.', id: _errId(error) });
+  const botHandle = 'FOREX_APEX_BOT';
+  addLog(`Trial issued: ${_maskLicence(key)} (${product}, ${days}d) for ${_maskEmail(email) || 'no email'}`, 'license', 'success');
+  res.json({ key, product, expiresAt, telegramLink: `https://t.me/${botHandle}?start=${key}` });
+});
 
-// ── DIGISTORE24 IPN (webhook) ───────────────────────────────────────────────
-// Merchant of Record — D24 handles EU VAT/taxes/invoices, we just deliver the
-// license. Events (sent as $_POST['event'] equivalent): on_payment (deliver
-// license), on_refund / on_chargeback (revoke license).
-//
-// Signature: sha_sign = SHA-512 of every OTHER param, sorted by key
-// (case-insensitive), concatenated as "UPPERKEY=value" per key, then
-// "$" + IPN passphrase appended, all hashed once. (Best-effort from public
-// docs — D24's own docs site is unreachable from here; verified against the
-// first real IPN hit, see the [D24] signature-mismatch log line if it's off.)
-function _digistore24VerifySignature(params, passphrase) {
-  const { sha_sign, SHASIGN, ...rest } = params;
-  if (!sha_sign || !passphrase) return false;
-  const keys = Object.keys(rest)
-    .filter(k => rest[k] !== '' && rest[k] !== null && rest[k] !== undefined)
-    .sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
-  let buf = '';
-  for (const k of keys) buf += `${k}=${rest[k]}${passphrase}`;
-  const computed = crypto.createHash('sha512').update(buf, 'utf8').digest('hex').toUpperCase();
-  return computed === String(sha_sign).toUpperCase();
+// POST /api/admin/trial/finish?secret=... — cuts off every still-active trial license at once.
+// The bot's next /api/verify-license check (on startup/restart) will then reject them with
+// the "trial ended, open the platform to keep your account running" message.
+app.post('/api/admin/trial/finish', async (req, res) => {
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  const { data: rows } = await supabase.from('licenses')
+    .select('key,email,product').eq('trial', true).eq('active', true);
+  if (rows?.length) {
+    const keys = rows.map(r => r.key);
+    await supabase.from('licenses').update({ active: false }).in('key', keys);
+  }
+  addLog(`Trial /finish: cut off ${rows?.length || 0} active trial(s)`, 'license', 'success');
+  res.json({ cutOff: rows?.length || 0, licenses: rows || [] });
+});
+
+// ── STRIPE CHECKOUT ─────────────────────────────────────────────────────────
+// We are the merchant of record here (unlike D24) — Stripe just processes the
+// card. Below the Romanian VAT-exemption threshold this needs no special tax
+// handling; see the PFA discussion elsewhere for when that changes.
+// Stripe is the primary/default processor now — ApexTradingSuite (acct_1TSAWQGpBbs5xtI5),
+// business profile corrected to match what's actually sold, live and charges_enabled.
+// Price IDs default to the ones created on that account; override via env if recreated.
+// FOREX ONLY. The 'apex-crypto' SKU is removed, not disabled: the bot it
+// delivered no longer exists, so a completed checkout would take money for
+// something that cannot be shipped.
+const STRIPE_PRICE_IDS = {
+  'apex-forex': process.env.STRIPE_PRICE_FOREX || 'price_1Tge4PGpBbs5xtI5jAjgndKZ'
+};
+// Matches the one_time_price unit_amount on each Stripe Price above — used to
+// price the order without an extra API round-trip.
+const STRIPE_PRODUCT_AMOUNTS_CENTS = { 'apex-forex': 49700 };
+
+// POST /api/checkout/create-session — { product: 'apex-forex', ref? } -> { url }
+app.post('/api/checkout/create-session', _authLimiter, async (req, res) => {
+  const product = String(req.body?.product || '');
+  const ref = String(req.body?.ref || '').toLowerCase().trim().slice(0, 40);
+  const origin = _safeOrigin(req);
+
+  if (stripe) {
+    const priceId = STRIPE_PRICE_IDS[product];
+    if (!priceId) return res.status(400).json({ error: 'Unknown or unavailable product' });
+    try {
+      const sessionParams = {
+        mode: 'payment',
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${origin}/thank-you?product=${encodeURIComponent(product)}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/${product === 'apex-forex' ? 'forex' : ''}`,
+        customer_creation: 'always'
+      };
+
+      // `ref` is kept as plain provenance — where the buyer came from — and is
+      // no longer an attribution key: there is no affiliate program to pay.
+      sessionParams.metadata = { product, ref };
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
+      return res.json({ url: session.url });
+    } catch (e) {
+      addLog(`[Stripe] Checkout session error: ${e.message}`, 'payment', 'error');
+      return res.status(500).json({ error: 'Could not start checkout. Please try again.' });
+    }
+  }
+
+  return res.status(500).json({ error: 'Payments are not configured' });
+});
+
+// GET /api/order-status?session_id=cs_...|order_id=... -> { ready, licenseKey? }
+// Polled by thank-you.html. Only returns data for a piRef the caller can already
+// prove (a Stripe session_id or D24 order_id from their own redirect) — not a
+// general lookup surface.
+app.get('/api/order-status', _codeLimiter, async (req, res) => {
+  const sessionId = String(req.query?.session_id || '');
+  const orderId = String(req.query?.order_id || '');
+  if (!sessionId && !orderId) return res.status(400).json({ ready: false, error: 'Missing session_id or order_id' });
+  if (!supabase) return res.json({ ready: false });
+
+  try {
+    let piRef;
+    if (sessionId) {
+      if (!stripe) return res.json({ ready: false });
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (!session.payment_intent) return res.json({ ready: false });
+      piRef = `stripe_${session.payment_intent}`;
+    } else {
+      piRef = `d24_${orderId}`;
+    }
+
+    const { data } = await supabase.from('licenses').select('key,active').eq('payment_intent_id', piRef).maybeSingle();
+    if (data?.key && data.active) return res.json({ ready: true, licenseKey: data.key });
+    return res.json({ ready: false });
+  } catch (e) {
+    addLog(`[order-status] ${e.message}`, 'payment', 'error');
+    return res.json({ ready: false });
+  }
+});
+
+// Shared fulfillment: licence generation and the licence email. `provider` only
+// controls the log/alert prefix, so a second processor can reuse this without a
+// second copy of the fulfillment logic.
+async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref }) {
+  // Money has already changed hands here, so an unknown product must not be
+  // silently fulfilled as the retired crypto bot — that delivers a key for
+  // something that does not exist. Refuse loudly and alert the operator.
+  if (product !== 'apex-forex') {
+    addLog(`[${provider}] REFUSED fulfilment for unknown product ${product} — ref ${piRef}`, 'payment', 'error');
+    _notifyAdminAlert(
+      `⚠️ A payment (${provider}) arrived for product "${product}", which is no ` +
+      `longer sold. NOTHING was delivered and no key was minted.\n\n` +
+      `Email: ${email}\nRef: ${piRef}\n\nRefund or handle manually.`
+    );
+    return;
+  }
+  let licenseKey;
+  if (supabase) {
+    const { data: existing } = await supabase.from('licenses').select('key').eq('payment_intent_id', piRef).maybeSingle();
+    if (existing?.key) licenseKey = existing.key;
+  }
+  const isNew = !licenseKey;
+  if (!licenseKey) licenseKey = generateForexKey();
+
+  if (supabase) {
+    const { error } = await supabase.from('licenses').upsert([{
+      key: licenseKey, active: true, activated_at: new Date().toISOString(),
+      email: email || '', name: buyerName || 'there', product, payment_intent_id: piRef
+    }], { onConflict: 'key' });
+    if (error) addLog(`[${provider}] License DB error: ${error.message}`, 'license', 'error');
+  }
+  addLog(`[${provider}] License activated: ${_maskLicence(licenseKey)} for ${_maskEmail(email)} (${product})`, 'license', 'success');
+
+  if (isNew && email) {
+    const html = _buildForexEmailHtml(_he(buyerName || 'there'), _he(email), licenseKey);
+    const subject = `${BRAND} — your licence key and access link`;
+    const result = await _sendEmail({ to: email, subject, html, fromName: BRAND });
+    if (!result.ok) {
+      addLog(`[${provider}] Email NOT sent for ${_maskEmail(email)} — ${result.error}`, 'email', 'error');
+      _notifyAdminAlert(
+        `⚠️ Customer paid (${provider}) but the license email FAILED to send.\n\n` +
+        `Product: Forex\nEmail: ${email}\nRef: ${piRef}\n` +
+        `License: ${_maskLicence(licenseKey)} (${_maskEmail(email)})\n` +
+        `Error: ${result.error}\n\n` +
+        `The full key is in the licenses table for this email. It is deliberately ` +
+        `not repeated here: an inbox is not a credential store, and this message ` +
+        `exists because delivery already failed once.`
+      );
+    } else addLog(`[${provider}] Forex email sent to ${email}`, 'email', 'success');
+  }
+  if (isNew) addLog(`[${provider}] Forex Bot sold: ${_maskEmail(email)} — key: ${_maskLicence(licenseKey)}`, 'payment', 'success');
 }
+const _fulfillStripeOrder = (args) => _fulfillOrder({ provider: 'Stripe', ...args });
 
-async function handleDigistore24Webhook(req, res) {
-  const params = req.body || {};
-  const passphrase = process.env.DIGISTORE24_IPN_PASSPHRASE;
-  if (!passphrase) { console.error('[D24] Missing DIGISTORE24_IPN_PASSPHRASE'); return res.status(400).send('Webhook not configured'); }
-
-  const sigOk = _digistore24VerifySignature(params, passphrase);
-  if (!sigOk) {
-    console.error(`[D24] Signature mismatch — raw params: ${JSON.stringify(params).slice(0, 500)}`);
-    addLog(`[D24] Signature mismatch — raw params: ${JSON.stringify(params).slice(0, 500)}`, 'payment', 'error');
-    return res.status(401).send('Invalid signature');
+app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) return res.status(500).send('Stripe not configured');
+  const sig = req.headers['stripe-signature'];
+  const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!whSecret) { console.error('[Stripe] Missing STRIPE_WEBHOOK_SECRET'); return res.status(400).send('Webhook not configured'); }
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, whSecret);
+  } catch (e) {
+    addLog(`[Stripe] Webhook signature verification failed: ${e.message}`, 'payment', 'error');
+    return res.status(400).send(`Webhook Error: ${e.message}`);
   }
 
   try {
-    const event = params.event || '';
-    const email = params.email || params.buyer_email || '';
-    const buyerName = [params.first_name, params.last_name].filter(Boolean).join(' ')
-      || params.buyer_first_name || 'there';
-    const orderId = String(params.order_id || '');
-    const productId = String(params.product_id || '');
-    const amount = Number(params.amount || params.amount_netto || 0);
-
-    // Map D24 product IDs to our products.
-    //   DIGISTORE24_PRODUCT_CRYPTO=714550  (the $297 crypto bot)
-    //   DIGISTORE24_PRODUCT_FOREX=<set once the forex product is created>
-    const cryptoProductId = process.env.DIGISTORE24_PRODUCT_CRYPTO || '714550';
-    const forexProductId = process.env.DIGISTORE24_PRODUCT_FOREX || '';
-    let product = null;
-    if (productId && productId === cryptoProductId) product = 'apex-bot';
-    else if (productId && forexProductId && productId === forexProductId) product = 'apex-forex';
-
-    if (event === 'on_payment' && orderId && product) {
-      const isForex = product === 'apex-forex';
-      const piRef = `d24_${orderId}`;
-
-      // Idempotency: a retried IPN for the same order must not re-generate/re-email.
-      let licenseKey;
-      if (supabase) {
-        const { data: existing } = await supabase.from('licenses').select('key').eq('payment_intent_id', piRef).maybeSingle();
-        if (existing?.key) licenseKey = existing.key;
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const product = session.metadata?.product || '';
+      const ref = session.metadata?.ref || '';
+      if (STRIPE_PRICE_IDS[product]) {
+        if (!session.payment_intent) {
+          addLog(`[Stripe] session=${session.id} has no payment_intent — refund revocation will not match`, 'payment', 'warn');
+        }
+        const piRef = `stripe_${session.payment_intent || session.id}`;
+        const email = session.customer_details?.email || '';
+        const buyerName = session.customer_details?.name || 'there';
+        const amountCents = Number(session.amount_total || 0);
+        await _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref });
+      } else {
+        addLog(`[Stripe] checkout.session.completed for unmapped product="${product}" session=${session.id}`, 'payment', 'warn');
       }
-      const isNew = !licenseKey;
-      if (!licenseKey) licenseKey = isForex ? generateForexKey() : generateLicenseKey();
-
-      if (supabase) {
-        const { error } = await supabase.from('licenses').upsert([{
-          key: licenseKey, active: true, activated_at: new Date().toISOString(),
-          email: email || '', name: buyerName, product, payment_intent_id: piRef
-        }], { onConflict: 'key' });
-        if (error) addLog(`[D24] License DB error: ${error.message}`, 'license', 'error');
-      }
-      addLog(`[D24] License activated: ${licenseKey} for ${email} (${product})`, 'license', 'success');
-
-      // Affiliate commission — D24's own affiliate marketplace already pays its
-      // affiliates directly, so this only applies to refs from our own funnel.
-      const ref = (params.aff || params.affiliate || params.custom_aff || '').toLowerCase().trim();
-      if (isNew && ref && supabase) {
-        try {
-          const { data: aff } = await supabase.from('affiliates').select('code,commission_percent,status').eq('code', ref).maybeSingle();
-          if (aff && aff.status === 'active') {
-            const pct = Number(aff.commission_percent) > 0 ? Number(aff.commission_percent) : 30;
-            const commission = Math.round(amount * 100 * pct / 100); // amount is in whole currency units
-            await supabase.from('referral_sales').upsert([{
-              affiliate_code: aff.code, license_key: licenseKey, payment_intent_id: piRef,
-              product, amount: Math.round(amount * 100), commission_amount: commission
-            }], { onConflict: 'payment_intent_id' });
-            addLog(`[D24] Affiliate sale: ${aff.code} earned $${(commission / 100).toFixed(2)} on ${product}`, 'affiliate', 'success');
-            _notifyAffiliateSale(aff.code, product, commission);
-          }
-        } catch (e) { addLog(`[D24] Affiliate error: ${e.message}`, 'affiliate', 'error'); }
-      }
-
-      if (isNew && email) {
-        const html = isForex
-          ? _buildForexEmailHtml(_he(buyerName), _he(email), licenseKey)
-          : _buildBotEmailHtml(_he(buyerName), _he(email), licenseKey);
-        const subject = isForex
-          ? '🤖 Your Apex Forex Bot — License Key inside'
-          : '🤖 Your Apex Trade Bot — License Key inside';
-        const result = await _sendEmail({ to: email, subject, html, fromName: 'Apex.Bot' });
-        if (!result.ok) {
-          addLog(`[D24] Email NOT sent for ${email} — ${result.error}`, 'email', 'error');
-          _notifyAdminAlert(
-            `⚠️ Customer paid but the license email FAILED to send.\n\n` +
-            `Product: ${isForex ? 'Forex' : 'Crypto'}\nEmail: ${email}\nOrder: ${orderId}\n` +
-            `License key: ${licenseKey}\nError: ${result.error}\n\n` +
-            `Send the key to them manually until this is fixed.`
-          );
-        } else addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} email sent to ${email}`, 'email', 'success');
-      }
-      if (isNew) addLog(`[D24] ${isForex ? 'Forex' : 'Crypto'} Bot sold: ${email} — key: ${licenseKey}`, 'payment', 'success');
-    } else if (event === 'on_payment') {
-      addLog(`[D24] on_payment for unmapped product_id=${productId} order=${orderId} — set DIGISTORE24_PRODUCT_CRYPTO/FOREX`, 'payment', 'warn');
-    }
-
-    if ((event === 'on_refund' || event === 'on_chargeback') && orderId) {
-      const piRef = `d24_${orderId}`;
-      if (supabase) {
+    } else if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
+      const obj = event.data.object;
+      const paymentIntentId = obj.payment_intent || '';
+      if (paymentIntentId && supabase) {
+        const piRef = `stripe_${paymentIntentId}`;
         const { data: revoked } = await supabase.from('licenses')
           .update({ active: false, refunded: true, refunded_at: new Date().toISOString() })
           .eq('payment_intent_id', piRef).select('key,product');
-        if (revoked?.length) addLog(`[D24] License revoked (${event}): ${revoked[0].key} (${revoked[0].product})`, 'license', 'warn');
-        await supabase.from('referral_sales')
-          .update({ refunded: true, refunded_at: new Date().toISOString() })
-          .eq('payment_intent_id', piRef);
+        if (revoked?.length) addLog(`[Stripe] License revoked (${event.type}): ${_maskLicence(revoked[0].key)} (${revoked[0].product})`, 'license', 'warn');
       }
     }
-
-    res.send('OK');
+    res.json({ received: true });
   } catch (e) {
-    console.error('[D24] Webhook error:', e);
+    console.error('[Stripe] Webhook error:', e);
     res.status(500).send('Internal error');
   }
-}
-app.post('/digistore24-webhook', (req, res, next) => {
-  console.log(`[D24] Incoming request — content-type=${req.headers['content-type']} content-length=${req.headers['content-length']} ip=${req.ip}`);
-  next();
-}, express.urlencoded({ extended: true }), (req, res, next) => {
-  console.log(`[D24] Parsed body: ${JSON.stringify(req.body).slice(0, 500)}`);
-  next();
-}, handleDigistore24Webhook);
-
-// ════════════════════════════════════════
-// VIDEO DOWNLOAD ROUTES (Veo 3 generated)
-// ════════════════════════════════════════
-
-const VEO_FILES = {
-  v1: 'okco5vw2ygdo',
-  v2: 'kb3wyz27b6rg',
-  v3: 'wish204mx53o',
-  v4: 'mo5kg30u0q2x',
-  v5: 'wehowxf92z6t',
-  v6: 'ki993zeg87pw',
-  v7: 'hcu69oshg8qf',
-};
-
-app.get('/download/:id', requireCourse('any'), async (req, res) => {
-  const fileId = VEO_FILES[req.params.id];
-  if (!fileId) return res.status(404).json({ error: 'Video not found' });
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/files/${fileId}:download?alt=media&key=${apiKey}`;
-    const response = await fetch(url);
-    if (!response.ok) return res.status(502).json({ error: 'Video expired or unavailable' });
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Disposition', `attachment; filename="aicash_ugc_${req.params.id}.mp4"`);
-    const { Readable } = require('stream');
-    const stream = Readable.fromWeb(response.body);
-    stream.on('error', () => { if (!res.headersSent) res.status(500).end(); });
-    stream.pipe(res);
-  } catch (e) {
-    if (!res.headersSent) res.status(500).json({ error: 'Download failed' });
-  }
 });
 
-app.get('/descarcare', requireCourse('any'), (req, res) => {
-  const videos = [
-    { id: 'v1', title: '"I Made $300 Selling AI Bots"', desc: 'Hook direct · 8s' },
-    { id: 'v2', title: '"One Skill Changes Everything"', desc: 'Empatie · 8s' },
-    { id: 'v3', title: '"I Failed First"', desc: 'Vulnerabil · 8s' },
-    { id: 'v4', title: '"Nobody Teaches You This"', desc: 'Educational · 8s' },
-    { id: 'v5', title: '"What Would You Do?"', desc: 'Aspirational · 8s' },
-    { id: 'v6', title: '"2025 Reality Check"', desc: 'Urgenta · 8s' },
-    { id: 'v7', title: '"To the Version of Me"', desc: 'Emotional · 8s' },
-  ];
-  const cards = videos.map(v => `
-    <div style="background:#111;border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:16px">
-      <div>
-        <div style="color:#C8A96E;font-weight:700;font-size:15px">${v.title}</div>
-        <div style="color:#666;font-size:12px;margin-top:4px">${v.desc} · Veo 3 · 9:16</div>
-      </div>
-      <a href="/download/${v.id}" style="background:linear-gradient(135deg,#8A6A2E,#E8CB8A);color:#000;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;font-size:12px;white-space:nowrap">⬇ Download</a>
-    </div>`).join('');
-  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Download Videoclipuri TikTok</title></head>
-  <body style="background:#080808;color:#F5F0E8;font-family:sans-serif;padding:24px 16px;max-width:600px;margin:0 auto">
-    <h1 style="color:#C8A96E;text-align:center;font-size:20px;margin-bottom:4px">Videoclipuri TikTok</h1>
-    <p style="text-align:center;color:#666;font-size:12px;margin-bottom:24px">Generate cu Veo 3 · Descarca pe telefon</p>
-    <div style="display:flex;flex-direction:column;gap:12px">${cards}</div>
-    <p style="text-align:center;color:#444;font-size:11px;margin-top:24px">Disponibile 48 ore · aicashsystem.space</p>
-  </body></html>`);
-});
 
 // Diagnostic route — admin only
 app.get('/debug', auth, (req, res) => {
@@ -2074,7 +2059,7 @@ app.get('/debug', auth, (req, res) => {
 
 // Favicon + OG image (3-candle logo)
 const _LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#060608"/><rect x="3" y="19" width="5" height="10" rx="2.5" fill="#ff2d4f" opacity=".45"/><rect x="11.5" y="12" width="5" height="17" rx="2.5" fill="#ff2d4f" opacity=".72"/><rect x="20" y="6" width="5" height="23" rx="2.5" fill="#ff2d4f"/><circle cx="22.5" cy="5" r="3.1" fill="#ff5c74"/></svg>';
-const _OG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#060608"/><rect x="480" y="340" width="60" height="190" rx="12" fill="#ff2d4f" opacity=".45"/><rect x="570" y="220" width="60" height="310" rx="12" fill="#ff2d4f" opacity=".72"/><rect x="660" y="120" width="60" height="410" rx="12" fill="#ff2d4f"/><circle cx="690" cy="96" r="34" fill="#ff5c74"/><text x="600" y="520" font-family="system-ui,sans-serif" font-weight="700" font-size="38" fill="#f5f5f7" text-anchor="middle">Apex Trading Suite</text><text x="600" y="568" font-family="system-ui,sans-serif" font-size="22" fill="#9696a0" text-anchor="middle">Fully-Hosted AI Trading Bots · Crypto $297 · Forex $497</text></svg>';
+const _OG_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#060608"/><rect x="480" y="340" width="60" height="190" rx="12" fill="#ff2d4f" opacity=".45"/><rect x="570" y="220" width="60" height="310" rx="12" fill="#ff2d4f" opacity=".72"/><rect x="660" y="120" width="60" height="410" rx="12" fill="#ff2d4f"/><circle cx="690" cy="96" r="34" fill="#ff5c74"/><text x="600" y="520" font-family="system-ui,sans-serif" font-weight="700" font-size="38" fill="#f5f5f7" text-anchor="middle">${BRAND}</text><text x="600" y="568" font-family="system-ui,sans-serif" font-size="22" fill="#9696a0" text-anchor="middle">Automated forex execution, hosted and managed · $497</text></svg>';
 app.get('/favicon.svg', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=86400'); res.end(_LOGO_SVG); });
 app.get('/favicon.ico', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=86400'); res.end(_LOGO_SVG); });
 app.get('/og.svg', (req, res) => { res.setHeader('Content-Type','image/svg+xml'); res.setHeader('Cache-Control','public,max-age=3600'); res.end(_OG_SVG); });
@@ -2104,17 +2089,16 @@ app.get('/index.html', (req, res) => {
 // the cinematic curtain intro now lives on the homepage itself.
 app.get(['/intro', '/intro.html'], (req, res) => res.redirect(301, '/'));
 
-// Configurators (linked from bot delivery emails — license-gated client-side)
-app.get('/configurator', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'configurator.html'));
-});
+// Configurator (linked from the delivery email — license-gated client-side).
+// The crypto configurator that used to sit beside this one is gone with its
+// product; /configurator now 301s to the homepage further down.
 app.get('/configurator-forex', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'configurator-forex.html'));
 });
 
 // POST /api/demo/generate — public, rate-limited (3 req/IP/day)
 const _demoLimiter = rateLimit({ windowMs: 24*60*60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
-  handler: (req,res) => res.status(429).json({ error: 'Demo limit reached. Get full access at aicashsystem.space' }) });
+  handler: (req,res) => res.status(429).json({ error: `Demo limit reached. Open ${ACCESS_URL} for full access.` }) });
 app.post('/api/demo/generate', _demoLimiter, async (req, res) => {
   const { desc } = req.body;
   if (!desc || desc.length < 10) return res.status(400).json({ error: 'Describe your automation' });
@@ -2158,7 +2142,7 @@ app.get('/api/creatify/avatars', async (req, res) => {
     const r = await fetch('https://api.creatify.ai/api/ai-avatars/', { headers: _creatifyHdrs(req) });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.post('/api/creatify/create', async (req, res) => {
@@ -2179,7 +2163,7 @@ app.post('/api/creatify/create', async (req, res) => {
     const d = await r.json();
     if (!r.ok) return res.status(r.status).json(d);
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.post('/api/creatify/render/:id', async (req, res) => {
@@ -2190,7 +2174,7 @@ app.post('/api/creatify/render/:id', async (req, res) => {
     });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.get('/api/creatify/status/:id', async (req, res) => {
@@ -2199,7 +2183,7 @@ app.get('/api/creatify/status/:id', async (req, res) => {
     const r = await fetch(`https://api.creatify.ai/api/ai-ads/${req.params.id}/`, { headers: _creatifyHdrs(req) });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 // ── HEYGEN API ROUTES ──
 const _heyHeaders = () => ({ 'X-Api-Key': HEYGEN_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json' });
@@ -2210,7 +2194,7 @@ app.get('/api/heygen/avatars', async (req, res) => {
     const r = await fetch('https://api.heygen.com/v2/avatars', { headers: _heyHeaders() });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.get('/api/heygen/voices', async (req, res) => {
@@ -2219,7 +2203,7 @@ app.get('/api/heygen/voices', async (req, res) => {
     const r = await fetch('https://api.heygen.com/v2/voices', { headers: _heyHeaders() });
     const d = await r.json();
     res.json(d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.post('/api/heygen/generate', async (req, res) => {
@@ -2242,7 +2226,7 @@ app.post('/api/heygen/generate', async (req, res) => {
     const d = await r.json();
     if (d.error) return res.status(400).json({ error: d.error });
     res.json({ video_id: d.data?.video_id || d.video_id });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 app.get('/api/heygen/status/:id', async (req, res) => {
@@ -2253,7 +2237,7 @@ app.get('/api/heygen/status/:id', async (req, res) => {
     const r = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${req.params.id}`, { headers: hdrs });
     const d = await r.json();
     res.json(d.data || d);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // POST /api/heygen/photo-generate — talking photo video from base64 image
@@ -2294,114 +2278,36 @@ app.post('/api/heygen/photo-generate', async (req, res) => {
     const genData = await genResp.json();
     if (genData.error) return res.status(400).json({ error: genData.error });
     res.json({ video_id: genData.data?.video_id || genData.video_id });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // Explicit HTML page routes
 // Public pages — no auth required
-// Legacy crypto page (apex-bot.html) described a self-hosted "source code" product
-// that no longer matches the fully-hosted offering — redirect to the canonical
-// hosted crypto page so buyers never see the stale copy.
-app.get(['/apex-bot', '/apex-bot.html'], (req, res) => res.redirect(301, '/index'));
+// apex-bot.html sold the retired crypto product. The product is gone, so the
+// page is redirected rather than served — a live sales page for something that
+// cannot be delivered is worse than a 301.
+app.get(['/apex-bot', '/apex-bot.html', '/configurator', '/configurator.html',
+         '/bot-setup', '/bot-setup.html', '/deploy', '/deploy.html'],
+       (req, res) => res.redirect(301, '/index'));
 
-const publicPages = ['access','privacy','terms','impressum','intro-epic','app','demo','try','videos','screen','screens','tiktok-demo','video-maker','video-gen','forex','bot-setup','setup-guide','configurator','configurator-forex','deploy','ad','results','profile','flex','flex2','flex3','heygen','mt5-sim','trading-journal','affiliate','affiliate-terms','thank-you','thank-you-d24','chart','free','promo','guide'];
+// 'configurator', 'bot-setup' and 'deploy' are gone with the crypto product:
+// they configured Binance keys and walked a client through deploying the
+// retired Railway image. Serving them would hand a buyer instructions for a
+// product that cannot be delivered. 'configurator-forex' is the live one.
+// Only pages that belong to this platform. Everything the old AI-course and
+// Blueprint Studio products served — the fourteen course modules, the video
+// tools, the MetaTrader simulator (this product trades cTrader) and the crypto
+// beginner's guide (crypto is retired) — is gone. A visitor or an ad reviewer
+// reaching a "$3K/month automation course" from a forex ad is how ad accounts
+// get flagged, and none of it could be delivered anyway.
+const publicPages = ['privacy','terms','impressum','forex','configurator-forex','ad','results','profile','screens','trading-journal','thank-you'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
 });
 
 // ── BOT EMAIL HTML — funcție separată reutilizabilă ──────────────────────────
-function _buildBotEmailHtml(safeName, safeEmail, licenseKey = 'APEX-XXXX-XXXX-XXXX') {
-  const firstName = safeName.split(' ')[0];
-  const step = (n, title, body) => `<tr><td style="padding:0 0 12px"><table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#111114;border:1px solid rgba(255,255,255,0.06);border-radius:14px"><tr><td style="padding:22px 24px"><table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px"><tr><td style="background:linear-gradient(135deg,#e63946,#ff6b7a);border-radius:8px;width:28px;height:28px;text-align:center;vertical-align:middle;font-size:13px;font-weight:900;color:#fff;font-family:Arial,sans-serif">${n}</td><td style="padding:0 0 0 12px;font-size:14px;font-weight:800;color:#e4e4e7;font-family:Arial,sans-serif">${title}</td></tr></table><p style="margin:0;font-size:13px;color:#a1a1aa;font-family:Arial,sans-serif;line-height:1.75">${body}</p></td></tr></table></td></tr>`;
-
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-body,table,td,p,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
-table,td{mso-table-lspace:0;mso-table-rspace:0}
-body{margin:0;padding:0;background:#09090b}
-a{text-decoration:none}
-@media only screen and (max-width:600px){
-  .key-mono{font-size:17px!important;letter-spacing:2px!important}
-  .hero-h1{font-size:26px!important}
-  .outer-pad{padding:24px 12px 0!important}
-  .inner-pad{padding:28px 20px!important}
-  .btn-cta{padding:16px 32px!important;font-size:15px!important}
-}
-</style></head>
-<body style="margin:0;padding:0;background:#09090b">
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;min-height:100vh">
-<tr><td class="outer-pad" align="center" style="padding:40px 16px 0">
-<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">
-
-<tr><td align="center" style="padding:0 0 24px">
-  <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:#52525b;font-family:Arial,sans-serif">APEX TRADING SUITE</p>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-bottom:none;border-radius:20px 20px 0 0">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr><td style="background:linear-gradient(90deg,#e63946,#ff6b7a);height:3px;border-radius:19px 19px 0 0;font-size:0;line-height:0">&nbsp;</td></tr>
-    <tr><td class="inner-pad" align="center" style="padding:44px 40px 36px">
-      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 28px"><tr><td style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:24px;padding:7px 20px">
-        <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#22c55e;font-family:Arial,sans-serif">&#10003;&nbsp; PAYMENT CONFIRMED</p>
-      </td></tr></table>
-      <p class="hero-h1" style="margin:0 0 8px;font-size:34px;font-weight:900;color:#ffffff;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">Your Crypto bot is ready,</p>
-      <p class="hero-h1" style="margin:0 0 24px;font-size:34px;font-weight:900;color:#e63946;font-family:Arial,sans-serif;letter-spacing:-0.5px;line-height:1.15">${firstName}.</p>
-      <p style="margin:0;font-size:15px;color:#a1a1aa;font-family:Arial,sans-serif;line-height:1.75;max-width:420px">One tap to activate. Follow the steps below &mdash; you can be trading in under 10 minutes.</p>
-    </td></tr>
-  </table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 12px;text-align:center">
-  <a class="btn-cta" href="https://t.me/ApexTradeBot_official_bot?start=${licenseKey}" style="display:inline-block;background:linear-gradient(135deg,#e63946,#d62839);color:#ffffff;font-family:Arial,sans-serif;font-size:17px;font-weight:900;padding:20px 56px;border-radius:14px;text-decoration:none;letter-spacing:0.3px;box-shadow:0 4px 20px rgba(230,57,70,0.35)">&#128640; Open your Crypto Bot &rarr;</a>
-</td></tr>
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:4px 32px 32px;text-align:center">
-  <p style="margin:0;font-size:12px;color:#52525b;font-family:Arial,sans-serif">Tap the button &mdash; Telegram opens and the bot activates automatically</p>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#09090b;border:1px solid rgba(230,57,70,0.2);border-radius:14px"><tr>
-    <td style="background:linear-gradient(180deg,#e63946,#d62839);width:4px;border-radius:14px 0 0 14px;font-size:0;line-height:0">&nbsp;</td>
-    <td style="padding:24px 24px">
-      <p style="margin:0 0 16px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#ff6b7a;font-family:Arial,sans-serif">YOUR LICENSE KEY</p>
-      <p class="key-mono" style="margin:0 0 12px;font-family:'Courier New',Courier,monospace;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:4px;text-align:center;background:#111114;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:18px 14px;word-break:break-all">${licenseKey}</p>
-      <p style="margin:0;font-size:11px;color:#71717a;font-family:Arial,sans-serif;text-align:center;line-height:1.6">Save this key &mdash; you'll need it if you contact support</p>
-    </td>
-  </tr></table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 24px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-    <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-    <td style="white-space:nowrap;padding:0 14px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#52525b;font-family:Arial,sans-serif">SETUP STEPS</td>
-    <td style="border-top:1px solid rgba(255,255,255,0.06)"></td>
-  </tr></table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 20px">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    ${step(1, 'Open the bot on Telegram', 'Press the red button above. The bot sends you a welcome message and activates your license automatically.')}
-    ${step(2, 'Connect your cTrader account', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/ctrader</span> in the chat. Log in with your cTID &mdash; the bot guides you step by step.')}
-    ${step(3, 'Start trading', 'Send <span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;color:#e2e8f0;font-family:\'Courier New\',monospace;font-size:11px;font-weight:700">/start</span> to go live on your connected cTrader account &mdash; real signals, real trades from the first run.')}
-  </table>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 20px">
-  <p style="margin:0;font-size:11px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center"><strong style="color:#52525b">Risk Disclosure</strong> &mdash; Crypto trading involves substantial risk. Only invest what you can afford to lose. This is an automation tool, not financial advice.</p>
-</td></tr>
-
-<tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
-  <p style="margin:0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you requested immediate supply and waived the 14-day withdrawal right per Art. 16(m) EU Directive 2011/83/EU. All sales final once access is delivered. <a href="https://aicashsystem.space/terms" style="color:#52525b">Terms</a></p>
-</td></tr>
-
-<tr><td align="center" style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 20px 20px;padding:28px 40px 32px">
-  <p style="margin:0 0 8px;font-size:13px;color:#71717a;font-family:Arial,sans-serif">Need help? We're here for you:</p>
-  <a href="mailto:supportaicashsystem@gmail.com" style="color:#ff6b7a;font-size:14px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
-  <p style="margin:20px 0 0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif">&copy; 2025 Apex Trading Suite &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#3f3f46;text-decoration:none">aicashsystem.space</a></p>
-</td></tr>
-
-<tr><td style="height:40px;font-size:0;line-height:0">&nbsp;</td></tr>
-</table></td></tr></table></body></html>`;}
+// _buildBotEmailHtml — the crypto bot's delivery email — removed with the product.
 
 // ── FOREX BOT EMAIL ─────────────────────────────────────────────────────────
 function _buildForexEmailHtml(safeName, safeEmail, licenseKey = 'FORX-XXXX-XXXX-XXXX') {
@@ -2484,64 +2390,41 @@ a{text-decoration:none}
 </td></tr>
 
 <tr><td style="background:#0c0c0f;border-left:1px solid rgba(255,255,255,0.08);border-right:1px solid rgba(255,255,255,0.08);padding:0 32px 28px">
-  <p style="margin:0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you requested immediate supply and waived the 14-day withdrawal right per Art. 16(m) EU Directive 2011/83/EU. All sales final once access is delivered. <a href="https://aicashsystem.space/terms" style="color:#52525b">Terms</a></p>
+  <p style="margin:0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif;line-height:1.8;text-align:center">By completing this purchase you requested immediate supply and waived the 14-day withdrawal right per Art. 16(m) EU Directive 2011/83/EU. All sales final once access is delivered. <a href="${ACCESS_URL}" style="color:#52525b">Terms</a></p>
 </td></tr>
 
 <tr><td align="center" style="background:#0c0c0f;border:1px solid rgba(255,255,255,0.08);border-top:1px solid rgba(255,255,255,0.05);border-radius:0 0 20px 20px;padding:28px 40px 32px">
   <p style="margin:0 0 8px;font-size:13px;color:#71717a;font-family:Arial,sans-serif">Need help? We're here for you:</p>
-  <a href="mailto:supportaicashsystem@gmail.com" style="color:#ff6b7a;font-size:14px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">supportaicashsystem@gmail.com</a>
-  <p style="margin:20px 0 0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif">&copy; 2025 Apex Trading Suite &nbsp;&middot;&nbsp; <a href="https://aicashsystem.space" style="color:#3f3f46;text-decoration:none">aicashsystem.space</a></p>
+  <a href="mailto:${SUPPORT_EMAIL}" style="color:#ff6b7a;font-size:14px;font-weight:700;font-family:Arial,sans-serif;text-decoration:none">${SUPPORT_EMAIL}</a>
+  <p style="margin:20px 0 0;font-size:10px;color:#3f3f46;font-family:Arial,sans-serif">&copy; 2026 ${BRAND} &nbsp;&middot;&nbsp; <a href="${ACCESS_URL}" style="color:#3f3f46;text-decoration:none">Open the platform</a></p>
 </td></tr>
 
 <tr><td style="height:40px;font-size:0;line-height:0">&nbsp;</td></tr>
 </table></td></tr></table></body></html>`;}
 
-// ── BOT ACCESS — streams a clean ZIP; requires valid HMAC-signed license key
-app.get('/bot-access', async (req, res) => {
-  const key = req.query.key || req.headers['x-license-key'];
-  if (!key) return res.status(403).send('License key required. Add ?key=APEX-XXXX-XXXX-XXXX');
-  // Validate HMAC signature — not just format
-  if (!verifyLicenseKeyHmac(key)) {
-    return res.status(403).send('Invalid license key.');
-  }
-  console.log('[BOT-ACCESS] download with key:', key.slice(0, 9) + '…');
-  const archiver = require('archiver');
-  const botDir = path.join(__dirname, 'apex-trade-bot');
-  res.setHeader('Content-Disposition', 'attachment; filename="apex-trade-bot.zip"');
-  res.setHeader('Content-Type', 'application/zip');
-  const archive = archiver('zip', { zlib: { level: 6 } });
-  archive.on('error', (err) => {
-    console.error('[BOT-ACCESS] archive error:', err.message);
-    if (!res.headersSent) res.status(500).send('Could not generate bot package. Contact support.');
-  });
-  archive.pipe(res);
-  // Include src/, package.json, railway.json — no node_modules
-  archive.directory(path.join(botDir, 'src'), 'src');
-  archive.file(path.join(botDir, 'package.json'), { name: 'package.json' });
-  archive.file(path.join(botDir, 'railway.json'), { name: 'railway.json' });
-  archive.finalize();
-});
+// ── BOT ACCESS — REMOVED.
+// This streamed a ZIP of apex-trade-bot/ (the retired crypto product) to any
+// holder of an HMAC-valid key. That directory no longer exists, so the route
+// could only 500 — and shipping self-hosted trading source is an execution
+// path outside the canonical architecture regardless. The Forex product is
+// delivered through Telegram, never as source.
 
 // ── EMAIL STATUS — requires owner secret
 app.get('/api/email-status', (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   res.json({ resend: !!RESEND_API_KEY, brevo: !!BREVO_API_KEY, smtp: !!transporter, sender: SENDER_EMAIL || 'not set' });
 });
 
 // ── RESEND DNS RECORDS — requires owner secret
 app.get('/api/resend-dns', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
   try {
     const r = await fetch('https://api.resend.com/domains', {
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}` },
     });
     const data = await r.json();
-    const domain = (data.data || []).find(d => d.name === 'aicashsystem.space');
+    const domain = (data.data || []).find(d => d.name === (process.env.RESEND_DOMAIN || 'aicashsystem.space'));
     if (!domain) return res.json({ error: 'Domain not found in Resend', allDomains: data.data || [], rawResponse: data });
     // Get full domain details
     const r2 = await fetch(`https://api.resend.com/domains/${domain.id}`, {
@@ -2554,14 +2437,12 @@ app.get('/api/resend-dns', async (req, res) => {
         `Type: ${rec.type}\nHost: ${rec.name}\nValue: ${rec.value}\nPriority: ${rec.priority || 'N/A'}\n`
       ).join('\n---\n\n')
     );
-  } catch(e) { res.json({ error: e.message }); }
+  } catch(e) { res.json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // ── DEBUG: test Resend directly — requires owner secret
 app.get('/api/test-resend', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   if (!RESEND_API_KEY) return res.json({ error: 'RESEND_API_KEY not set' });
   const to = req.query.email || 'test@example.com';
   const resendFrom = process.env.RESEND_FROM || 'onboarding@resend.dev';
@@ -2574,14 +2455,12 @@ app.get('/api/test-resend', async (req, res) => {
     });
     const body = await r.json();
     res.json({ status: r.status, ok: r.ok, body, from: resendFrom });
-  } catch(e) { res.json({ error: e.message }); }
+  } catch(e) { res.json({ error: 'Request failed.', id: _errId(e) }); }
 });
 
 // GET /api/test-brevo?email=X — requires owner secret
 app.get('/api/test-brevo', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const to = req.query.email || SENDER_EMAIL;
   if (!BREVO_API_KEY) return res.json({ error: 'BREVO_API_KEY not set' });
   try {
@@ -2603,9 +2482,7 @@ app.get('/api/test-brevo', async (req, res) => {
 
 // GET /api/test-resend?secret=X&email=Y — debug Resend
 app.get('/api/test-resend', async (req, res) => {
-  const secret = req.query.secret;
-  const expected = process.env.BOT_EMAIL_SECRET;
-  if (!expected || secret !== expected) return res.status(403).json({ error: 'Forbidden' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const to = req.query.email || SENDER_EMAIL;
   const resendKey = process.env.RESEND_API_KEY;
   const resendFrom = process.env.RESEND_FROM;
@@ -2627,31 +2504,34 @@ app.get('/api/test-resend', async (req, res) => {
 // GET  (browser): /api/send-bot-email?secret=X&email=you@gmail.com&name=Alex
 // POST (curl):    /api/send-bot-email?secret=X  body: { email, name }
 app.get('/api/send-bot-email', async (req, res) => {
-  req.body = { email: req.query.email, name: req.query.name, secret: req.query.secret };
+  req.body = { email: req.query.email, name: req.query.name };
   // fall through to shared handler below
   return _sendBotEmailHandler(req, res);
 });
 app.post('/api/send-bot-email', async (req, res) => {
-  req.body.secret = req.body.secret || req.query.secret;
   return _sendBotEmailHandler(req, res);
 });
 async function _sendBotEmailHandler(req, res) {
-  const secret = req.query.secret || req.body.secret;
+  const secretOk = _ownerSecretOk(req);
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
   const isPreview = req.query.preview === '1';
 
   if (!adminSecret) {
     return res.status(403).json({ error: 'BOT_EMAIL_SECRET not set in env — add it on Render' });
   }
-  if (secret !== adminSecret) {
-    return res.status(403).json({ error: 'Wrong secret', hint: `Expected length: ${adminSecret.length} chars, got: ${(secret||'').length} chars` });
+  if (!secretOk) {
+    // The old reply included the expected character count. That is an oracle
+    // for the licence-signing secret: it tells anyone who asks exactly how
+    // long the value they are guessing is, removing the largest unknown
+    // before they start.
+    return _denyOwner(req, res);
   }
 
   // Preview mode — shows email in browser without actually sending (requires valid secret)
   if (isPreview) {
     const name  = req.query.name || req.body.name || 'Alex';
     const email = req.query.email || req.body.email || 'preview@example.com';
-    const previewHtml = _buildBotEmailHtml(_he(name), _he(email), 'APEX-DEMO-PREW-2025');
+    const previewHtml = _buildForexEmailHtml(_he(name), _he(email), 'FORX-DEMO-PREW-2025');
     return res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview: Bot Delivery Email</title>
       <style>body{margin:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;padding:40px 20px;font-family:sans-serif}
       .bar{background:#2d2d44;border:1px solid #444;border-radius:8px;padding:10px 20px;margin-bottom:24px;color:#aaa;font-size:13px;text-align:center;max-width:600px;width:100%}
@@ -2666,8 +2546,8 @@ async function _sendBotEmailHandler(req, res) {
   if (!email) return res.status(400).json({ error: 'email required' });
 
   // Generate a real license key for test sends
-  const testKey = generateLicenseKey();
-  const botEmailHtml = _buildBotEmailHtml(_he(name), _he(email), testKey);
+  const testKey = generateForexKey();
+  const botEmailHtml = _buildForexEmailHtml(_he(name), _he(email), testKey);
 
   // Save test license to Supabase
   if (supabase) {
@@ -2675,147 +2555,38 @@ async function _sendBotEmailHandler(req, res) {
     catch(e) { /* non-fatal */ }
   }
 
-  const result = await _sendEmail({ to: email, subject: '🤖 Your Apex Trade Bot is ready — access inside', html: botEmailHtml, fromName: 'Apex.Bot' });
+  const result = await _sendEmail({ to: email, subject: `${BRAND} — your account is ready`, html: botEmailHtml, fromName: BRAND });
   return res.json({ success: result.ok, to: email, licenseKey: testKey, method: result.method, error: result.error });
 }
 
-// Protected pages — require any valid course purchase
-const protectedPages = ['videos','blueprints','ai-builder','course-starter',
-  'module1','module2','module3','module4','module5','module6','module7','module8','module9',
-  'module10','module11','module12','module13','module14','chat'];
-protectedPages.forEach(p => {
-  app.get(`/${p}.html`, requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
-  app.get(`/${p}`, requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`)));
-});
 
-// Pro-only pages
-app.get('/course-pro.html', requireCourse('pro'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'course-pro.html')));
-app.get('/course-pro', requireCourse('pro'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'course-pro.html')));
-
-app.get('/tiktok', requireCourse('any'), (req, res) => res.sendFile(path.join(__dirname, 'public', 'videos.html')));
 
 // ════════════════════════════════════════
-// AI BUSINESS BUILDER ROUTES
-// ════════════════════════════════════════
-
-app.post('/api/builder/plan', auth, _aiLimiter, async (req, res) => {
-  const { passions, hours, budget, name } = req.body;
-  if (!passions) return res.status(400).json({ error: 'Answers required' });
-
-  const prompt = `You are an expert online business strategist. Based on this user profile, create a complete online business plan. Return ONLY valid JSON, no markdown.
-
-USER:
-- Name: ${name || 'Friend'}
-- Passions/Skills: ${passions}
-- Hours per week: ${hours || '5-10h'}
-- Starting budget: ${budget || '$0'}
-
-Return this exact JSON structure:
-{
-  "business": {
-    "model": "specific business model name",
-    "description": "2 sentences what they will do daily",
-    "why_perfect": "1 sentence why this fits their specific profile",
-    "income_potential": "realistic range after 90 days (e.g. $500–$2,000/month)"
-  },
-  "brand": {
-    "name": "brand name (1-2 words, catchy)",
-    "tagline": "tagline under 7 words",
-    "personality": "3 adjectives",
-    "target_audience": "who they sell to"
-  },
-  "seven_day_plan": [
-    {"day": 1, "focus": "Setup & Foundation", "tasks": ["specific task", "specific task", "specific task"]},
-    {"day": 2, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 3, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 4, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 5, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 6, "focus": "...", "tasks": ["...", "...", "..."]},
-    {"day": 7, "focus": "First Outreach", "tasks": ["...", "...", "..."]}
-  ],
-  "content_hooks": [
-    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"},
-    {"platform": "Instagram", "hook": "opening 3 seconds exactly", "script": "caption 100 words"},
-    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"},
-    {"platform": "Instagram Reels", "hook": "opening 3 seconds exactly", "script": "script outline"},
-    {"platform": "TikTok", "hook": "opening 3 seconds exactly", "script": "30-second script outline"}
-  ],
-  "ad_copy": {
-    "headline": "ad headline under 10 words",
-    "body": "50-word ad body text",
-    "cta": "button text"
-  },
-  "daily_routine": [
-    {"time": "Morning", "duration": "30 min", "task": "specific task"},
-    {"time": "Midday", "duration": "1 hour", "task": "specific task"},
-    {"time": "Evening", "duration": "45 min", "task": "specific task"}
-  ],
-  "logo_prompt": "minimalist vector logo for [brand name], [describe style based on niche], clean lines, white background, professional"
-}`;
-
-  try {
-    let result;
-    if (OPENAI_KEY) {
-      const r = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-        body: JSON.stringify({ model: 'gpt-4o', max_tokens: 3500, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] })
-      });
-      const d = await r.json();
-      if (d.choices?.[0]) result = JSON.parse(d.choices[0].message.content);
-    } else if (anthropic) {
-      const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 3500, messages: [{ role: 'user', content: prompt }] });
-      const text = msg.content[0].text;
-      result = JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim());
-    }
-    if (!result) return res.status(500).json({ error: 'No AI provider configured' });
-    addLog(`Business plan generated for ${name || 'user'}`, 'builder', 'success');
-    res.json(result);
-  } catch (e) {
-    console.error('Builder plan error:', e);
-    res.status(500).json({ error: 'Generation failed: ' + e.message });
-  }
-});
-
-app.post('/api/builder/logo', auth, _aiLimiter, async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'Prompt required' });
-  if (!OPENAI_KEY) return res.status(400).json({ error: 'OpenAI key required for logo generation' });
-  try {
-    const r = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-      body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size: '1024x1024', quality: 'standard' })
+app.post('/admin/sync-bot-repo', async (req, res) => {
+  // Was GET with ?secret=<owner secret>&token=ghp_.... Two credentials in one
+  // URL, on a route that WRITES to a GitHub repository — so a single proxy log
+  // line handed over both the owner secret and a token with repo scope.
+  //
+  // POST, both credentials in headers, and ?token= refused outright: a request
+  // that carried one has already published it, and the honest response is to
+  // fail and let the operator revoke rather than to accept it quietly.
+  if (req.query.token) {
+    return res.status(403).json({
+      error: 'A GitHub token in the URL is not accepted.',
+      code: 'TOKEN_IN_URL',
+      detail: 'This token has been written to the request log. Revoke it, then send it as the X-GitHub-Token header or set GH_TOKEN.',
     });
-    const d = await r.json();
-    if (d.data?.[0]) { addLog('Logo generated', 'builder', 'success'); return res.json({ url: d.data[0].url }); }
-    res.status(500).json({ error: d.error?.message || 'Logo generation failed' });
-  } catch (e) {
-    res.status(500).json({ error: 'Logo generation failed. Please try again.' });
   }
-});
-
-
-// ════════════════════════════════════════
-// ADMIN: SYNC BOT FILES → GitHub repo
-// Usage: GET /admin/sync-bot-repo?secret=BOT_EMAIL_SECRET&token=ghp_xxx[&bot=crypto|forex]
-// ════════════════════════════════════════
-app.get('/admin/sync-bot-repo', async (req, res) => {
-  const secret = req.query.secret || '';
-  // Token can come from the URL (?token=ghp_...) or, preferably, a Render env
-  // var GH_TOKEN so it stays out of browser history and URLs.
-  const ghToken = req.query.token || process.env.GH_TOKEN || '';
-  const bot = (req.query.bot || 'crypto').toLowerCase();
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const adminSecret = process.env.BOT_EMAIL_SECRET || '';
+  const ghToken = String(req.headers['x-github-token'] || process.env.GH_TOKEN || '');
+  if (!adminSecret) return res.status(500).json({ error: 'Service not configured.' });
 
-  if (!adminSecret) return res.status(500).json({ error: 'BOT_EMAIL_SECRET not set' });
-  if (secret !== adminSecret) return res.status(403).json({ error: 'Wrong secret' });
-  if (!ghToken) return res.status(400).json({ error: 'GitHub token required — add GH_TOKEN in Render env, or pass ?token=ghp_...' });
-  if (!['crypto', 'forex'].includes(bot)) return res.status(400).json({ error: "bot must be 'crypto' or 'forex'" });
+  if (!ghToken) return res.status(400).json({ error: 'GitHub token required — set GH_TOKEN, or send the X-GitHub-Token header.' });
 
   const fs = require('fs');
   const OWNER = 'alexgabriel225sefu-dotcom';
-  const REPO  = bot === 'forex' ? 'apex-forex-bot' : 'apex-trade-bot';
+  const REPO  = 'apex-forex-bot';
   const botDir = path.join(__dirname, REPO);
 
   // Recursively collect deployable source files (skips caches/tests/git noise).
@@ -2841,40 +2612,23 @@ app.get('/admin/sync-bot-repo', async (req, res) => {
   }
   const filesToPush = walk(botDir);
 
-  const readmeContent = bot === 'forex' ? `# Apex Forex Bot 🤖
+  const readmeContent = `# ${BRAND}
 
-AI-powered forex trading bot (OANDA + MT5 bridge). Deploy with one click on Railway — runs 24/7, never sleeps.
+Automated forex execution on cTrader. The platform is hosted and managed — there
+is nothing to install, deploy or keep running.
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
+## Access
+Open the platform on Telegram: [${ACCESS_URL}](${ACCESS_URL})
 
-## Setup
-The only variable you set is your license key — everything else is configured
-on [aicashsystem.space/configurator-forex](https://aicashsystem.space/configurator-forex)
-and loaded automatically at startup.
-
-| Variable | Value |
-|----------|-------|
-| \`LICENSE_KEY\` | Your key from purchase email |
-
-## License
-Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).
-` : `# Apex Trade Bot 🤖
-
-AI-powered crypto trading bot. Deploy with one click on Railway — runs 24/7, never sleeps.
-
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/${OWNER}/${REPO})
-
-## Setup
-The only variable you set is your license key — everything else is configured
-on [aicashsystem.space/configurator](https://aicashsystem.space/configurator)
-and loaded automatically at startup.
+Your licence key arrives by email after purchase. Opening the Telegram link from
+that email activates the account; no configuration is copied by hand.
 
 | Variable | Value |
 |----------|-------|
-| \`LICENSE_KEY\` | Your key from purchase email |
+| \`LICENSE_KEY\` | Your key from the purchase email |
 
-## License
-Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsystem.space).
+## Licence
+Requires a valid licence key. Open [${ACCESS_URL}](${ACCESS_URL}) to get one.
 `;
 
   const results = [];
@@ -2935,7 +2689,7 @@ Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsys
   // mistaken earlier push (e.g. apex-forex-bot/ committed inside apex-trade-bot).
   // Each bot must live in its own repo — a nested folder makes Railway build the
   // wrong service. We mirror by deleting any blob under the stray bot dir.
-  const strayDir = bot === 'forex' ? 'apex-trade-bot' : 'apex-forex-bot';
+  const strayDir = 'apex-trade-bot';
   let deleted = 0;
   try {
     const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/HEAD?recursive=1`, {
@@ -2974,72 +2728,447 @@ Requires a valid license key. Purchase at [aicashsystem.space](https://aicashsys
 // NOTE: must be registered BEFORE the catch-all 404 below.
 // ════════════════════════════════════════
 function _botConfigKey() {
-  const s = process.env.JWT_SECRET || process.env.COOKIE_SECRET || 'bot-cfg-fallback-change-me';
+  // No committed fallback. This literal used to be `bot-cfg-fallback-change-me`,
+  // published in this repository — anyone who could read the bot_configs table
+  // could decrypt every client's stored configuration with a key taken from
+  // the source. Refusing is the only safe answer when no real secret exists.
+  const s = process.env.JWT_SECRET || process.env.COOKIE_SECRET;
+  if (!s) throw new Error('bot config encryption unavailable: JWT_SECRET/COOKIE_SECRET not set');
   return crypto.createHash('sha256').update(s).digest();
 }
+// AES-256-GCM, replacing AES-256-CBC.
+//
+// CBC encrypts but does not AUTHENTICATE. Anyone who could write the
+// bot_configs row could flip bits in the ciphertext and the server would
+// decrypt the result without complaint — and this blob decides RISK_PER_TRADE,
+// PAPER_TRADING and the broker environment of a bot that trades real money.
+// Silent corruption of a padding-correct block is a plausible outcome; a
+// padding oracle against an endpoint that reports decryption failure is
+// another. GCM's tag makes both a hard failure instead.
+//
+// FORMAT
+//   v2:<iv-hex>:<tag-hex>:<ciphertext-hex>     GCM, 96-bit IV, 128-bit tag
+//   <iv-hex>:<ciphertext-hex>                  legacy CBC, read-only
+//
+// A fresh random IV per operation, from the CSPRNG. GCM repeats catastrophically
+// under a reused nonce — it leaks the XOR of both plaintexts and, worse, the
+// authentication subkey — so the IV is never derived from anything.
+const _GCM_IV_BYTES = 12;      // 96 bits: the size GCM is specified for
+const _GCM_TAG_BYTES = 16;
+
 function encryptBotConfig(obj) {
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-cbc', _botConfigKey(), iv);
+  const iv = crypto.randomBytes(_GCM_IV_BYTES);
+  const cipher = crypto.createCipheriv('aes-256-gcm', _botConfigKey(), iv);
   const enc = Buffer.concat([cipher.update(JSON.stringify(obj), 'utf8'), cipher.final()]);
-  return iv.toString('hex') + ':' + enc.toString('hex');
+  return ['v2', iv.toString('hex'), cipher.getAuthTag().toString('hex'),
+          enc.toString('hex')].join(':');
 }
+
+// Returns { config, legacy }. `legacy` true means the row was written by the
+// CBC version and should be re-encrypted — see the read path below, which does
+// exactly that and persists the result, so a row migrates the first time it is
+// used and CBC is never written again.
+//
+// LIMITATION, stated rather than buried: legacy rows have no authentication
+// tag. There is no way to tell a genuine old ciphertext from one an attacker
+// altered while it was CBC — that information was never stored. Migration
+// therefore carries forward whatever is there; it cannot retroactively verify
+// it. The window closes as rows migrate, and only for rows that migrate.
 function decryptBotConfig(data) {
-  const [ivHex, encHex] = data.split(':');
-  const dc = crypto.createDecipheriv('aes-256-cbc', _botConfigKey(), Buffer.from(ivHex, 'hex'));
-  return JSON.parse(Buffer.concat([dc.update(Buffer.from(encHex, 'hex')), dc.final()]).toString('utf8'));
+  const str = String(data || '');
+  const parts = str.split(':');
+
+  if (parts[0] === 'v2') {
+    if (parts.length !== 4) throw new Error('bot config: malformed v2 record');
+    const [, ivHex, tagHex, encHex] = parts;
+    const iv = Buffer.from(ivHex, 'hex');
+    const tag = Buffer.from(tagHex, 'hex');
+    if (iv.length !== _GCM_IV_BYTES || tag.length !== _GCM_TAG_BYTES) {
+      throw new Error('bot config: malformed v2 record');
+    }
+    const dc = crypto.createDecipheriv('aes-256-gcm', _botConfigKey(), iv);
+    dc.setAuthTag(tag);
+    // final() throws when the tag does not verify. Deliberately NOT caught
+    // here: a failed tag means the ciphertext is not what was written, and
+    // continuing with the plaintext would defeat the point of having a tag.
+    const out = Buffer.concat([dc.update(Buffer.from(encHex, 'hex')), dc.final()]);
+    return { config: JSON.parse(out.toString('utf8')), legacy: false };
+  }
+
+  if (parts.length !== 2) throw new Error('bot config: unrecognised record');
+  const [ivHex, encHex] = parts;
+  const iv = Buffer.from(ivHex, 'hex');
+  if (iv.length !== 16) throw new Error('bot config: malformed legacy record');
+  const dc = crypto.createDecipheriv('aes-256-cbc', _botConfigKey(), iv);
+  const out = Buffer.concat([dc.update(Buffer.from(encHex, 'hex')), dc.final()]);
+  return { config: JSON.parse(out.toString('utf8')), legacy: true };
+}
+
+// Which configuration keys the bot may receive.
+//
+// The stored blob can contain anything a configurator once wrote, including
+// keys for settings that no longer exist and credentials for brokers that can
+// no longer run. Returning all of it is gratuitous: the bot discards what it
+// cannot apply anyway, so everything else is a secret travelling for no reason.
+//
+// The list is generated from apex/settings_policy.py — the same allowlist that
+// decides what the bot will accept — rather than written out again here. A
+// second copy in JavaScript is the copy that drifts, and the failure is silent:
+// add a setting in Python only, and the bot quietly stops receiving it.
+const _BOT_CONFIG_FIELDS = (() => {
+  try {
+    const doc = JSON.parse(require('fs').readFileSync(
+      require('path').join(__dirname, 'config', 'bot-config-fields.json'), 'utf8'));
+    return new Set([...(doc.runtime || []), ...(doc.provisioning || [])]);
+  } catch (e) {
+    // Fail CLOSED-ish: an unreadable allowlist must not become "send
+    // everything". null means "filter unavailable", and the route refuses
+    // rather than guessing.
+    console.error('[BOT-CONFIG] field allowlist unreadable', _errId(e));
+    return null;
+  }
+})();
+
+function _filterBotConfig(config) {
+  if (!_BOT_CONFIG_FIELDS) return null;
+  const out = {};
+  let dropped = 0;
+  for (const [k, v] of Object.entries(config || {})) {
+    if (_BOT_CONFIG_FIELDS.has(String(k).toUpperCase())) out[k] = v;
+    else dropped++;
+  }
+  // Names only — a dropped key can still be carrying a credential.
+  if (dropped) console.log(`[BOT-CONFIG] withheld ${dropped} key(s) the bot cannot apply`);
+  return out;
 }
 
 // POST /api/save-bot-config  — called by configurator when client clicks "Save & Deploy"
 app.post('/api/save-bot-config', async (req, res) => {
-  const { key, config } = req.body || {};
-  if (!key || !config || typeof config !== 'object') return res.status(400).json({ error: 'key and config required' });
-  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+  // The licence key used to BE the authorisation here: whoever held it could
+  // rewrite the stored configuration — which decides RISK_PER_TRADE, the
+  // broker environment and PAPER_TRADING — forever, because a licence key does
+  // not expire. The read path was moved to short-lived sessions in the
+  // previous pass and this one was left behind, so the credential kept its
+  // most dangerous power while appearing to have lost it.
+  //
+  // Now it needs a session with bot:config:write, obtained by presenting the
+  // licence once to /api/bot-session.
+  const body = req.body || {};
 
-  const { data: lic } = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
-  if (!lic) return res.status(403).json({ error: 'Invalid or inactive license key' });
+  // A licence key in the body is refused rather than ignored. Accepting the
+  // session while tolerating the key alongside it leaves callers sending the
+  // credential indefinitely, and the point is that it stops travelling.
+  if (body.key || body.licenseKey || body.licenceKey) {
+    return res.status(401).json({
+      error: 'A licence key is not accepted here.',
+      code: 'LICENCE_NOT_ACCEPTED',
+      detail: 'POST {"licenseKey":"...","scope":"bot:config:write"} to /api/bot-session and send the returned token as Authorization: Bearer <token>.',
+    });
+  }
+
+  const sess = _botSession(req, SCOPE_WRITE);
+  if (!sess) {
+    // A read token reaching here is the case worth being explicit about: it
+    // is a valid credential, just not for this.
+    const anyScope = _botSession(req, null);
+    if (anyScope) {
+      return res.status(403).json({
+        error: 'This session cannot modify configuration.',
+        code: 'INSUFFICIENT_SCOPE',
+        required: SCOPE_WRITE,
+      });
+    }
+    return res.status(401).json({ error: 'Authorization failed.' });
+  }
+
+  const config = body.config;
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return res.status(400).json({ error: 'config required' });
+  }
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+
+  // The licence being written to comes from the SESSION, never from the
+  // request. A caller must not be able to name a different licence alongside
+  // a valid session and have their configuration land on someone else's bot.
+  const key = sess.licenseKey;
+
+  let lic = null;
+  try {
+    const r = await supabase.from('licenses')
+      .select('active, revoked_at, expires_at')
+      .eq('key', key).eq('active', true).single();
+    lic = r.data;
+  } catch (e) {
+    // Fail closed: a database that cannot answer is not permission to write.
+    console.error('[SAVE-BOT-CONFIG] licence lookup failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+  // Re-checked at write time, not just at session issue: a licence can be
+  // revoked or expire inside the session's ten-minute window.
+  const stillValid = lic && !lic.revoked_at
+    && (!lic.expires_at || new Date(lic.expires_at).getTime() > Date.now());
+  if (!stillValid) {
+    _revokeBotSessionsFor(key);
+    return res.status(403).json({ error: 'Invalid or inactive licence.' });
+  }
 
   const encrypted = encryptBotConfig(config);
   const { error } = await supabase.from('bot_configs').upsert(
     { license_key: key, config: encrypted, updated_at: new Date().toISOString() },
     { onConflict: 'license_key' }
   );
-  if (error) return res.status(500).json({ error: 'Save failed. Run: CREATE TABLE bot_configs (license_key TEXT PRIMARY KEY, config TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW());', detail: error.message });
+  if (error) {
+    // The old reply pasted the CREATE TABLE statement and the raw driver
+    // message to the client — schema and internals handed to anyone who could
+    // provoke a failure.
+    const id = _errId(error);
+    console.error(`[SAVE-BOT-CONFIG] upsert failed (id ${id})`);
+    return res.status(500).json({ error: 'Could not save configuration.', id });
+  }
+  // Configuration changed, so any token still holding the old view is stale.
+  _revokeBotSessionsFor(key);
   res.json({ success: true });
 });
 
-// GET /api/bot-config?key=APEX-XXXX  — called by bot on startup to fetch remote config
-app.get('/api/bot-config', async (req, res) => {
-  const key = (req.query.key || '').trim();
-  if (!key) return res.status(400).json({ error: 'key required' });
-  if (!supabase) return res.status(500).json({ error: 'Database not configured' });
+// ════════════════════════════════════════
+// BOT SESSIONS — a licence key is an entitlement, not a bearer token.
+//
+// /api/bot-config?key=LICENSE_KEY made the licence key do both jobs: it
+// identified which customer this is AND authorised reading their stored
+// configuration, which contains broker credentials. That is wrong twice over.
+//
+//   * It is a permanent credential. A licence key does not expire, is printed
+//     in the customer's email, is pasted into a deployment dashboard, and is
+//     typed into a configurator. Anything that leaks it leaks standing access.
+//   * It was in the QUERY STRING, so it reached every proxy log, access log
+//     and browser history along the way.
+//
+// The licence is now presented once, in a POST body, and exchanged for a
+// short-lived opaque token that carries ONE scope: bot:config:read. That token
+// cannot manage licences, cannot write configuration, and cannot administer
+// anything — a compromise of the fetch path stays a compromise of the fetch
+// path.
+//
+// Tokens live in memory. This service runs a single instance, so that is
+// sufficient; it is stated because it would NOT be sufficient behind more
+// than one, where a restart or a second instance would reject live tokens.
+const BOT_SESSION_TTL_MS = 10 * 60 * 1000;      // 10 minutes
+const BOT_SESSION_MAX = 5000;
+const _botSessions = new Map();                 // token -> {licenseKey, product, scope, exp}
 
-  const { data: lic } = await supabase.from('licenses').select('active').eq('key', key).eq('active', true).single();
-  if (!lic) return res.status(403).json({ error: 'Invalid license key' });
-
-  const { data, error } = await supabase.from('bot_configs').select('config').eq('license_key', key).single();
-  if (error || !data) return res.status(404).json({ error: 'No config found for this key. Complete the configurator at aicashsystem.space/configurator first.' });
-
-  try {
-    const config = decryptBotConfig(data.config);
-    res.json({ success: true, config });
-  } catch(e) {
-    res.status(500).json({ error: 'Config decryption failed' });
+function _pruneBotSessions() {
+  const now = Date.now();
+  for (const [t, sess] of _botSessions) if (sess.exp <= now) _botSessions.delete(t);
+  if (_botSessions.size > BOT_SESSION_MAX) {
+    const oldest = [..._botSessions.entries()].sort((a, b) => a[1].exp - b[1].exp);
+    for (let i = 0; i < oldest.length / 2; i++) _botSessions.delete(oldest[i][0]);
   }
+}
+
+// Scopes are explicit and disjoint. A token issued to READ configuration must
+// not be able to WRITE it: the configuration decides RISK_PER_TRADE, the
+// broker environment and PAPER_TRADING, so a read path compromise must not
+// become a write path compromise.
+const SCOPE_READ = 'bot:config:read';
+const SCOPE_WRITE = 'bot:config:write';
+const _VALID_SCOPES = new Set([SCOPE_READ, SCOPE_WRITE]);
+
+function _issueBotSession(licenseKey, product, scope = SCOPE_READ) {
+  if (!_VALID_SCOPES.has(scope)) throw new Error('unknown scope');
+  _pruneBotSessions();
+  const token = crypto.randomBytes(32).toString('base64url');   // 256 bits
+  _botSessions.set(token, {
+    licenseKey, product, scope,
+    exp: Date.now() + BOT_SESSION_TTL_MS,
+  });
+  return token;
+}
+
+// Returns the session, or null. Scope is checked here rather than at each
+// call site so a new protected route cannot forget to check it.
+function _botSession(req, requiredScope) {
+  const auth = String((req.get && req.get('authorization')) || '');
+  if (!/^Bearer /i.test(auth)) return null;
+  const token = auth.slice(7).trim();
+  if (!token) return null;
+  const sess = _botSessions.get(token);
+  if (!sess || sess.exp <= Date.now()) { _botSessions.delete(token); return null; }
+  if (requiredScope && sess.scope !== requiredScope) return null;
+  return sess;
+}
+
+function _revokeBotSessionsFor(licenseKey) {
+  for (const [t, sess] of _botSessions) if (sess.licenseKey === licenseKey) _botSessions.delete(t);
+}
+
+// POST /api/bot-session  { licenseKey }  -> { token, expiresIn, scope }
+app.post('/api/bot-session', _authLimiter, async (req, res) => {
+  const key = String((req.body && req.body.licenseKey) || '').trim();
+  if (!key) return res.status(400).json({ error: 'licenseKey required' });
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+
+  // Check the HMAC before touching the database: a key that was never minted
+  // here should cost an attacker a rejection, not a query.
+  const hm = verifyLicenseKeyHmac(key);
+  if (!hm.valid) return res.status(403).json({ error: 'Invalid or inactive licence.' });
+
+  let lic = null;
+  try {
+    const r = await supabase.from('licenses')
+      .select('active, product, expires_at, revoked_at')
+      .eq('key', key).single();
+    lic = r.data;
+  } catch (e) {
+    // Fail CLOSED. A database that cannot answer is not permission to proceed.
+    console.error('[BOT-SESSION] licence lookup failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+
+  // One message for every rejection reason. "expired" vs "revoked" vs "no such
+  // licence" tells someone probing which keys exist.
+  const now = Date.now();
+  const ok = lic && lic.active === true
+    && !lic.revoked_at
+    && (!lic.expires_at || new Date(lic.expires_at).getTime() > now)
+    && (!lic.product || !hm.product || lic.product === hm.product);
+  if (!ok) return res.status(403).json({ error: 'Invalid or inactive licence.' });
+
+  // The caller asks for one scope and gets exactly that one. Defaulting to
+  // read means a client that forgets to ask cannot accidentally hold write.
+  const wanted = String((req.body && req.body.scope) || SCOPE_READ);
+  if (!_VALID_SCOPES.has(wanted)) {
+    return res.status(400).json({ error: 'Unknown scope requested.' });
+  }
+
+  const token = _issueBotSession(key, hm.product, wanted);
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    success: true, token, scope: wanted,
+    expiresIn: Math.floor(BOT_SESSION_TTL_MS / 1000),
+    licenceFormat: hm.legacy ? 'legacy' : 'current',
+  });
+});
+
+// GET /api/bot-config  — Authorization: Bearer <bot-session token>
+app.get('/api/bot-config', async (req, res) => {
+  // A licence key in the URL is refused rather than ignored: the request has
+  // already written it into whatever logs sit in front of this service, and
+  // the operator should learn that from a failure.
+  if (req.query.key) {
+    return res.status(401).json({
+      error: 'A licence key in the URL is not accepted.',
+      code: 'LICENCE_IN_URL',
+      detail: 'POST {"licenseKey":"..."} to /api/bot-session and send the returned token as Authorization: Bearer <token>.',
+    });
+  }
+  const sess = _botSession(req, SCOPE_READ);
+  if (!sess) return res.status(401).json({ error: 'Authorization failed.' });
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+
+  let row = null;
+  try {
+    const r = await supabase.from('bot_configs').select('config')
+      .eq('license_key', sess.licenseKey).single();
+    row = r.data;
+    if (r.error && r.error.code !== 'PGRST116') throw r.error;
+  } catch (e) {
+    console.error('[BOT-CONFIG] read failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+  if (!row) {
+    return res.status(404).json({ error: 'No configuration saved for this licence yet.' });
+  }
+
+  let decoded;
+  try {
+    decoded = decryptBotConfig(row.config);
+  } catch (e) {
+    // Never surface the cryptographic detail. A tag failure and a malformed
+    // record must look identical from outside, or the endpoint becomes an
+    // oracle. The correlation id is how the operator finds the real reason.
+    const id = _errId(e);
+    console.error(`[BOT-CONFIG] decrypt failed for a licence (id ${id})`);
+    return res.status(500).json({ error: 'Configuration unavailable.', id });
+  }
+
+  // Migrate a legacy CBC row to GCM the first time it is read, so the
+  // unauthenticated format disappears through use rather than through a
+  // migration nobody runs.
+  if (decoded.legacy) {
+    try {
+      await supabase.from('bot_configs').upsert(
+        { license_key: sess.licenseKey, config: encryptBotConfig(decoded.config),
+          updated_at: new Date().toISOString() },
+        { onConflict: 'license_key' });
+      console.log('[BOT-CONFIG] migrated one row from CBC to GCM');
+    } catch (e) {
+      // Serving the config still works; the row migrates on a later read.
+      console.error('[BOT-CONFIG] migration write failed', _errId(e));
+    }
+  }
+
+  // Least privilege on the way out: only the keys the bot can actually apply.
+  const filtered = _filterBotConfig(decoded.config);
+  if (filtered === null) {
+    return res.status(503).json({ error: 'Configuration unavailable.' });
+  }
+
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, config: filtered });
 });
 
 // ════════════════════════════════════════
 // RAILWAY AUTO-DEPLOY — client provides their Railway token,
 // we create project + service + variables + deploy for them.
 // ════════════════════════════════════════
-app.post('/api/railway-deploy', async (req, res) => {
+// TRUST MODEL, stated because this endpoint is unusual.
+//
+// The Railway token belongs to the CALLER and is used to create resources in
+// THEIR Railway account — so this service never needs to own it, and it is
+// never stored or logged. What it must check is the LICENCE, because the key
+// supplied here is written into the deployed service as LICENSE_KEY: it is the
+// entitlement the bot will present. It was not checked at all, so anyone could
+// deploy a bot carrying an invented one.
+//
+// A licence is not proof of identity for anything else. This endpoint deploys
+// the caller's own bot into the caller's own account with the caller's own
+// token, and grants nothing beyond that.
+app.post('/api/railway-deploy', _authLimiter, async (req, res) => {
   const { railwayToken, licenseKey, product } = req.body || {};
   if (!railwayToken || !licenseKey) return res.status(400).json({ error: 'railwayToken and licenseKey required' });
 
+  // Check the HMAC before touching either API: a key that was never minted
+  // here should cost a rejection, not a round trip.
+  if (!verifyLicenseKeyHmac(licenseKey).valid) {
+    return res.status(403).json({ error: 'Invalid or inactive licence.' });
+  }
+  if (!supabase) return res.status(503).json({ error: 'Service unavailable.' });
+  let lic = null;
+  try {
+    const r = await supabase.from('licenses')
+      .select('active, revoked_at, expires_at')
+      .eq('key', licenseKey).eq('active', true).single();
+    lic = r.data;
+  } catch (e) {
+    // Fail closed: a database that cannot answer is not permission to deploy.
+    console.error('[RAILWAY-DEPLOY] licence lookup failed', _errId(e));
+    return res.status(503).json({ error: 'Service unavailable. Try again shortly.' });
+  }
+  const licenceOk = lic && !lic.revoked_at
+    && (!lic.expires_at || new Date(lic.expires_at).getTime() > Date.now());
+  // One message for every rejection reason, so probing cannot map which keys
+  // exist, which are expired and which were revoked.
+  if (!licenceOk) return res.status(403).json({ error: 'Invalid or inactive licence.' });
+
   const RAILWAY_API = 'https://backboard.railway.com/graphql/v2';
-  const image = product === 'apex-forex'
-    ? 'ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest'
-    : 'ghcr.io/alexgabriel225sefu-dotcom/apex-trade-bot:latest';
-  const projectName = product === 'apex-forex' ? 'apex-forex-bot' : 'apex-trade-bot';
+  // One image. The apex-trade-bot image was the retired crypto product; it is
+  // no longer built or published, so defaulting an unknown `product` to it
+  // would deploy an image that does not exist.
+  if (product && product !== 'apex-forex') {
+    return res.status(400).json({ error: 'Unknown product — this deploys the Forex bot only.' });
+  }
+  const image = 'ghcr.io/alexgabriel225sefu-dotcom/apex-forex-bot:latest';
+  const projectName = 'apex-forex-bot';
 
   async function gql(query, variables) {
     const r = await fetch(RAILWAY_API, {
@@ -3055,7 +3184,7 @@ app.post('/api/railway-deploy', async (req, res) => {
     // 0) Validate token + get teamId (needed for team Railway accounts)
     const meRes = await gql(`query{ me{ id teams{ edges{ node{ id } } } } }`, {});
     const userId = meRes?.data?.me?.id;
-    if (!userId) return res.status(400).json({ error: 'Invalid Railway token — generate one at railway.com/account/tokens', detail: JSON.stringify(meRes).slice(0,300) });
+    if (!userId) return res.status(400).json({ error: 'That Railway token was not accepted. Generate one at railway.com/account/tokens.', id: _errId(new Error('railway: me query returned no user')) });
     const teamId = meRes?.data?.me?.teams?.edges?.[0]?.node?.id;
 
     // 1) Create project (include teamId if team account)
@@ -3065,7 +3194,7 @@ app.post('/api/railway-deploy', async (req, res) => {
       { input: projInput }
     );
     const projectId = proj?.data?.projectCreate?.id;
-    if (!projectId) return res.status(500).json({ error: 'Failed to create Railway project', detail: JSON.stringify(proj).slice(0,500) });
+    if (!projectId) return res.status(500).json({ error: 'Could not create the Railway project.', id: _errId(new Error('railway: projectCreate returned no id')) });
 
     // 1b) Fetch environment ID separately (Railway does not return it inline at creation)
     const envRes = await gql(
@@ -3073,7 +3202,7 @@ app.post('/api/railway-deploy', async (req, res) => {
       { id: projectId }
     );
     const envId = envRes?.data?.project?.environments?.edges?.[0]?.node?.id;
-    if (!envId) return res.status(500).json({ error: 'Failed to get Railway environment', detail: JSON.stringify(envRes).slice(0,500) });
+    if (!envId) return res.status(500).json({ error: 'Could not read the Railway environment.', id: _errId(new Error('railway: environment query returned no id')) });
 
     // 2) Create service (name only — Docker image set separately via serviceInstanceUpdate)
     const svc = await gql(
@@ -3081,7 +3210,7 @@ app.post('/api/railway-deploy', async (req, res) => {
       { projectId, input: { name: projectName } }
     );
     const serviceId = svc?.data?.serviceCreate?.id;
-    if (!serviceId) return res.status(500).json({ error: 'Failed to create Railway service', detail: JSON.stringify(svc).slice(0,300) });
+    if (!serviceId) return res.status(500).json({ error: 'Could not create the Railway service.', id: _errId(new Error('railway: serviceCreate returned no id')) });
 
     // 3) Set Docker image via serviceInstanceUpdate
     await gql(
@@ -3110,7 +3239,10 @@ app.post('/api/railway-deploy', async (req, res) => {
 
     res.json({ ok: true, projectId, serviceId, message: 'Bot deployed! Check Railway dashboard for your URL in ~2 minutes.' });
   } catch (e) {
-    res.status(500).json({ error: 'Deploy failed: ' + e.message });
+    // e.message can carry the upstream GraphQL body, and this route holds the
+    // caller's Railway token in scope — an exception raised anywhere inside it
+    // is the wrong thing to hand back.
+    res.status(500).json({ error: 'Deploy failed.', id: _errId(e) });
   }
 });
 
@@ -3128,8 +3260,10 @@ app.post('/api/railway-deploy', async (req, res) => {
 //   META_APP_ID, META_APP_SECRET, META_PAGE_ACCESS_TOKEN, META_PAGE_ID,
 //   META_IG_BUSINESS_ID, META_WEBHOOK_VERIFY_TOKEN (any string you pick)
 //   TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_REDIRECT_URI
-// Admin endpoints are protected by the same owner secret as the payout
-// export above (BOT_EMAIL_SECRET), via ?secret= or X-Owner-Secret header.
+// Admin endpoints are protected by the owner secret (BOT_EMAIL_SECRET),
+// sent as the X-Owner-Secret header. A ?secret= query is refused: the
+// licence-signing key is derived from that value, so a URL copy of it is a
+// copy in every proxy log. See _ownerSecretOk.
 
 const _AUTO_REPLY_TEXT = "Hey! Thanks for reaching out 🙌 We're running a free Apex Trading Bot demo for the first testers — no cost, no risk (demo account only). Want in? Reply here and I'll get you set up.";
 
@@ -3175,7 +3309,7 @@ async function _metaPost(platform, content, mediaUrl) {
 
 // POST /api/admin/social/post — { platform: 'facebook'|'instagram', content, media_url? }
 app.post('/api/admin/social/post', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const { platform, content, media_url } = req.body || {};
   if (!['facebook', 'instagram'].includes(platform)) return res.status(400).json({ error: "platform must be 'facebook' or 'instagram'" });
   let postRow = null;
@@ -3191,7 +3325,7 @@ app.post('/api/admin/social/post', async (req, res) => {
     res.json({ ok: true, external_post_id: externalId });
   } catch (e) {
     if (supabase && postRow) await supabase.from('social_posts').update({ status: 'failed', error: e.message }).eq('id', postRow.id);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Request failed.', id: _errId(e) });
   }
 });
 
@@ -3208,7 +3342,7 @@ app.get('/webhooks/meta', (req, res) => {
 });
 
 // POST carries real events (messages, comments). Signature-verified so only
-// Meta can trigger auto-replies — mirrors _digistore24VerifySignature's
+// Meta can trigger auto-replies — mirrors the payment webhook's
 // approach (HMAC over the raw body, compared to the header Meta sends).
 function _metaVerifySignature(req) {
   const sig = req.headers['x-hub-signature-256'];
@@ -3288,7 +3422,7 @@ app.get('/auth/tiktok/callback', async (req, res) => {
 // TikTok's Content Posting API) — this posts via PULL_FROM_URL for a hosted
 // video file. { video_url, content }
 app.post('/api/admin/social/tiktok/post', async (req, res) => {
-  if (!_ownerSecretOk(req)) return res.status(403).json({ error: 'Forbidden — secret required' });
+  if (!_ownerSecretOk(req)) return _denyOwner(req, res);
   const { video_url, content } = req.body || {};
   if (!video_url) return res.status(400).json({ error: 'video_url is required (TikTok posts video, not text/images)' });
   let postRow = null;
@@ -3313,7 +3447,7 @@ app.post('/api/admin/social/tiktok/post', async (req, res) => {
     res.json({ ok: true, publish_id: publishId, note: 'privacy_level is SELF_ONLY (TikTok default for unaudited apps) — switch to PUBLIC_TO_EVERYONE once your app passes Content Posting API review.' });
   } catch (e) {
     if (supabase && postRow) await supabase.from('social_posts').update({ status: 'failed', error: e.message }).eq('id', postRow.id);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Request failed.', id: _errId(e) });
   }
 });
 
@@ -3334,7 +3468,31 @@ app.use((err, req, res, next) => {
 // ════════════════════════════════════════
 // START SERVER
 // ════════════════════════════════════════
+// Exported so the security tests can exercise the licence and configuration
+// primitives directly instead of re-implementing them — a test that carries
+// its own copy of the crypto proves only that the copy works.
+module.exports = {
+  app,
+  _internal: {
+    generateForexKey, verifyLicenseKeyHmac,
+    encryptBotConfig, decryptBotConfig,
+    _issueBotSession, _botSession, _revokeBotSessionsFor,
+    assertPublicHttpUrl, _isPublicIp,
+    _ownerSecretOk, _ownerSecretPresentInUrl,
+    _maskLicence, _maskEmail,
+    _filterBotConfig, _BOT_CONFIG_FIELDS,
+    SCOPE_READ, SCOPE_WRITE,
+    BOT_SESSION_TTL_MS,
+  },
+};
+
+// APEX_NO_LISTEN lets a test require this file without binding a port or
+// firing the self-test request. It is checked here and nowhere else, so it
+// cannot affect how the service behaves when it IS listening.
 const PORT = process.env.PORT || 3000;
+if (process.env.APEX_NO_LISTEN === 'true') {
+  console.log('APEX_NO_LISTEN=true — routes registered, not listening.');
+} else
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Blueprint Studio server running on port ${PORT} (0.0.0.0)`);
   addLog('Server started', 'system', 'success');

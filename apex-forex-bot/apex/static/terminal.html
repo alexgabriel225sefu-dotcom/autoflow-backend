@@ -1,0 +1,2584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<link rel="preconnect" href="https://telegram.org" crossorigin>
+<title>Apex4Traders</title>
+<style>
+:root{--bg:#07090f;--card:rgba(255,255,255,.045);--line:rgba(255,255,255,.08);
+  --t0:#eef1f6;--t1:#9aa3b2;--t2:#5b6472;--up:#2fd575;--dn:#ff4560;--acc:#ff2d4f;--gold:#f5b544;
+  /* APEX4TRADERS design system.
+     One scale for spacing, one for type. Every screen composes from these, so
+     a card on Home and a card on Risk are the same object rather than two that
+     happen to look alike. Status colours are separate from accent colours: an
+     environment badge must never borrow the brand red. */
+  --sp1:4px;--sp2:8px;--sp3:12px;--sp4:16px;--sp5:24px;--sp6:32px;
+  --fs-mega:34px;--fs-xl:22px;--fs-lg:17px;--fs-md:14px;--fs-sm:12.5px;--fs-xs:10.5px;
+  --r-sm:9px;--r-md:14px;--r-lg:18px;
+  --st-live:#ff4560;--st-demo:#2fd575;--st-unver:#f5b544;--st-off:#5b6472;
+  /* Telegram draws its own chrome top and bottom; the shell has to sit inside
+     it or the nav lands under the home indicator on an iPhone. */
+  --safe-b:env(safe-area-inset-bottom,0px);--nav-h:58px;--top-h:62px}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--t0);font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+  overflow-x:hidden;padding-top:var(--top-h);
+  padding-bottom:calc(var(--nav-h) + var(--safe-b) + var(--sp4))}
+/* ── AppShell ───────────────────────────────────────────────────────
+   TopBar and BottomNavigation are fixed and always present. The
+   environment badge lives in the TopBar rather than inside a screen,
+   because "which account is this" must be answerable without scrolling
+   and without remembering which tab you came from. */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:20;background:rgba(7,9,15,.92);
+  backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+#tbRow{display:flex;align-items:center;gap:var(--sp3);padding:9px var(--sp4) 0}
+#tbBack{font-size:20px;color:var(--t1);width:22px;visibility:hidden;cursor:pointer;line-height:1}
+#tbBack.on{visibility:visible}
+#tbTitle{flex:1;font-size:12px;font-weight:800;letter-spacing:.22em;color:var(--t0)}
+#tbTitle b{color:var(--acc)}
+#tbAct{font-size:15px;color:var(--t2)}
+#envBadge{padding:3px var(--sp4) 9px;font-size:var(--fs-xs);font-weight:800;letter-spacing:.1em;
+  color:var(--t2);display:flex;align-items:center;gap:7px}
+#envBadge i{width:7px;height:7px;border-radius:50%;background:var(--st-off);display:inline-block;flex:none}
+#envBadge.live i{background:var(--st-live)} #envBadge.demo i{background:var(--st-demo)}
+#envBadge.unver i{background:var(--st-unver)} #envBadge.sim i{background:var(--st-off)}
+#envBadge.live{color:#ff97a8} #envBadge.demo{color:#8fe7b6}
+#envBadge.unver{color:#f7d08a} 
+.screen{display:none}
+.screen.on{display:block;animation:rise .32s both}
+#bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;
+  background:rgba(7,9,15,.94);backdrop-filter:blur(18px);border-top:1px solid var(--line);
+  padding-bottom:var(--safe-b)}
+#bottomnav div{flex:1;text-align:center;padding:9px 2px 8px;font-size:9.5px;font-weight:700;
+  color:var(--t2);letter-spacing:.04em;cursor:pointer}
+#bottomnav div em{display:block;font-style:normal;font-size:17px;margin-bottom:2px;opacity:.55}
+#bottomnav div.on{color:var(--t0)} #bottomnav div.on em{opacity:1}
+.sec-h{font-size:var(--fs-xs);font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--t2);margin:var(--sp5) var(--sp4) var(--sp2)}
+#greet{padding:var(--sp4) var(--sp4) 0;font-size:var(--fs-md);color:var(--t1);font-weight:600}
+/* Account card */
+#acctCard{margin:var(--sp3) var(--sp4) 0;padding:var(--sp4);border:1px solid var(--line);
+  border-radius:var(--r-lg);background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015))}
+#acctTop{display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp3);margin-bottom:var(--sp3)}
+#acctBroker{font-size:var(--fs-md);font-weight:800}
+#acctEnv{font-size:var(--fs-xs);font-weight:800;letter-spacing:.09em;color:var(--t2)}
+.kvr{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--line)}
+.kvr:last-of-type{border-bottom:none}
+.kvr span{color:var(--t1)} .kvr b{font-variant-numeric:tabular-nums}
+.kvr b.na{color:var(--t2);font-weight:600}
+.note{font-size:11px;color:var(--t2);margin-top:var(--sp2);line-height:1.45}
+/* Market rows */
+.mrow{display:flex;justify-content:space-between;align-items:center;gap:var(--sp3);
+  padding:11px var(--sp4);border-bottom:1px solid var(--line);cursor:pointer}
+.mrow:last-child{border-bottom:none}
+.msym{font-size:var(--fs-md);font-weight:800;letter-spacing:.02em}
+.mpx{font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums;margin-top:1px}
+.mchg{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+.mchg.up{color:var(--up)} .mchg.dn{color:var(--dn)} .mchg.na{color:var(--t2);font-weight:600}
+/* Risk */
+.rmeter{margin:var(--sp3) var(--sp4)}
+.rmeter .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--t1);margin-bottom:5px}
+.rmeter .lbl b{color:var(--t0);font-variant-numeric:tabular-nums}
+.rbar{height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+.rbar i{display:block;height:100%;background:var(--up);border-radius:4px;transition:width .4s}
+.rbar i.warn{background:var(--st-unver)} .rbar i.bad{background:var(--st-live)}
+#rEngine{margin:var(--sp3) var(--sp4);padding:var(--sp3) var(--sp4);border-radius:var(--r-md);
+  border:1px solid var(--line);font-size:13px}
+#rEngine.ok{border-color:rgba(47,213,117,.3);background:rgba(47,213,117,.07)}
+#rEngine.halt{border-color:rgba(255,69,96,.4);background:rgba(255,69,96,.09)}
+#rEngine.unk{border-color:rgba(245,181,68,.35);background:rgba(245,181,68,.07)}
+#rEngine b{display:block;margin-bottom:3px}
+#rEngine ul{margin:4px 0 0 16px;color:var(--t1);font-size:12.5px}
+/* Confirmation sheet — the only financial action the app can start */
+#sheetBg{position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:40;display:none}
+#sheetBg.on{display:block}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;transform:translateY(100%);
+  transition:transform .28s cubic-bezier(.22,.61,.36,1);background:#0d1017;
+  border-top:1px solid var(--line);border-radius:var(--r-lg) var(--r-lg) 0 0;
+  padding:var(--sp5) var(--sp4) calc(var(--sp5) + var(--safe-b))}
+#sheet.on{transform:none}
+#sheet h3{font-size:var(--fs-lg);font-weight:800;margin-bottom:var(--sp3)}
+#sheet .body{font-size:13.5px;color:var(--t1);line-height:1.5;margin-bottom:var(--sp4)}
+#sheet .body b{color:var(--t0)}
+.btn{display:block;width:100%;text-align:center;padding:15px;border-radius:var(--r-md);
+  font-size:15px;font-weight:800;border:1px solid var(--line);background:transparent;
+  color:var(--t0);margin-top:var(--sp2);cursor:pointer;font-family:inherit}
+.btn.danger{background:var(--st-live);border-color:var(--st-live);color:#fff}
+.btn:disabled{opacity:.5}
+#askChips{display:flex;flex-wrap:wrap;gap:var(--sp2);padding:0 var(--sp4)}
+#askChips div{border:1px solid var(--line);background:var(--card);border-radius:var(--r-md);
+  padding:9px 13px;font-size:12.5px;color:var(--t1);cursor:pointer}
+#askOut{padding:var(--sp3) var(--sp4)}
+.ans{border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp3) var(--sp4);
+  margin-bottom:var(--sp3);background:var(--card);font-size:13.5px;line-height:1.55;
+  white-space:pre-wrap}
+.ans .kind{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.1em;
+  padding:2px 7px;border-radius:5px;margin-bottom:7px}
+.ans .kind.FACT{background:rgba(47,213,117,.14);color:#8fe7b6}
+.ans .kind.OBSERVATION{background:rgba(245,181,68,.14);color:#f7d08a}
+.ans .kind.ANALYSIS{background:rgba(255,45,79,.14);color:#ff97a8}
+.ans .kind.UNKNOWN{background:rgba(255,255,255,.07);color:var(--t2)}
+.ans .kind.REFUSED{background:rgba(255,69,96,.16);color:#ff97a8}
+.ans .q{color:var(--t2);font-size:12px;margin-bottom:6px}
+#askBar{display:flex;gap:var(--sp2);padding:var(--sp2) var(--sp4) var(--sp5)}
+#askQ{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-family:inherit}
+#askGo{background:var(--acc);border:none;color:#fff;border-radius:var(--r-md);
+  padding:0 18px;font-size:16px;cursor:pointer}
+/* Splash. Covers the shell until the first real answer arrives, so the
+   client never sees a screen full of em-dashes and wonders whether it broke.
+   It removes itself on the first successful load OR after a timeout — a
+   splash that can outlive the app is worse than none. */
+#splash{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:var(--sp3);
+  transition:opacity .35s ease-out}
+#splash.gone{opacity:0;pointer-events:none}
+.sp-logo{font-size:26px;font-weight:800;letter-spacing:.22em;text-align:center;
+  line-height:1.25;color:var(--t0)}
+.sp-logo b{color:var(--acc)}
+.sp-tag{font-size:13px;color:var(--t1)}
+.sp-ring{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);
+  border-top-color:var(--acc);animation:spin .9s linear infinite;margin:var(--sp2) 0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sp-steps{font-size:12px;color:var(--t2);line-height:1.9;text-align:left}
+.sp-steps div::before{content:'\25cb  ';color:var(--t2)}
+.sp-steps div.on{color:var(--up)}
+.sp-steps div.on::before{content:'\2713  ';color:var(--up)}
+/* Global search, in the shell so it works from any screen. */
+#searchWrap{position:fixed;top:var(--top-h);left:0;right:0;z-index:19;
+  background:rgba(7,9,15,.97);border-bottom:1px solid var(--line);display:none}
+#searchWrap.on{display:block}
+#gSearch{width:100%;background:transparent;border:none;color:var(--t0);
+  padding:12px var(--sp4);font-size:14px;font-family:inherit;outline:none}
+#gResults .mrow{padding-left:var(--sp4);padding-right:var(--sp4)}
+/* Loading skeletons — shape without inventing a number. */
+.skel{height:13px;border-radius:6px;margin:9px var(--sp4);
+  background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.11),
+  rgba(255,255,255,.05));background-size:200% 100%;animation:sk 1.3s linear infinite}
+@keyframes sk{to{background-position:-200% 0}}
+.skel.w1{width:62%} .skel.w2{width:88%} .skel.w3{width:44%}
+/* A banner that states a platform-level condition. */
+.banner{margin:var(--sp3) var(--sp4);padding:var(--sp3) var(--sp4);
+  border-radius:var(--r-md);border:1px solid rgba(245,181,68,.35);
+  background:rgba(245,181,68,.08);font-size:13px;line-height:1.5}
+.banner.bad{border-color:rgba(255,69,96,.4);background:rgba(255,69,96,.09)}
+.banner.demo{border-color:rgba(47,213,117,.3);background:rgba(47,213,117,.07)}
+.banner b{display:block;margin-bottom:4px}
+#connLines{padding:var(--sp3) var(--sp4) 0;font-size:12px;color:var(--t1)}
+#connLines div{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--st-off);flex:none}
+.dot.ok{background:var(--up)} .dot.warn{background:var(--st-unver)}
+.dot.bad{background:var(--st-live)}
+.star{float:right;color:var(--t2);font-size:15px;padding:0 4px;cursor:pointer}
+.star.on{color:var(--gold)}
+.srch{display:block;width:calc(100% - 2*var(--sp4));margin:var(--sp2) var(--sp4) 0;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:9px 12px;font-size:13px;font-family:inherit}
+#symChart{height:44vh}
+.tfrow{display:flex;gap:5px;margin:var(--sp2) var(--sp4) 0}
+.tfrow div{flex:1;text-align:center;padding:8px 2px;border:1px solid var(--line);
+  border-radius:var(--r-sm);font-size:11.5px;font-weight:700;color:var(--t1);
+  background:var(--card);cursor:pointer}
+.tfrow div.on{color:#fff;background:rgba(255,45,79,.13);border-color:rgba(255,45,79,.4)}
+#symHead{padding:var(--sp3) var(--sp4) 0}
+#symHead .s{font-size:var(--fs-xl);font-weight:800}
+#symHead .p{font-size:var(--fs-lg);font-variant-numeric:tabular-nums;margin-top:2px}
+.pill{background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:5px 14px;font-size:12px;font-weight:800;
+  cursor:pointer;font-family:inherit}
+.num{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--t0);
+  border-radius:var(--r-sm);padding:5px 8px;font-size:13px;width:88px;text-align:right;
+  font-family:inherit;font-variant-numeric:tabular-nums}
+.pclose{display:block;width:100%;margin-top:var(--sp2);padding:11px;border-radius:var(--r-sm);
+  border:1px solid rgba(255,69,96,.35);background:rgba(255,69,96,.08);color:#ff97a8;
+  font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(70% 32% at 50% -4%,rgba(255,45,79,.16),transparent 70%)}
+.wrap{position:relative;z-index:1}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.rise{animation:rise .5s cubic-bezier(.22,.61,.36,1) both}
+#hero{padding:16px 16px 12px}
+#brandRow{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+#brand{font-size:10.5px;font-weight:800;letter-spacing:.28em;color:var(--t2)}
+#brand b{color:var(--acc)}
+/* the badge is deliberately loud: mistaking demo for live is the worst error here */
+#modeBadge{font-size:10.5px;font-weight:800;letter-spacing:.1em;padding:5px 10px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--t1);white-space:nowrap}
+#modeBadge.live{background:rgba(255,45,79,.16);border-color:rgba(255,45,79,.5);color:#ff8598}
+#modeBadge.demo{background:rgba(47,213,117,.13);border-color:rgba(47,213,117,.4);color:var(--up)}
+#modeBadge.sim{background:rgba(245,181,68,.13);border-color:rgba(245,181,68,.4);color:var(--gold)}
+#modeBadge.unver{background:rgba(245,181,68,.16);border-color:rgba(245,181,68,.55);color:var(--gold)}
+#statusLine{font-size:14.5px;font-weight:600;color:var(--t1);margin-bottom:14px;line-height:1.4}
+#statusLine b{color:var(--t0);font-weight:800}
+#balRow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+#balV{font-size:34px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;transition:color .35s}
+#balV.up{color:var(--up)}#balV.dn{color:var(--dn)}
+#dayChip{font-size:13px;font-weight:700;border-radius:9px;padding:6px 10px;background:rgba(47,213,117,.12);color:var(--up)}
+#dayChip.neg{background:rgba(255,69,96,.12);color:var(--dn)}
+#badges{margin-top:10px;font-size:12.5px;color:var(--t1);font-weight:600}
+#tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:4px 16px 0}
+.tile{background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.02));
+  border:1px solid var(--line);border-radius:14px;padding:10px 8px;text-align:center}
+.tile b{display:block;font-size:15.5px;font-weight:800;font-variant-numeric:tabular-nums}
+.tile span{display:block;font-size:8.5px;font-weight:700;letter-spacing:.09em;color:var(--t2);
+  text-transform:uppercase;margin-top:3px}
+.card{margin:12px 16px 0;background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px}
+.card-h b{font-size:13.5px;font-weight:800}
+.card-h span{font-size:10.5px;color:var(--t2);font-weight:600}
+#chart{height:40vh;min-height:230px}
+#eqChart{height:30vh;display:none}
+#tfBar{display:flex;gap:5px;padding:8px 12px 12px}
+#tfBar div{flex:1;text-align:center;font-size:11px;font-weight:700;padding:7px 2px;border-radius:9px;
+  border:1px solid var(--line);color:var(--t1);background:rgba(0,0,0,.2)}
+#tfBar div.on{color:#fff;background:rgba(255,45,79,.14);border-color:rgba(255,45,79,.45)}
+#pos{margin:0 14px 12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;
+  font-size:13px;display:none;background:rgba(0,0,0,.25)}
+#pos .lg{font-weight:800}
+#pos .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;font-size:11.5px;color:var(--t1)}
+#pos .grid b{display:block;color:var(--t0);font-size:12.5px;font-variant-numeric:tabular-nums}
+.pnl-up{color:var(--up)}.pnl-dn{color:var(--dn)}
+#posList{display:none;margin:0 14px 12px}
+.prow{padding:10px 12px;border:1px solid var(--line);border-radius:12px;
+  background:rgba(0,0,0,.25);margin-top:8px;font-size:13px}
+.prow.focus{border-color:rgba(255,45,79,.38)}
+.ptop{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800}
+.pgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:7px;
+  font-size:11.5px;color:var(--t1)}
+.pgrid b{display:block;color:var(--t0);font-size:12.5px;font-variant-numeric:tabular-nums}
+#tabs{display:flex;gap:6px;margin:14px 16px 10px}
+.tab{flex:1;text-align:center;padding:10px 3px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;font-size:11px;font-weight:700;color:var(--t1);transition:all .25s}
+.tab.on{color:#fff;border-color:rgba(255,45,79,.45);background:rgba(255,45,79,.13)}
+.panel{margin:0 16px;display:none}
+.panel.on{display:block;animation:rise .35s both}
+.item{padding:11px 2px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.5}
+.item:last-child{border-bottom:none}
+.item .sub{color:var(--t1);font-size:11px;margin-top:2px}
+.trow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer}
+.trow .r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:800}
+.trow .chev{color:var(--t2);font-size:11px;margin-left:2px}
+.chip{display:inline-block;font-size:9.5px;font-weight:800;border-radius:5px;padding:2px 6px;
+  background:rgba(245,181,68,.14);color:var(--gold);margin-right:6px;letter-spacing:.05em}
+.chip.red{background:rgba(255,45,79,.14);color:#ff97a8}
+.chip.live{background:rgba(255,45,79,.16);color:#ff8598}
+.chip.demo{background:rgba(47,213,117,.13);color:var(--up)}
+.empty{color:var(--t2);font-size:12.5px;padding:16px 2px;text-align:center}
+.kv{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.kv:last-child{border-bottom:none}
+.kv span{color:var(--t1)}.kv b{font-variant-numeric:tabular-nums}
+#jSwitch{display:flex;gap:6px;margin-bottom:10px}
+#jSwitch div{flex:1;text-align:center;font-size:11px;font-weight:700;padding:7px;border-radius:9px;
+  border:1px solid var(--line);color:var(--t1);background:var(--card)}
+#jSwitch div.on{color:#fff;background:rgba(255,45,79,.13);border-color:rgba(255,45,79,.4)}
+#cMeta[data-conn="delayed"] #liveDot{background:var(--st-unver);animation:none}
+#cMeta[data-conn="delayed"]::after{content:' · DELAYED';color:var(--st-unver);
+  font-weight:800;letter-spacing:.06em}
+#cMeta[data-conn="live"]::after{content:' · LIVE';color:var(--up);
+  font-weight:800;letter-spacing:.06em}
+#liveDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--up);margin-right:6px;
+  animation:pulse 1.6s ease-in-out infinite}
+#liveDot.stale{background:var(--gold);animation:none}
+#liveDot.off{background:var(--dn);animation:none}
+@keyframes pulse{50%{opacity:.25}}
+#err{position:fixed;bottom:10px;left:16px;right:16px;background:rgba(255,69,96,.14);
+  border:1px solid rgba(255,69,96,.4);color:#ffb4be;font-size:11.5px;padding:8px 12px;
+  border-radius:10px;display:none;z-index:9}
+/* ── REPLAY ── */
+#replay{position:fixed;inset:0;background:var(--bg);z-index:20;display:none;overflow-y:auto;padding-bottom:30px}
+#replay.on{display:block;animation:rise .3s both}
+#rBack{padding:14px 16px 6px;font-size:12.5px;font-weight:700;color:var(--t1)}
+#rHead{padding:0 16px 10px}
+#rTitle{font-size:19px;font-weight:800}
+#rSub{font-size:12px;color:var(--t1);margin-top:3px}
+#rPnl{font-size:26px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums}
+#rChart{height:42vh;min-height:250px;margin:0 12px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+#rCtl{display:flex;gap:8px;padding:12px 16px}
+#rCtl button{flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+  color:var(--t0);font-size:13px;font-weight:800}
+#rCtl button:disabled{opacity:.45}
+.sec{font-size:10px;font-weight:800;letter-spacing:.18em;color:var(--t2);margin:16px 16px 6px;text-transform:uppercase}
+.bar{margin:0 16px 10px}
+.bar .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--t1);margin-bottom:4px}
+.bar .lbl b{color:var(--t0);font-variant-numeric:tabular-nums}
+.bar .track{height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+.bar .fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--acc),#ff7a8c)}
+.na{color:var(--t2);font-size:12px}
+</style>
+</head>
+<body>
+<div id="splash">
+  <div class="sp-logo">APEX<br><b>4TRADERS</b></div>
+  <div class="sp-tag">Your trading platform inside Telegram</div>
+  <div class="sp-ring"></div>
+  <div class="sp-steps">
+    <div id="sp1">Telegram verified</div>
+    <div id="sp2">Account loaded</div>
+    <div id="sp3">Market connection</div>
+    <div id="sp4">Platform ready</div>
+  </div>
+</div>
+<div id="topbar">
+  <div id="tbRow">
+    <span id="tbBack">&lsaquo;</span>
+    <div id="tbTitle">APEX<b>4TRADERS</b></div>
+    <span id="tbBell" title="Alerts">&#128276;</span>
+    <span id="tbAct" title="Settings">&#8942;</span>
+  </div>
+  <div id="envBadge"><i></i><span id="envText">CONNECTING…</span></div>
+</div>
+<div id="searchWrap">
+  <input id="gSearch" placeholder="Search markets or a trade id" maxlength="24">
+  <div id="gResults"></div>
+</div>
+<div class="wrap">
+<section class="screen on" id="s-home">
+  <div id="connLines">
+    <div><i class="dot" id="dotPlat"></i><span id="txtPlat">Platform — connecting…</span></div>
+    <div><i class="dot" id="dotBrk"></i><span id="txtBrk">cTrader — connecting…</span></div>
+  </div>
+  <div id="envNotice"></div>
+  <div id="greet">Welcome back</div>
+  <div id="hero" class="rise">
+    <div id="brandRow">
+      <div id="brand">APEX<b>4TRADERS</b></div>
+      <div id="modeBadge">— — —</div>
+    </div>
+    <div id="statusLine">Connecting…</div>
+    <div id="balRow">
+      <div>
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.14em;color:var(--t2);margin-bottom:3px">EQUITY</div>
+        <div id="balV">$ —</div>
+      </div>
+      <div id="dayChip">today —</div>
+    </div>
+    <div id="balSub" style="margin-top:8px;font-size:12px;color:var(--t1);font-variant-numeric:tabular-nums">—</div>
+    <div id="badges"></div>
+  </div>
+
+  <div id="tiles" class="rise">
+    <div class="tile"><b id="tWr">—</b><span>Win rate</span></div>
+    <div class="tile"><b id="tPf">—</b><span>Profit factor</span></div>
+    <div class="tile"><b id="tDd">—</b><span>Max drawdown</span></div>
+    <div class="tile"><b id="tSk">—</b><span>Filtered today</span></div>
+  </div>
+
+  <div class="sec-h">Account</div>
+  <div id="acctCard">
+    <div id="acctTop"><div id="acctBroker">—</div><div id="acctEnv">—</div></div>
+    <div class="kvr"><span>Balance</span><b id="acBal">—</b></div>
+    <div class="kvr"><span>Equity</span><b id="acEq">—</b></div>
+    <div class="kvr"><span>Open P&amp;L</span><b id="acFloat">—</b></div>
+    <div class="kvr"><span>Free margin</span><b id="acFree" class="na">—</b></div>
+    <div class="kvr"><span>Margin level</span><b id="acML" class="na">—</b></div>
+    <!-- Balance and equity are the broker's own figures. Free margin and
+         margin level are not in cTrader's account response, so they are shown
+         as unavailable rather than derived from leverage and passed off as
+         the broker's number. -->
+    <div class="note" id="acNote">Free margin and margin level are not reported by the cTrader account API.</div>
+  </div>
+
+  <div class="sec-h">Open positions</div>
+  <div id="homePos"><div class="empty">Loading…</div></div>
+  <button class="btn" data-goto="portfolio">View portfolio</button>
+  <div class="sec-h">Market snapshot</div>
+  <div id="homeMkt"><div class="empty">Loading…</div></div>
+  <button class="btn" data-goto="ask">Ask APEX &rarr;</button>
+</section>
+
+<section class="screen" id="s-markets">
+  <input id="mktSearch" class="srch" placeholder="Search markets" maxlength="12">
+  <div class="sec-h">&#11088; Watchlist</div>
+  <div id="mkWatch"><div class="empty">Your watchlist is empty. Tap the star on
+    any instrument to follow it.</div></div>
+  <div class="sec-h">Market movers</div>
+  <div id="mkMovers"><div class="empty">Loading markets…</div></div>
+  <div class="sec-h">Recently viewed</div>
+  <div id="mkRecent"><div class="empty">Instruments you open appear here.</div></div>
+  <div class="sec-h">Forex</div>
+  <div id="mkForex"><div class="empty">Loading markets…</div></div>
+  <div class="sec-h">Metals</div>
+  <div id="mkMetals"><div class="empty">Loading markets…</div></div>
+  <div class="sec-h" id="mkChartH">Chart</div>
+  <div class="card rise">
+    <div class="card-h"><b id="cSym">—</b><span id="cMeta"><i id="liveDot"></i>loading…</span></div>
+    <div id="chart"></div>
+    <div id="tfBar">
+      <div data-tf="1m">1m</div><div data-tf="5m">5m</div><div class="on" data-tf="15m">15m</div>
+      <div data-tf="1h">1h</div><div data-tf="4h">4h</div><div data-tf="1d">1d</div>
+    </div>
+    
+  </div>
+
+  <div class="panel on" id="p-chart"></div>
+  <div class="sec-h">Economic events</div>
+  <div class="panel on" id="p-news"><div class="empty">Loading events…</div></div>
+</section>
+
+<section class="screen" id="s-portfolio">
+  <div class="sec-h">Open positions</div>
+  <div id="posList"></div>
+  <div class="sec-h">Performance</div>
+  <div class="card rise" style="margin-top:0"><div id="eqChart"></div></div>
+  <div class="panel on" id="p-perf"><div class="empty">Loading…</div></div>
+  <div class="sec-h">Execution log</div>
+  <div class="panel on" id="p-journal">
+    <div id="jSwitch"><div class="on" data-j="trades">Recent</div><div data-j="skips">Filtered signals</div></div>
+    <div id="jTrades"><div class="empty">No trades yet.</div></div>
+    <div id="jSkips" style="display:none"><div class="empty">Nothing skipped yet today.</div></div>
+  </div>
+</section>
+
+<section class="screen" id="s-history">
+  <div class="sec-h">Your trade library</div>
+  <div id="histFilter" class="tfrow">
+    <div class="on" data-hf="all">All</div><div data-hf="wins">Wins</div>
+    <div data-hf="losses">Learning</div><div data-hf="best">Best</div>
+    <div data-hf="open">Open</div><div data-hf="closed">Closed</div>
+  </div>
+  <input id="histSearch" class="srch" placeholder="Filter by symbol" maxlength="12">
+  <input id="histDate" class="srch" type="date" placeholder="Date">
+  <div class="panel on" id="p-hist"><div class="empty">Loading your trades…</div></div>
+</section>
+
+<section class="screen" id="s-position">
+  <div class="sec-h">Position</div>
+  <div id="posBody"><div class="empty">Loading…</div></div>
+</section>
+
+<section class="screen" id="s-trade">
+  <div class="sec-h">Trade</div>
+  <div id="tradeBody"><div class="empty">Loading…</div></div>
+</section>
+
+<section class="screen" id="s-symbol">
+  <div id="symHead"></div>
+  <div class="card rise"><div id="symChart"></div></div>
+  <div id="symTf" class="tfrow">
+    <div data-stf="1m">1m</div><div data-stf="5m">5m</div>
+    <div class="on" data-stf="15m">15m</div><div data-stf="1h">1h</div>
+    <div data-stf="4h">4h</div><div data-stf="1d">1d</div>
+  </div>
+  <div id="symBody"><div class="empty">Loading market data…</div></div>
+</section>
+
+<section class="screen" id="s-settings">
+  <div class="sec-h">Settings</div>
+  <div id="setList">
+    <div class="mrow" data-goto="account"><div><div class="msym">Trading account</div>
+      <div class="mpx">Broker, environment, connection</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="automation"><div><div class="msym">Automation</div>
+      <div class="mpx">Strategy, markets, limits</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="alerts"><div><div class="msym">Alerts</div>
+      <div class="mpx">What the platform recorded</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="notifications"><div><div class="msym">Notifications</div>
+      <div class="mpx">Which messages reach you</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="security"><div><div class="msym">Security &amp; sessions</div>
+      <div class="mpx">Identity and authorisation</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="preferences"><div><div class="msym">Preferences</div>
+      <div class="mpx">Language, currency, times</div></div><div class="mchg na">&rsaquo;</div></div>
+    <div class="mrow" data-goto="risk"><div><div class="msym">Risk centre</div>
+      <div class="mpx">Limits and exposure</div></div><div class="mchg na">&rsaquo;</div></div>
+  </div>
+  <div class="sec-h">Security</div>
+  <div style="margin:0 var(--sp4)">
+    <div class="kvr"><span>Telegram session</span><b id="secSess">Verified</b></div>
+    <div class="kvr"><span>Identity</span><b>Signed by Telegram</b></div>
+    <div class="kvr"><span>Trading authorisation</span><b id="secAuth">—</b></div>
+  </div>
+  <div class="note" style="margin:var(--sp3) var(--sp4)">Your broker credentials are
+    never shown here and never leave the server.</div>
+  <div class="sec-h">About</div>
+  <div style="margin:0 var(--sp4) var(--sp6)">
+    <div class="kvr"><span>Platform</span><b>APEX4TRADERS</b></div>
+  </div>
+</section>
+
+<section class="screen" id="s-notifications">
+  <div class="sec-h">Notifications</div>
+  <div id="notifBody"><div class="empty">Loading…</div></div>
+</section>
+
+<section class="screen" id="s-security">
+  <div class="sec-h">Security</div>
+  <div style="margin:0 var(--sp4)">
+    <div class="kvr"><span>Telegram session</span><b id="secVerified">Verified</b></div>
+    <div class="kvr"><span>Identity</span><b>Signed by Telegram</b></div>
+    <div class="kvr"><span>Trading authorisation</span><b id="secAuth2">—</b></div>
+  </div>
+  <div class="note" style="margin:var(--sp3) var(--sp4)">Every request from this
+    screen carries a signature Telegram issued for you, checked on the server
+    before anything is read. Your broker credentials are stored encrypted and
+    are never sent to this app.</div>
+  <div class="sec-h">Sessions</div>
+  <div class="note" style="margin:0 var(--sp4)">The platform holds no separate
+    login. There is one session — this Telegram account — so there is nothing
+    to sign out of elsewhere.</div>
+  <button class="btn" id="secLogout">Log out other sessions</button>
+</section>
+
+<section class="screen" id="s-preferences">
+  <div class="sec-h">Preferences</div>
+  <div style="margin:0 var(--sp4)">
+    <div class="kvr"><span>Language</span><b>English</b></div>
+    <div class="kvr"><span>Currency</span><b id="prefCcy">Account currency</b></div>
+    <div class="kvr"><span>Times</span><b>UTC</b></div>
+  </div>
+  <div class="note" style="margin:var(--sp3) var(--sp4)">Amounts are shown in
+    your account&#8217;s own currency, as your broker reports them — nothing is
+    converted here, because a converted figure is not the one on your statement.
+    Times are UTC throughout, so a timestamp means the same thing in every
+    screen and every message.</div>
+</section>
+
+<section class="screen" id="s-account">
+  <div class="sec-h">Trading account</div>
+  <div id="acctScreen"><div class="empty">Loading your account…</div></div>
+</section>
+
+<section class="screen" id="s-alerts">
+  <div class="sec-h">Alerts</div>
+  <div id="alertBody"><div class="empty">Loading…</div></div>
+</section>
+
+<section class="screen" id="s-ask">
+  <div class="sec-h">Ask APEX</div>
+  <div id="askChips"></div>
+  <div id="askOut"></div>
+  <div id="askBar">
+    <input id="askQ" placeholder="Ask about your account…" maxlength="500">
+    <button id="askGo">&#10148;</button>
+  </div>
+</section>
+
+<section class="screen" id="s-automation">
+  <div class="sec-h">Automation</div>
+  <!-- Reflects server-side state. The controls offered are the ones the
+       policy says a client may change; the environment (LIVE/DEMO) is not
+       among them and never can be. -->
+  <div id="autoBody"><div class="empty">Loading automation…</div></div>
+</section>
+
+<section class="screen" id="s-intelligence">
+  <div class="sec-h">APEX Intelligence</div>
+  <!-- Four blocks, never merged: what the market shows, what the strategy
+       detected, whether trading is allowed, and what APEX actually decided.
+       A market reading is not a signal and a signal is not a decision. -->
+  <div id="intelBody"><div class="empty">Loading APEX Intelligence…</div></div>
+</section>
+
+<section class="screen" id="s-risk">
+  <div class="sec-h">Risk centre</div>
+  <!-- Every value here is rendered from the risk engine's own state. Until it
+       answers, the screen says so rather than showing a zero that reads as
+       "no risk". -->
+  <div id="riskBody"><div class="empty">Loading risk state…</div></div>
+</section>
+</div>
+
+<div id="replay">
+  <div id="rBack">← Back to history</div>
+  <div id="rHead"><div id="rTitle">—</div><div id="rSub">—</div><div id="rPnl">—</div></div>
+  <div id="rChart"></div>
+  <div id="rCtl">
+    <button id="rBack1">&#9664;</button>
+    <button id="rPlay">&#9654; Replay</button>
+    <button id="rPause">&#10074;&#10074;</button>
+    <button id="rFwd1">&#9654;&#9654;</button>
+    <button id="rReset">&#8635; Reset</button>
+  </div>
+  <div id="rSpeeds" class="tfrow">
+    <div data-spd="0.5">0.5x</div><div class="on" data-spd="1">1x</div>
+    <div data-spd="2">2x</div><div data-spd="4">4x</div>
+  </div>
+  <div id="rBody"></div>
+</div>
+
+<section class="screen" id="s-order">
+  <div id="orderBody"><div class="empty">Loading…</div></div>
+</section>
+
+<div id="sheetBg"></div>
+<div id="sheet" role="dialog" aria-modal="true">
+  <h3 id="shTitle">Close position</h3>
+  <div class="body" id="shBody">—</div>
+  <button class="btn danger" id="shGo">Confirm close</button>
+  <button class="btn" id="shNo">Cancel</button>
+</div>
+<nav id="bottomnav">
+  <div class="on" data-s="home"><em>&#127968;</em>Home</div>
+  <div data-s="markets"><em>&#128200;</em>Markets</div>
+  <div data-s="portfolio"><em>&#128188;</em>Portfolio</div>
+  <div data-s="history"><em>&#128202;</em>History</div>
+  <div data-s="intelligence"><em>&#129504;</em>Insight</div>
+  <div data-s="automation"><em>&#9881;</em>Auto</div>
+  <div data-s="ask"><em>&#128172;</em>Ask</div>
+  <div data-s="risk"><em>&#128737;</em>Risk</div>
+  <div data-s="settings"><em>&#9881;&#65039;</em>More</div>
+</nav>
+<div id="err"></div>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- Served from this deployment, not unpkg: a third-party CDN round-trip sat on
+     the critical path of every cold open, and nothing could be drawn until
+     ~160KB arrived from somebody else's host. -->
+<script src="/static/lightweight-charts.js"></script>
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+if(tg){tg.ready();tg.expand();try{tg.setBackgroundColor('#07090f');}catch(e){}}
+const initData = tg ? tg.initData : '';
+const Q = s => document.getElementById(s);
+const esc = s => String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const money = v => (v>=0?'+$':'−$') + Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const num = (v,d) => (v==null||v==='')?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:d==null?5:d});
+
+const mkChart = (el,opts)=>LightweightCharts.createChart(el,Object.assign({
+  layout:{background:{color:'transparent'},textColor:'#5b6472',fontSize:10},
+  grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
+  timeScale:{timeVisible:true,secondsVisible:false,borderColor:'rgba(255,255,255,.08)'},
+  rightPriceScale:{borderColor:'rgba(255,255,255,.08)'},crosshair:{mode:1}},opts||{}));
+const CANDLE_STYLE={upColor:'#2fd575',downColor:'#ff4560',borderUpColor:'#2fd575',
+  borderDownColor:'#ff4560',wickUpColor:'#2fd575',wickDownColor:'#ff4560'};
+
+let chart=null,series=null,eqChart=null,eqSeries=null;
+const chartEl=Q('chart'), eqEl=Q('eqChart');
+try{
+  chart=mkChart(chartEl); series=chart.addCandlestickSeries(CANDLE_STYLE);
+  eqChart=mkChart(eqEl,{timeScale:{timeVisible:false}});
+  eqSeries=eqChart.addAreaSeries({lineColor:'#ff2d4f',lineWidth:2,
+    topColor:'rgba(255,45,79,.25)',bottomColor:'rgba(255,45,79,0)'});
+  new ResizeObserver(()=>{
+    chart.applyOptions({width:chartEl.clientWidth,height:chartEl.clientHeight});
+    eqChart.applyOptions({width:eqEl.clientWidth,height:eqEl.clientHeight});
+  }).observe(chartEl);
+}catch(e){console.error('chart lib unavailable',e);}
+
+let lines=[], entryLine=null;
+/* The entry line carries the running result, the way a broker terminal does:
+   the number you care about sits on the line it belongs to, not only in a card
+   further down the page. */
+function entryTitle(pos){
+  if(!pos) return 'ENTRY';
+  const p=pos.pnlPips, u=pos.pnlUsd;
+  if(p==null && u==null) return 'ENTRY';
+  const sign=(p!=null?p:u)>=0?'+':'';
+  return 'ENTRY  '+(p!=null?sign+p.toFixed(1)+' pips':'')
+       + (u!=null?'  ('+(u>=0?'+':'−')+'$'+Math.abs(u).toFixed(2)+')':'');
+}
+/* Only the FOCUSED symbol's levels go on the chart. The other open positions
+   are on other instruments, and a GBPUSD stop drawn on a XAUUSD price scale is
+   worse than no line at all — they get rows below instead. */
+function setLines(pos){
+  if(!series)return;
+  lines.forEach(l=>{try{series.removePriceLine(l)}catch(e){}});
+  lines=[]; entryLine=null;
+  if(!pos)return;
+  const add=(p,c,t,w)=>{ if(p==null||p==='')return null;
+    const l=series.createPriceLine({price:Number(p),color:c,lineWidth:w||1,
+      lineStyle:2,axisLabelVisible:true,title:t}); lines.push(l); return l; };
+  entryLine=add(pos.entryPrice,'#f5b544',entryTitle(pos),2);
+  add(pos.stopLoss||pos.sl,'#ff4560','SL');
+  add(pos.takeProfit||pos.tp,'#2fd575','TP');
+}
+function refreshEntryLine(pos){
+  if(!entryLine||!pos)return;
+  try{ entryLine.applyOptions({title:entryTitle(pos),
+        color:(pos.pnlUsd!=null&&pos.pnlUsd<0)?'#ff8598':'#f5b544'}); }catch(e){}
+}
+
+/* ── tabs ── */
+/* ── Screen router ────────────────────────────────────────────────────
+   Five destinations behind one persistent shell. Routing is hash-based so
+   Telegram's own back gesture and the shell's back arrow both land on a
+   previous screen instead of closing the Mini App — inside Telegram a
+   history entry is the only thing that makes "back" mean anything.
+   Screens are shown, never rebuilt: every element keeps its id, so the
+   data layer goes on writing to the same nodes it always did. */
+const SCREENS={home:'APEX4TRADERS',markets:'MARKETS',portfolio:'PORTFOLIO',
+               history:'TRADE HISTORY',intelligence:'APEX INTELLIGENCE',
+               automation:'AUTOMATION',ask:'ASK APEX',risk:'RISK CENTRE',
+               settings:'SETTINGS',account:'TRADING ACCOUNT',alerts:'ALERTS',
+               symbol:'MARKET',trade:'TRADE',notifications:'NOTIFICATIONS',
+               security:'SECURITY',preferences:'PREFERENCES',
+               position:'POSITION',order:'ORDER'};
+let screenNow='home';
+function showScreen(name,push){
+  if(!SCREENS[name])name='home';
+  screenNow=name;
+  document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('on',x.id==='s-'+name));
+  document.querySelectorAll('#bottomnav div').forEach(x=>x.classList.toggle('on',x.dataset.s===name));
+  Q('tbTitle').innerHTML = name==='home' ? 'APEX<b>4TRADERS</b>' : SCREENS[name];
+  Q('tbBack').classList.toggle('on',name!=='home');
+  Q('cSym').textContent = lastSym;
+  if(name==='history') loadHistory();
+  if(name==='risk') loadRisk(true);
+  if(name==='intelligence') loadIntel(true);
+  if(name==='automation') loadAuto(true);
+  if(name==='ask') initAsk();
+  if(name==='account') loadAccount(true);
+  if(name==='alerts') loadAlerts(true);
+  if(name==='trade' && tradeCur) loadTrade(tradeCur);
+  if(name==='notifications') loadNotif();
+  /* Both of these are normally reached from an action, but a hash survives a
+     reload. Entering them cold must not leave a permanent "Loading…" or, far
+     worse, a stale outcome from a request this page never made. */
+  if(name==='position') renderPosition();
+  if(name==='order' && !orderShown)
+    Q('orderBody').innerHTML='<div class="empty">No recent order or close to '
+      +'report on this screen.</div>'
+      +'<button class="btn" data-goto="portfolio">View positions</button>';
+  if(push!==false && location.hash!=='#'+name) location.hash=name;
+  window.scrollTo(0,0);
+  /* Both charts are laid out while hidden, so they measure 0 wide until the
+     screen they live on is visible. Re-fit after the paint that shows it. */
+  setTimeout(()=>{
+    if(chart&&name==='markets'){chart.applyOptions({width:chartEl.clientWidth});chart.timeScale().fitContent();}
+    if(eqChart&&name==='portfolio'){eqChart.applyOptions({width:eqEl.clientWidth});eqChart.timeScale().fitContent();}
+  },60);
+}
+document.querySelectorAll('#bottomnav div').forEach(d=>d.onclick=()=>showScreen(d.dataset.s));
+Q('tbBack').onclick=()=>history.back();
+window.addEventListener('hashchange',()=>showScreen((location.hash||'#home').slice(1),false));
+/* The first showScreen() call lives with the other boot calls at the very
+   bottom. Running it here read `lastSym` before its `let` had executed, which
+   throws in the temporal dead zone — and a throw at parse-and-run time stops
+   the whole script, so every handler defined below it never existed. That is
+   what "the app does not load" looked like. */
+document.querySelectorAll('#jSwitch div').forEach(d=>d.onclick=()=>{
+  document.querySelectorAll('#jSwitch div').forEach(x=>x.classList.remove('on')); d.classList.add('on');
+  Q('jTrades').style.display=d.dataset.j==='trades'?'block':'none';
+  Q('jSkips').style.display=d.dataset.j==='skips'?'block':'none';
+});
+
+/* ── timeframe ── */
+let TF='15m', tfDirty=false;
+document.querySelectorAll('#tfBar div').forEach(d=>d.onclick=()=>{
+  document.querySelectorAll('#tfBar div').forEach(x=>x.classList.remove('on'));
+  d.classList.add('on'); TF=d.dataset.tf; tfDirty=true; refresh();
+});
+
+/* ── the badge. Renders the backend verdict and nothing else. ── */
+function setBadge(acct,broker){
+  /* Written in two places on purpose. The hero badge is where a client
+     already looks; the TopBar one is what makes the environment answerable
+     from Markets, History or Risk without scrolling back to Home. Both are
+     driven by the SAME server-resolved value — the Mini App never decides
+     for itself whether an account is live. */
+  const cls = !acct ? '' : (acct.mode==='LIVE'?'live' : acct.mode==='DEMO'?'demo'
+              : acct.mode==='SIMULATION'?'sim' : 'unver');
+  const b=Q('modeBadge');
+  if(b){ b.className=cls; b.textContent = acct ? (acct.badge||'—') : '— — —'; }
+  const e=Q('envBadge'), et=Q('envText');
+  if(e&&et){
+    e.className=cls;
+    /* The emoji is stripped: the dot beside it already carries the colour,
+       and §20 forbids leaning on colour alone — the WORD is what stays. */
+    et.textContent = acct ? String(acct.badge||'—').replace(/[^\x20-\x7E]/g,'').trim().toUpperCase()
+                          : 'ACCOUNT UNAVAILABLE';
+    if(acct&&broker) et.textContent += ' \u00b7 ' + String(broker).toUpperCase();
+  }
+}
+
+let first=true,lastSym='—',lastOk=0,failStreak=0,everLoaded=false;
+/* Price precision comes from the broker's symbol details. Lightweight Charts
+   defaults to 2 decimals, which renders a GBPUSD entry of 1.36078 as "1.36" —
+   the three digits that carry all the meaning, dropped. */
+let DIGITS=5, PIP=0.0001, TFSEC=900, lastBar=null, livePos=null;
+const TF_SECONDS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400};
+let _precisionSet=false;
+function applyPrecision(d){
+  // `d===DIGITS` used to short-circuit here, and DIGITS defaults to 5 — so on
+  // every 5-digit pair (which is most of them) the format was never applied at
+  // all and the axis kept rendering 1.36. Skip only once it has actually been
+  // set on the series.
+  if(d==null||!series||(_precisionSet&&d===DIGITS))return;
+  DIGITS=d; _precisionSet=true;
+  const mv=Number(Math.pow(10,-d).toFixed(d));
+  try{ series.applyOptions({priceFormat:{type:'price',precision:d,minMove:mv}}); }catch(e){}
+}
+const px = v => v==null?'—':Number(v).toFixed(DIGITS);
+/* Money and pips settle toward the new value instead of snapping, so a moving
+   number reads as movement rather than as a page redraw. */
+function glide(el,to,fmt){
+  if(!el)return;
+  const from=el.__v==null?to:el.__v; el.__v=to;
+  if(from===to){el.textContent=fmt(to);return;}
+  const t0=performance.now(), dur=260;
+  cancelAnimationFrame(el.__raf||0);
+  const step=now=>{
+    const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
+    el.textContent=fmt(from+(to-from)*e);
+    if(k<1) el.__raf=requestAnimationFrame(step);
+  };
+  el.__raf=requestAnimationFrame(step);
+}
+function freshness(){
+  const dot=Q('liveDot'); if(!dot)return;
+  const age=(Date.now()-lastOk)/1000;
+  dot.className = lastOk===0?'off' : age>25?'off' : age>8?'stale':'';
+}
+setInterval(freshness,2000);
+
+// initData IS the credential: it is Telegram's HMAC over this user's
+// identity, and anyone holding a fresh one can act as them until it ages out.
+// It used to be appended to the query string, which put it in the browser's
+// history, in every proxy and access log on the way, and in the Referer
+// header of any outbound link. It travels as a header now, and the server
+// REFUSES a request that still carries it in the URL.
+/* ── Home: account card ───────────────────────────────────────────────
+   Balance and equity are the broker's own numbers, passed straight through.
+   Free margin and margin level are NOT in cTrader's account response, so
+   they stay "—" with the reason printed under the card. Deriving them from
+   leverage and showing them beside two real figures would make a guess look
+   like a fourth broker fact. */
+function renderAccount(d){
+  const a=d.account||{}, set=(id,v,cls)=>{const e=Q(id);if(!e)return;
+    e.textContent=v;e.className=cls||'';};
+  const br=Q('acctBroker'); if(br) br.textContent = d.broker || 'No account connected';
+  const ev=Q('acctEnv');
+  if(ev) ev.textContent = String(a.badge||'—').replace(/[^\x20-\x7E]/g,'').trim().toUpperCase();
+  const bal=d.balance, eq=(d.equityLive!=null?d.equityLive:d.equity), fl=d.floatingPnl;
+  set('acBal', bal!=null?'$'+Number(bal).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):'—', bal!=null?'':'na');
+  set('acEq',  eq!=null?'$'+Number(eq).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):'—', eq!=null?'':'na');
+  set('acFloat', fl!=null?money(fl):'—', fl==null?'na':(fl>=0?'pnl-up':'pnl-dn'));
+}
+
+/* ── Markets ──────────────────────────────────────────────────────────
+   One shared snapshot serves every client (see apex/markets.py). A symbol
+   the broker did not price is rendered as unavailable — never as 0.00, and
+   never as the last price it happened to have. */
+function marketRow(r, star){
+  const st = star===false ? '' :
+    '<span class="star'+((prefs.watchlist||[]).indexOf(r.symbol)>=0?' on':'')
+    +'" data-star="'+esc(r.symbol)+'">\u2605</span>';
+  if(!r.available) return '<div class="mrow"><div><div class="msym">'+esc(r.symbol)
+    +'</div><div class="mpx">unavailable</div></div><div class="mchg na">—'+st+'</div></div>';
+  const up=r.changePct>=0;
+  return '<div class="mrow" data-sym="'+esc(r.symbol)+'"><div>'
+    +'<div class="msym">'+esc(r.symbol)+'</div>'
+    +'<div class="mpx">'+Number(r.price).toLocaleString(undefined,{maximumFractionDigits:5})+'</div></div>'
+    +'<div class="mchg '+(up?'up':'dn')+'">'+(up?'+':'')+r.changePct.toFixed(2)+'%'+st+'</div></div>';
+}
+/* ── Risk Centre ──────────────────────────────────────────────────────
+   Presentation only. Every figure comes from the risk engine's published
+   state; the screen computes no limit and enforces none. RISK_UNKNOWN is a
+   third answer and is drawn as its own colour — a risk state we could not
+   read must never look like a risk state that is fine. */
+function meter(label, used, limit, unit){
+  const known = used!=null && limit;
+  const pct = known ? Math.max(0, Math.min(100, (Math.abs(used)/limit)*100)) : 0;
+  const cls = !known ? '' : pct>=90 ? 'bad' : pct>=60 ? 'warn' : '';
+  return '<div class="rmeter"><div class="lbl"><span>'+esc(label)+'</span><b>'
+    +(known ? Math.abs(used).toFixed(2)+unit+' / '+limit.toFixed(2)+unit : 'unknown')
+    +'</b></div><div class="rbar"><i class="'+cls+'" style="width:'+pct+'%"></i></div></div>';
+}
+/* ── APEX Intelligence ────────────────────────────────────────────────
+   Renders four separate blocks. Nothing is computed here and nothing is
+   scored here: a field the engine did not publish is drawn as "Not
+   available", because a made-up number beside four real ones is
+   indistinguishable from a fifth real one. */
+function kvRows(pairs){
+  return pairs.map(([k,v])=>'<div class="kvr"><span>'+esc(k)+'</span><b'
+    +(v==null||v===''?' class="na">Not available':'>'+esc(String(v)))+'</b></div>').join('');
+}
+/* ── Automation ───────────────────────────────────────────────────────
+   Every control here is offered because the SERVER said it is writable.
+   The screen never decides that for itself, so it cannot present a switch
+   the policy would refuse — and the execution environment is not in the
+   list, by design: a client must never be able to move their own account
+   from demo to live from a phone. */
+/* ── Ask APEX ─────────────────────────────────────────────────────────
+   Every reply carries what KIND of claim it is. A reader who cannot tell an
+   observation from a measurement will take the weakest as the strongest, so
+   the label is part of the answer rather than decoration on it. */
+const ASK_CHIPS=['What is my current risk?','What positions are open?',
+  'Show me my best trade',"Why didn't APEX enter GBPUSD?",
+  'What is the market doing?'];
+let askReady=false;
+function initAsk(){
+  if(askReady) return; askReady=true;
+  Q('askChips').innerHTML=ASK_CHIPS.map(c=>'<div>'+esc(c)+'</div>').join('');
+  Q('askChips').querySelectorAll('div').forEach(d=>d.onclick=()=>askSend(d.textContent));
+  Q('askGo').onclick=()=>askSend(Q('askQ').value);
+  Q('askQ').onkeydown=e=>{ if(e.key==='Enter') askSend(Q('askQ').value); };
+}
+async function askSend(q){
+  q=String(q||'').trim(); if(!q) return;
+  Q('askQ').value='';
+  const out=Q('askOut');
+  /* The question is escaped before it is echoed. It came from a keyboard and
+     goes into the DOM; nothing about it is trusted. */
+  const card=document.createElement('div');
+  card.className='ans';
+  card.innerHTML='<div class="q">'+esc(q)+'</div><span class="kind UNKNOWN">…</span>';
+  out.insertBefore(card, out.firstChild);
+  try{
+    const r=await fetch('/api/app/ask',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify({q:q})});
+    const d=await r.json().catch(()=>({}));
+    const kind=String(d.kind||'UNKNOWN');
+    /* §13: an answer shows the facts it was built from. A number with no
+       stated source is indistinguishable from one the model made up, so the
+       fact rows come from the server's own `facts` and nothing is added here
+       when it sends none. */
+    let _f='';
+    if(d.facts && d.facts.length)
+      _f='<div style="margin-top:10px">'+d.facts.map(function(fx){
+        return '<div class="kvr"><span>'+esc(String(fx.label||''))+'</span><b>'
+          +esc(String(fx.value==null?'not recorded':fx.value))+'</b></div>';
+      }).join('')+'</div>';
+    let _a='';
+    if(d.symbol) _a+='<button class="pill" data-sym="'+esc(String(d.symbol))+'">View chart</button> ';
+    if(d.position) _a+='<button class="pill" data-pos="'+esc(String(d.position))+'">View position</button> ';
+    if(d.screen) _a+='<button class="pill" data-goto="'+esc(d.screen)+'">Open '+esc(d.screen)+'</button>';
+    card.innerHTML='<div class="q">'+esc(q)+'</div>'
+      +'<span class="kind '+esc(kind)+'">'+esc(kind)+'</span>\n'+esc(d.text||'')
+      +_f+(_a?'<div style="margin-top:9px">'+_a+'</div>':'');
+  }catch(e){
+    card.innerHTML='<div class="q">'+esc(q)+'</div>'
+      +'<span class="kind UNKNOWN">UNKNOWN</span>\nI could not reach the platform.';
+  }
+}
+
+/* ── Trading account ──────────────────────────────────────────────────
+   Identity, never credentials. The account number is masked to its last
+   four: the client knows which account is theirs, and a full number on a
+   screen is a number in a screenshot. */
+/* ── Symbol detail ────────────────────────────────────────────────────
+   A chart for one instrument, opened from a Markets row. Its own chart
+   object: the Markets/Portfolio charts are bound to their own elements and
+   sharing one would make the back button redraw the wrong screen. */
+let symChart=null, symSeries=null, symCur='', symTf='15m', symLines=[];
+function openSymbol(sym){
+  symCur=String(sym||'').toUpperCase();
+  noteRecent(symCur);
+  showScreen('symbol');
+  Q('symHead').innerHTML='<div class="s">'+esc(symCur.replace('_','/'))+'</div>'
+    +'<div class="p" id="symPx">—</div>';
+  loadSymbol(true);
+}
+async function loadSymbol(force){
+  const H=Q('symBody'); if(!H||!symCur) return;
+  if(!symChart){
+    try{
+      symChart=mkChart(Q('symChart'));
+      symSeries=symChart.addCandlestickSeries({upColor:'#2fd575',downColor:'#ff4560',
+        borderUpColor:'#2fd575',borderDownColor:'#ff4560',
+        wickUpColor:'#2fd575',wickDownColor:'#ff4560'});
+    }catch(e){ /* the chart library is optional; the quote below is not */ }
+  }
+  try{
+    const d=await api('/api/app/symbol?sym='+encodeURIComponent(symCur)
+      +'&tf='+encodeURIComponent(symTf));
+    if(!d.available){
+      H.innerHTML='<div class="empty">'
+        +(d.reason==='UNKNOWN_INSTRUMENT'
+          ? 'This instrument is not one the platform trades.'
+          : 'Market data for this instrument is unavailable right now.')+'</div>';
+      return;
+    }
+    if(symSeries&&d.candles&&d.candles.length){
+      symSeries.setData(d.candles);
+      symChart.timeScale().fitContent();
+      /* Entry, stop and target come from the client's OWN open position on
+         this instrument, read server-side. Nothing is drawn from a value the
+         page was given by the request. */
+      symLines.forEach(l=>symSeries.removePriceLine(l)); symLines=[];
+      if(d.position){
+        const mk=(px,c,t)=>{ if(px) symLines.push(symSeries.createPriceLine(
+          {price:px,color:c,lineWidth:1,lineStyle:2,title:t})); };
+        mk(d.position.entryPrice,'#eef1f6','ENTRY');
+        mk(d.position.stopLoss,'#ff4560','SL');
+        mk(d.position.takeProfit,'#2fd575','TP');
+      }
+    }
+    const px=Q('symPx');
+    if(px) px.textContent = d.bid!=null
+      ? Number(d.bid).toLocaleString(undefined,{maximumFractionDigits:5}) : '—';
+    let h='<div class="sec-h">Price</div><div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Bid</span><b'+(d.bid==null?' class="na">Not available'
+        :'>'+Number(d.bid).toLocaleString(undefined,{maximumFractionDigits:5}))+'</b></div>'
+      +'<div class="kvr"><span>Ask</span><b'+(d.ask==null?' class="na">Not available'
+        :'>'+Number(d.ask).toLocaleString(undefined,{maximumFractionDigits:5}))+'</b></div>'
+      +'<div class="kvr"><span>Spread</span><b'+(d.spreadPips==null?' class="na">Not available'
+        :'>'+d.spreadPips+' pips')+'</b></div></div>';
+    if(d.position){
+      const p=d.position, known=p.pnlUsd!=null;
+      h+='<div class="sec-h">Your position</div><div style="margin:0 var(--sp4)">'
+        +'<div class="kvr"><span>Direction</span><b>'+esc(p.side||'—')+'</b></div>'
+        +'<div class="kvr"><span>Entry</span><b>'+(p.entryPrice||'—')+'</b></div>'
+        +'<div class="kvr"><span>Open P&amp;L</span><b class="'
+        +(known?(p.pnlUsd>=0?'pnl-up':'pnl-dn'):'na')+'">'
+        +(known?money(p.pnlUsd):'Not available')+'</b></div></div>';
+    }
+    h+='<button class="btn" data-goto="intelligence">Analyze with APEX Intelligence</button>';
+    H.innerHTML=h;
+  }catch(e){
+    H.innerHTML='<div class="empty">Market data for this instrument is unavailable ('
+      +esc(e.message||'error')+').</div>';
+  }
+}
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-stf]');
+  if(!t)return;
+  document.querySelectorAll('#symTf div').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); symTf=t.dataset.stf; loadSymbol(true);
+});
+
+/* Pages of trades, not the whole journal. §24: a client with two thousand
+   closed trades must not download them to look at last week. The server
+   already bounds and paginates; this is the client half. */
+const HIST_PAGE=50;
+let histTotal=0, histLoading=false;
+async function loadMoreHistory(){
+  if(histLoading || histCache.length >= histTotal) return;
+  histLoading=true;
+  const btn=Q('histMore'); if(btn){ btn.disabled=true; btn.textContent='Loading…'; }
+  try{
+    const h=await api('/api/app/history?limit='+HIST_PAGE+'&offset='+histCache.length);
+    histCache=histCache.concat(h.trades||[]);
+    histTotal=h.total||histTotal;
+    applyHistFilter();
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='Could not load more — retry'; }
+  }
+  histLoading=false;
+}
+document.addEventListener('click',ev=>{
+  if(ev.target && ev.target.id==='histMore') loadMoreHistory();
+});
+
+/* ── Trade Library ────────────────────────────────────────────────────
+   Filters run over the SAME rows the server already sent. Filtering must
+   never become a reason to re-query, and an empty section says so rather
+   than showing a placeholder trade. */
+let histFilter='all', histSearch='', histDate='';
+function applyHistFilter(){
+  let rows=(histCache||[]).slice();
+  if(histSearch)
+    rows=rows.filter(t=>String(t.symbol||'').toUpperCase().indexOf(histSearch)>=0);
+  if(histDate)
+    rows=rows.filter(t=>String(t.time||'').slice(0,10)===histDate);
+  if(histFilter==='wins')   rows=rows.filter(t=>t.win===true);
+  if(histFilter==='losses') rows=rows.filter(t=>t.win===false);
+  /* "Closed" is every row in this journal — it only holds closed trades — and
+     "Open" therefore has nothing to show here. Saying that is better than a
+     filter that silently returns the same list. */
+  if(histFilter==='closed') rows=rows.filter(t=>t.exit!=null||t.netPnl!=null);
+  if(histFilter==='open')   rows=[];
+  if(histFilter==='best')
+    rows=rows.filter(t=>t.netPnl!=null).sort((a,b)=>b.netPnl-a.netPnl).slice(0,10);
+  drawHistory(rows);
+}
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-hf]');
+  if(!t)return;
+  document.querySelectorAll('#histFilter div').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); histFilter=t.dataset.hf; applyHistFilter();
+});
+document.addEventListener('input',ev=>{
+  if(ev.target && ev.target.id==='histSearch'){
+    histSearch=String(ev.target.value||'').toUpperCase(); applyHistFilter();
+  }
+  if(ev.target && ev.target.id==='histDate'){
+    histDate=String(ev.target.value||''); applyHistFilter();
+  }
+});
+
+/* ── Trade detail ─────────────────────────────────────────────────────
+   R multiple and duration are derived SERVER-side from the trade's own
+   recorded stop distance and timestamps, and come back null when those were
+   never stored. An absent measurement is shown as absent. */
+let tradeCur=null;
+function openTrade(id){ tradeCur=id; showScreen('trade'); loadTrade(id); }
+async function loadTrade(id){
+  const H=Q('tradeBody'); if(!H) return;
+  H.innerHTML='<div class="empty">Loading…</div>';
+  try{
+    const d=await api('/api/app/trade?id='+encodeURIComponent(id));
+    if(!d.available){
+      H.innerHTML='<div class="empty">'
+        +(d.reason==='TRADE_NOT_FOUND'?'That trade is not in your history.'
+          :'This trade could not be read just now.')+'</div>';
+      return;
+    }
+    const t=d.trade||{}, win=(t.netPnl!=null&&t.netPnl>=0);
+    const dur=t.durationSec==null?null
+      :(t.durationSec>=3600?Math.round(t.durationSec/360)/10+'h'
+        :Math.round(t.durationSec/60)+'m');
+    let h='<div style="padding:0 var(--sp4) var(--sp3)">'
+      +'<div style="font-size:var(--fs-xl);font-weight:800">'
+      +esc(String(t.symbol||'').replace('_','/'))+' '+esc(t.side||'')+'</div>'
+      +'<div style="font-size:var(--fs-mega);font-weight:800;'
+      +'font-variant-numeric:tabular-nums" class="'+(win?'pnl-up':'pnl-dn')+'">'
+      +(t.netPnl==null?'—':money(t.netPnl))+'</div>'
+      +(t.rMultiple!=null?'<div class="mpx">'+(t.rMultiple>=0?'+':'')+t.rMultiple+'R</div>':'')
+      +'</div>';
+    h+='<div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Entry</span><b>'+(t.entry==null?'—':t.entry)+'</b></div>'
+      +'<div class="kvr"><span>Exit</span><b>'+(t.exit==null?'—':t.exit)+'</b></div>'
+      +'<div class="kvr"><span>R multiple</span><b'+(t.rMultiple==null
+        ?' class="na">Not recorded':'>'+t.rMultiple)+'</b></div>'
+      +'<div class="kvr"><span>Duration</span><b'+(dur==null
+        ?' class="na">Not recorded':'>'+dur)+'</b></div>'
+      +'<div class="kvr"><span>Environment</span><b>'+esc(String(t.mode||'—').toUpperCase())+'</b></div>'
+      +'<div class="kvr"><span>Strategy</span><b>'+esc(t.strategyId||'—')
+      +(t.strategyVersion?' v'+esc(t.strategyVersion):'')+'</b></div>'
+      +'<div class="kvr"><span>Result</span><b>'+esc(t.action||'—')+'</b></div>'
+      +'</div>';
+    h+='<div class="sec-h">Decision timeline</div>';
+    if(d.eventsRecorded){
+      h+=d.events.map(function(ev){
+        const when=new Date((ev.ts||0)*1000).toISOString().slice(11,19);
+        const pl=ev.payload||{};
+        const bit=pl.reason||pl.side||pl.to||'';
+        return '<div class="item" style="margin:0 var(--sp4)"><b>'
+          +esc(_EVT_LABEL[ev.type]||ev.type)+'</b>'
+          +'<div class="sub">'+esc(when)+' UTC'+(bit?' \u00b7 '+esc(String(bit)):'')
+          +(ev.strategy_version?' \u00b7 v'+esc(ev.strategy_version):'')+'</div></div>';
+      }).join('');
+    }else{
+      h+='<div class="empty">No recorded decision events for this trade. The '
+        +'decision log began after it closed — nothing is reconstructed.</div>';
+    }
+    h+='<button class="btn" id="tradeReplay">Replay this trade</button>';
+    H.innerHTML=h;
+    Q('tradeReplay').onclick=()=>openReplay(id);
+  }catch(e){
+    H.innerHTML='<div class="empty">This trade could not be read just now.</div>';
+  }
+}
+
+/* ── Splash ───────────────────────────────────────────────────────────
+   Four steps, each ticked only when the thing it names actually happened.
+   A checklist that ticks itself on a timer is decoration; this one reports
+   what the app knows. It clears on the first real answer, and also on a
+   timeout — a splash that can outlive the app is worse than none. */
+function spStep(id, ok){ const e=Q(id); if(e && ok) e.classList.add('on'); }
+let splashDone=false;
+function splashClear(){
+  if(splashDone) return; splashDone=true;
+  const e=Q('splash'); if(!e) return;
+  e.classList.add('gone');
+  setTimeout(()=>{ if(e.parentNode) e.parentNode.removeChild(e); }, 400);
+}
+try{ if(tg && tg.initData) spStep('sp1', true); }catch(e){}
+/* Never trap the client behind a spinner because a backend is slow. */
+setTimeout(splashClear, 6000);
+
+/* ── Global search ────────────────────────────────────────────────────
+   Instruments the platform trades, plus a trade id. Both resolve against
+   data already in hand — searching is not a reason to query. */
+function searchToggle(){
+  const w=Q('searchWrap'); if(!w) return;
+  w.classList.toggle('on');
+  if(w.classList.contains('on')) Q('gSearch').focus(); else Q('gResults').innerHTML='';
+}
+function gRender(q){
+  q=String(q||'').trim().toUpperCase();
+  const R=Q('gResults'); if(!R) return;
+  if(!q){ R.innerHTML=''; return; }
+  const rows=[];
+  (window.__mkAll||[]).filter(r=>r.symbol.indexOf(q)>=0).slice(0,6).forEach(r=>{
+    rows.push('<div class="mrow" data-sym="'+esc(r.symbol)+'"><div>'
+      +'<div class="msym">'+esc(r.symbol)+'</div>'
+      +'<div class="mpx">Market</div></div><div class="mchg na">&rsaquo;</div></div>');
+  });
+  (histCache||[]).filter(t=>String(t.symbol||'').toUpperCase().indexOf(q)>=0
+                        || String(t.id||'').toUpperCase().indexOf(q)>=0)
+    .slice(0,6).forEach(t=>{
+      rows.push('<div class="mrow" data-trade="'+esc(t.id)+'"><div>'
+        +'<div class="msym">'+esc(String(t.symbol||'').replace('_','/'))+'</div>'
+        +'<div class="mpx">Trade &middot; '+esc(String(t.time||'').slice(0,16))+'</div></div>'
+        +'<div class="mchg na">&rsaquo;</div></div>');
+    });
+  R.innerHTML = rows.length ? rows.join('')
+    : '<div class="empty">Nothing matches. Search an instrument the platform '
+      +'trades, or a trade from your history.</div>';
+}
+document.addEventListener('input',ev=>{
+  if(ev.target && ev.target.id==='gSearch') gRender(ev.target.value);
+});
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-trade]');
+  if(t){ searchToggle(); openTrade(t.dataset.trade); }
+});
+
+/* ── Position detail ──────────────────────────────────────────────────
+   Everything §11 names, read from the position the server reports. The R
+   multiple needs the entry stop distance; when the platform did not record
+   one there is no R to show, and the row says so. */
+let posCur=null;
+function openPosition(sym){
+  posCur=String(sym||'').toUpperCase();
+  showScreen('position');
+  renderPosition();
+}
+function renderPosition(){
+  const H=Q('posBody'); if(!H) return;
+  const p=(window.__positions||[]).find(x=>String(x.symbol).toUpperCase()===posCur);
+  if(!p){
+    H.innerHTML='<div class="empty">That position is no longer open. '
+      +'Closed trades are in your history.</div>'
+      +'<button class="btn" data-goto="history">Open trade history</button>';
+    return;
+  }
+  const known=p.pnlUsd!=null;
+  const risk=(p.entryPrice!=null&&p.stopLoss!=null)
+    ? Math.abs(p.entryPrice-p.stopLoss) : null;
+  const moved=(p.entryPrice!=null&&p.currentPrice!=null)
+    ? (p.side==='SELL'?p.entryPrice-p.currentPrice:p.currentPrice-p.entryPrice) : null;
+  const r=(risk&&moved!=null)?Math.round((moved/risk)*100)/100:null;
+  let h='<div style="padding:0 var(--sp4) var(--sp3)">'
+    +'<div style="font-size:var(--fs-xl);font-weight:800">'
+    +esc(String(p.symbol).replace('_','/'))+' '+esc(p.side||'')+'</div>'
+    +'<div style="font-size:var(--fs-mega);font-weight:800;font-variant-numeric:tabular-nums" '
+    +'class="'+(known?(p.pnlUsd>=0?'pnl-up':'pnl-dn'):'')+'">'
+    +(known?money(p.pnlUsd):'Not yet priced')+'</div>'
+    +(r!=null?'<div class="mpx">'+(r>=0?'+':'')+r+'R</div>':'')+'</div>';
+  h+='<div style="margin:0 var(--sp4)">'
+    +'<div class="kvr"><span>Volume</span><b>'+(p.units!=null?p.units:'—')+'</b></div>'
+    +'<div class="kvr"><span>Entry</span><b>'+(p.entryPrice!=null?p.entryPrice:'—')+'</b></div>'
+    +'<div class="kvr"><span>Current</span><b>'+(p.currentPrice!=null?p.currentPrice:'—')+'</b></div>'
+    +'<div class="kvr"><span>Stop loss</span><b>'+(p.stopLoss!=null?p.stopLoss:'—')+'</b></div>'
+    +'<div class="kvr"><span>Take profit</span><b>'+(p.takeProfit!=null?p.takeProfit:'—')+'</b></div>'
+    +'<div class="kvr"><span>R multiple</span><b'+(r==null?' class="na">Not recorded':'>'+r)+'</b></div>'
+    +'<div class="kvr"><span>Opened</span><b>'+esc(p.openedAt||'—')+'</b></div>'
+    +'<div class="kvr"><span>Status</span><b>Open</b></div>'
+    +'</div>';
+  h+='<div class="sec-h">Trade intelligence</div>';
+  h+='<div class="empty">Why this position was opened is shown on the trade once '
+    +'it closes, from the decision log — nothing is reconstructed here.</div>';
+  h+='<button class="btn" data-sym="'+esc(p.symbol)+'">View chart</button>';
+  h+='<button class="btn" data-goto="intelligence">View decision</button>';
+  h+='<button class="btn danger" data-close="'+esc(String(p.symbol))+'">Close position</button>';
+  H.innerHTML=h;
+}
+
+/* ── Order / close outcome ────────────────────────────────────────────
+   One screen, three outcomes, worded as §21 requires. "Unknown" is its own
+   outcome and never collapses into failure. */
+let orderShown=false;
+function showOrder(kind, detail){
+  const H=Q('orderBody'); if(!H) return;
+  orderShown=true;
+  /* Opening and closing fail differently, and the words are not
+     interchangeable: "no new position was created" is meaningless after a
+     failed close, and "nothing was closed" is meaningless after a failed
+     order. Each outcome carries the sentence that is actually true of it. */
+  const map={
+    confirmed:    ['Order confirmed','ok',''],
+    closed:       ['Position closed','ok',''],
+    refused:      ['Order not executed','unk',
+                   'No new position was created.'],
+    close_refused:['Position not closed','unk',
+                   'Nothing was closed. Your position is exactly as it was.'],
+    unknown:      ['Order status unknown','unk',
+                   '<b>Do not retry yet.</b> The platform is verifying the '
+                   +'broker state; this screen updates on its own once it answers.'],
+    close_unknown:['Close status unknown','unk',
+                   '<b>Do not retry yet.</b> Retrying could close the position '
+                   +'twice. Your position list updates on its own once the '
+                   +'broker answers.'],
+  };
+  const m=map[kind]||map.unknown;
+  let h='<div class="sec-h">'+esc(m[0])+'</div>';
+  h+='<div id="rEngine" class="'+m[1]+'"><b>'+esc(m[0])+'</b><div class="note">'
+    +(detail||'')+'</div></div>';
+  if(m[2]) h+='<div class="note" style="margin:0 var(--sp4)">'+m[2]+'</div>';
+  h+='<button class="btn" data-goto="portfolio">View positions</button>';
+  h+='<button class="btn" data-goto="home">Back</button>';
+  H.innerHTML=h;
+  showScreen('order');
+}
+
+let acctAt=0;
+async function loadAccount(force){
+  if(!force && Date.now()-acctAt < 8000) return;
+  const H=Q('acctScreen'); if(!H) return;
+  try{
+    const d=await api('/api/app/account');
+    acctAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Your account could not be read just now. '
+        +esc(d.detail||'')+'</div>';
+      return;
+    }
+    const e=d.environment||{};
+    const badge=String(e.badge||'').replace(/[^\x20-\x7E]/g,'').trim().toUpperCase();
+    let h='<div id="rEngine" class="'+(d.connected?'ok':'unk')+'"><b>'
+      +(d.connected?'Connected':'Not connected')+'</b>'
+      +'<div class="note">'+esc(d.broker||'cTrader')+' \u00b7 '+esc(badge||'UNKNOWN')
+      +(e.proven?'':' (unconfirmed)')+'</div>'
+      +(e.detail?'<div class="note">'+esc(e.detail)+'</div>':'')+'</div>';
+    h+='<div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Account</span><b>'+esc(d.accountMask||'—')+'</b></div>'
+      +'<div class="kvr"><span>Balance</span><b'+(d.balance==null?' class="na">Not available':
+        '>$'+Number(d.balance).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}))+'</b></div>'
+      +'<div class="kvr"><span>Equity</span><b'+(d.equity==null?' class="na">Not available':
+        '>$'+Number(d.equity).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}))+'</b></div>'
+      +'<div class="kvr"><span>Broker connection</span><b>'+esc(d.brokerHealth||'unknown')+'</b></div>'
+      +'</div>';
+    if(!e.proven)
+      h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Your account environment '
+        +'could not be verified with your broker. New live orders are unavailable until '
+        +'verification is restored.</div>';
+    h+='<button class="btn" id="acctRefresh">Refresh connection</button>';
+    h+='<button class="btn" id="acctManage">Manage account</button>';
+    h+='<button class="btn" id="acctDisconnect">Disconnect</button>';
+    h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Your broker credentials are '
+      +'never shown here and never leave the server. Connecting, switching and '
+      +'disconnecting an account all happen in the chat, where the broker\u2019s own '
+      +'sign-in runs \u2014 this screen never handles them.</div>';
+    H.innerHTML=h;
+    Q('acctRefresh').onclick=()=>{ acctAt=0; loadAccount(true); };
+    Q('acctManage').onclick=()=>sheetOpen('Manage account',
+      'Connecting, switching and disconnecting a broker account all happen in '
+      +'the chat with <b>/ctrader</b>, where your broker\u2019s own sign-in runs. '
+      +'This screen never handles a credential.', null, null);
+    Q('acctDisconnect').onclick=()=>sheetOpen('Disconnect account',
+      'Disconnecting is done from the chat, with <b>/ctrader</b>, because it '
+      +'revokes a broker token and that must not be doable from a screen that '
+      +'only ever reads.<br><br>Your open positions are unaffected either way.',
+      null, null);
+    const sa=Q('secAuth'); if(sa) sa.textContent = e.proven ? 'Active' : 'Verification required';
+  }catch(err){
+    H.innerHTML='<div class="empty">Your account could not be read just now.</div>';
+  }
+}
+
+/* ── Alerts ───────────────────────────────────────────────────────────
+   Assembled from the decision log. An empty list means nothing was
+   recorded, which is said rather than left blank. */
+const _EVT_LABEL={'decision.declined':'No trade','order.filled':'Position opened',
+  'order.rejected':'Order rejected','position.closed':'Position closed',
+  'risk.checked':'Settings changed','order.authorized':'Order authorised',
+  'order.submitted':'Order submitted','stop.updated':'Stop moved'};
+let alertAt=0;
+async function loadAlerts(force){
+  if(!force && Date.now()-alertAt < 8000) return;
+  const H=Q('alertBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/alerts');
+    alertAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Alerts are unavailable right now.</div>';
+      return;
+    }
+    let h='';
+    const rk=d.risk||{};
+    if(rk.engine==='RISK_HOLDING')
+      h+='<div id="rEngine" class="halt"><b>Trading paused by the risk engine</b>'
+        +((rk.reasons&&rk.reasons.length)?'<ul>'+rk.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')
+        +'</div>';
+    const rows=d.events||[];
+    if(!rows.length){
+      h+='<div class="empty">Nothing recorded yet. Decisions and positions appear '
+        +'here as they happen.</div>';
+    }else{
+      /* §19 groups alerts by what they are about, because the three kinds are
+         read differently: a risk alert may need a decision now, a trade alert
+         is a record, a market alert is context. The grouping is by EVENT TYPE
+         — never by whether the wording sounds urgent. */
+      const item=function(ev){
+        const when=new Date((ev.ts||0)*1000).toISOString().replace('T',' ').slice(5,16);
+        const pl=ev.payload||{};
+        const detail=pl.reason||pl.side||(pl.automationChanged?pl.automationChanged.join(', '):'')||'';
+        return '<div class="item" style="margin:0 var(--sp4)"><b>'
+          +esc(_EVT_LABEL[ev.type]||ev.type)+'</b>'
+          +(ev.symbol?' \u00b7 '+esc(String(ev.symbol).replace('_','/')):'')
+          +'<div class="sub">'+esc(when)+' UTC'+(detail?' \u00b7 '+esc(String(detail)):'')
+          +(ev.environment&&ev.environment!=='UNKNOWN'?' \u00b7 '+esc(ev.environment):'')
+          +'</div></div>';
+      };
+      const RISK=['risk.halt','risk.resumed','risk.limit','licence.blocked',
+                  'order.rejected','decision.declined'];
+      const TRADE=['order.submitted','order.filled','order.authorized',
+                   'position.closed','stop.updated'];
+      const g={risk:[],trade:[],market:[]};
+      rows.forEach(function(ev){
+        const t=String(ev.type||'');
+        g[RISK.indexOf(t)>=0?'risk':TRADE.indexOf(t)>=0?'trade':'market'].push(ev);
+      });
+      [['risk','Risk'],['trade','Trades'],['market','Market']].forEach(function(sec){
+        if(!g[sec[0]].length) return;
+        h+='<div class="sec-h">'+sec[1]+'</div>'+g[sec[0]].map(item).join('');
+      });
+    }
+    H.innerHTML=h;
+  }catch(e){
+    H.innerHTML='<div class="empty">Alerts are unavailable right now.</div>';
+  }
+}
+
+let autoAt=0, autoWritable=[];
+function autoField(key, label, value, kind){
+  if(autoWritable.indexOf(key) < 0)
+    return '<div class="kvr"><span>'+esc(label)+'</span><b class="na">'
+      +(value==null?'Not available':esc(String(value))+' \u00b7 read-only')+'</b></div>';
+  if(kind==='bool')
+    return '<div class="kvr"><span>'+esc(label)+'</span><b>'
+      +'<button class="pill" data-set="'+key+'" data-val="'+(value?'false':'true')+'">'
+      +(value?'ON':'OFF')+'</button></b></div>';
+  return '<div class="kvr"><span>'+esc(label)+'</span><b>'
+    +'<input class="num" data-set="'+key+'" value="'+esc(value==null?'':String(value))
+    +'" inputmode="decimal"></b></div>';
+}
+async function loadAuto(force){
+  if(!force && Date.now()-autoAt < 8000) return;
+  const H=Q('autoBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/automation');
+    autoAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Automation state unavailable — '
+        +esc(d.detail||d.reason||'')+'</div>';
+      return;
+    }
+    autoWritable = d.writable || [];
+    const st=d.settings||{}, env=d.environment||{};
+    const on = d.running && d.active;
+    let h='<div id="rEngine" class="'+(on?'ok':'unk')+'"><b>'
+      +(on?'Automation active':'Automation not running')+'</b>'
+      +'<div class="note">Mode: '+esc(d.mode||'—')+' \u00b7 Strategy: '
+      +esc(d.strategy||'not set')+'</div></div>';
+    /* The environment is shown here and is NOT a control. */
+    h+='<div class="note" style="margin:var(--sp2) var(--sp4)">Environment: <b>'
+      +esc(env.env||'UNKNOWN')+'</b>'+(env.proven?'':' (unconfirmed)')
+      +' \u2014 set by your broker, not from this screen.</div>';
+    /* §16: the three modes, shown as what the SERVER reports. Selecting one
+       is a request; the server decides whether it lands. */
+    h+='<div class="sec-h">Mode</div><div style="margin:0 var(--sp4)">'
+      +[['manual','Manual'],['assisted','Assisted'],['automatic','Automatic']]
+       .map(function(m){
+        const on=(d.mode===m[0]);
+        return '<div class="kvr"><span>'+m[1]+'</span><b>'
+          +(on?'<span style="color:var(--up)">\u25cf selected</span>'
+              :'<button class="pill" data-mode="'+m[0]+'">Select</button>')
+          +'</b></div>';
+      }).join('')+'</div>'
+      +'<div class="note" style="margin:var(--sp2) var(--sp4)">Mode is changed '
+      +'from the chat with <b>/automation</b>, where the same authorisation runs '
+      +'that guards every other change.</div>';
+    h+='<div class="sec-h">Markets</div><div style="margin:0 var(--sp4)">'
+      +((d.markets&&d.markets.length)
+        ? d.markets.map(m=>'<span class="chip">'+esc(m)+'</span>').join(' ')
+        : '<span class="empty">No instruments selected.</span>')+'</div>';
+    h+='<div class="sec-h">Limits</div><div style="margin:0 var(--sp4)">'
+      +autoField('RISK_PER_TRADE','Risk per trade', st.RISK_PER_TRADE)
+      +autoField('MIN_CONFIDENCE','Minimum confidence', st.MIN_CONFIDENCE)
+      +autoField('MAX_SPREAD_PCT','Max spread %', st.MAX_SPREAD_PCT)
+      +autoField('BREAKEVEN_AT_R','Breakeven at R', st.BREAKEVEN_AT_R)
+      +autoField('TRAILING_STOP','Trailing stop', st.TRAILING_STOP, 'bool')
+      +autoField('HTF_FILTER','Higher-timeframe filter', st.HTF_FILTER, 'bool')
+      +'</div>';
+    h+='<button class="btn" id="autoSave">Save changes</button>';
+    h+='<button class="btn" data-goto="settings">Manage automation</button>';
+    h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Saved settings are '
+      +'checked by the risk engine on every order. Changing them here cannot '
+      +'permit a trade the engine would refuse.</div>';
+    h+='<div id="autoMsg"></div>';
+    H.innerHTML=h;
+    Q('autoSave').onclick=saveAuto;
+  }catch(e){
+    H.innerHTML='<div class="empty">Automation state unavailable ('
+      +esc(e.message||'error')+').</div>';
+  }
+}
+async function saveAuto(){
+  const btn=Q('autoSave'); btn.disabled=true; btn.textContent='Saving\u2026';
+  const body={};
+  document.querySelectorAll('#autoBody [data-set]').forEach(el=>{
+    const k=el.dataset.set;
+    if(el.tagName==='INPUT'){ if(el.value!=='') body[k]=el.value; }
+    else if(el.dataset.pending==='1') body[k]=el.dataset.val;
+  });
+  const msg=Q('autoMsg');
+  try{
+    const r=await fetch('/api/app/automation',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    const d=await r.json().catch(()=>({}));
+    if(d.ok){
+      msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4);color:var(--up)">Saved: '
+        +esc((d.applied||[]).join(', '))+'</div>';
+      loadAuto(true);
+    }else{
+      /* A refusal names the keys, never the values. */
+      msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4);color:var(--st-unver)">'
+        +'Not saved. '+esc((d.refused||[]).join(' \u00b7 ')||d.error||'refused')+'</div>';
+    }
+  }catch(e){
+    msg.innerHTML='<div class="note" style="margin:var(--sp2) var(--sp4)">Could not reach the platform.</div>';
+  }
+  btn.disabled=false; btn.textContent='Save changes';
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest&&ev.target.closest('[data-set].pill');
+  if(!b)return;
+  b.dataset.pending='1';
+  b.textContent = b.dataset.val==='true' ? 'ON' : 'OFF';
+  b.dataset.val = b.dataset.val==='true' ? 'false' : 'true';
+});
+
+let intelAt=0;
+async function loadIntel(force){
+  if(!force && Date.now()-intelAt < 8000) return;
+  const H=Q('intelBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/intelligence');
+    intelAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">APEX Intelligence is unavailable for this market right now.</div>';
+      return;
+    }
+    const m=d.market||{}, rg=d.regime||{}, st=d.strategy||{}, rk=d.risk||{}, dc=d.decision||{};
+    let h='';
+    h+='<div style="margin:0 var(--sp4) var(--sp2);font-size:var(--fs-xl);font-weight:800">'
+      +esc(String(d.symbol||'—').replace('_','/'))+'</div>';
+    if(!d.isFocus)
+      h+='<div class="note" style="margin:0 var(--sp4) var(--sp3)">This reading is for the '
+        +'instrument the platform is currently watching.</div>';
+
+    h+='<div class="sec-h">Market observation</div><div style="margin:0 var(--sp4)">'
+      +kvRows([['Trend',m.trend],['Momentum',m.momentum],['Volatility',m.volatility],
+               ['Regime',rg.label||rg.regime],['ATR %',m.atrPct!=null?m.atrPct+'%':null],
+               ['RSI',m.rsi]])+'</div>';
+
+    h+='<div class="sec-h">Strategy observation</div><div style="margin:0 var(--sp4)">'
+      +kvRows([['Active strategy',st.label],['Sentinel',st.sentinel],
+               ['Institutional read',st.institutional]])+'</div>';
+
+    h+='<div class="sec-h">Risk state</div>';
+    const eng = rk.engine==='RISK_HOLDING'?'halt':rk.engine==='RISK_OK'?'ok':'unk';
+    h+='<div id="rEngine" class="'+eng+'"><b>'
+      +(eng==='halt'?'Trading paused by the risk engine'
+        :eng==='ok'?'Within limits':'Risk state could not be read')+'</b>'
+      +((rk.reasons&&rk.reasons.length)?'<ul>'+rk.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')
+      +'</div>';
+
+    /* §12: setup strength as a measured bar, never a mood word. It is shown
+       only when the platform actually scored this instrument — an empty bar
+       labelled 0% would read as a weak setup rather than as no reading. */
+    if(dc.confidence!=null || st.confidence!=null){
+      const _cf=Math.max(0,Math.min(100,Math.round(dc.confidence!=null?dc.confidence:st.confidence)));
+      h+='<div class="sec-h">Setup strength</div>'
+        +'<div style="margin:0 var(--sp4)"><div class="kvr"><span>Confidence</span>'
+        +'<b>'+_cf+'%</b></div>'
+        +'<div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden">'
+        +'<div style="height:100%;width:'+_cf+'%;background:var(--gold)"></div></div></div>';
+    }else{
+      h+='<div class="sec-h">Setup strength</div>'
+        +'<div class="empty">Not scored for this instrument right now.</div>';
+    }
+    h+='<button class="btn" data-sym="'+esc(String(d.symbol||''))+'">View chart</button>';
+    h+='<div class="sec-h">APEX decision</div>';
+    if(dc.recorded){
+      h+=dc.declines.map(function(ev){
+        const when=new Date((ev.ts||0)*1000).toISOString().slice(11,16);
+        const pl=ev.payload||{};
+        return '<div class="item" style="margin:0 var(--sp4)"><b>No trade</b>'
+          +'<div class="sub">'+when+' UTC \u00b7 '+esc(pl.reason||'reason not recorded')
+          +(ev.strategy_version?' \u00b7 v'+esc(ev.strategy_version):'')+'</div></div>';
+      }).join('');
+    }else{
+      /* The distinction that matters: nothing recorded is not the same as
+         nothing happened. §21 forbids inventing a reason here. */
+      h+='<div class="empty">No recorded APEX decision for this instrument yet. '
+        +'Decisions are logged as they are made — nothing is reconstructed afterwards.</div>';
+    }
+    if(d.evCalibration && d.evCalibration.ready===false)
+      h+='<div class="note" style="margin:var(--sp3) var(--sp4)">Probability model is still '
+        +'calibrating ('+esc(String(d.evCalibration.samples))+'/'
+        +esc(String(d.evCalibration.needed))+' labelled trades). No win probability is '
+        +'shown until it is measured.</div>';
+    H.innerHTML=h;
+  }catch(e){
+    H.innerHTML='<div class="empty">APEX Intelligence is unavailable right now ('
+      +esc(e.message||'error')+').</div>';
+  }
+}
+
+let riskAt=0;
+async function loadRisk(force){
+  if(!force && Date.now()-riskAt < 8000) return;
+  const H=Q('riskBody'); if(!H) return;
+  try{
+    const d=await api('/api/app/risk');
+    riskAt=Date.now();
+    if(!d.available){
+      H.innerHTML='<div class="empty">Risk state unavailable — '+esc(d.detail||d.reason||'')+'</div>';
+      return;
+    }
+    const L=d.limits||{}, T=d.today||{};
+    let html='';
+    /* The engine verdict first: it is the only line that changes what the
+       platform will DO next. */
+    const eng = d.engine==='RISK_HOLDING' ? 'halt' : d.engine==='RISK_OK' ? 'ok' : 'unk';
+    const engTxt = eng==='halt' ? 'Trading paused by the risk engine'
+                 : eng==='ok'   ? 'Risk engine: within limits'
+                 : 'Risk state could not be read';
+    html+='<div id="rEngine" class="'+eng+'"><b>'+engTxt+'</b>'
+      + (d.reasons&&d.reasons.length ? '<ul>'+d.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>' : '')
+      + (eng==='unk' ? '<div class="note">New orders still pass the same gate; this screen simply has nothing to show yet.</div>' : '')
+      + '</div>';
+    html+=meter('Today\u2019s loss vs daily limit',
+                (T.pnlPct!=null && T.pnlPct<0) ? T.pnlPct : (T.pnlPct!=null?0:null),
+                L.maxDailyLossPct, '%');
+    html+=meter('Drawdown from peak', d.drawdownPct, L.maxDrawdownPct, '%');
+    html+='<div class="sec-h">Limits</div>';
+    html+='<div style="margin:0 var(--sp4)">'
+      +'<div class="kvr"><span>Risk per trade</span><b>'+(L.riskPerTradePct!=null?L.riskPerTradePct+'%':'—')+'</b></div>'
+      +'<div class="kvr"><span>Daily loss limit</span><b>'+(L.maxDailyLossPct!=null?L.maxDailyLossPct+'%':'—')+'</b></div>'
+      +'<div class="kvr"><span>Max drawdown</span><b>'+(L.maxDrawdownPct!=null?L.maxDrawdownPct+'%':'—')+'</b></div>'
+      +'<div class="kvr"><span>Trades today</span><b>'+(T.trades!=null?T.trades:'—')+'</b></div>'
+      +'</div>';
+    /* §15: the eight checks the engine runs before an order exists. Each is
+       ticked from the engine's OWN verdict — a green tick nobody verified is
+       worse than no list, so an unread state shows every line as unknown. */
+    const _m = eng==='unk' ? '\u25cb' : eng==='ok' ? '\u2713' : '\u2717';
+    const _c = eng==='unk' ? 'var(--t2)' : eng==='ok' ? 'var(--up)' : 'var(--st-live)';
+    html+='<div class="sec-h">Risk engine checks</div><div style="margin:0 var(--sp4)">'
+      +['Position sizing','Stop loss present','Daily loss limit','Total exposure',
+        'Margin headroom','Account state','Licence state','Broker connection']
+       .map(function(k){
+        return '<div class="kvr"><span>'+k+'</span><b style="color:'+_c+'">'+_m+'</b></div>';
+      }).join('')+'</div>'
+      +(eng==='unk'
+        ? '<div class="note" style="margin:var(--sp2) var(--sp4)">The engine did '
+          +'not report, so no line above is confirmed. New orders still pass the '
+          +'same checks.</div>'
+        : '');
+    html+='<div class="sec-h">Exposure</div>';
+    html += (d.exposure&&d.exposure.length)
+      ? d.exposure.map(e=>{
+          const bias = e.usdBias>0?'long USD':e.usdBias<0?'short USD':'no USD leg';
+          const known=e.pnlUsd!=null, up=known&&e.pnlUsd>=0;
+          return '<div class="mrow"><div><div class="msym">'+esc(String(e.symbol).replace('_','/'))
+            +'</div><div class="mpx">'+esc(e.side||'')+' \u00b7 '+bias+'</div></div>'
+            +'<div class="mchg '+(known?(up?'up':'dn'):'na')+'">'+(known?money(e.pnlUsd):'—')+'</div></div>';
+        }).join('')
+      : '<div class="empty">No open exposure.</div>';
+    H.innerHTML=html;
+  }catch(e){
+    H.innerHTML='<div class="empty">Risk state unavailable ('+esc(e.message||'error')+').</div>';
+  }
+}
+
+/* ── Close: confirm, then hand it to the same gate every other origin uses.
+   The Mini App names no position. Whatever is on screen, the server closes
+   the position IT holds for this chat — an id from a frontend is a request,
+   not proof of the right to act on it. */
+function sheetOpen(title, body, goText, onGo){
+  Q('shTitle').textContent=title; Q('shBody').innerHTML=body;
+  const go=Q('shGo');
+  go.textContent=goText||'Confirm'; go.disabled=false;
+  go.style.display = onGo ? 'block' : 'none';
+  go.onclick = onGo || null;
+  Q('sheetBg').classList.add('on'); Q('sheet').classList.add('on');
+}
+function sheetClose(){ Q('sheetBg').classList.remove('on'); Q('sheet').classList.remove('on'); }
+Q('shNo').onclick=sheetClose; Q('sheetBg').onclick=sheetClose;
+
+function askClose(pos){
+  const known = pos && pos.pnlUsd!=null;
+  sheetOpen('Close position',
+    '<b>'+esc(String(pos.symbol||'').replace('_','/'))+'</b> \u00b7 '
+    +esc(pos.side||'')+(pos.units!=null?' \u00b7 '+pos.units:'')+'<br><br>'
+    +'Current P&amp;L: <b>'+(known?money(pos.pnlUsd):'not yet priced')+'</b><br><br>'
+    +'This sends a close request to your connected cTrader account. It goes '
+    +'through the same authorization every other close does.',
+    'Confirm close', doClose);
+}
+async function doClose(){
+  const go=Q('shGo'); go.disabled=true; go.textContent='Closing\u2026';
+  try{
+    const r=await fetch('/api/app/close',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:'{}'});
+    const d=await r.json().catch(()=>({}));
+    sheetClose();
+    if(r.status===502 || d.error==='CLOSE_STATUS_UNKNOWN'){
+      /* Neither confirmed nor refused. Telling the client to retry could close
+         a position twice; telling them it failed could be a lie. Unknown is
+         its own outcome and never collapses into either. */
+      showOrder('close_unknown', 'The platform is verifying the broker state.');
+    }else if(d.ok){
+      showOrder('closed', 'Closed <b>'+esc(String(d.symbol||'').replace('_','/'))
+        +'</b>'+(d.price!=null?' at <b>'+num(d.price)+'</b>':'')
+        +'. cTrader confirmed the close.');
+      refresh();
+    }else{
+      showOrder('close_refused', 'The platform could not safely complete this '
+        +'request. Reason: '
+        +esc(d.detail||d.error||'refused by the risk and ownership checks')+'.');
+    }
+  }catch(e){
+    sheetClose();
+    showOrder('close_unknown', 'The request did not complete, so the platform '
+      +'cannot confirm whether it reached your broker.');
+  }
+}
+
+/* ── Preferences: watchlist, recently viewed, notification switches ────
+   Held on the server against the client's own record. The watchlist is
+   filtered there against the instruments the platform trades, so a value
+   from this page can never become a market request for something the
+   engine does not know. */
+let prefs={watchlist:[],recent:[],notifications:{}};
+async function loadPrefs(){
+  try{
+    const d=await api('/api/app/prefs');
+    if(d.available) prefs={watchlist:d.watchlist||[],recent:d.recent||[],
+                           notifications:d.notifications||{}};
+  }catch(e){ /* the board still renders; only the star state is missing */ }
+}
+async function savePrefs(patch){
+  try{
+    await fetch('/api/app/prefs',{method:'POST',
+      headers:{'Authorization':'Telegram '+initData,'Content-Type':'application/json'},
+      body:JSON.stringify(patch)});
+  }catch(e){}
+}
+function toggleWatch(sym){
+  const i=prefs.watchlist.indexOf(sym);
+  if(i>=0) prefs.watchlist.splice(i,1); else prefs.watchlist.push(sym);
+  savePrefs({watchlist:prefs.watchlist});
+  loadMarkets(true);
+}
+function noteRecent(sym){
+  prefs.recent=[sym].concat((prefs.recent||[]).filter(x=>x!==sym)).slice(0,8);
+  savePrefs({recent:prefs.recent});
+}
+document.addEventListener('click',ev=>{
+  const st=ev.target.closest&&ev.target.closest('[data-star]');
+  if(!st)return;
+  ev.stopPropagation();
+  toggleWatch(st.dataset.star);
+});
+
+/* ── Notifications ────────────────────────────────────────────────────
+   Switches only. Nothing here changes what the platform DOES, only which
+   of it reaches the client — so it is deliberately a different door from
+   the automation settings. */
+const NOTIF_ROWS=[['opened','Position opened'],['closed','Position closed'],
+  ['stop','Stop loss'],['target','Take profit'],['price','Price alerts'],
+  ['insight','APEX insights'],['risk','Risk warnings'],['margin','Margin warnings']];
+async function loadNotif(){
+  const H=Q('notifBody'); if(!H) return;
+  await loadPrefs();
+  H.innerHTML='<div style="margin:0 var(--sp4)">'+NOTIF_ROWS.map(function(r){
+    const on=prefs.notifications[r[0]]!==false;
+    return '<div class="kvr"><span>'+esc(r[1])+'</span><b>'
+      +'<button class="pill" data-notif="'+r[0]+'">'+(on?'ON':'OFF')+'</button></b></div>';
+  }).join('')+'</div>'
+   +'<div class="note" style="margin:var(--sp3) var(--sp4)">These control which '
+   +'messages reach you. They do not change what the platform does — a position '
+   +'still opens and closes whether or not you are told about it.</div>';
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest&&ev.target.closest('[data-notif]');
+  if(!b)return;
+  const k=b.dataset.notif, now=b.textContent==='ON';
+  b.textContent=now?'OFF':'ON';
+  prefs.notifications[k]=!now;
+  savePrefs({notifications:prefs.notifications});
+});
+
+let mktAt=0, mktSearch='';
+document.addEventListener('input',ev=>{
+  if(ev.target && ev.target.id==='mktSearch'){
+    mktSearch=String(ev.target.value||''); loadMarkets(true);
+  }
+});
+async function loadMarkets(force){
+  if(!force && Date.now()-mktAt < 20000) return;
+  if(!prefs.watchlist.length && !prefs.recent.length) await loadPrefs();
+  const F=Q('mkForex'), M=Q('mkMetals'), H=Q('homeMkt');
+  try{
+    const d=await api('/api/app/markets');
+    mktAt=Date.now();
+    if(!d.available){
+      const msg='<div class="empty">Market data unavailable right now.</div>';
+      if(F)F.innerHTML=msg; if(M)M.innerHTML=msg; if(H)H.innerHTML=msg; return;
+    }
+    const by={}; (d.rows||[]).forEach(r=>by[r.symbol]=r);
+    const draw=(list)=>(list||[]).map(sym=>by[sym]?marketRow(by[sym]):'').join('');
+    const q=(mktSearch||'').toUpperCase();
+    const keep=list=>(list||[]).filter(sym=>!q||sym.indexOf(q)>=0);
+    if(F)F.innerHTML=draw(keep(d.forex))
+      ||'<div class="empty">'+(q?'No instrument matches.':'No forex instruments.')+'</div>';
+    if(M)M.innerHTML=draw(keep(d.metals))
+      ||'<div class="empty">'+(q?'No instrument matches.':'No metals.')+'</div>';
+    /* Watchlist, movers and recently viewed are three views of the SAME rows
+       the server sent — no extra request, and no instrument appears in one of
+       them that is not in the board. */
+    const W=Q('mkWatch'), MV=Q('mkMovers'), RC=Q('mkRecent');
+    if(W) W.innerHTML = draw(keep(prefs.watchlist))
+      || '<div class="empty">Your watchlist is empty. Tap the star on any '
+        +'instrument to follow it.</div>';
+    if(MV){
+      const moved=(d.rows||[]).filter(r=>r.available)
+        .sort((a,b)=>Math.abs(b.changePct)-Math.abs(a.changePct)).slice(0,4);
+      MV.innerHTML = moved.length
+        ? moved.map(r=>marketRow(r,false)).join('')
+        : '<div class="empty">No instrument has moved enough to rank today.</div>';
+    }
+    if(RC) RC.innerHTML = draw(keep(prefs.recent))
+      || '<div class="empty">Instruments you open appear here.</div>';
+    /* Home shows a short overview, not the whole board. */
+    if(H)H.innerHTML=draw((d.forex||[]).slice(0,3).concat((d.metals||[]).slice(0,1)))
+      ||'<div class="empty">No market data.</div>';
+    if(d.stale){
+      const w='<div class="empty">Showing the last snapshot — the broker did not answer.</div>';
+      if(F)F.insertAdjacentHTML('afterbegin',w);
+    }
+  }catch(e){
+    const msg='<div class="empty">Market data unavailable ('+esc(e.message||'error')+').</div>';
+    if(F&&!F.querySelector('.mrow'))F.innerHTML=msg;
+    if(M&&!M.querySelector('.mrow'))M.innerHTML=msg;
+    if(H&&!H.querySelector('.mrow'))H.innerHTML=msg;
+  }
+}
+/* The TopBar's two controls, and the actions that had markup but no wiring.
+   Bound by delegation because several of these are rendered on demand. */
+document.addEventListener('click',function(ev){
+  const t=ev.target;
+  if(!t || !t.id) return;
+  if(t.id==='tbBell'){ showScreen('alerts'); loadAlerts(true); }
+  else if(t.id==='tbAct'){ showScreen('settings'); }
+  else if(t.id==='secLogout') sheetOpen('Sessions',
+    'There is no second session to end. The platform authenticates you through '
+    +'Telegram alone \u2014 signing out happens in Telegram itself, and revoking '
+    +'access there revokes it here.', null, null);
+});
+/* An automation mode is a REQUEST, and the platform answers it in chat where
+   the same authorisation runs as for every other change. */
+document.addEventListener('click',function(ev){
+  const m=ev.target.closest&&ev.target.closest('[data-mode]');
+  if(!m) return;
+  sheetOpen('Change automation mode',
+    'Switching to <b>'+esc(m.dataset.mode)+'</b> is done from your chat with '
+    +'<b>/automation</b>. The change is authorised there, not from this screen.',
+    null, null);
+});
+
+/* Tapping a market row or a Home position goes where the detail lives. */
+document.addEventListener('click',ev=>{
+  const row=ev.target.closest&&ev.target.closest('[data-goto],[data-sym]');
+  if(!row)return;
+  if(row.dataset.goto) showScreen(row.dataset.goto);
+  else if(row.dataset.sym) openSymbol(row.dataset.sym);
+});
+document.addEventListener('click',ev=>{
+  const pr=ev.target.closest&&ev.target.closest('[data-pos]');
+  if(pr && !(ev.target.closest&&ev.target.closest('[data-close]'))){
+    openPosition(pr.dataset.pos); return;
+  }
+  const b=ev.target.closest&&ev.target.closest('[data-close]');
+  if(!b)return;
+  const pos=(window.__positions||[]).find(p=>String(p.symbol)===b.dataset.close);
+  if(pos) askClose(pos);
+});
+
+async function api(path){
+  const r = await fetch(path, {headers: {'Authorization': 'Telegram ' + initData}});
+  if(!r.ok){
+    let code=''; try{code=(await r.json()).code||'';}catch(e){}
+    const err=new Error(code||('HTTP '+r.status)); err.status=r.status; err.code=code; throw err;
+  }
+  return r.json();
+}
+
+async function refresh(){
+ try{
+  const d = await api('/api/app/data?tf='+encodeURIComponent(TF));
+  Q('err').style.display='none'; lastOk=Date.now(); failStreak=0; everLoaded=true; freshness();
+  outageClear();
+  setBadge(d.account, d.broker);
+  renderAccount(d);
+  /* Two lines, two different facts: whether the PLATFORM is answering, and
+     whether the BROKER is. A screen that merges them tells a client their
+     account is fine when only the server is. */
+  /* §5: a DEMO account says so plainly, and an environment the broker has
+     not confirmed says that new live orders are unavailable — never a quiet
+     badge that a client reads as approval. */
+  const nb=Q('envNotice');
+  if(nb){
+    const a=d.account||{}, unproven=(a.source==='stored-env');
+    if(a.mode==='DEMO' && !unproven)
+      nb.innerHTML='<div class="banner demo"><b>Demo account</b>'
+        +'No real funds are at risk.</div>';
+    else if(unproven || a.mode==='UNKNOWN')
+      nb.innerHTML='<div class="banner"><b>Account verification required</b>'
+        +'We cannot currently verify your cTrader account environment. '
+        +'Existing account information may be delayed, and new live orders are '
+        +'unavailable until verification is restored.'
+        +'<button class="btn" id="envRetry" style="margin-top:10px">Retry connection</button></div>';
+    else nb.innerHTML='';
+    const rt=Q('envRetry');
+    if(rt) rt.onclick=()=>{ acctAt=0; refresh(); loadAccount(true); };
+  }
+  splashClear();
+  spStep('sp2', true);
+  const dp=Q('dotPlat'), tp=Q('txtPlat'), db=Q('dotBrk'), tb=Q('txtBrk');
+  if(dp&&tp){ dp.className='dot ok'; tp.textContent='Platform connected'; }
+  if(db&&tb){
+    const h=d.brokerHealth;
+    db.className='dot '+(h==='ok'?'ok':h?'warn':'bad');
+    tb.textContent = h==='ok' ? (esc(d.broker||'Broker')+' connected')
+      : h ? (esc(d.broker||'Broker')+' — '+esc(h))
+          : 'Broker connection unavailable';
+  }
+  applyPrecision(d.digits);
+  if(d.pipSize) PIP=d.pipSize;
+  TFSEC=TF_SECONDS[d.timeframeUsed||TF]||TFSEC;
+  lastSym=(d.symbol||'—').replace('_','/');
+  /* The tab strip this used to read was replaced by the screen router. The
+     chart header shows the instrument unless Portfolio is on screen, where the
+     same element titles the equity curve. */
+  if(screenNow!=='portfolio') Q('cSym').textContent=lastSym;
+  Q('cMeta').innerHTML='<i id="liveDot"></i><b id="livePx">'+(d.price?px(d.price):'—')+'</b> · '+esc(d.timeframeUsed||d.timeframe||'')+' · '+esc(d.broker||'');
+  freshness();
+
+  const eq = d.equityLive!=null?d.equityLive:(d.balance||0);
+  const bv=Q('balV'), prev=window.__eq; window.__eq=eq;
+  bv.textContent='$'+eq.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(prev!=null&&eq!==prev){bv.classList.remove('up','dn');void bv.offsetWidth;
+    bv.classList.add(eq>prev?'up':'dn');setTimeout(()=>bv.classList.remove('up','dn'),600);}
+  Q('balSub').innerHTML=balanceLine(d);
+
+  const st=d.stats||{}, td=st.today||{};
+  const chip=Q('dayChip');
+  chip.textContent='today '+money(td.netPnl||0)+' · '+(td.trades||0)+' trades';
+  chip.className=(td.netPnl||0)<0?'neg':'';
+
+  Q('statusLine').innerHTML = d.position
+    ? ((d.position.side==='BUY'?'Long ':'Short ')+'<b>'+esc(lastSym)+'</b> — '
+       +(fl>=0?'up $':'down $')+Math.abs(fl).toFixed(2))
+    : '<b>'+esc(lastSym)+'</b> — no open position, monitoring for entry conditions';
+
+  const bp=[];
+  if(d.strategy)bp.push(d.strategy);
+  if(d.regime&&d.regime.regime)bp.push(d.regime.regime.charAt(0).toUpperCase()+d.regime.regime.slice(1)+' market');
+  if(d.sessions&&d.sessions.length)bp.push(d.sessions.join(' + '));
+  Q('badges').innerHTML=bp.map(esc).join('  ·  ');
+
+  Q('tWr').textContent=st.winRate!=null?st.winRate.toFixed(0)+'%':'—';
+  Q('tPf').textContent=st.profitFactor!=null?st.profitFactor:'—';
+  Q('tDd').textContent=st.maxDrawdownPct!=null?st.maxDrawdownPct.toFixed(1)+'%':'—';
+  Q('tSk').textContent=td.skips!=null?td.skips:'0';
+
+  if(series&&d.candles&&d.candles.length){
+    series.setData(d.candles);
+    lastBar=Object.assign({},d.candles[d.candles.length-1]);
+    if(first||tfDirty){chart.timeScale().fitContent();first=false;tfDirty=false;}
+  }
+  if(eqSeries&&d.equity&&d.equity.length) eqSeries.setData(d.equity.map((p,i)=>({time:i,value:p.value})));
+  livePos=d.position?Object.assign({},d.position):null;
+  setLines(livePos);
+
+  // One renderer for every position, focused or not — the single-card version
+  // it replaced could only ever describe one of them.
+  renderPositions(d.positions && d.positions.length
+                    ? d.positions
+                    : (d.position ? [Object.assign({focused:true,
+                        symbol:d.symbol}, d.position)] : []),
+                  d.openCount);
+
+  const perf=Q('p-perf');
+  perf.innerHTML = st.trades ?
+     '<div class="kv"><span>Closed trades</span><b>'+st.trades+' ('+st.wins+'W / '+st.losses+'L)</b></div>'
+    +'<div class="kv"><span>Net P&L</span><b class="'+(st.netPnl>=0?'pnl-up':'pnl-dn')+'">'+money(st.netPnl)+'</b></div>'
+    +'<div class="kv"><span>Profit factor</span><b>'+(st.profitFactor!=null?st.profitFactor:'—')+'</b></div>'
+    +'<div class="kv"><span>Average win / loss</span><b>'+money(st.avgWin)+' / '+money(st.avgLoss)+'</b></div>'
+    +'<div class="kv"><span>Best / worst trade</span><b>'+money(st.best)+' / '+money(st.worst)+'</b></div>'
+    +'<div class="kv"><span>Max drawdown</span><b>'+(st.maxDrawdownPct!=null?st.maxDrawdownPct.toFixed(1)+'%':'—')+'</b></div>'
+    : '<div class="empty">No closed trades yet — statistics build as trades close.</div>';
+
+  // News. Prefer the rolling feed; fall back to newsToday so a page still
+  // cached from an older deploy keeps rendering instead of going blank.
+  const nv=Q('p-news'), ev=(d.newsFeed&&d.newsFeed.length)?d.newsFeed:(d.newsToday||[]);
+  if(ev.length){
+    nv.innerHTML=ev.map(e=>{
+      const past=e.mins<=0, am=Math.abs(e.mins), h=Math.floor(am/60), m=am%60;
+      const when=(h?h+'h ':'')+m+'m'+(past?' ago':'');
+      const high=(e.impact||'high')==='high';
+      // Only high-impact releases actually hold execution back, and only inside
+      // the guard window. Saying it on every line would claim the platform reacts
+      // to things it ignores.
+      const note=e.guarded?' — automation stands aside':'';
+      const fig=[];
+      if(e.actual!=null) fig.push('actual <b>'+esc(e.actual)+'</b>');
+      if(e.forecast!=null) fig.push('exp '+esc(e.forecast));
+      if(e.previous!=null) fig.push('prev '+esc(e.previous));
+      return '<div class="item"'+(past?' style="opacity:.62"':'')+'>'
+        +'<span class="chip'+(high?' red':'')+'">'+esc(e.currency)+'</span>'
+        +'<span class="chip">'+(high?'HIGH':'MED')+'</span>'
+        +'<b>'+esc(e.title)+'</b>'
+        +'<div class="sub">'+(past?'Released ':'In ')+when+note
+        +(fig.length?' · '+fig.join(' · '):'')+'</div></div>';
+    }).join('');
+  } else nv.innerHTML='<div class="empty">Nothing on the calendar right now — clear runway. \u2705</div>';
+
+  const jt=Q('jTrades');
+  if(d.trades&&d.trades.length){
+    jt.innerHTML=d.trades.map(t=>'<div class="item"><b>'+esc(t.action||'')+'</b> '+esc((t.symbol||'').replace('_','/'))
+      +(t.price?' @ '+num(t.price):'')
+      +(t.netPnl!=null?' · <span class="'+(t.netPnl>=0?'pnl-up':'pnl-dn')+'">'+money(t.netPnl)+'</span>':'')
+      +'<div class="sub">'+esc(t.time||'')+(t.reasoning?' — '+esc(t.reasoning):'')+'</div></div>').join('');
+  }
+  const js=Q('jSkips');
+  if(d.skips&&d.skips.length){
+    js.innerHTML=d.skips.map(k=>'<div class="item"><span class="chip red">SKIP</span>'+esc(k.reason)
+      +'<div class="sub">'+esc(k.time||'')+'</div></div>').join('');
+  }
+ }catch(e){
+  // One slow poll is not an outage. The banner used to appear on the first
+  // failure, so a single request that lost a race with the broker socket made
+  // a working terminal look broken. Auth is different — that never fixes
+  // itself by waiting, so it is said straight away.
+  failStreak++;
+  const el=Q('err');
+  if(e.code==='TELEGRAM_AUTH_FAILED'){
+    el.style.display='block';
+    el.textContent='Open this from your Telegram chat to see your account.';
+  }else if(!everLoaded){
+    el.style.display='block';
+    el.textContent='Loading your account…';
+  }else if(failStreak>=3){
+    /* One voice for one outage. This line used to say "reconnecting" while the
+       banner said "unavailable", which reads as two different problems. The
+       banner carries the wording and the retry; this line stays out of it. */
+    el.style.display='none';
+    outage(e);
+  }
+  splashClear();
+  freshness();
+ }
+}
+
+/* paintPnl's single-card job is now renderPositions'. Every open position
+   gets a row. The account can hold `maxpos` at once and
+   this screen used to show only the one Auto-Pilot was watching, so a client
+   with two trades open saw one of them and an equity figure that reflected
+   both — which reads as a bug in the number rather than a gap in the list. */
+function renderPositions(list, count){
+  const host=Q('posList'); if(!host)return;
+  const rows=(list||[]).filter(p=>p&&p.symbol);
+  window.__positions=rows;
+  /* Home carries a compact copy so the first screen answers "am I in
+     anything" without a tap. Same rows, same source — never a second
+     count computed a different way. */
+  const home=Q('homePos');
+  if(home) home.innerHTML = rows.length
+    ? rows.map(p=>{
+        const known=p.pnlUsd!=null, up=known&&p.pnlUsd>=0;
+        return '<div class="mrow" data-goto="portfolio"><div>'
+          +'<div class="msym">'+esc(String(p.symbol).replace('_','/'))+'</div>'
+          +'<div class="mpx">'+(p.side==='SELL'?'SELL':'BUY')+(p.units!=null?' \u00b7 '+p.units:'')+'</div></div>'
+          +'<div class="mchg '+(known?(up?'up':'dn'):'na')+'">'
+          +(known?money(p.pnlUsd):'price pending')+'</div></div>';
+      }).join('')
+    : '<div class="empty">No open positions.</div>';
+  if(home && rows.length){
+    home.innerHTML += '<button class="btn" data-goto="portfolio">View all positions</button>';
+  }
+  if(!rows.length){
+    /* §20: an empty state names the state and offers the next step. A blank
+       panel reads as a failure to load. */
+    host.innerHTML='<div class="empty">No open positions.<br>'
+      +'When APEX opens a trade it appears here with its live result.</div>'
+      +'<button class="btn" data-goto="markets">Explore markets</button>';
+    host.style.display='block'; return;
+  }
+  host.style.display='block';
+  host.innerHTML=rows.map(p=>{
+    const dir=dirLabel(p.side);
+    const known=p.pnlUsd!=null;
+    const up=known&&p.pnlUsd>=0;
+    const pnl=known
+      ? '<span class="'+(up?'pnl-up':'pnl-dn')+'">'
+        +(p.pnlPips!=null?(p.pnlPips>=0?'+':'')+p.pnlPips.toFixed(1)+' pips ':'')
+        +'('+money(p.pnlUsd)+')</span>'
+      : '<span class="na">price pending</span>';
+    return '<div class="prow'+(p.focused?' focus':'')+'" data-pos="'+esc(String(p.symbol))+'">'
+      +'<div class="ptop"><b>'+dir+' '+esc(String(p.symbol).replace('_','/'))+'</b>'+pnl+'</div>'
+      +'<div class="pgrid"><div>Entry<b>'+px(p.entryPrice)+'</b></div>'
+      +'<div>Stop<b>'+px(p.stopLoss)+'</b></div>'
+      +'<div>Target<b>'+px(p.takeProfit)+'</b></div></div>'
+      +'<button class="pclose" data-close="'+esc(String(p.symbol))+'">Close position</button>'
+      +'</div>';
+  }).join('');
+}
+
+/* ── HISTORY ── */
+let histCache=[];
+async function loadHistory(){
+  const el=Q('p-hist');
+  try{
+    const h=await api('/api/app/history?limit='+HIST_PAGE+'&offset=0');
+    histCache=h.trades||[];
+    histTotal=h.total||histCache.length;
+    applyHistFilter();
+  }catch(e){
+    el.innerHTML='<div class="empty">'+(e.code==='TELEGRAM_AUTH_FAILED'
+      ? 'Open this from your Telegram chat to see your trades.'
+      : 'Your trade history is temporarily unavailable.')+'</div>';
+  }
+}
+/* Drawing is separate from fetching so a filter reuses the rows the server
+   already sent. Filtering must never become a reason to re-query. */
+function drawHistory(rows){
+  const el=Q('p-hist'); if(!el) return;
+  if(!rows.length){
+    el.innerHTML='<div class="empty">'
+      +(histFilter==='open'
+          ? 'Open positions live in Portfolio — this library holds closed trades.'
+          : histCache.length ? 'No trades match this filter.'
+                             : 'Your completed trades will appear here.')+'</div>';
+    return;
+  }
+  /* §9 groups the library by day. The heading comes from the trade's own
+     recorded timestamp — a trade whose time was never recorded is grouped
+     under "Date not recorded" rather than silently landing on today. */
+  let _day='';
+  const _head=function(t){
+    const raw=String(t.time||'').slice(0,10);
+    const d=raw && !isNaN(Date.parse(raw)) ? new Date(raw+'T00:00:00Z') : null;
+    const lbl = d ? d.toLocaleDateString(undefined,
+                      {month:'short', day:'numeric', timeZone:'UTC'}).toUpperCase()
+                  : 'DATE NOT RECORDED';
+    if(lbl===_day) return '';
+    _day=lbl;
+    return '<div class="sec-h">'+esc(lbl)+'</div>';
+  };
+  el.innerHTML=rows.map(t=>{
+      const win=t.win===true, dir=dirLabel(t.side);
+      const md=(t.mode||'').toLowerCase();
+      const badge=md==='live'?'<span class="chip live">LIVE</span>'
+                 :md==='demo'?'<span class="chip demo">DEMO</span>'
+                 :md==='simulation'?'<span class="chip">SIM</span>':'';
+      return _head(t)+'<div class="item"><div class="trow" data-t="'+esc(t.id)+'">'
+        +'<div><b>'+dir+' '+esc((t.symbol||'').replace('_','/'))+'</b>'
+        +'<div class="sub">'+badge+esc((t.time||'').slice(0,16))
+        +(t.entry!=null&&t.exit!=null?' · '+num(t.entry)+' → '+num(t.exit):'')+'</div></div>'
+        +'<div class="r '+(t.netPnl==null?'':(win?'pnl-up':'pnl-dn'))+'">'
+        +(t.netPnl==null?'—':money(t.netPnl))+'<span class="chev"> ›</span></div></div></div>';
+  }).join('');
+  /* Only offered when the server said there are more, and only on the
+     unfiltered view — "load more" under a filtered list would suggest the
+     filter is incomplete rather than the page. */
+  if(histFilter==='all' && !histSearch && !histDate && histCache.length < histTotal)
+    el.insertAdjacentHTML('beforeend',
+      '<button class="btn" id="histMore">Load more ('
+      +histCache.length+' of '+histTotal+')</button>');
+  el.querySelectorAll('.trow').forEach(r=>r.onclick=()=>openTrade(r.dataset.t));
+}
+
+/* ── REPLAY ── */
+let rChart=null,rSeries=null,rTimer=null,rData=null;
+Q('rBack').onclick=()=>{stopReplay();Q('replay').classList.remove('on');};
+function stopReplay(){if(rTimer){clearInterval(rTimer);rTimer=null;}Q('rPlay').disabled=false;}
+
+function bar(label,value,pct,suffix){
+  if(value==null) return '<div class="bar"><div class="lbl"><span>'+label+'</span><b class="na">not recorded</b></div></div>';
+  const p=Math.max(0,Math.min(100,pct));
+  return '<div class="bar"><div class="lbl"><span>'+label+'</span><b>'+value+(suffix||'')+'</b></div>'
+    +'<div class="track"><div class="fill" style="width:'+p+'%"></div></div></div>';
+}
+
+async function openReplay(tid){
+  const scr=Q('replay'); scr.classList.add('on'); stopReplay();
+  Q('rTitle').textContent='Loading…'; Q('rSub').textContent=''; Q('rPnl').textContent='';
+  Q('rBody').innerHTML='';
+  try{
+    const d=await api('/api/app/replay?trade='+encodeURIComponent(tid)+'&timeframe='+encodeURIComponent(TF));
+    rData=d;
+    const t=d.trade, win=t.win===true;
+    const dir=dirLabel(t.side);
+    Q('rTitle').textContent=dir+' '+String(t.symbol||'').replace('_','/');
+    const md=(t.mode||'').toUpperCase();
+    Q('rSub').textContent=String(t.time||'').slice(0,16)+(md?' · '+md:'');
+    Q('rPnl').textContent=t.netPnl==null?'—':money(t.netPnl);
+    Q('rPnl').className=t.netPnl==null?'':(win?'pnl-up':'pnl-dn');
+
+    if(!rChart){
+      rChart=mkChart(Q('rChart')); rSeries=rChart.addCandlestickSeries(CANDLE_STYLE);
+      new ResizeObserver(()=>rChart.applyOptions({width:Q('rChart').clientWidth,height:Q('rChart').clientHeight})).observe(Q('rChart'));
+    }
+    drawFull();
+
+    const s=d.snapshot||{};
+    Q('rBody').innerHTML=
+       '<div class="sec">Entry snapshot</div>'
+      +bar('Confidence', s.confidence!=null?Math.round(s.confidence):null, s.confidence, '%')
+      +bar('Probability', s.probability!=null?Math.round(s.probability*100):null, s.probability*100, '%')
+      +'<div class="sec">What APEX saw</div>'
+      +'<div style="margin:0 16px">'
+      +'<div class="kv"><span>Strategy</span><b>'+esc(s.strategyId||'—')+'</b></div>'
+      +'<div class="kv"><span>Market regime</span><b>'+esc(s.regime||'not recorded')+'</b></div>'
+      +'<div class="kv"><span>Spread at entry</span><b>'+(s.spreadPips!=null?s.spreadPips+' pips':'not recorded')+'</b></div>'
+      +'<div class="kv"><span>Expected value</span><b>'+(s.evR!=null?Number(s.evR).toFixed(2)+'R':'not recorded')+'</b></div>'
+      +'</div>'
+      +'<div class="sec">Result</div>'
+      +'<div style="margin:0 16px 20px">'
+      +'<div class="kv"><span>Entry</span><b>'+num(t.entry)+'</b></div>'
+      +'<div class="kv"><span>Exit</span><b>'+num(t.exit)+'</b></div>'
+      +'<div class="kv"><span>Net P&L</span><b class="'+(win?'pnl-up':'pnl-dn')+'">'+(t.netPnl==null?'—':money(t.netPnl))+'</b></div>'
+      +'<div class="kv"><span>Trade ID</span><b>'+esc(t.id)+'</b></div>'
+      +'</div>'
+      /* §14: the outcome named the way the platform recorded it. "TP hit" is
+         only claimed when the exit reason says so — inferring it from a
+         positive P&L would turn a manual close into a target hit. */
+      +'<div class="sec">Trade completed</div>'
+      +'<div style="margin:0 16px 20px"><div class="kv"><span>Outcome</span><b>'
+      +esc(t.exitReason ? String(t.exitReason).replace(/_/g,' ')
+           : (t.netPnl==null ? 'not recorded'
+              : (win ? 'Profitable trade' : 'Loss taken')))
+      +'</b></div>'
+      +'<div class="kv"><span>Closed</span><b>'+esc(String(t.closeTime||t.time||'').slice(0,16))+'</b></div>'
+      +'</div>'
+      +'<div style="margin:0 16px 24px">'
+      +'<button class="btn" id="rAgain">Replay again</button>'
+      +'<button class="btn" id="rBack">Back to trade history</button></div>';
+    const _ra=Q('rAgain'), _rb=Q('rBack');
+    /* Restart from the beginning, not from wherever the last run stopped —
+       "replay again" that resumes mid-trade is not a replay. */
+    if(_ra) _ra.onclick=()=>{ stopReplay(); rIdx=0; drawFull();
+                              Q('rPlay').click(); };
+    if(_rb) _rb.onclick=()=>{ stopReplay(); Q('replay').classList.remove('on');
+                              showScreen('history'); };
+  }catch(e){
+    Q('rTitle').textContent='Unavailable';
+    Q('rSub').textContent='';
+    Q('rBody').innerHTML='<div class="empty">'+(
+      e.code==='TRADE_NOT_FOUND'||e.code==='TRADE_INCOMPLETE' ? 'This trade could not be found.'
+      : e.code==='MARKET_DATA_UNAVAILABLE' ? 'Historical market data is temporarily unavailable for this trade.'
+      : e.code==='TELEGRAM_AUTH_FAILED' ? 'Open this from your Telegram chat.'
+      : 'This replay is temporarily unavailable.')+'</div>';
+  }
+}
+
+function markerSet(upto){
+  if(!rData)return [];
+  const m=rData.markers, out=[];
+  if(m.entry&&m.entry.time!=null&&(upto==null||m.entry.time<=upto))
+    out.push({time:m.entry.time,position:'belowBar',color:'#f5b544',shape:'arrowUp',text:'ENTRY '+num(m.entry.price)});
+  if(m.exit&&m.exit.time!=null&&(upto==null||m.exit.time<=upto))
+    out.push({time:m.exit.time,position:'aboveBar',color:m.exit.win?'#2fd575':'#ff4560',
+              shape:'arrowDown',text:'EXIT '+num(m.exit.price)});
+  return out.sort((a,b)=>a.time-b.time);
+}
+function drawFull(){
+  if(!rSeries||!rData)return;
+  rSeries.setData(rData.candles);
+  rSeries.setMarkers(markerSet(null));
+  rChart.timeScale().fitContent();
+}
+/* The playhead lives outside the timer. Speed changes restart the interval,
+   and a replay that jumped back to the entry every time someone pressed 2x
+   would not be a replay. */
+let rIdx=0, rSpeed=1;
+const R_BASE_MS=55;
+function rStartIndex(){
+  if(!rData||!rData.candles.length) return 2;
+  const cs=rData.candles;
+  let i=Math.max(2,cs.findIndex(c=>c.time>=rData.markers.entry.time)-12);
+  return i<2?2:i;
+}
+function rPaint(){
+  if(!rSeries||!rData) return;
+  const cs=rData.candles;
+  rIdx=Math.max(2,Math.min(rIdx,cs.length));
+  rSeries.setData(cs.slice(0,rIdx));
+  rSeries.setMarkers(rIdx>=2?markerSet(cs[rIdx-1].time):[]);
+}
+function rTick(){
+  if(!rData) return stopReplay();
+  rIdx++;
+  if(rIdx>rData.candles.length){stopReplay();rChart.timeScale().fitContent();return;}
+  rPaint();
+}
+function rRun(){
+  stopReplay();
+  Q('rPlay').disabled=true;
+  rTimer=setInterval(rTick, Math.max(12, Math.round(R_BASE_MS/rSpeed)));
+}
+Q('rReset').onclick=()=>{stopReplay();rIdx=0;drawFull();};
+Q('rPause').onclick=()=>{stopReplay();};
+Q('rBack1').onclick=()=>{stopReplay();rIdx=Math.max(2,rIdx-1);rPaint();};
+Q('rFwd1').onclick=()=>{stopReplay();rIdx=rIdx+1;rPaint();};
+Q('rPlay').onclick=()=>{
+  if(!rSeries||!rData||!rData.candles.length)return;
+  if(!rIdx || rIdx>=rData.candles.length) rIdx=rStartIndex();
+  rPaint();
+  rChart.timeScale().fitContent();
+  rRun();
+};
+document.addEventListener('click',ev=>{
+  const t=ev.target.closest&&ev.target.closest('[data-spd]');
+  if(!t)return;
+  document.querySelectorAll('#rSpeeds div').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  rSpeed=parseFloat(t.dataset.spd)||1;
+  /* Only re-time a replay that is actually running. Changing speed while
+     paused must not start it. */
+  if(rTimer) rRun();
+});
+
+/* ── THE LIVE TICK ──────────────────────────────────────────────────────────
+   /api/app/data rebuilds candles, stats, news and the journal — far too heavy
+   to ask for at the rate a price moves. The tick asks only for what changes:
+   the price, the position's running P&L, and the money. The full refresh drops
+   to every 6s because the tick already carries everything that moves. */
+/* Grow the current candle instead of redrawing the series. setData() rebuilds
+   every bar and visibly resets the view; update() moves only the bar in flight,
+   which is what makes the chart breathe the way a terminal's does. */
+function growBar(price, ts){
+  if(!series||!lastBar||price==null)return;
+  const bucket=Math.floor(ts/TFSEC)*TFSEC;
+  if(bucket>lastBar.time){
+    lastBar={time:bucket,open:price,high:price,low:price,close:price};
+  }else if(bucket===lastBar.time){
+    lastBar.high=Math.max(lastBar.high,price);
+    lastBar.low=Math.min(lastBar.low,price);
+    lastBar.close=price;
+  }else return;                      // a stale tick never rewrites history
+  try{ series.update(lastBar); }catch(e){}
+}
+
+/* One balance line for both the full refresh and the poll. Both used to build
+   it inline, and both gated the floating figure on there being a FOCUSED
+   position — so a client holding a trade the platform was not currently
+   watching saw a balance with no floating P&L beside it at all.
+
+   The caveat matters as much as the number: "estimated" is multiplied here and
+   is missing swap and commission, so it will not match cTrader to the cent,
+   and "partial" means a position could not be priced and the equity above is a
+   floor rather than the account's. Neither may be shown as a plain figure. */
+function balanceLine(d){
+  const fl = Number(d.floatingPnl||0);
+  const has = (d.positions && d.positions.length) || d.position || fl !== 0;
+  let note='';
+  if(d.equitySource==='estimated')
+    note=' <span class="na">· estimated, cTrader is exact</span>';
+  else if(d.equitySource==='partial')
+    note=' <span class="na">· incomplete, '+(d.unpricedPositions||0)
+        +' position(s) unpriced</span>';
+  return 'Balance $'+Number(d.balance||0).toLocaleString(undefined,
+           {minimumFractionDigits:2,maximumFractionDigits:2})
+    + (has ? ' · <span class="'+(fl>=0?'pnl-up':'pnl-dn')+'">Floating '
+             +money(fl)+'</span>' : '')
+    + note;
+}
+/* Direction, or an explicit gap. This used to be
+   `side==='SELL' ? SHORT : LONG` at three call sites, which quietly turned
+   every trade with no recorded side into a long one — and the journal's
+   broker-close path recorded no side at all, so a losing SELL closed by its
+   own stop was shown to the client as a winning-looking long. An unknown
+   direction is now unknown. */
+function dirLabel(side){
+  return side==='SELL' ? '\uD83D\uDD34 SHORT'
+       : side==='BUY'  ? '\uD83D\uDFE2 LONG'
+       : '<span class="na">Direction not recorded</span>';
+}
+async function tick(){
+  try{
+    const t=await api('/api/app/tick');
+    lastOk=Date.now(); failStreak=0; freshness();
+    const lp=Q('livePx');
+    if(lp&&t.price!=null){
+      const prev=lp.__p; lp.__p=t.price;
+      lp.textContent=px(t.price);
+      if(prev!=null&&t.price!==prev){
+        lp.style.color=t.price>prev?'#2fd575':'#ff4560';
+        setTimeout(()=>{lp.style.color='';},420);
+      }
+    }
+    if(t.price!=null&&t.ts) growBar(t.price, t.ts);
+
+    if(t.equityLive!=null){
+      const bv=Q('balV'), prev=bv.__v;
+      glide(bv,t.equityLive,v=>'$'+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+      if(prev!=null&&t.equityLive!==prev){
+        bv.classList.remove('up','dn'); void bv.offsetWidth;
+        bv.classList.add(t.equityLive>prev?'up':'dn');
+        setTimeout(()=>bv.classList.remove('up','dn'),600);
+      }
+    }
+    Q('balSub').innerHTML=balanceLine(t);
+
+    renderPositions(t.positions, t.openCount);
+    if(t.position){
+      livePos=Object.assign(livePos||{},t.position);
+      refreshEntryLine(livePos);
+      const up=fl>=0;
+      // Direction comes from the POSITION, never from whether it is winning.
+      // The emoji this replaced was a profit indicator, and reusing it for
+      // side made a profitable short read as "Long SELL".
+      Q('statusLine').innerHTML=(t.position.side==='BUY'?'Long ':'Short ')
+        +'<b>'+esc(lastSym)+'</b> — '
+        +(up?'up $':'down $')+Math.abs(fl).toFixed(2);
+    }else if(livePos){
+      // The position closed between full refreshes — clear it now rather than
+      // leaving a dead trade on screen for the rest of the cycle.
+      livePos=null; setLines(null); renderPositions([],0);
+      Q('statusLine').innerHTML='<b>'+esc(lastSym)+'</b> — no open position, monitoring for entry conditions';
+    }
+  }catch(e){
+    /* §22: one failed poll is a hiccup, not an outage. The banner appears
+       only after the platform has failed repeatedly, and it says what is
+       still true — positions are untouched — because a client who reads
+       "unavailable" and assumes their trades are gone will act on that. */
+    failStreak++; freshness();
+    if(failStreak>=3) outage(e);
+  }
+}
+/* Taking it down is separate from putting it up: only the outage banner is
+   removed, so the DEMO and verification notices survive a reconnect. */
+function outageClear(){
+  const nb=Q('envNotice');
+  if(nb && nb.querySelector('.banner.bad')) nb.innerHTML='';
+}
+/* One banner, one retry. It never claims to know the broker's state — only
+   that this app cannot currently reach the platform. */
+function outage(e){
+  const nb=Q('envNotice'); if(!nb) return;
+  if(e && e.code==='TELEGRAM_AUTH_FAILED'){
+    nb.innerHTML='<div class="banner bad"><b>Open this from your Telegram chat</b>'
+      +'This screen authenticates through Telegram, and it was opened without '
+      +'that signature.</div>';
+    return;
+  }
+  if(nb.querySelector('#outRetry')) return;   // already showing
+  nb.innerHTML='<div class="banner bad"><b>APEX services temporarily unavailable</b>'
+    +'This app cannot reach the platform right now. Your open positions and '
+    +'their stops are held by your broker and are unaffected by this screen.'
+    +'<button class="btn" id="outRetry" style="margin-top:10px">Retry</button></div>';
+  Q('outRetry').onclick=function(){
+    this.disabled=true; this.textContent='Retrying\u2026';
+    failStreak=0;
+    tick().then(function(){ if(failStreak===0){ nb.innerHTML=''; refresh(); } })
+          .catch(function(){});
+  };
+}
+
+/* TICK FIRST. It is cached server-side and returns in milliseconds, so price,
+   positions and the money are on screen while /api/app/data is still fetching
+   150 candles, stats, news and the journal. Painting the cheap thing first is
+   the difference between "instant" and "loading". */
+/* The client's own first name, from Telegram's signed payload. Not a stored
+   profile — nothing here is worth a round trip, and it is already in hand. */
+try{
+  const who = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  const h = new Date().getHours();
+  const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  Q('greet').textContent = who && who.first_name
+    ? part + ', ' + String(who.first_name).slice(0, 24) : part;
+}catch(e){}
+
+/* ── Live stream ──────────────────────────────────────────────────────
+   The stream is an accelerator, never a replacement. Polling keeps running
+   underneath it: if the feed drops, stalls behind a proxy, or the browser
+   has no EventSource, the screen goes on updating on its own — a live view
+   that silently freezes is worse than a slow one.
+
+   A frozen stream that keeps drawing its last frame is a lie about the
+   market, so the connection line reports what the client actually has. */
+let streamAt=0, streamOn=false, es=null;
+function setConn(state, detail){
+  const el=Q('cMeta'); if(!el) return;
+  el.dataset.conn = state;
+  if(state==='delayed' && detail) el.title = detail;
+}
+function applyStream(ev){
+  streamAt=Date.now();
+  if(ev.type==='connection.status'){
+    /* The server dropped events for this client rather than stalling
+       everyone. Say so; the poll below will fill the gap. */
+    if(ev.status==='lagging') setConn('delayed', ev.detail||'');
+    return;
+  }
+  if(ev.type==='account.updated'){
+    if(ev.equity!=null){
+      const bv=Q('balV'), prev=window.__eq; window.__eq=ev.equity;
+      bv.textContent='$'+Number(ev.equity).toLocaleString(undefined,
+        {minimumFractionDigits:2,maximumFractionDigits:2});
+      if(prev!=null&&ev.equity!==prev){
+        bv.classList.remove('up','dn'); void bv.offsetWidth;
+        bv.classList.add(ev.equity>prev?'up':'dn');
+        setTimeout(()=>bv.classList.remove('up','dn'),600);
+      }
+    }
+    if(ev.positions) renderPositions(ev.positions, ev.openCount);
+    if(ev.balance!=null) Q('balSub').innerHTML=balanceLine(ev);
+    setConn(ev.brokerHealth==='ok'?'live':'delayed');
+  }
+  if(ev.type==='market.tick' && ev.rows){
+    const by={}; ev.rows.forEach(r=>by[r.symbol]=r);
+    document.querySelectorAll('#mkForex .mrow,#mkMetals .mrow,#homeMkt .mrow')
+      .forEach(row=>{
+        const r=by[row.dataset.sym]; if(!r||!r.available) return;
+        const px=row.querySelector('.mpx'), ch=row.querySelector('.mchg');
+        if(px) px.textContent=Number(r.price).toLocaleString(undefined,{maximumFractionDigits:5});
+        if(ch){ ch.textContent=(r.changePct>=0?'+':'')+r.changePct.toFixed(2)+'%';
+                ch.className='mchg '+(r.changePct>=0?'up':'dn'); }
+      });
+    if(ev.stale) setConn('delayed','Market snapshot is the last one the broker answered.');
+    spStep('sp3', true); spStep('sp4', true); splashClear();
+  }
+  if(ev.type==='risk.updated'){ riskAt=0; if(screenNow==='risk') loadRisk(true); }
+}
+function openStream(){
+  if(!window.EventSource) return;          // fall back to polling entirely
+  try{
+    /* initData cannot ride in a header on EventSource, and it must not ride
+       in a query string — it is a credential and a URL reaches proxy logs.
+       So the stream is opened with fetch, which CAN carry the header, and
+       read as a body stream. */
+    fetch('/api/app/stream',{headers:{'Authorization':'Telegram '+initData}})
+      .then(r=>{
+        if(!r.ok||!r.body) throw new Error('HTTP '+r.status);
+        streamOn=true; setConn('live');
+        const rd=r.body.getReader(), dec=new TextDecoder();
+        let buf='';
+        const pump=()=>rd.read().then(({done,value})=>{
+          if(done){ streamOn=false; setConn('delayed','Live feed closed.');
+                    setTimeout(openStream, 5000); return; }
+          buf+=dec.decode(value,{stream:true});
+          let i;
+          while((i=buf.indexOf('\n\n'))>=0){
+            const frame=buf.slice(0,i); buf=buf.slice(i+2);
+            if(!frame.startsWith('data: ')) continue;   // comment/keepalive
+            try{ applyStream(JSON.parse(frame.slice(6))); }catch(e){}
+          }
+          return pump();
+        }).catch(()=>{ streamOn=false; setConn('delayed','Live feed lost.');
+                       setTimeout(openStream, 5000); });
+        pump();
+      })
+      .catch(()=>{ streamOn=false; setTimeout(openStream, 10000); });
+  }catch(e){ streamOn=false; }
+}
+/* Stale detection is independent of the connection state: a socket that is
+   open but silent looks identical to a working one from the outside. */
+setInterval(()=>{
+  if(streamOn && streamAt && Date.now()-streamAt > 30000)
+    setConn('delayed','No live update for 30s — showing the last known values.');
+}, 5000);
+openStream();
+
+/* Everything is defined by now, so the first screen can safely be drawn. */
+showScreen((location.hash||'#home').slice(1),false);
+
+tick().finally(()=>{ setInterval(tick, 1500); });
+refresh().finally(()=>{ setInterval(refresh, 6000); });
+/* Markets is its own cadence. The snapshot is shared and changes on the day,
+   not on the tick, so polling it beside the position feed would spend the
+   broker's historical allowance for a number that has not moved. */
+loadMarkets(true).finally(()=>{ setInterval(()=>loadMarkets(), 30000); });
+</script>
+</body>
+</html>
