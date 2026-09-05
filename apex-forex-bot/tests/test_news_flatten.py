@@ -361,6 +361,12 @@ def _run_block(rec, *, positions, tracked=None, paper=False,
         # NEWS_EXIT_SKIP_MANUAL being wired in.
         "_news_skip_manual": user_loop._news_skip_manual,
         "_nrm": user_loop._nrm,
+        # The persisted entry snapshot the block now reads to LABEL the
+        # journal row. Empty here on purpose: with no snapshot the block
+        # must fall back to the position and still journal, which is
+        # what "journalled once each" below proves. A row that reaches
+        # the tax export is never traded away for a missing label.
+        "entry_meta_by_sym": {},
         "forex": user_loop.forex,
         "realized_cost_usd": user_loop.realized_cost_usd,
         "time": time,
