@@ -142,6 +142,37 @@ def _news_exit_due(cfg, symbol):
         return None
 
 
+
+def _news_skip_manual(targets, tracked_symbol, manual_hold, enabled):
+    """Drop the client's own trade from the news-flatten target list.
+
+    A /buy or /sell belongs to the person who typed it, the same line the
+    strategy exit already draws. Returns the list unchanged unless the setting
+    is on AND the loop is tracking a hand-opened position.
+
+    The guarantee is narrow, and narrow on purpose rather than by omission:
+    `manual_hold` says "the position this loop is TRACKING was opened by hand".
+    It is one flag, not a mark on each position, and it cannot become one —
+    broker.get_all_positions() reports what is open, not which software opened
+    it. A hand-opened trade that is not the loop's current focus is therefore
+    indistinguishable from a bot one and is still closed.
+
+    Pure and total: it only ever removes, never adds, and never raises.
+    """
+    if not (enabled and manual_hold and targets and tracked_symbol):
+        return list(targets or [])
+    keep = _nrm(tracked_symbol)
+    out = []
+    for p in targets:
+        try:
+            if _nrm(p.get("symbol")) == keep:
+                continue
+        except Exception:
+            pass
+        out.append(p)
+    return out
+
+
 def _nrm(x):
     """Broker-agnostic symbol key (EUR_USD / EUR/USD / eurusd → EURUSD).
     Module-level so the startup recovery can key off it too — it used to be
@@ -1102,6 +1133,9 @@ def _make_broker(user):
         # from this object is unreachable from inside the loop, so
         # NEWS_EXIT_MIN in the environment would silently do nothing.
         NEWS_EXIT_MIN    = float(getattr(_appcfg, "NEWS_EXIT_MIN", 15)),
+        # Without this key the loop reads the module default and
+        # NEWS_EXIT_SKIP_MANUAL in the environment does nothing.
+        NEWS_EXIT_SKIP_MANUAL = getattr(_appcfg, "NEWS_EXIT_SKIP_MANUAL", False),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
         MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
         # Caps scaled with RISK_PER_TRADE above (2.5x risk) so the bot still
@@ -3277,6 +3311,26 @@ def _loop(user_id, alert_fn, gen=None):
                                           "symbol": open_pos.get("symbol") or symbol}]
                 elif all_positions:
                     _news_targets = list(all_positions)
+                # The client's own /buy or /sell is theirs to hold through a
+                # release, the same line the strategy exit already draws
+                # ("trades belong to the USER"). Off by default: the weekend
+                # flatten closes everything regardless of origin because a gap
+                # does not care who opened the trade, and neither does NFP.
+                #
+                # `manualHold` is not a per-position marker and cannot be one —
+                # broker.get_all_positions() carries no origin. This skips the
+                # TRACKED position only; a hand-opened trade the loop is not
+                # focused on is still closed, and the setting must not be read
+                # as a wider promise than that.
+                _mh_before = len(_news_targets)
+                _news_targets = _news_skip_manual(
+                    _news_targets,
+                    (open_pos or {}).get("symbol") or symbol,
+                    dash.get("manualHold"),
+                    getattr(cfg, "NEWS_EXIT_SKIP_MANUAL", False))
+                if len(_news_targets) != _mh_before:
+                    print(f"[UserLoop:{user_id}] news exit: leaving the "
+                          f"client's own trade alone (NEWS_EXIT_SKIP_MANUAL)")
                 # Ask the calendar first and load the user once, rather than
                 # per position: on the overwhelming majority of ticks nothing
                 # is due and this costs one cached lookup per open trade.

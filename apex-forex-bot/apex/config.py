@@ -264,6 +264,23 @@ RIDE_LOCK = float(os.getenv("RIDE_LOCK") or 0.6)
 # somebody who turned the news guard off keeps the bot they asked for.
 NEWS_EXIT_MIN = float(os.getenv("NEWS_EXIT_MIN") or 15)
 
+# Leave the client's OWN trade alone when a release is due.
+#
+# `manualHold` is a single flag meaning "the position this loop is TRACKING was
+# opened by hand" — it is NOT a per-position marker and cannot become one, since
+# the account-wide list comes from broker.get_all_positions() and a broker does
+# not record which software placed an order. So this skips the TRACKED position
+# only; a hand-opened trade the loop is not focused on is indistinguishable from
+# a bot one and is still closed.
+#
+# OFF by default. The weekend flatten this exit was modelled on closes every
+# position regardless of origin, because a gap does not care who opened the
+# trade — and neither does NFP: a hand-opened XAUUSD is blown through its stop
+# exactly the way the bot's EURUSD was on 2026-09-04, 11.1 pips past a 21.6-pip
+# stop. Protection is the safer default; skipping it is a deliberate choice.
+NEWS_EXIT_SKIP_MANUAL = (os.getenv("NEWS_EXIT_SKIP_MANUAL") or "").strip().lower() in (
+    "1", "true", "yes", "on")
+
 # ─── Permanent Market Sentinel (see apex/sentinel.py) ────
 # A persistent, EXPIRING view of each symbol, so "what the AI thinks about
 # EURUSD" outlives the single function call that produced it — and so a stale
