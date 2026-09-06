@@ -1,89 +1,102 @@
-# HANDOFF — Apex Trade Bot (context for continuing in a new session)
+# HANDOFF — Apex Trade Bot
 
-> ## 🛑 FIRST THING, BEFORE ANYTHING ELSE
-> **Run `git checkout claude/arcads-external-api-gExX7` immediately.**
-> ALL of our work (cTrader, copilot, Market Pulse, news, legal, lead funnel — 1000+
-> commits) lives ONLY on that branch. `main` is OLD and diverged: it still has
-> OANDA, has NO cTrader, and does NOT even contain this file. If you are reading
-> stale code (OANDA-only, no `/ctrader`, no `apex/market.py`), you are on the wrong
-> branch — switch now. Render deploys from `claude/arcads-external-api-gExX7`
-> (confirmed live via `/api/health` → `sale_ready:true`). Never work on `main`.
->
-> After switching branches, read the rest of this file. It carries the
-> **conversation** context (decisions, pending work, current bug) that isn't in code.
+> **Fișier de stare partajat între agenți (Claude Code și Codex).**
+> Se citește la începutul fiecărei sesiuni și se actualizează la sfârșit.
+> Protocolul de ștafetă e în `AGENTS.md`.
 
-## What this project is
-- **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, Romania).
-- Two Telegram trading bots sold as one-time licenses + a sales site + affiliate program.
-  - `apex-forex-bot/` — Python, **$497** forex bot.
+---
 
-> **⚠️ BROKER — read this, don't get confused:** the forex bot uses **cTrader**
-> (the owner's cTrader account is hosted at **Pepperstone** — Pepperstone is just
-> the broker where the cTrader account lives, NOT a separate integration). The bot
-> connects via the **cTrader Open API** (`apex/brokers/ctrader.py`, `/ctrader`
-> onboarding). **OANDA is a LEGACY option still in the code and defaults/help text,
-> but it is NOT used** — do not "fix" the bot toward OANDA. `_make_broker()` picks
-> the broker per-user: cTrader token present → cTrader; else OANDA token → OANDA;
-> else paper → Yahoo. The owner trades via cTrader/Pepperstone. (Cleaning the
-> stale OANDA-worded defaults/help to say cTrader is a nice-to-do, not urgent.)
+# STARE CURENTĂ
 
-  - `server.js` + `public/` — Node sales site, Digistore24 checkout/IPN, license delivery, affiliate API.
-  - Affiliates are recruited via the Digistore24 marketplace (30% commission) — no in-house affiliate bot.
+**Ultima actualizare:** 2026-09-06
+**Branch de lucru:** `claude/arcads-external-api-gexx7-6n4pr9`
+**Teste:** 134/134 trec (`python apex-forex-bot/tests/run_all.py`)
 
-## Render services (deploys from the working branch)
-- `autoflow-backend` — the Node site (`server.js`). `/api/health` → `sale_ready:true`.
-- `autoflow-backend-2` — the **forex** bot (Python). Callback: `/api/ctrader/callback`.
-- Free tier: ~3 weeks/month uptime, suspends late-month, auto-resumes on the 1st.
+## Ce s-a terminat recent
 
-## What is BUILT & live (all committed + tested)
-- **Legal**: EU Art.16(m) withdrawal waiver at checkout + terms + emails; no-refund; cookie banner; refund/chargeback → license revoked.
-- **Security**: payment-authoritative `/verify-license`; `/api/health` diagnostic.
-- **Client onboarding** (both bots): welcome, Binance referral link, paper vs real, per-user AI keys (Groq/Gemini/Claude), any-coin/any-pair.
-- **cTrader integration** (forex): OAuth onboarding (`/ctrader`, `/ctaccount`), sync protobuf connector, `_make_broker` wiring. OAuth hardened (query-param token exchange + `state` fallback). Scope configurable via `CTRADER_SCOPE`.
-- **10 "copilot" features**: per-trade explanations in alerts; copilot mode (`/copilot on|off`, approve/reject buttons); smart "don't-trade" alerts; news guard + `/news`; flash-crash breaker.
-- **Market Pulse** (`/market`): volatility/volume/trend/momentum + **session awareness** (Sydney/Tokyo/London/NY from UTC clock).
-- **News**: FMP economic calendar support (set `NEWS_API_KEY`); default Forex Factory feed is blocked on Render datacenter IPs.
-- **Marketing**: `public/promo.html` — on-brand animated 9:16 promo (bg `#060608`, red `#ff2d4f`, Clash Display + JetBrains Mono). Affiliate recruitment DMs + UGC scripts written (in chat history).
-- **Lead funnel** (`public/free.html` + `POST /api/lead`): cold-DM traffic → free offer → email capture → shows promo → buy CTA. Preserves affiliate ref. **Owner's plan: send ~10k DMs pointing to `aicashsystem.space/free`** (NOT the $297 page directly).
-  - To actually STORE leads, create the Supabase table (endpoint is fail-soft without it):
-    ```sql
-    create table if not exists leads (
-      id bigserial primary key, email text not null,
-      ref text, source text default 'free',
-      created_at timestamptz default now()
-    );
-    ```
+Analiza jurnalului a găsit de ce pierdea botul și de unde venea `-27k`:
 
-## PENDING / IN PROGRESS
-1. **🔴 CURRENT BUG (unresolved): forex bot "stays in place" / repeats errors.**
-   Suspected cause: the **news-feed fetch blocks the loop** — `news._load()` does a
-   `requests.get(timeout=10)` to a host that may hang (not fast-403), freezing the
-   tick for up to 10s every 30 min. Proposed fix (not yet applied): lower timeout,
-   move the feed fetch to a background thread so it NEVER blocks the loop, add
-   back-off on repeated failures. **Get the exact error first if possible.**
-   Files: `apex-*/apex/news.py`, `apex-*/apex/user_loop.py`.
-2. **cTrader KYC**: app status **"Submitted"** (~3 business days to "Active"). Trading
-   scope needs "Active". For now set `CTRADER_SCOPE=accounts` (paper works on read-only
-   data). When Active → `CTRADER_SCOPE=trading` for live orders. Then test `/ctrader`.
-   Client ID/Secret already created at openapi.ctrader.com (owner has them).
-   Redirect URI: `https://autoflow-backend-2.onrender.com/api/ctrader/callback`.
-3. **`session_secrets:false`** on `/api/health` → set `JWT_SECRET` on `autoflow-backend`
-   (affects affiliate login only, not sales).
-4. **News real data**: set `NEWS_API_KEY` (free FinancialModelingPrep key) on both bots.
+- **Artefacte în jurnal.** 4 rânduri din 2026-08-19 cu `balance: 470.586` (unul pe
+  `US400`, index pe care platforma nici nu-l poate tranzacționa) însumând
+  **-26.586**, plus XAUUSD **-779,74** pe un cont de 3.002 (26% din cont, față de
+  o limită de 2,5%). **Istoricul real: 71 trade-uri, +264,16, 45,1% win, R 1:1,60, PF 1,35.**
+- **Cauzele pierderilor (94% explicat):** fibonacci în regim `trending`
+  (5 trade-uri, **-202,37**) și poziții ținute peste NFP (2 trade-uri, **-116,67**).
+- **Patru remedii livrate 2026-09-04:** `REGIME_GATE` (default `enforce` în cod),
+  `NEWS_EXIT_MIN=15` (default în cod), `MIN_EXIT_R` și `INSTITUTIONAL_GATE`
+  (setate prin env pe Render — verifică valorile acolo, defaults în cod sunt
+  `1.0` respectiv `shadow`).
 
-## Env vars to set (Render)
-- forex bot (`autoflow-backend-2`): `CTRADER_CLIENT_ID`, `CTRADER_CLIENT_SECRET`,
+## 🔴 URMĂTORUL PAS — nefăcut
+
+1. **`/markartefacts` NU a fost rulat încă.** Jurnalul arată în continuare 84 de
+   rânduri, iar `/report` îi spune clientului **-$27.052**, cifră falsă.
+   Comanda trebuie tastată de proprietarul contului (e în `_MSG_DENY`), din
+   Telegram. Scriptul echivalent: `apex-forex-bot/scripts/mark_journal_artefacts.py`
+   (dry-run implicit, `--apply` scrie, e idempotent).
+2. **Verifică datele de luni.** Cele patru remedii au prins doar ~6 ore de piață
+   deschisă vineri 2026-09-04. Fără o săptămână de date, nu se poate spune dacă
+   au funcționat.
+3. **`git fetch --unshallow`** în clonele locale — clonă shallow strică `git log`
+   ca mecanism de transfer de context între agenți.
+
+## Mediu local (laptop Windows)
+
+`pip install -r requirements.txt` eșuează pe Python 3.14: **`twisted-iocpsupport`**
+(dependință a `ctrader-open-api`) nu publică wheel pentru 3.14 pe Windows, deci
+cere compilator C++. Soluție: **Python 3.11 sau 3.12**, unde există wheel
+precompilat. Alternativ, Visual Studio Build Tools cu workload C++.
+
+---
+
+# CONTEXT PERMANENT
+
+## Ce e proiectul
+- **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, România).
+- Bot de trading Telegram vândut ca licență one-time + site de vânzări + program de afiliere.
+  - `apex-forex-bot/` — Python, bot forex **$497**.
+  - `server.js` + `public/` — site Node, checkout/IPN Digistore24, livrare licențe, API afiliere.
+  - Afiliații se recrutează prin marketplace-ul Digistore24 (30% comision).
+
+> **⚠️ BROKER:** botul forex folosește **cTrader** (contul e găzduit la
+> **Pepperstone** — Pepperstone e doar brokerul unde stă contul cTrader, NU o
+> integrare separată). Conectarea se face prin **cTrader Open API**
+> (`apex/brokers/ctrader.py`, onboarding `/ctrader`). **OANDA e opțiune LEGACY
+> rămasă în cod și în textele default, dar NU se folosește** — nu "repara" botul
+> spre OANDA. `_make_broker()` alege brokerul per utilizator: token cTrader →
+> cTrader; altfel token OANDA → OANDA; altfel paper → Yahoo.
+
+## Servicii Render
+- `autoflow-backend` — site-ul Node (`server.js`). `/api/health` → `sale_ready:true`.
+- `autoflow-backend-2` — botul forex (Python). Callback: `/api/ctrader/callback`.
+- Tier gratuit: ~3 săptămâni/lună uptime, se suspendă la final de lună, revine pe 1.
+
+## Ce e construit și live
+- **Legal**: renunțare Art.16(m) UE la checkout + termeni + emailuri; fără refund;
+  banner cookies; refund/chargeback → licență revocată.
+- **Securitate**: `/verify-license` autoritativ pe plată; `/api/health` diagnostic.
+- **Onboarding client**: welcome, link referral Binance, paper vs real, chei AI
+  per utilizator (Groq/Gemini/Claude), orice pereche.
+- **cTrader**: OAuth onboarding (`/ctrader`, `/ctaccount`), conector protobuf sync,
+  wiring `_make_broker`. Scope configurabil prin `CTRADER_SCOPE`.
+- **Copilot (10 funcții)**: explicații per trade în alerte; mod copilot
+  (`/copilot on|off`, butoane approve/reject); alerte "nu tranzacționa"; news
+  guard + `/news`; breaker flash-crash.
+- **Market Pulse** (`/market`): volatilitate/volum/trend/momentum + sesiuni
+  (Sydney/Tokyo/London/NY din ceasul UTC).
+- **News**: calendar economic FMP (`NEWS_API_KEY`); feed-ul default Forex Factory
+  e blocat pe IP-uri de datacenter Render.
+- **Lead funnel** (`public/free.html` + `POST /api/lead`): trafic DM → ofertă
+  gratuită → captare email → promo → CTA cumpărare. Păstrează ref-ul de afiliat.
+
+## Env vars (Render)
+- bot forex (`autoflow-backend-2`): `CTRADER_CLIENT_ID`, `CTRADER_CLIENT_SECRET`,
   `CTRADER_REDIRECT_URI=https://autoflow-backend-2.onrender.com/api/ctrader/callback`,
-  `CTRADER_SCOPE=accounts` (→ `trading` after KYC).
-- both bots: `NEWS_API_KEY=<FMP key>` (optional, makes `/news` show real events).
-- site (`autoflow-backend`): `JWT_SECRET=<random 40+ chars>`.
+  `CTRADER_SCOPE`.
+- ambele: `NEWS_API_KEY=<cheie FMP>`.
+- site (`autoflow-backend`): `JWT_SECRET=<random 40+ caractere>`.
 
-## Business plan / strategy
-- Growth model = **affiliate-driven** (like 3Commas), 30% commission — infra already built (`public/affiliate.html`, affiliate API, affiliate bot).
-- Ads: `public/promo.html` screen-recorded for TikTok/Reels. Compliance: never promise guaranteed returns; say "risk-free paper testing", "you control the risk".
-- Forex is the only product. Live trading waits on cTrader KYC.
-
-## Conventions
-- Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` + `Claude-Session:` line.
-- Keep files <500 lines; tests: `apex-forex-bot/tests/run_all.py` (7 files).
-- Never commit secrets. Push to the working branch only.
+## Convenții
+- Fișiere sub 500 de linii. Teste: `apex-forex-bot/tests/run_all.py`.
+- Nu comite niciodată secrete. Push doar pe branch-ul de lucru.
+- Restul regulilor: `CLAUDE.md` (Claude Code) și `AGENTS.md` (Codex + ștafetă).
