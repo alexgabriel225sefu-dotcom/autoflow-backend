@@ -93,7 +93,7 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
   font:700 40px/1 var(--f);color:var(--acc2)}
 
 /* ═══════════════════════════════════════
-   SCENE 2 · 3 AM
+   SCENE 2 · DECISION LOG
    ═══════════════════════════════════════ */
 .s2-time{font-family:var(--m);font-weight:700;font-size:200px;
   letter-spacing:-.03em;color:var(--t0);text-align:center;
@@ -132,7 +132,7 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
 .t-tag.forex{background:rgba(42,171,238,.12);color:#2aabee;border:1px solid rgba(42,171,238,.22)}
 
 /* ═══════════════════════════════════════
-   SCENE 3 · BIG NUMBER
+   SCENE 3 · WHAT IT ENFORCES
    ═══════════════════════════════════════ */
 .s3-lbl{font:700 30px/1 var(--m);letter-spacing:.2em;text-transform:uppercase;
   color:var(--acc);margin-bottom:16px}
@@ -258,88 +258,88 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
   <!-- ══ 1 · HOOK ══ -->
   <section class="scene" data-dur="4200" id="s1">
     <div class="s1-q rv">
-      How much did <em>you</em><br>make today?
+      Your setup appeared<br>at <em>3AM</em>.
     </div>
     <div class="s1-divider rv d2"></div>
-    <div class="s1-answer-lbl rv d3">The bot made</div>
-    <div class="s1-amount rv d3" id="s1cnt">$0</div>
-    <div class="s1-suffix rv d4">while you were sleeping</div>
-    <div class="s1-tag rv d5">Without touching a single button.</div>
+    <div class="s1-answer-lbl rv d3">You were asleep.</div>
+    <div class="s1-amount rv d3" id="s1cnt">24/5</div>
+    <div class="s1-suffix rv d4">it was not</div>
+    <div class="s1-tag rv d5">Rules don't sleep. Execution shouldn't either.</div>
   </section>
 
-  <!-- ══ 2 · LIVE TRADES ══ -->
+  <!-- ══ 2 · DECISION LOG ══ -->
   <section class="scene" data-dur="5000" id="s2">
     <div class="s2-headline rv">
-      The bot never <span class="acc">stops.</span>
+      It never <span class="acc">stops watching.</span>
     </div>
-    <div class="s2-sub rv d1">Crypto & Forex · Running right now.</div>
+    <div class="s2-sub rv d1">8 pairs · 24/5 · your own cTrader account</div>
     <div class="ticker rv d2">
       <div class="ticker-head">
-        <span class="t-pair">Live Positions</span>
+        <span class="t-pair">Decision Log</span>
         <span class="t-live"><span class="live-dot"></span>LIVE</span>
       </div>
       <div class="t-row">
         <div>
-          <div class="t-name">BTC / USDT <span class="t-tag crypto">Crypto</span></div>
-          <div class="t-type">Long · 2x · cTrader</div>
+          <div class="t-name">EUR / USD <span class="t-tag forex">Forex</span></div>
+          <div class="t-type">Spread 4.2p — over your 3p limit</div>
         </div>
-        <div class="t-profit">+$84.20</div>
+        <div class="t-profit" id="d1" style="color:var(--acc2)">SKIPPED</div>
       </div>
       <div class="t-row">
         <div>
-          <div class="t-name">EUR / USD <span class="t-tag forex">Forex · cTrader</span></div>
-          <div class="t-type">Buy · 1 lot · cTrader</div>
+          <div class="t-name">GBP / USD <span class="t-tag forex">Forex</span></div>
+          <div class="t-type">Fibonacci · ranging · confidence 73%</div>
         </div>
-        <div class="t-profit" id="eur-v">+$47.80</div>
+        <div class="t-profit" id="d2">EXECUTED</div>
       </div>
       <div class="t-row">
         <div>
-          <div class="t-name">ETH / USDT <span class="t-tag crypto">Crypto</span></div>
-          <div class="t-type">Long · 1.5x · cTrader</div>
+          <div class="t-name">USD / CHF <span class="t-tag forex">Forex</span></div>
+          <div class="t-type">High-impact news in 24 min</div>
         </div>
-        <div class="t-profit" id="eth-v">+$38.60</div>
+        <div class="t-profit" id="d3" style="color:var(--acc2)">BLOCKED</div>
       </div>
       <div class="t-row" style="border-bottom:none">
         <div>
-          <div class="t-name">SOL / USDT <span class="t-tag crypto">Crypto</span></div>
-          <div class="t-type">Long · 2x · cTrader</div>
+          <div class="t-name">XAU / USD <span class="t-tag forex">Gold</span></div>
+          <div class="t-type">+1R reached — risk removed</div>
         </div>
-        <div class="t-profit" id="sol-v">+$21.40</div>
+        <div class="t-profit" id="d4" style="color:var(--t0)">STOP MOVED</div>
       </div>
     </div>
     <div class="s2-total rv d3">
-      Total open P&amp;L &nbsp;<span id="s2total" style="color:var(--up)">+$191.80</span>
+      <span id="s2total">4 rules applied &nbsp;·&nbsp; 0 decisions left to you</span>
     </div>
   </section>
 
-  <!-- ══ 3 · PROFIT ══ -->
+  <!-- ══ 3 · WHAT IT ENFORCES ══ -->
   <section class="scene" data-dur="4800" id="s3">
-    <div class="s3-lbl rv">30-Day Results</div>
-    <div class="s3-since rv d1">Starting capital: $1,000</div>
-    <div class="s3-profit rv d2" id="s3cnt">$0</div>
+    <div class="s3-lbl rv">Every trade. Every time.</div>
+    <div class="s3-since rv d1">Emotional decisions taken</div>
+    <div class="s3-profit rv d2" id="s3cnt">0</div>
     <div class="s3-grid rv d3">
-      <div class="sg"><div class="gv up" id="s3wr">0%</div><div class="gl">Win rate</div></div>
-      <div class="sg"><div class="gv" style="color:var(--acc2)" id="s3tr">0</div><div class="gl">Trades</div></div>
+      <div class="sg"><div class="gv up" id="s3wr">0</div><div class="gl">Pairs watched</div></div>
+      <div class="sg"><div class="gv" style="color:var(--acc2)" id="s3tr">0</div><div class="gl">Risk filters</div></div>
       <div class="sg"><div class="gv" style="color:var(--t0)">$0</div><div class="gl">Monthly fee</div></div>
     </div>
     <div class="s3-quote rv d4">
-      &ldquo;Woke up to <strong>+$284</strong> more than the night before.<br>I didn't do a thing.&rdquo;
+      Your stop loss. Your daily loss limit. Your max drawdown.<br>Applied to <strong>every</strong> trade — including the one<br>you would have talked yourself into.
     </div>
   </section>
 
   <!-- ══ 4 · YOURS TO BUILD ══ -->
   <section class="scene" data-dur="4800" id="s4">
     <div class="s4-h rv">
-      Your bot.<br><span class="acc">Your rules.</span>
+      Your rules.<br><span class="acc">Enforced.</span>
     </div>
-    <div class="s4-sub rv d1">Fully hosted. Configure everything. Own it forever.</div>
+    <div class="s4-sub rv d1">Fully hosted. You set the limits. It applies them.</div>
     <div class="step" data-at="350">
       <div class="step-num">1</div>
-      <div><div class="step-h">Get instant access</div><div class="step-p">Crypto &amp; Forex — connect your own cTrader account</div></div>
+      <div><div class="step-h">Get instant access</div><div class="step-p">Connect your own cTrader account — funds stay at your broker</div></div>
     </div>
     <div class="step" data-at="1050">
       <div class="step-num">2</div>
-      <div><div class="step-h">Customize your strategy</div><div class="step-p">Change pairs, risk levels, signals — it's your bot</div></div>
+      <div><div class="step-h">Customize your strategy</div><div class="step-p">Change pairs, risk levels, strategy — it's your platform</div></div>
     </div>
     <div class="step" data-at="1750">
       <div class="step-num">3</div>
@@ -367,16 +367,16 @@ html,body{height:100%;width:100%;background:#000;overflow:hidden;font-family:var
         </div>
       </div>
       <div class="cc cc-bot">
-        <div class="cc-lbl">The Bot</div>
+        <div class="cc-lbl">The platform</div>
         <div class="cc-val up">168h</div>
         <div class="cc-items">
           <div class="cc-item good">Every signal. Every entry.</div>
           <div class="cc-item good">No emotions. No sleep.</div>
-          <div class="cc-item good">Crypto + Forex. Always on.</div>
+          <div class="cc-item good">8 pairs. Always on.</div>
         </div>
       </div>
     </div>
-    <div class="stop-line rv d3">Stop leaving money on the table.</div>
+    <div class="stop-line rv d3">Stop missing your own setups.</div>
     <div class="s5-url rv d4">t.me/FOREX_APEX_BOT</div>
     <div class="s5-bio rv d5">Link in bio · One-time payment</div>
   </section>
@@ -437,42 +437,25 @@ function cu(id,to,ms,fmt){
 }
 
 function animS1(){
-  cu('s1cnt',284,2400,v=>'+$'+Math.round(v));
+  /* nothing to count — the claim is presence, not profit */
 }
 
 function animS2(){
-  var tickers=[
-    {id:'eur-v', steps:[52.30,61.80,74.20,88.40]},
-    {id:'eth-v', steps:[44.10,53.70,62.30,71.90]},
-    {id:'sol-v', steps:[28.60,37.40,47.80,58.10]}
-  ];
-  var totals=[191.80,212.40,238.70,264.10,297.30,318.60];
-  var ti=0;
-  function tickTotal(){
-    if(ti>=totals.length)return;
-    var el=document.getElementById('s2total');
-    if(el){el.textContent='+$'+totals[ti].toFixed(2);el.classList.remove('flash');requestAnimationFrame(function(){el.classList.add('flash')});}
-    ti++;T(tickTotal,Math.random()*600+400);
-  }
-  T(tickTotal,1800);
-  tickers.forEach(function(t){
-    var el=document.getElementById(t.id);if(!el)return;
-    var i=0;
-    function tick(){
-      if(i>=t.steps.length)return;
-      el.textContent='+$'+t.steps[i].toFixed(2);
+  ['d1','d2','d3','d4'].forEach(function(id,k){
+    var el=document.getElementById(id);if(!el)return;
+    el.style.opacity=0;
+    T(function(){
+      el.style.transition='opacity .35s var(--e)';el.style.opacity=1;
       el.classList.remove('flash');
       requestAnimationFrame(function(){el.classList.add('flash')});
-      i++;T(tick,Math.random()*700+500);
-    }
-    T(tick,Math.random()*1000+600);
+    },700+k*620);
   });
 }
 
 function animS3(){
-  cu('s3cnt',2847,2400,v=>'$'+Math.round(v).toLocaleString());
-  cu('s3wr',68,2400,v=>Math.round(v)+'%');
-  cu('s3tr',134,2400,v=>Math.round(v)+'');
+  var z=document.getElementById('s3cnt'); if(z) z.textContent='0';
+  cu('s3wr',8,2000,v=>Math.round(v)+'');
+  cu('s3tr',5,2000,v=>Math.round(v)+'');
 }
 
 function toggleClean(){document.body.classList.toggle('clean')}
