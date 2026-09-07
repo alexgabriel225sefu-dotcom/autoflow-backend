@@ -23,7 +23,7 @@ Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi l
 | Agent | Zona lui — NUMAI aici | Task |
 |---|---|---|
 | **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
-| **Codex** (laptop) | `apex-forex-bot/scripts/`, `apex/cot.py` | Fix fus orar în `backfill_trades.py` |
+| **Codex** (laptop) | ✅ TERMINAT — vezi mai jos | ~~Fix fus orar în `backfill_trades.py`~~ |
 | **Claude local** (VS Code) | ✅ TERMINAT — vezi mai jos | ~~Contorul zilnic blocat~~ |
 
 **Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
@@ -31,17 +31,27 @@ Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi l
 
 ## Detaliile task-urilor
 
-### Codex — fus orar în backfill
-`_ts()` din `scripts/backfill_trades.py:78` face `.timestamp()` pe un datetime
-naiv, deci îl citește ca oră **locală**. Jurnalul stochează **UTC**. În România
-decalajul de 3h depășește `_TIME_SLACK_S` (90 min) → „no deal matches".
-Testul `tests/test_backfill_trades.py` trece pe UTC și pică pe RO — reprodus cu
-`TZ=Europe/Bucharest`.
+### Codex — fus orar ✅ REZOLVAT (2026-09-07)
+**Cauza:** `_ts()` din `scripts/backfill_trades.py` apela `.timestamp()` pe un
+`datetime` naiv. Python îl interpreta ca oră locală, deși jurnalul de tranzacții
+stochează UTC. În România, diferența de trei ore depășea `_TIME_SLACK_S` (90 de
+minute), astfel încât reconcilierea fără `positionId` raporta în mod fals „no deal
+matches”. `apex/cot.py` avea aceeași clasă de eroare: `time.mktime()` interpreta
+`report_date` ca ora locală când calcula vârsta raportului COT.
 
-Repară cum face deja codul în `apex/miniapp_api.py:65`:
-`.replace(tzinfo=timezone.utc)` înainte de `.timestamp()`.
-**Nu modifica testul — testul e corect.** Verifică și `apex/cot.py:217`
-(`time.mktime` e tot oră locală).
+**Fix** (doar `scripts/backfill_trades.py` și `apex/cot.py`):
+1. `_ts()` atașează explicit `timezone.utc` după parsare și înainte de
+   `.timestamp()`, urmând același pattern ca `apex/miniapp_api.py`.
+2. `age_days()` parsează data COT într-un `datetime` cu `timezone.utc` înainte de
+   a o transforma în timestamp; nu mai folosește `time.mktime()` dependent de
+   fusul local.
+3. Nu s-a modificat `tests/test_backfill_trades.py`; testul verifică corect
+   contractul UTC.
+
+**Validare:** suita completă `python apex-forex-bot/tests/run_all.py` este verde
+(135/135). Pe Windows local, `time.tzset` nu există, deci variabila `TZ` nu poate
+schimba fusul procesului; testul dedicat a rulat verde și implementarea este acum
+independentă de fusul local.
 
 ### Claude local — contorul zilnic ✅ REZOLVAT (2026-09-07)
 **Cauza:** nici una din cele două ipoteze — resetarea (`_reset_daily_if_needed`,

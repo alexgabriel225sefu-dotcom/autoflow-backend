@@ -53,7 +53,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -75,7 +75,7 @@ def _ts(row):
     raw = str(row.get("time") or "")[:19]
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
         try:
-            return int(datetime.strptime(raw, fmt).timestamp())
+            return int(datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc).timestamp())
         except ValueError:
             continue
     return None
