@@ -44,6 +44,11 @@ def get_session(user_id=None):
         except Exception:
             pass
         _sessions[user_id] = s
+        # Roll the day over right here, before anything reads this session —
+        # a restored session can be several days stale (see _roll_day), and a
+        # reader that never calls should_stop()/record_trade() first (the
+        # dashboard, /report) must not be the one to see yesterday's count.
+        _roll_day(s, user_id)
     return _sessions[user_id]
 
 
@@ -141,8 +146,13 @@ def _persist_symbol_session(user_id, symbol):
         print(f"[STRATEGY:{key}] symbol session persist failed: {e}")
 
 
-def _reset_daily_if_needed(user_id=None):
-    s = get_session(user_id)
+def _roll_day(s, user_id):
+    """Reset the daily counters if `s` still belongs to a previous day, and
+    persist the roll-over immediately — nothing else writes a fresh-day
+    session to disk on its own. record_trade() is the only other writer, and
+    several of its call sites in the tick loop run BEFORE should_stop() — a
+    trade that closes early in the first tick after a restart would otherwise
+    increment and persist YESTERDAY's stale count instead of today's."""
     today = date.today().isoformat()
     if s["lastResetDay"] != today:
         s["dailyTrades"] = 0
@@ -150,6 +160,11 @@ def _reset_daily_if_needed(user_id=None):
         s["dailyPnLPct"] = 0.0
         s["lastResetDay"] = today
         print(f"[STRATEGY:{user_id or '?'}] 🌅 New day — counters reset.")
+        _persist_session(user_id)
+
+
+def _reset_daily_if_needed(user_id=None):
+    _roll_day(get_session(user_id), user_id)
 
 
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
@@ -306,7 +321,13 @@ def druckenmiller_multiplier(confidence, criteria_score, livermore, turtle):
 def record_trade(won, pnl_amount, start_balance, user_id=None, symbol=None):
     """Account-wide daily P&L/trade counters always update here. The
     consecutive-loss streak (Seykota rule) is tracked per `symbol` when given,
-    so it no longer bleeds across instruments."""
+    so it no longer bleeds across instruments.
+
+    Rolls the day over first: several call sites in the tick loop close a
+    trade BEFORE should_stop() runs that same tick, so this cannot assume the
+    day boundary has already been handled — otherwise a stale count from a
+    previous day gets incremented and persisted instead of starting at 1."""
+    _reset_daily_if_needed(user_id)
     s = get_session(user_id)
     s["totalTrades"] += 1
     s["dailyTrades"] += 1

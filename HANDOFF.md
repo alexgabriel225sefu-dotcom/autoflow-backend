@@ -8,9 +8,10 @@
 
 # STARE CURENTĂ
 
-**Ultima actualizare:** 2026-09-06
+**Ultima actualizare:** 2026-09-07
 **Branch de lucru:** `claude/arcads-external-api-gexx7-6n4pr9`
-**Teste:** 134/134 trec (`python apex-forex-bot/tests/run_all.py`)
+**Teste:** 134/135 trec (`python apex-forex-bot/tests/run_all.py`) — singurul eșec
+e `test_backfill_trades.py`, în zona lui Codex (fus orar), nu s-a schimbat.
 
 ---
 
@@ -23,7 +24,7 @@ Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi l
 |---|---|---|
 | **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
 | **Codex** (laptop) | `apex-forex-bot/scripts/`, `apex/cot.py` | Fix fus orar în `backfill_trades.py` |
-| **Claude local** (VS Code) | `apex-forex-bot/apex/user_loop.py` | Contorul zilnic blocat |
+| **Claude local** (VS Code) | ✅ TERMINAT — vezi mai jos | ~~Contorul zilnic blocat~~ |
 
 **Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
 întreabă operatorul. Nu rezolva conflicte peste munca altui agent.
@@ -42,11 +43,31 @@ Repară cum face deja codul în `apex/miniapp_api.py:65`:
 **Nu modifica testul — testul e corect.** Verifică și `apex/cot.py:217`
 (`time.mktime` e tot oră locală).
 
-### Claude local — contorul zilnic
-`strategy_session` are `lastResetDay: "2026-09-04"` deși suntem pe 07 și s-au
-deschis poziții pe 06. `dailyTrades: 5` a depășit `max_trades_day: 4`, dar
-tranzacțiile au continuat. Ori resetarea zilnică nu se declanșează, ori limita
-se verifică pe alt contor. Găsește care din două. Scrie test înainte de fix.
+### Claude local — contorul zilnic ✅ REZOLVAT (2026-09-07)
+**Cauza:** nici una din cele două ipoteze — resetarea (`_reset_daily_if_needed`,
+apelată din `should_stop()`) SE declanșează la fiecare tick, dar nu se persista
+NICIODATĂ pe disc (doar `record_trade()` scria sesiunea, ca efect secundar).
+`record_trade()` rulează ÎNAINTEA lui `should_stop()` în 6 din 9 puncte din
+`user_loop.py` (liniile 1880/2249/2761/2825/3043/3272 vs. 3493) — o poziție
+închisă devreme într-un tick, imediat după un restart, incrementa și persista
+contorul ZILEI ANTERIOARE în loc să pornească ziua nouă de la 1. Exact tabloul
+raportat: `dailyTrades: 5, lastResetDay:` trei zile în urmă.
+
+**Fix** (`apex/strategies.py`, ~30 linii, fără atingere `public/` sau `scripts/`):
+1. Reset-ul persistă imediat (`_persist_session` chemat din interiorul reset-ului).
+2. `record_trade()` face rollover-ul ZILEI ÎNAINTE de a incrementa — nu mai
+   depinde de ordinea apelurilor din tick.
+3. `get_session()` face rollover chiar la încărcare — un cititor care nu trece
+   niciodată prin `should_stop()`/`record_trade()` (dashboard-ul, `/report`)
+   nu mai vede contorul zilei precedente imediat după un restart.
+
+**Test nou:** `tests/test_daily_reset_persist.py` (RED pe codul vechi, GREEN
+după fix). `test_strategies.py` și `test_loss_streak_rollover.py` — fără
+regresii. Suita completă: 134/135 (singurul eșec e bug-ul de fus orar al lui
+Codex, neatins).
+
+**Următorul pas, dacă preiei aici:** niciunul — task-ul e închis. Zona e liberă
+pentru un task nou.
 
 ### Claude cloud — limbajul
 `public/ad.html` conține cifre **inventate** prezentate ca rezultate
