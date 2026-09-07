@@ -19,15 +19,16 @@ e `test_backfill_trades.py`, în zona lui Codex (fus orar), nu s-a schimbat.
 
 Agenții lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.
 
-> **Notă:** nu rulează niciun Codex. Panoul numit „OpenAI Codex installation" e
-> tot Claude Code — e doar numele tab-ului. Task-ul de fus orar a fost mutat
-> la al doilea panou Claude.
+> **Notă:** Codex rulează în aplicația **Codex Desktop**, separat de VS Code —
+> nu în panourile Claude. Trebuie să i se deschidă proiectul ca „local project"
+> (folderul `proiect-codex`), altfel stă într-un folder gol.
 Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi lucrează.
 
 | Agent | Zona lui — NUMAI aici | Task |
 |---|---|---|
 | **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
 | **Claude local #2** (panoul liber) | `apex-forex-bot/scripts/`, `apex/cot.py` | Fix fus orar în `backfill_trades.py` — **reatribuit de la Codex** |
+| **Codex Desktop** | `apex-forex-bot/apex/brokers/` | Ordine autorizate care nu se execută |
 | **Claude local #1** (VS Code) | ✅ TERMINAT | ~~Contorul zilnic blocat~~ — livrat în 9add7d5, 135/135 verde |
 
 **Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
@@ -46,6 +47,21 @@ Repară cum face deja codul în `apex/miniapp_api.py:65`:
 `.replace(tzinfo=timezone.utc)` înainte de `.timestamp()`.
 **Nu modifica testul — testul e corect.** Verifică și `apex/cot.py:217`
 (`time.mktime` e tot oră locală).
+
+### Codex — ordine trimise în gol
+Pe 6 sept, două ordine SELL USDCHF au fost autorizate și trimise la 21:06:51 și
+21:12:46 UTC (identice: 23.063 unități, SL 0.812953, TP 0.804095). În log apare
+`order` + `AUTHORIZED` pentru amândouă, dar **niciun eveniment `trade`** după,
+și poziția nu apare la broker. Nicio eroare logată.
+
+Comparație — un ordin reușit arată așa (USDCAD, 21:35):
+`order` → `AUTHORIZED` → ~10s → `trade  BUY USDCAD price=1.38376`.
+La USDCHF, al treilea pas lipsește de două ori.
+
+Caută în `apex/brokers/ctrader.py`, `place_order()` (linia ~978): ce se întâmplă
+când brokerul respinge sau nu confirmă execuția? Se înghite excepția? Se ignoră
+un cod de eroare? Un ordin care eșuează trebuie să lase urmă în log.
+**Zona ta: `apex/brokers/` — atât.** Nu atinge `user_loop.py` sau `scripts/`.
 
 ### Claude local — contorul zilnic ✅ REZOLVAT (2026-09-07)
 **Cauza:** nici una din cele două ipoteze — resetarea (`_reset_daily_if_needed`,
