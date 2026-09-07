@@ -17,14 +17,18 @@ e `test_backfill_trades.py`, în zona lui Codex (fus orar), nu s-a schimbat.
 
 # 🔴 CINE CE LUCREAZĂ ACUM (actualizat 2026-09-07)
 
-Trei agenți lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.
+Agenții lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.
+
+> **Notă:** nu rulează niciun Codex. Panoul numit „OpenAI Codex installation" e
+> tot Claude Code — e doar numele tab-ului. Task-ul de fus orar a fost mutat
+> la al doilea panou Claude.
 Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi lucrează.
 
 | Agent | Zona lui — NUMAI aici | Task |
 |---|---|---|
 | **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
-| **Codex** (laptop) | `apex-forex-bot/scripts/`, `apex/cot.py` | Fix fus orar în `backfill_trades.py` |
-| **Claude local** (VS Code) | ✅ TERMINAT — vezi mai jos | ~~Contorul zilnic blocat~~ |
+| **Claude local #2** (panoul liber) | `apex-forex-bot/scripts/`, `apex/cot.py` | Fix fus orar în `backfill_trades.py` — **reatribuit de la Codex** |
+| **Claude local #1** (VS Code) | ✅ TERMINAT | ~~Contorul zilnic blocat~~ — livrat în 9add7d5, 135/135 verde |
 
 **Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
 întreabă operatorul. Nu rezolva conflicte peste munca altui agent.
