@@ -167,13 +167,15 @@ def _exec_name(value):
 def _is_terminal_execution(evt):
     """True once this event settles the order one way or the other.
 
-    Unknown or unresolvable types are not accepted: an order must not be
-    reported as filled without an explicit broker confirmation.
+    Unknown or unresolvable types are accepted so place_order() can check the
+    broker's position list before deciding whether the order actually filled.
     """
     if str(getattr(evt, "errorCode", "") or "").strip():
         return True
     name = _exec_name(getattr(evt, "executionType", None))
-    return bool(name) and name in _TERMINAL_EXEC
+    if not name:
+        return True
+    return name in _TERMINAL_EXEC
 
 
 # ── Synchronous protobuf client ──────────────────────────────────────────────
@@ -1019,11 +1021,6 @@ class CtraderBroker:
             err = f"cTrader order error: {execution_error}"
             print(f"[cTrader] order failed {side} {units} {sym}: {err}")
             raise RuntimeError(err)
-        if not _is_terminal_execution(res):
-            err = (f"cTrader order has no terminal execution confirmation: "
-                   f"{_exec_name(getattr(res, 'executionType', None)) or 'unknown'}")
-            print(f"[cTrader] order failed {side} {units} {sym}: {err}")
-            raise RuntimeError(err)
         _et = _exec_name(getattr(res, "executionType", None))
         if _et in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
             err = f"cTrader rejected the order: {_et}"
@@ -1032,6 +1029,22 @@ class CtraderBroker:
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
+        pid = res.position.positionId if res.HasField("position") else None
+        if _et not in _TERMINAL_EXEC and not pid:
+            for _try in range(3):
+                time.sleep(0.3 * (_try + 1))
+                try:
+                    pos = self.get_open_position(instrument)
+                    pid = (pos or {}).get("positionId")
+                    if pid:
+                        break
+                except Exception:
+                    pass
+            if not pid:
+                err = ("cTrader order has no terminal execution confirmation "
+                       "and no open position")
+                print(f"[cTrader] order failed {side} {units} {sym}: {err}")
+                raise RuntimeError(err)
         # ── HARD GUARANTEE: the stop must live AT THE BROKER. We attach it via
         # an ABSOLUTE-price amend right after the fill (relative SL/TP on the
         # order failed 'invalid precision' on non-FX). We only PANIC
@@ -1040,7 +1053,6 @@ class CtraderBroker:
         # must NOT close a valid trade (the false-negative that rejected
         # EURUSD buys).
         if sl or tp:
-            pid = res.position.positionId if res.HasField("position") else None
             if not pid:
                 for _try in range(3):
                     time.sleep(0.3 * (_try + 1))

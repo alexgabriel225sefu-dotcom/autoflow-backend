@@ -1,6 +1,10 @@
 import contextlib
 import io
+import os
+import sys
 from types import SimpleNamespace
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from apex.brokers import ctrader
 
@@ -59,7 +63,17 @@ def test_execution_timeout_is_logged_and_propagated():
     assert "no terminal execution event" in output.getvalue()
 
 
-def test_missing_execution_type_is_not_reported_as_filled():
+def test_unknown_execution_uses_existing_position_for_protection():
+    broker = _broker(_Conn(event=ctrader.ProtoOAExecutionEvent()))
+    broker.get_open_position = lambda instrument: {"positionId": 456}
+    broker._conn = lambda: _Conn(event=ctrader.ProtoOAExecutionEvent(
+        executionType=ctrader.ProtoOAExecutionType.ORDER_FILLED,
+    ))
+    result = broker.place_order("SELL", 23_063, "USDCHF", sl=0.812953, tp=0.804095)
+    assert result["status"] == "FILLED"
+
+
+def test_unknown_execution_without_position_is_logged_and_rejected():
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
         try:
@@ -76,5 +90,6 @@ def test_missing_execution_type_is_not_reported_as_filled():
 if __name__ == "__main__":
     test_execution_error_code_is_rejected_and_logged()
     test_execution_timeout_is_logged_and_propagated()
-    test_missing_execution_type_is_not_reported_as_filled()
+    test_unknown_execution_uses_existing_position_for_protection()
+    test_unknown_execution_without_position_is_logged_and_rejected()
     print("order failure tests passed")
