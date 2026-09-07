@@ -12,6 +12,49 @@
 **Branch de lucru:** `claude/arcads-external-api-gexx7-6n4pr9`
 **Teste:** 134/134 trec (`python apex-forex-bot/tests/run_all.py`)
 
+---
+
+# 🔴 CINE CE LUCREAZĂ ACUM (actualizat 2026-09-07)
+
+Trei agenți lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.
+Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi lucrează.
+
+| Agent | Zona lui — NUMAI aici | Task |
+|---|---|---|
+| **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
+| **Codex** (laptop) | `apex-forex-bot/scripts/`, `apex/cot.py` | Fix fus orar în `backfill_trades.py` |
+| **Claude local** (VS Code) | `apex-forex-bot/apex/user_loop.py` | Contorul zilnic blocat |
+
+**Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
+întreabă operatorul. Nu rezolva conflicte peste munca altui agent.
+
+## Detaliile task-urilor
+
+### Codex — fus orar în backfill
+`_ts()` din `scripts/backfill_trades.py:78` face `.timestamp()` pe un datetime
+naiv, deci îl citește ca oră **locală**. Jurnalul stochează **UTC**. În România
+decalajul de 3h depășește `_TIME_SLACK_S` (90 min) → „no deal matches".
+Testul `tests/test_backfill_trades.py` trece pe UTC și pică pe RO — reprodus cu
+`TZ=Europe/Bucharest`.
+
+Repară cum face deja codul în `apex/miniapp_api.py:65`:
+`.replace(tzinfo=timezone.utc)` înainte de `.timestamp()`.
+**Nu modifica testul — testul e corect.** Verifică și `apex/cot.py:217`
+(`time.mktime` e tot oră locală).
+
+### Claude local — contorul zilnic
+`strategy_session` are `lastResetDay: "2026-09-04"` deși suntem pe 07 și s-au
+deschis poziții pe 06. `dailyTrades: 5` a depășit `max_trades_day: 4`, dar
+tranzacțiile au continuat. Ori resetarea zilnică nu se declanșează, ori limita
+se verifică pe alt contor. Găsește care din două. Scrie test înainte de fix.
+
+### Claude cloud — limbajul
+`public/ad.html` conține cifre **inventate** prezentate ca rezultate
+(`+$191.80`, „30-Day Results", citat „+$284") și perechi crypto care nu mai
+sunt produsul. Risc de chargeback și de închidere Digistore24. Se rescrie pe
+execuție/control al riscului, fără promisiuni de performanță.
+
+
 ## Ce s-a terminat recent
 
 Analiza jurnalului a găsit de ce pierdea botul și de unde venea `-27k`:
