@@ -2089,12 +2089,14 @@ app.get('/index.html', (req, res) => {
 // the cinematic curtain intro now lives on the homepage itself.
 app.get(['/intro', '/intro.html'], (req, res) => res.redirect(301, '/'));
 
-// Configurator (linked from the delivery email — license-gated client-side).
-// The crypto configurator that used to sit beside this one is gone with its
-// product; /configurator now 301s to the homepage further down.
-app.get('/configurator-forex', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'configurator-forex.html'));
-});
+// /configurator-forex is retired — it 301s to /forex further down.
+// It collected OANDA credentials and walked the buyer through deploying a
+// Railway image with an MT5 bridge: twenty-five references to OANDA and none
+// to cTrader, for a platform that trades cTrader only. The comment that used
+// to sit here said the delivery email linked to it; the email now sends the
+// buyer straight into Telegram with their key, and onboarding is /setup and
+// /ctrader from inside the bot. The page is kept in public/ so it can be
+// rewritten for cTrader if a web configurator is ever wanted again.
 
 // POST /api/demo/generate — public, rate-limited (3 req/IP/day)
 const _demoLimiter = rateLimit({ windowMs: 24*60*60*1000, max: 5, standardHeaders: true, legacyHeaders: false,
@@ -2290,17 +2292,24 @@ app.get(['/apex-bot', '/apex-bot.html', '/configurator', '/configurator.html',
          '/bot-setup', '/bot-setup.html', '/deploy', '/deploy.html'],
        (req, res) => res.redirect(301, '/index'));
 
+// A buyer who kept an old link lands on the product page, whose Setup section
+// carries the flow that actually works, rather than on a form asking for a
+// broker this platform does not use.
+app.get(['/configurator-forex', '/configurator-forex.html'],
+       (req, res) => res.redirect(301, '/forex'));
+
 // 'configurator', 'bot-setup' and 'deploy' are gone with the crypto product:
 // they configured Binance keys and walked a client through deploying the
 // retired Railway image. Serving them would hand a buyer instructions for a
-// product that cannot be delivered. 'configurator-forex' is the live one.
+// product that cannot be delivered. 'configurator-forex' went the same way
+// for the same reason — it configured the wrong broker on the wrong host.
 // Only pages that belong to this platform. Everything the old AI-course and
 // Blueprint Studio products served — the fourteen course modules, the video
 // tools, the MetaTrader simulator (this product trades cTrader) and the crypto
 // beginner's guide (crypto is retired) — is gone. A visitor or an ad reviewer
 // reaching a "$3K/month automation course" from a forex ad is how ad accounts
 // get flagged, and none of it could be delivered anyway.
-const publicPages = ['privacy','terms','impressum','forex','configurator-forex','ad','results','profile','screens','trading-journal','thank-you'];
+const publicPages = ['privacy','terms','impressum','forex','ad','results','profile','screens','trading-journal','thank-you'];
 publicPages.forEach(p => {
   app.get(`/${p}.html`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
   app.get(`/${p}`, (req, res) => res.sendFile(path.join(__dirname, 'public', `${p}.html`), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } }));
