@@ -27,7 +27,7 @@ Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi l
 | Agent | Zona lui — NUMAI aici | Task |
 |---|---|---|
 | **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
-| **Claude local #2** (panoul liber) | `apex-forex-bot/scripts/`, `apex/cot.py` | Fix fus orar în `backfill_trades.py` — **reatribuit de la Codex** |
+| ~~Claude local #2~~ | ✅ TERMINAT | ~~Fix fus orar~~ — preluat și livrat de Claude cloud (nu fusese început) |
 | **Codex Desktop** | `apex-forex-bot/apex/brokers/` | Ordine autorizate care nu se execută |
 | **Claude local #1** (VS Code) | ✅ TERMINAT | ~~Contorul zilnic blocat~~ — livrat în 9add7d5, 135/135 verde |
 
@@ -48,7 +48,19 @@ Repară cum face deja codul în `apex/miniapp_api.py:65`:
 **Nu modifica testul — testul e corect.** Verifică și `apex/cot.py:217`
 (`time.mktime` e tot oră locală).
 
-### Codex — DE CORECTAT în 76cced8 (verificat de Claude cloud)
+### ✅ Fus orar — REZOLVAT
+`_ts()` din `scripts/backfill_trades.py` parsează acum explicit UTC
+(`.replace(tzinfo=timezone.utc)`). Verificat: testul trece și pe
+`TZ=Europe/Bucharest`, și pe `TZ=UTC`. Suita nu mai e roșie pe mașinile din
+România.
+
+**Rămas nereparat, intenționat:** `apex/cot.py:217` folosește `time.mktime`,
+tot oră locală. Aceeași clasă de bug, dar rezultatul e vechimea unui raport
+în zile, rotunjită la o zecimală, pentru rapoarte săptămânale — un decalaj de
+3h înseamnă 0,125 zile. Imaterial, și nu există test care să acopere modulul,
+deci o schimbare acolo ar fi mai riscantă decât artefactul de rotunjire.
+
+### Codex — ✅ CORECTAT în 98d7705 (verificat de Claude cloud)
 
 Diagnosticul a fost corect și suita e verde (135/135), dar două lucruri:
 
