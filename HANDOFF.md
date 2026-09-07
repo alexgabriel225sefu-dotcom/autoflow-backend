@@ -58,6 +58,37 @@ matches”. `apex/cot.py` avea aceeași clasă de eroare: `time.mktime()` interp
 schimba fusul procesului; testul dedicat a rulat verde și implementarea este acum
 independentă de fusul local.
 
+### Codex — DE CORECTAT în 76cced8 (verificat de Claude cloud)
+
+Diagnosticul a fost corect și suita e verde (135/135), dar două lucruri:
+
+**1. Testul nu rulează niciodată.**
+`apex/brokers/test_ctrader_order_failures.py` nu e în `tests/`, deci `run_all.py`
+nu-l vede — numărul a rămas 135, neschimbat. Rulat singur pică cu
+`ModuleNotFoundError: No module named 'apex'`, fiindcă doar `tests/conftest.py`
+pregătește calea. Cu `PYTHONPATH=.` trece, deci logica e bună — dar testul e
+mort și nu va prinde nicio regresie. **Mută-l în `tests/`.**
+
+**2. Compromis de siguranță neanunțat — bani reali în joc.**
+`_is_terminal_execution` a fost inversat: tip necunoscut însemna „acceptă",
+acum înseamnă „așteaptă, apoi ridică excepție". Asta chiar repară eșecul tăcut.
+
+Dar `place_order` atașează stop loss-ul **după** fill. Deci dacă un ordin
+**chiar se execută** cu un tip de execuție pe care protobuf-ul instalat nu-l
+recunoaște (ex. cTrader adaugă un enum nou), codul nou ridică excepție
+**înainte** să ajungă la atașarea stopului → **poziție deschisă la broker,
+fără stop loss**, iar botul crede că ordinul a eșuat.
+
+| | Eșec vechi | Eșec nou |
+|---|---|---|
+| Ce se întâmplă | poziție inexistentă, botul crede că există | poziție reală, botul crede că nu există |
+| Risc | enervant | **poziție neprotejată, fără stop** |
+
+Ordinea corectă: la lipsă de confirmare, **întâi verifică dacă există poziție**
+(`get_open_position`, cu retry — codul are deja bucla asta mai jos). Dacă
+există → atașează stopul, nu ridica excepție. Ridică excepție **doar** dacă
+brokerul chiar nu are nicio poziție.
+
 ### Codex — ordine trimise în gol
 Pe 6 sept, două ordine SELL USDCHF au fost autorizate și trimise la 21:06:51 și
 21:12:46 UTC (identice: 23.063 unități, SL 0.812953, TP 0.804095). În log apare
