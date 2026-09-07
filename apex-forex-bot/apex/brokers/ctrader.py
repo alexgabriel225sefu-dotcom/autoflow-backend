@@ -167,14 +167,13 @@ def _exec_name(value):
 def _is_terminal_execution(evt):
     """True once this event settles the order one way or the other.
 
-    Unknown or unresolvable types are accepted rather than skipped: an enum we
-    do not recognise must not make the caller wait out the full timeout on an
-    order that has already filled.
+    Unknown or unresolvable types are not accepted: an order must not be
+    reported as filled without an explicit broker confirmation.
     """
-    name = _exec_name(getattr(evt, "executionType", None))
-    if not name:
+    if str(getattr(evt, "errorCode", "") or "").strip():
         return True
-    return name in _TERMINAL_EXEC
+    name = _exec_name(getattr(evt, "executionType", None))
+    return bool(name) and name in _TERMINAL_EXEC
 
 
 # ── Synchronous protobuf client ──────────────────────────────────────────────
@@ -1009,11 +1008,27 @@ class CtraderBroker:
         # the relative value fails 'invalid precision'). Instead the position
         # is amended with ABSOLUTE prices (rounded to the symbol's digits)
         # immediately after the fill, then verified — see below.
-        res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
-                                    accept=_is_terminal_execution)
+        try:
+            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
+                                        accept=_is_terminal_execution)
+        except Exception as e:
+            print(f"[cTrader] order failed {side} {units} {sym}: {e}")
+            raise
+        execution_error = str(getattr(res, "errorCode", "") or "").strip()
+        if execution_error:
+            err = f"cTrader order error: {execution_error}"
+            print(f"[cTrader] order failed {side} {units} {sym}: {err}")
+            raise RuntimeError(err)
+        if not _is_terminal_execution(res):
+            err = (f"cTrader order has no terminal execution confirmation: "
+                   f"{_exec_name(getattr(res, 'executionType', None)) or 'unknown'}")
+            print(f"[cTrader] order failed {side} {units} {sym}: {err}")
+            raise RuntimeError(err)
         _et = _exec_name(getattr(res, "executionType", None))
         if _et in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
-            raise RuntimeError(f"cTrader rejected the order: {_et}")
+            err = f"cTrader rejected the order: {_et}"
+            print(f"[cTrader] order failed {side} {units} {sym}: {err}")
+            raise RuntimeError(err)
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
