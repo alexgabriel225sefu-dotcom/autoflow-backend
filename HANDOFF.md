@@ -10,21 +10,26 @@
 
 **Ultima actualizare:** 2026-09-07
 **Branch de lucru:** `claude/arcads-external-api-gexx7-6n4pr9`
-**Teste:** 134/135 trec (`python apex-forex-bot/tests/run_all.py`) — singurul eșec
-e `test_backfill_trades.py`, în zona lui Codex (fus orar), nu s-a schimbat.
+**Teste:** 135/135 trec (`python apex-forex-bot/tests/run_all.py`) — fixul de fus
+orar (Codex) a închis ultimul eșec, `test_backfill_trades.py`.
 
 ---
 
 # 🔴 CINE CE LUCREAZĂ ACUM (actualizat 2026-09-07)
 
-Trei agenți lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.
+Agenții lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.
+
+> **Notă:** Codex rulează în aplicația **Codex Desktop**, separat de VS Code —
+> nu în panourile Claude. Trebuie să i se deschidă proiectul ca „local project"
+> (folderul `proiect-codex`), altfel stă într-un folder gol.
 Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi lucrează.
 
 | Agent | Zona lui — NUMAI aici | Task |
 |---|---|---|
 | **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
-| **Codex** (laptop) | ✅ TERMINAT — vezi mai jos | ~~Fix fus orar în `backfill_trades.py`~~ |
-| **Claude local** (VS Code) | ✅ TERMINAT — vezi mai jos | ~~Contorul zilnic blocat~~ |
+| **Codex Desktop** | `apex-forex-bot/apex/brokers/` | Ordine autorizate care nu se execută |
+| **Claude local #1** (VS Code) | ✅ TERMINAT | ~~Contorul zilnic blocat~~ — livrat în 9add7d5, 135/135 verde |
+| **Claude local #2** (panoul liber) | ✅ TERMINAT — vezi mai jos | ~~Fix fus orar în `backfill_trades.py`~~ — Codex apucase deja să-l rezolve înainte ca task-ul să fie reatribuit; liber pentru un task nou |
 
 **Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
 întreabă operatorul. Nu rezolva conflicte peste munca altui agent.
@@ -52,6 +57,21 @@ matches”. `apex/cot.py` avea aceeași clasă de eroare: `time.mktime()` interp
 (135/135). Pe Windows local, `time.tzset` nu există, deci variabila `TZ` nu poate
 schimba fusul procesului; testul dedicat a rulat verde și implementarea este acum
 independentă de fusul local.
+
+### Codex — ordine trimise în gol
+Pe 6 sept, două ordine SELL USDCHF au fost autorizate și trimise la 21:06:51 și
+21:12:46 UTC (identice: 23.063 unități, SL 0.812953, TP 0.804095). În log apare
+`order` + `AUTHORIZED` pentru amândouă, dar **niciun eveniment `trade`** după,
+și poziția nu apare la broker. Nicio eroare logată.
+
+Comparație — un ordin reușit arată așa (USDCAD, 21:35):
+`order` → `AUTHORIZED` → ~10s → `trade  BUY USDCAD price=1.38376`.
+La USDCHF, al treilea pas lipsește de două ori.
+
+Caută în `apex/brokers/ctrader.py`, `place_order()` (linia ~978): ce se întâmplă
+când brokerul respinge sau nu confirmă execuția? Se înghite excepția? Se ignoră
+un cod de eroare? Un ordin care eșuează trebuie să lase urmă în log.
+**Zona ta: `apex/brokers/` — atât.** Nu atinge `user_loop.py` sau `scripts/`.
 
 ### Claude local — contorul zilnic ✅ REZOLVAT (2026-09-07)
 **Cauza:** nici una din cele două ipoteze — resetarea (`_reset_daily_if_needed`,
