@@ -27,7 +27,6 @@ degrades data_quality, which is exactly true.
 """
 import threading
 import time
-from datetime import datetime, timezone
 
 import requests
 
@@ -215,9 +214,7 @@ def age_days(symbol, legs=None, now=None):
         got = reading(c, now)
         if got and got.get("report_date"):
             try:
-                t = datetime.strptime(got["report_date"], "%Y-%m-%d").replace(
-                    tzinfo=timezone.utc
-                ).timestamp()
+                t = time.mktime(time.strptime(got["report_date"], "%Y-%m-%d"))
                 ages.append((now - t) / 86400.0)
             except (TypeError, ValueError):
                 pass
