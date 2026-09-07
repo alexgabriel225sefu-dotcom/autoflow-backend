@@ -15,6 +15,58 @@
 
 ---
 
+# 🔴 AUDIT 2026-09-07 — 7 CRITICE, împărțite pe zone
+
+Audit complet al `apex-forex-bot/` (90 fișiere, 6 recenzori paraleli). Claude
+cloud a verificat 3 din 7 afirmații direct în cod — **toate trei reale**.
+
+**Context care schimbă urgența:** există **un singur utilizator (proprietarul),
+pe cont demo**. Șase din șapte sunt blocaje **înainte de primul client**, nu
+incendii de azi. Două ating contul chiar acum.
+
+| # | Constatare | Zonă | Cine |
+|---|---|---|---|
+| C1 | Chat AI execută trade fără confirmare | `apex/assistant.py` | Claude cloud |
+| C2 | 3 din 6 închideri ocolesc `gates.authorize_close` | `apex/user_loop.py` | Claude local #1 |
+| C3 | Cont nou → `automation="full"` implicit | `apex/automation.py` | Claude cloud |
+| C4 | `close_position()` nu așteaptă evenimentul terminal | `apex/brokers/` | **Codex** |
+| C5 | Verificare stop eșuată = tratată ca reușită | `apex/brokers/` | **Codex** |
+| C6 | Jurnalul n-are compare-and-set (două scrieri se pierd) | `apex/user_store.py` | Claude local #2 |
+| C7 | Refund/chargeback nu oprește botul fără mesaj text | `apex/telegram.py` | Claude local #2 |
+| M4 | `dashboard.py` — `_fetch` se apelează recursiv | `apex/dashboard.py` | Claude cloud |
+
+**Regula rămâne: nu ieși din zona ta.** Rulează suita înainte de commit (136/136).
+
+## C4 + C5 — Codex, `apex/brokers/ctrader.py`
+
+Sunt aceeași familie cu ce ai reparat deja în `place_order` (98d7705) — dar pe
+calea de **închidere**, nu de deschidere.
+
+**C5 — `ctrader.py:1093-1100`, fail-closed.** După un amend de stop eșuat,
+codul recitește poziția ca să verifice că stopul chiar există. Dacă acea
+recitire aruncă excepție (socket, reconectare — exact ce descriu comentariile
+din modul), se setează `protected = True`, adică *„n-am putut verifica, deci
+presupun că e bine"*. Ramura de panic-close și statusul `UNPROTECTED` nu mai
+rulează niciodată. Rezultat: poziție reală, fără stop loss, raportată ca
+`FILLED` normal.
+**Fix:** implicit `protected = False` la excepție. Necunoscut ≠ protejat.
+
+**C4 — `close_position()` vs `place_order()`.** `place_order` așteaptă
+evenimentul **terminal** — comentariul lui explică de ce: un singur ordin
+produce mai multe frame-uri, iar primul nu poartă confirmare de execuție.
+`close_position` trimite cererea și acceptă **primul frame sosit**, fără să
+verifice `errorCode` sau tipul execuției. Dacă primul frame e doar o
+confirmare de primire, codul cade pe ramura „fără fill", cere o cotație
+proaspătă și raportează `FILLED` oricum.
+**Fix:** aceeași așteptare terminală și aceeași verificare de eroare pe care
+le are deja `place_order`. Refolosește `_is_terminal_execution`.
+**Scenariu:** brokerul respinge închiderea pe un frame ulterior, care nu mai e
+citit niciodată. Poziția rămâne deschisă la broker în timp ce toate evidențele
+interne spun „flat", cu un preț de ieșire inventat.
+
+Ambele au nevoie de test în `tests/` (nu în `apex/brokers/`).
+
+
 # 🔴 CINE CE LUCREAZĂ ACUM (actualizat 2026-09-07)
 
 Agenții lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.

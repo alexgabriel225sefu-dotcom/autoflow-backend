@@ -1109,7 +1109,7 @@ class CtraderBroker:
                     pos2 = self.get_open_position(instrument)
                     protected = bool(pos2 and pos2.get("stopLoss"))
                 except Exception:
-                    protected = True
+                    protected = False
             if not protected and sl:
                 # Do NOT raise here: the position already opened and filled at
                 # the broker — an exception at this point used to get caught
@@ -1157,7 +1157,27 @@ class CtraderBroker:
         req.ctidTraderAccountId = self._ctid()
         req.positionId = pos["positionId"]
         req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 oz → 34)
-        res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20)
+        try:
+            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
+                                        accept=_is_terminal_execution)
+        except Exception as e:
+            print(f"[cTrader] close failed {sym}: {e}")
+            raise
+        execution_error = str(getattr(res, "errorCode", "") or "").strip()
+        if execution_error:
+            err = f"cTrader close error: {execution_error}"
+            print(f"[cTrader] close failed {sym}: {err}")
+            raise RuntimeError(err)
+        execution_type = _exec_name(getattr(res, "executionType", None))
+        if execution_type not in _TERMINAL_EXEC:
+            err = ("cTrader close has no terminal execution confirmation: "
+                   f"{execution_type or 'unknown'}")
+            print(f"[cTrader] close failed {sym}: {err}")
+            raise RuntimeError(err)
+        if execution_type in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
+            err = f"cTrader close rejected: {execution_type}"
+            print(f"[cTrader] close failed {sym}: {err}")
+            raise RuntimeError(err)
         fill = None
         if res.HasField("order") and res.order.HasField("executionPrice"):
             fill = res.order.executionPrice
