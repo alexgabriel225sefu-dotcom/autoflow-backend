@@ -144,7 +144,7 @@ function loadCandles(){
 // so the page never handles the token at all and script cannot read it.
 // same-origin sends the cookie without making the URL carry anything.
 const _api = (p) => p;
-const _fetch = (p, o) => _fetch((p), Object.assign({credentials: 'same-origin'}, o || {}))
+const _fetch = (p, o) => fetch((p), Object.assign({credentials: 'same-origin'}, o || {}))
   .then(r => { if (r.status === 401) { location.reload(); throw new Error('session expired'); } return r; });
   _fetch(('/api/candles')).then(r=>r.json()).then(d=>{
     if(!d.candles||!d.candles.length) return;
