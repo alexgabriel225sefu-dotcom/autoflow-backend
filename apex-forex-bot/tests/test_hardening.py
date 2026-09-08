@@ -252,8 +252,12 @@ finally:
 print("\n8. The AI assistant cannot skip the loop's gates")
 ASRC = open(os.path.join(ROOT, "apex", "assistant.py"), encoding="utf-8").read()
 LSRC = open(os.path.join(ROOT, "apex", "user_loop.py"), encoding="utf-8").read()
-check("execute_trade goes through user_loop, not the broker",
-      "user_loop.force_trade(user_id" in ASRC)
+# The assistant used to have an execute_trade tool, and this line checked the
+# weaker property that it at least went through user_loop rather than straight
+# to the broker. There is now no opening path at all — see
+# tests/test_assistant_cannot_open.py — so the check is the stronger one.
+check("the assistant cannot open a position at all",
+      "force_trade" not in ASRC and "place_order" not in ASRC)
 check("close_position does too", "user_loop.force_close(user_id)" in ASRC)
 for direct in ("place_order", "get_bid_ask", "ctrader_access_token",
                "_make_broker"):

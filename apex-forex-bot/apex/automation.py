@@ -55,7 +55,8 @@ def mode(user) -> str:
     """
     u = user or {}
     stored = str(u.get("automation") or "").strip().lower()
-    legacy = bool(u.get("copilot"))
+    legacy_raw = u.get("copilot")
+    legacy = bool(legacy_raw)
     if stored in MODES:
         # The boolean was written by something that only knows two levels. If
         # it disagrees with the stored mode, honour it — it is the more recent
@@ -64,6 +65,18 @@ def mode(user) -> str:
         if legacy != (stored == "approval"):
             return "approval" if legacy else "full"
         return stored
+    # Neither key is set. The docstring above assumes every existing client
+    # carries the boolean, and they do — but a BRAND-NEW account carries
+    # nothing, and `bool(None)` is False, which resolved to "full". That is
+    # the one path where nobody had chosen anything and the answer was still
+    # "trade unattended". Onboarding (connect → account → style → method →
+    # risk) never asks, and linking a live account only writes `paper: False`,
+    # so this was the state every new live account started in.
+    #
+    # Absent is not the same as False: False means a client turned copilot off
+    # and kept autopilot, which is a choice and is honoured below.
+    if legacy_raw is None:
+        return "approval"
     return "approval" if legacy else "full"
 
 

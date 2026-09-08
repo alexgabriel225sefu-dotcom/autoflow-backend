@@ -32,22 +32,14 @@ _TOOLS = [
             "required": ["symbol"],
         },
     },
-    {
-        "name": "execute_trade",
-        "description": (
-            "Open a BUY or SELL position NOW. "
-            "Use when the user explicitly says they want to enter, buy, sell, or go long/short. "
-            "Confirmation can be in ANY language (yes, da, sí, oui, ja, evet, да, go, intru)."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "side":   {"type": "string", "enum": ["BUY", "SELL"]},
-                "symbol": {"type": "string", "description": "e.g. EUR_USD"},
-            },
-            "required": ["side", "symbol"],
-        },
-    },
+    # There is deliberately NO tool here that OPENS a position. apex/agent.py
+    # explains the reasoning for the newer AI surface: an execute tool defeats
+    # every other control in the platform, because a model reaches it from
+    # free text with no approval step in between. This surface used to have
+    # one, whose own description taught the model that a bare "da" or "go"
+    # counted as authorisation to open a real position. Closing is kept below:
+    # it only ever reduces exposure, and "get me out" is the one urgent thing
+    # a client may need from chat. Opening goes through the approval button.
     {
         "name": "close_position",
         "description": "Close the open position immediately. Use when the user asks to exit, close, or sell out.",
@@ -100,8 +92,11 @@ RULES:
   language throughout is clearer than each message being individually
   well-matched. If the user writes in another language, understand it fully
   and answer in English.
-- Trade execution: show a brief analysis, then execute immediately without asking for confirmation.
-  The user can always close manually. Do NOT ask "are you sure?" — just do it.
+- You CANNOT open a position. You have no tool for it, and there is no wording
+  that gives you one. When the user asks to buy, sell, or go long/short: give
+  the analysis, then tell them to use /buy, /sell or the approval buttons —
+  that path records who authorised the order. Never claim to have opened one.
+- You CAN close an open position when asked. Closing only reduces exposure.
 - Always cite real numbers: RSI, price, balance, P&L — never invent them
 - Auto-trading runs 24/7 in the background — you only intervene when asked
 - For errors: explain in plain language and suggest a fix
@@ -234,16 +229,6 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None) -> st
             })
         except Exception as e:
             return json.dumps({"error": str(e)})
-
-    if name == "execute_trade":
-        side = inp.get("side", "BUY").upper()
-        symbol = inp.get("symbol", "EUR_USD").upper().replace("/", "_").replace("-", "_")
-        send_status(f"⚡ Executing <b>{side} {symbol}</b>…")
-        try:
-            result = user_loop.force_trade(user_id, side, symbol)
-            return json.dumps(result)
-        except Exception as e:
-            return json.dumps({"ok": False, "error": str(e)})
 
     if name == "close_position":
         send_status("🔄 Closing position…")

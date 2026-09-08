@@ -351,8 +351,8 @@ print("\nAI assistant")
 ASRC = open(os.path.join(ROOT, "apex", "assistant.py"), encoding="utf-8").read()
 _ft = LSRC[LSRC.index("def force_trade"):LSRC.index("def read_candles")]
 GSRC = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
-row("AI trade request → goes through user_loop, not the broker",
-    "user_loop.force_trade(user_id" in ASRC and "place_order" not in ASRC)
+row("AI trade request → refused: the assistant has no opening path",
+    "force_trade" not in ASRC and "place_order" not in ASRC)
 row("AI close request → same", "user_loop.force_close(user_id)" in ASRC)
 row("AI has no broker credential path", "ctrader_access_token" not in ASRC)
 # The checks are centralised in apex/gates.py — one definition entered from
