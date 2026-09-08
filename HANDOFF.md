@@ -15,6 +15,23 @@
 
 ---
 
+# ⚠️ ÎNAINTE DE URMĂTORUL DEPLOY — citește asta
+
+Fixul C3 schimbă comportamentul **contului tău**, nu doar al clienților viitori.
+
+`automation.mode()` întorcea `"full"` când nu era setat niciun câmp. Contul
+proprietarului (7585109158) **nu are nici `automation`, nici `copilot`** — deci
+rula pe `full` prin exact acest fallback. După deploy va rula pe `approval`:
+botul va cere aprobare pentru fiecare intrare în loc să deschidă singur.
+
+**O singură comandă îl aduce înapoi:** `/automation full` în Telegram.
+Dă-o după deploy, altfel botul pare că „s-a oprit din tranzacționat".
+
+Conturile care au `copilot` setat explicit nu sunt afectate — `False` rămâne
+o decizie și rezolvă tot la `full`.
+
+---
+
 # 🔴 AUDIT 2026-09-07 — 7 CRITICE, împărțite pe zone
 
 Audit complet al `apex-forex-bot/` (90 fișiere, 6 recenzori paraleli). Claude
@@ -26,14 +43,14 @@ incendii de azi. Două ating contul chiar acum.
 
 | # | Constatare | Zonă | Cine |
 |---|---|---|---|
-| C1 | Chat AI execută trade fără confirmare | `apex/assistant.py` | Claude cloud |
+| C1 | ✅ **REZOLVAT** — unealta de execuție scoasă, test cu mutație | `apex/assistant.py` | Claude cloud |
 | C2 | 3 din 6 închideri ocolesc `gates.authorize_close` | `apex/user_loop.py` | Claude local #1 |
-| C3 | Cont nou → `automation="full"` implicit | `apex/automation.py` | Claude cloud |
-| C4 | `close_position()` nu așteaptă evenimentul terminal | `apex/brokers/` | **Codex** |
-| C5 | Verificare stop eșuată = tratată ca reușită | `apex/brokers/` | **Codex** |
+| C3 | ✅ **REZOLVAT** — absent ≠ False; vezi avertismentul de deploy sus | `apex/automation.py` | Claude cloud |
+| C4 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
+| C5 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
 | C6 | Jurnalul n-are compare-and-set (două scrieri se pierd) | `apex/user_store.py` | Claude local #2 |
 | C7 | Refund/chargeback nu oprește botul fără mesaj text | `apex/telegram.py` | Claude local #2 |
-| M4 | `dashboard.py` — `_fetch` se apelează recursiv | `apex/dashboard.py` | Claude cloud |
+| M4 | ✅ **REZOLVAT** — o literă | `apex/dashboard.py` | Claude cloud |
 
 **Regula rămâne: nu ieși din zona ta.** Rulează suita înainte de commit (136/136).
 
