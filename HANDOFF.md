@@ -1,3 +1,15 @@
+# 🛑 CODEX E INDISPONIBIL — cotă epuizată 2026-09-09 ~17:45 UTC
+
+Codex a lovit limita de utilizare în mijlocul task-ului („You've hit your usage
+limit"). Are ~158 de linii **necomise** pe laptop, care dublează limitatorul de
+rată deja livrat în `2d1517c`. **Nu se împing** — versiunea de pe branch e
+verde, 139/139, verificată pe două mutații.
+
+Zona `apex/brokers/` e liberă. **Claude cloud o preia** și continuă cu pasul 2
+din `docs/CTRADER_CAPABILITIES.md`: `guaranteedStopLoss` + `slippageInPoints`.
+
+---
+
 # 🛑 CODEX — LIMITATORUL DE RATĂ E DEJA FĂCUT, OPREȘTE-TE
 
 Ai revendicat pasul 1 la `930682e`. Claude cloud îl terminase deja și îl împinge
