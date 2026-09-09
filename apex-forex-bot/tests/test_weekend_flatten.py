@@ -72,7 +72,10 @@ check("Monday → open", not market.is_weekend_close_window(at(2026, 8, 17, 9)))
 print("\n── the announcement comes AFTER the attempt ──")
 _flat = LOOP.index("if in_weekend_window:")
 _alert = LOOP.index('"action": "WEEKEND_CLOSE"', _flat)
-_attempt = LOOP.index("broker.close_position(_wsym)", _flat)
+# The flatten closes through _authorized_close now (C2: every close in the
+# loop passes gates.authorize_close). Same symbol, same position, one gate
+# in front of it.
+_attempt = LOOP.index("_authorized_close(", _flat)
 check("the close is attempted before the alert is built", _attempt < _alert)
 check("the alert carries what actually happened",
       '"closed": _wk_closed' in LOOP and '"failed": sorted(_wk_failed)' in LOOP)
@@ -91,7 +94,11 @@ check("an already-flat position is not journalled either",
 
 print("\n── every position, not just the focused one ──")
 check("it asks the broker for the whole list", "broker.get_all_positions()" in _body)
-check("it closes each position's own symbol", "broker.close_position(_wsym)" in _body)
+check("it closes each position's own symbol",
+      "_wsym, _wp," in _body,
+      "the flatten must pass the position's OWN symbol, not the focused one")
+check("...through the gate, like every other close in the loop",
+      "_authorized_close(" in _body and '"weekend_flatten"' in _body)
 check("and files the close under that symbol", '"symbol": _wsym' in _body)
 check("the stats are credited to it too", "symbol=_wsym" in _body)
 check("the focus price is not used to value another instrument",

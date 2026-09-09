@@ -1477,6 +1477,37 @@ def _manage_trailing(broker, cfg, pos, symbol, price, initial_risk=None,
     return None
 
 
+def _authorized_close(user_id, user, broker, symbol, position, origin):
+    """Close through the same gate force_close uses. Returns (result, ok).
+
+    AGENTS.md names gates.authorize_close as the only thing that may let a
+    close through, and force_close's docstring says why: a non-owning instance
+    can close a position the owner is managing, and a close that timed out can
+    be retried into closing a position that was reopened in between — the
+    response was lost, not the execution.
+
+    Three closes inside the loop went straight to the broker with none of that,
+    including the ordinary strategy exit, which the comment beside it calls the
+    path that runs far more often than any of the gated ones.
+
+    `ok` is False when the GATE refused. A broker exception is left to
+    propagate, because each caller already handles that and the two failures
+    need the same conclusion for opposite reasons: refused means the position
+    is not ours to close, failed means it did not close. Either way it is still
+    live, and booking it as an exit is the bug this prevents.
+    """
+    pos = position or {}
+    decision, rid = gates.authorize_close(
+        user_id, position_id=pos.get("positionId"), symbol=symbol,
+        origin=origin, user=user)
+    gates.audit(user_id, "CLOSE", decision, origin=origin, rid=rid)
+    if not decision:
+        print(f"[UserLoop:{user_id}] {origin} close of {symbol} refused by the "
+              f"gate: {decision.reason} — position left open and still managed")
+        return None, False
+    return broker.close_position(symbol), True
+
+
 def _loop(user_id, alert_fn, gen=None):
     user = user_store.load(user_id)
 
@@ -2784,6 +2815,20 @@ def _loop(user_id, alert_fn, gen=None):
                     breached = stop_ and ((side_ == "BUY" and price <= stop_) or
                                           (side_ == "SELL" and price >= stop_))
                     if breached:
+                        # The gate can veto. Clearing `breached` skips the
+                        # journalling below as well — booking an exit for a
+                        # position that is still open is the same defect the
+                        # weekend flatten had.
+                        _pd, _prid = gates.authorize_close(
+                            user_id, position_id=(open_pos or {}).get("positionId"),
+                            symbol=symbol, origin="protective_stop", user=user)
+                        gates.audit(user_id, "CLOSE", _pd,
+                                    origin="protective_stop", rid=_prid)
+                        if not _pd:
+                            print(f"[UserLoop:{user_id}] protective close of "
+                                  f"{symbol} refused by the gate: {_pd.reason}")
+                            breached = False
+                    if breached:
                         exit_price = price
                         _close_res = None
                         try:
@@ -3207,7 +3252,12 @@ def _loop(user_id, alert_fn, gen=None):
                     _close_res = None
                     if not cfg.PAPER_TRADING:
                         try:
-                            _close_res = broker.close_position(_wsym)
+                            _close_res, _wk_ok = _authorized_close(
+                                user_id, user, broker, _wsym, _wp,
+                                "weekend_flatten")
+                            if not _wk_ok:
+                                _wk_failed.add(_wsym)
+                                continue
                         except Exception as e:
                             # Do NOT book a close that did not happen. The
                             # position is still live and still exposed, and
@@ -4681,7 +4731,9 @@ def _loop(user_id, alert_fn, gen=None):
                 # more often.
                 _close_res, _close_ok = None, True
                 try:
-                    _close_res = broker.close_position(symbol)
+                    _close_res, _close_ok = _authorized_close(
+                        user_id, user, broker, symbol, open_pos,
+                        "strategy_exit")
                 except Exception as _ce:
                     _close_ok = False
                     print(f"[UserLoop:{user_id}] strategy exit on {symbol} "

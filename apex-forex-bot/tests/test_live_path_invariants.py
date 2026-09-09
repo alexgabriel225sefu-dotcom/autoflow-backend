@@ -86,7 +86,8 @@ for path, tree in modules():
 
 print("\n2. Every NEW order is authorised in the same function that places it")
 LOOP = os.path.join(APEX, "user_loop.py")
-loop_tree = ast.parse(open(LOOP, encoding="utf-8").read())
+LOOP_SRC = open(LOOP, encoding="utf-8").read()
+loop_tree = ast.parse(LOOP_SRC)
 placements = [c for c in calls_named(loop_tree, "place_order")
               if isinstance(c.func.value, ast.Name)
               and "broker" in c.func.value.id.lower()]
@@ -100,7 +101,36 @@ for call in placements:
           gated, "an order that skips the gate skips entitlement, risk, "
                  "ownership and idempotency at once")
 
-print("\n3. Operator-initiated closes are authorised too")
+print("\n3. EVERY close is authorised, not just the operator's two")
+# Naming force_close and force_close_all covered two of the six closes that
+# reach the broker. The other four lived inside _loop — including the ordinary
+# strategy exit, which the comment beside it calls the path that runs far more
+# often than any gated one — and an enclosing-function check cannot see them:
+# _loop calls authorize_close somewhere, so every close inside it would pass
+# vacuously.
+#
+# So the check is per CALL SITE. Each close must have a gate, or the helper
+# that contains one, within the lines just above it.
+_LOOP_LINES = LOOP_SRC.splitlines()
+_closes = [n for n in ast.walk(loop_tree)
+           if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+           and n.func.attr == "close_position"]
+check(f"the close sites are still found ({len(_closes)})", len(_closes) >= 4,
+      "if this drops to zero the check below passes by finding nothing")
+for call in _closes:
+    fn = enclosing(loop_tree, call.lineno)
+    where = fn.name if fn else "<module>"
+    if where == "_authorized_close":
+        check(f"close_position at line {call.lineno} IS the gated helper", True)
+        continue
+    window = "\n".join(_LOOP_LINES[max(0, call.lineno - 46):call.lineno])
+    gated = ("authorize_close" in window) or ("_authorized_close" in window)
+    check(f"close_position at line {call.lineno} ({where}) clears a gate",
+          gated,
+          "a close that skips the gate skips ownership and idempotency: a "
+          "non-owning instance can close what the owner is managing, and a "
+          "timed-out close can be retried onto a position reopened since")
+
 for fname in ("force_close", "force_close_all"):
     fn = next((n for n in ast.walk(loop_tree)
                if isinstance(n, ast.FunctionDef) and n.name == fname), None)
@@ -109,6 +139,10 @@ for fname in ("force_close", "force_close_all"):
     check(f"{fname} clears authorize_close",
           bool(calls_named(fn, "authorize_close")),
           "an operator close still needs ownership and an idempotency claim")
+
+check("the loop's own closes go through one helper",
+      "_authorized_close" in LOOP_SRC,
+      "so a new close added to the loop inherits the gate by construction")
 
 print("\n4. LIVE is an activation — exactly one writer, and it is the gated one")
 writers = []
