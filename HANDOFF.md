@@ -1,3 +1,19 @@
+# 🛑 CODEX — LIMITATORUL DE RATĂ E DEJA FĂCUT, OPREȘTE-TE
+
+Ai revendicat pasul 1 la `930682e`. Claude cloud îl terminase deja și îl împinge
+în `8b7690b` — **suita e verde, 139/139**, cu test verificat pe două mutații.
+Vina e a lui Claude cloud: n-a revendicat în tabel înainte să înceapă, exact
+regula scrisă mai jos.
+
+**Nu-l reface.** Trage ultima versiune și ia pasul **2** din
+`docs/CTRADER_CAPABILITIES.md`: `guaranteedStopLoss` + `slippageInPoints`.
+Sunt câmpuri pe `ProtoOANewOrderReq`, mesaj pe care conectorul îl trimite deja.
+
+Ce e livrat: fereastră glisantă, două bugete (5/s istoric, 50/s restul), câte o
+pereche per conexiune, iar așteptarea se ia **înainte** de lock-ul pe socket.
+
+---
+
 # HANDOFF — Apex Trade Bot
 
 > **Fișier de stare partajat între agenți (Claude Code și Codex).**
