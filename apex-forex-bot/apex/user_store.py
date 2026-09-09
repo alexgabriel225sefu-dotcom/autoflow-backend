@@ -808,7 +808,50 @@ def clear_trades(user_id):
         print(f"[Store] clear_trades failed: {e}")
 
 
-def save_trades(user_id, trades):
+# The journal gets the same compare-and-set the user record has, for the same
+# reason and against a documented pair of writers: the trading loop appends a
+# closed trade, and an operator runs mark_journal_artefacts.py or
+# purge_bad_trades.py against a live account. Both read the whole list, change
+# it, and write it back. Whichever lands second wins outright and the other
+# row is gone — no error, no log line, nothing to notice.
+#
+# That is the same damage as the -$27,052 report, reached by losing a row
+# instead of trusting a bad one, and the journal is the one record a client
+# cannot reconstruct: the tax export reads it.
+#
+# Version lives in its own integer key, mirroring _LUA_SAVE_USER, so no JSON is
+# parsed inside Lua and the journal's version is independent of the record's.
+_LUA_SAVE_TRADES = """
+local expected = ARGV[2]
+if expected ~= '' then
+  local cur = redis.call('GET', KEYS[2])
+  if cur == false then cur = '0' end
+  if cur ~= expected then return -1 end
+end
+redis.call('SET', KEYS[1], ARGV[1])
+return redis.call('INCR', KEYS[2])
+"""
+
+
+def _tvkey(user_id):
+    return f"{_NS}:tver:{user_id}"
+
+
+def trades_version(user_id):
+    """The journal's current version, 0 when it has never been written."""
+    if not _USE_REDIS:
+        return 0
+    try:
+        return int(_redis_get(_tvkey(str(user_id))))
+    except (TypeError, ValueError):
+        return 0
+
+
+class TradeJournalConflict(Exception):
+    """The journal changed between the read and the write."""
+
+
+def save_trades(user_id, trades, expect_version=None):
     """Replace the whole closed-trade journal.
 
     Used by the backfill and by the artefact migration. Everything in the
@@ -830,7 +873,24 @@ def save_trades(user_id, trades):
         raise TypeError("save_trades expects a list of trade records")
     payload = json.dumps(trades[-500:])
     if _USE_REDIS:
-        return bool(_redis_set(f"{_NS}:trades:{user_id}", payload))
+        # expect_version=None keeps the old last-writer-wins behaviour, so the
+        # backfill and the migrations that pass nothing are unchanged. Only a
+        # caller that read a version is held to it.
+        res = _eval(_LUA_SAVE_TRADES,
+                    [f"{_NS}:trades:{user_id}", _tvkey(user_id)],
+                    [payload, "" if expect_version is None
+                     else str(int(expect_version))])
+        if res is None:
+            return False
+        try:
+            ok = int(res) != -1
+        except (TypeError, ValueError):
+            ok = False
+        if not ok:
+            raise TradeJournalConflict(
+                f"journal for {user_id} changed since it was read "
+                f"(expected v{expect_version}, now v{trades_version(user_id)})")
+        return True
     try:
         with open(_path(user_id) + ".trades", "w") as f:
             f.write(payload)
@@ -843,19 +903,33 @@ def save_trades(user_id, trades):
 def append_trade(user_id, record):
     """Append a closed-trade record to the user's tax journal (keeps last 500)."""
     user_id = str(user_id)
-    # RAW on purpose. This reads the journal, appends, and writes the whole
-    # list back — a filtering read would drop every marked row on the next
-    # closed trade, deleting the evidence the mark exists to preserve.
+    if _USE_REDIS:
+        # An append RETRIES a conflict rather than reporting it. A lost row is
+        # the failure being prevented, and the caller is the trading loop
+        # booking a trade that already happened at the broker — there is no
+        # useful thing for it to do with a refusal, and the record cannot be
+        # produced again.
+        for _attempt in range(5):
+            v = trades_version(user_id)
+            # RAW on purpose. A filtering read would drop every marked row on
+            # the next closed trade, deleting the evidence the mark exists to
+            # preserve.
+            trades = load_trades(user_id, include_artefacts=True)
+            trades.append(record)
+            try:
+                if save_trades(user_id, trades, expect_version=v):
+                    return
+            except TradeJournalConflict:
+                continue  # somebody else wrote; re-read and re-apply
+        print(f"[Store] append_trade for {user_id} lost 5 races — "
+              f"writing without a version check rather than dropping the trade")
+        save_trades(user_id, trades)
+        return
     trades = load_trades(user_id, include_artefacts=True)
     trades.append(record)
-    trades = trades[-500:]
-    payload = json.dumps(trades)
-    if _USE_REDIS:
-        _redis_set(f"{_NS}:trades:{user_id}", payload)
-        return
     try:
         with open(_path(user_id) + ".trades", "w") as f:
-            f.write(payload)
+            f.write(json.dumps(trades[-500:]))
     except Exception as e:
         print(f"[Store] append_trade failed: {e}")
 
