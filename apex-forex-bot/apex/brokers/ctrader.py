@@ -26,6 +26,7 @@ IMPORTANT: live order placement (volume scaling, fill handling) must be validate
 against a real cTrader demo account before being used with real money. Paper mode
 uses cTrader for DATA only and simulates fills locally, so it is safe to run now.
 """
+import collections
 import os
 import ssl
 import time
@@ -180,6 +181,79 @@ def _is_terminal_execution(evt):
 
 # ── Synchronous protobuf client ──────────────────────────────────────────────
 
+# cTrader rates every request against one of two budgets, and both are counted
+# PER CONNECTION — not per account, not per API key. Two clients sharing a
+# socket share the allowance, so the ceiling does not move when the business
+# grows; only the number of things competing for it does.
+#
+# The historical budget is the tight one. A single /report that walks a deal
+# history can spend it in under a second, and when it is gone the broker
+# refuses — the trading loop's next quote fails for a reason that has nothing
+# to do with trading. Waiting a few hundred milliseconds is always cheaper
+# than that.
+#
+# Anything that reads STORED history is charged to the small budget. The set
+# below is deliberately generous: classifying a cheap request as historical
+# only makes it slower, while the reverse overspends a budget the broker
+# enforces on our behalf.
+_HISTORICAL_REQUESTS = frozenset({
+    "ProtoOAGetTrendbarsReq",
+    "ProtoOAGetTickDataReq",
+    "ProtoOADealListReq",
+    "ProtoOADealListByPositionIdReq",
+    "ProtoOADealOffsetListReq",
+    "ProtoOAOrderListReq",
+    "ProtoOAOrderListByPositionIdReq",
+    # Cash-flow history is deliberately absent. tests/test_positioning_claims.py
+    # asserts this platform does not even READ it, so that "we cannot touch your
+    # money" is a structural fact rather than a promise. Listing it here would
+    # class a request that is never sent, and would break that guarantee's test
+    # for nothing.
+})
+
+_HIST_PER_SEC = float(os.getenv("CTRADER_HIST_RPS") or 5)
+_OTHER_PER_SEC = float(os.getenv("CTRADER_RPS") or 50)
+
+
+class _RateLimit:
+    """A sliding window: at most `allowance` acquisitions in any `per` seconds.
+
+    A window rather than a fixed gap, because the two are different promises.
+    A fixed 1/N gap would make five history calls take a full second even on a
+    connection that had been idle for an hour, which is a delay the broker
+    never asked for. A window spends the burst that is genuinely available and
+    only waits once the budget is actually gone.
+
+    The deque holds the timestamps still inside the window, so it is bounded by
+    `allowance` and never grows.
+    """
+
+    def __init__(self, allowance, per=1.0):
+        self._allowance = max(1, int(allowance))
+        self._per = float(per)
+        self._hits = collections.deque()
+        self._lock = threading.Lock()
+
+    def acquire(self):
+        """Block until this request fits in the budget. Returns seconds waited."""
+        waited = 0.0
+        while True:
+            with self._lock:
+                now = time.monotonic()
+                cutoff = now - self._per
+                while self._hits and self._hits[0] <= cutoff:
+                    self._hits.popleft()
+                if len(self._hits) < self._allowance:
+                    self._hits.append(now)
+                    return waited
+                # The oldest hit leaves the window first; that is the earliest
+                # moment a slot can exist.
+                sleep_for = self._hits[0] + self._per - now
+            sleep_for = min(max(sleep_for, 0.001), self._per)
+            time.sleep(sleep_for)
+            waited += sleep_for
+
+
 class _Conn:
     """One synchronous, authenticated TLS connection to a cTrader proxy.
 
@@ -197,6 +271,9 @@ class _Conn:
         self._mid = 0
         self._last_io = 0.0
         self._lock = threading.Lock()
+        # Per connection, because that is the unit the broker meters.
+        self._hist_limit = _RateLimit(_HIST_PER_SEC)
+        self._other_limit = _RateLimit(_OTHER_PER_SEC)
 
     # -- framing --------------------------------------------------------------
     def _send(self, msg):
@@ -281,6 +358,13 @@ class _Conn:
         raise TimeoutError(f"cTrader: no response for {res_cls.__name__}")
 
     def _request(self, req, res_cls, timeout=15, accept=None):
+        # Ahead of the lock: a thread waiting on the budget must not also be
+        # holding the socket, or one slow history call would stall every quote
+        # behind it for the whole wait.
+        limiter = (self._hist_limit
+                   if type(req).__name__ in _HISTORICAL_REQUESTS
+                   else self._other_limit)
+        limiter.acquire()
         with self._lock:
             cid = self._send(req)
             return self._await(cid, res_cls, timeout, accept=accept)

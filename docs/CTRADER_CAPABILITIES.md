@@ -63,12 +63,23 @@ Pragurile de margin call ale brokerului, și actualizarea lor.
 **De ce contează:** plasă de siguranță reală, verificabilă, pe care o poți
 afirma onest în marketing. Nu e o promisiune de profit — e o protecție.
 
-### `ProtoOACashFlowHistoryListReq` → `Res`
+### `ProtoOACashFlowHistoryListReq` → `Res` — ⚠️ INTERZIS DELIBERAT
 `fromTimestamp`, `toTimestamp`
-Depuneri, retrageri, **swap, comisioane**.
-**De ce contează:** fără el, P&L-ul e incomplet. Swap-ul peste noapte și
-comisioanele nu apar nicăieri în jurnal. Un client care își verifică cifrele
-față de extrasul brokerului va găsi diferențe.
+Depuneri, retrageri, swap, comisioane.
+
+**NU-L IMPLEMENTA fără decizia proprietarului.**
+`tests/test_positioning_claims.py` interzice explicit șirul `CashFlowHistory`
+oriunde în `apex/`, ca *„nu putem atinge banii tăi"* să fie un **fapt
+structural**, nu o promisiune: platforma nu doar că nu mută bani — nici măcar nu
+se uită la mișcările lor.
+
+**Tensiunea reală:** fără el, P&L-ul e incomplet — swap-ul peste noapte și
+comisioanele nu apar în jurnal, iar un client care compară cu extrasul
+brokerului va găsi diferențe.
+
+E un compromis de poziționare, nu unul tehnic: **contabilitate completă** contra
+**„nici nu ne uităm"**. Decide proprietarul. Dacă alege contabilitatea, testul
+de poziționare trebuie actualizat în același commit, cu motivul scris.
 
 ### `ProtoOASubscribeLiveTrendbarReq` → `Res`
 `period`, `symbolId`
@@ -163,14 +174,14 @@ Cu un utilizator merge din noroc. Nu e o funcționalitate de adăugat mai târzi
 
 | # | Ce | De ce acum |
 |---|---|---|
-| 1 | **Limitator de rată** | condiție de supraviețuire, blochează tot ce urmează |
+| 1 | ✅ **Limitator de rată** — LIVRAT | fereastră glisantă, per conexiune, două bugete |
 | 2 | **`guaranteedStopLoss` + `slippageInPoints`** | un câmp fiecare, cea mai mare valoare vizibilă |
 | 3 | **`trailingStopLoss` la broker** | scoate bucla `STOP_MOVED`; trailing-ul supraviețuiește repornirilor |
 | 4 | **`ProtoOAOrderListReq` în jurnal** | face vizibile ordinele respinse; închide clasa de bug USDCHF |
 | 5 | **`ProtoOAExpectedMarginReq`** înainte de fiecare ordin | prinde depășirile de risc înainte de intrare |
 | 6 | **`clientOrderId`** | idempotență la broker, peste cea din cod |
 | 7 | **Ordine în așteptare** (`LIMIT`/`STOP`) | schimbarea de arhitectură |
-| 8 | **`CashFlowHistoryList`** | P&L complet, cu swap și comisioane |
+| 8 | ~~`CashFlowHistoryList`~~ | **blocat de o garanție de produs** — vezi Partea 2. Decizie de poziționare, nu de inginerie. |
 
 Pașii 2–6 sunt câmpuri și cereri pe infrastructură care există deja. OAuth,
 protobuf, reconectarea și paginarea sunt scrise și testate.
