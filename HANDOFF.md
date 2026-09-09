@@ -73,7 +73,7 @@ o decizie și rezolvă tot la `full`.
 
 ---
 
-# 🔴 AUDIT 2026-09-07 — 7 CRITICE, împărțite pe zone
+# ✅ AUDIT 2026-09-07 — TOATE CELE 7 CRITICE REZOLVATE
 
 Audit complet al `apex-forex-bot/` (90 fișiere, 6 recenzori paraleli). Claude
 cloud a verificat 3 din 7 afirmații direct în cod — **toate trei reale**.
@@ -85,7 +85,7 @@ incendii de azi. Două ating contul chiar acum.
 | # | Constatare | Zonă | Cine |
 |---|---|---|---|
 | C1 | ✅ **REZOLVAT** — unealta de execuție scoasă, test cu mutație | `apex/assistant.py` | Claude cloud |
-| C2 | 🔵 **ÎN LUCRU — Claude cloud**, preluat: nimic livrat de Claude local #1 | `apex/user_loop.py` | Claude cloud |
+| C2 | ✅ **REZOLVAT** — toate cele 6 închideri sub poartă, `fc412af` | `apex/user_loop.py` | Claude cloud |
 | C3 | ✅ **REZOLVAT** — absent ≠ False; vezi avertismentul de deploy sus | `apex/automation.py` | Claude cloud |
 | C4 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
 | C5 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
