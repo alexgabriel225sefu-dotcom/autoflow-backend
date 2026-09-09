@@ -15,6 +15,19 @@
 
 ---
 
+# 📘 CE POATE FACE cTRADER — `docs/CTRADER_CAPABILITIES.md`
+
+Harta completă a API-ului, din introspecție directă a bibliotecii instalate.
+**40 de cereri disponibile, 15 folosite. 23 de câmpuri de ordin, 8 folosite.
+6 tipuri de ordine, 1 folosit.**
+
+Citește-o înainte să propui ceva pe partea de broker. Conține câmpurile exacte
+ale fiecărei cereri și ordinea de lucru recomandată. Prima poziție e
+**limitatorul de rată** — conectorul nu are niciunul, iar cTrader dă 5 cereri
+istorice/secundă per conexiune indiferent de câți clienți.
+
+---
+
 # ⚠️ ÎNAINTE DE URMĂTORUL DEPLOY — citește asta
 
 Fixul C3 schimbă comportamentul **contului tău**, nu doar al clienților viitori.
