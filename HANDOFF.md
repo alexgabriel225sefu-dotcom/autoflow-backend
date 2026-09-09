@@ -1,3 +1,63 @@
+# 🤝 PREDARE — Apex4Traders v2 (2026-09-09)
+
+**Ramura asta (`handoff/apex4traders-v2`) NU declanșează niciun deploy.**
+Verificat: toate cele trei servicii Render urmăresc exclusiv
+`claude/arcads-external-api-gExX7`, iar fiecare workflow GitHub listează ramuri
+explicite. Nimic nu prinde această ramură.
+
+**Nu s-a atins sistemul care tranzacționează.** Această ramură conține doar
+documente.
+
+## Ce declanșează ce — verificat, nu presupus
+
+| Ramură | Ce pornește la push |
+|---|---|
+| `claude/arcads-external-api-gExX7` | **Render × 2 (auto-deploy)** + backtest, docker-publish, railway-×4, tuning |
+| `claude/arcads-external-api-gexx7-6n4pr9` | doar `tests.yml` — CI, fără deploy |
+| `main` | `docker-publish.yml` — publică imagine Docker |
+| **`handoff/apex4traders-v2`** | **nimic** |
+
+## Bază
+
+Commit `1bea52568bf8c14ae09f17a3a911bc7e52f5dead` — identic cu arhiva
+`apex-platform-20260909.zip` analizată de Codex. Arborele de lucru era curat;
+**zero diferențe** față de versiunea analizată, deci constatările lui se
+aplică fără ajustare.
+
+## Arhitectura propusă
+
+**`docs/ARCHITECTURE_V2.md`** — straturi, ce reutilizăm / adaptăm / construim,
+cele cinci contracte, și constatările verificate în cod.
+
+## Împărțirea propusă — NU a început
+
+| Agent | Zonă |
+|---|---|
+| **Claude Code** | interfață și experiența de configurare |
+| **Codex** | motorul de reguli, validarea, testele |
+
+**Condiție de pornire:** cele cinci contracte din `ARCHITECTURE_V2.md §6`
+agreate. Până atunci nimeni nu scrie cod de platformă.
+
+## Conflict cu protocolul actual — de semnalat, nu de rezolvat unilateral
+
+`AGENTS.md` descrie ștafeta pe **o singură ramură partajată**, cu un agent
+activ o dată. Direcția nouă cere **ramuri separate, în paralel**. Sunt reguli
+diferite și nu am modificat `AGENTS.md` ca să pretind că schimbarea e aprobată.
+
+Propunerea, de confirmat de operator: ramuri separate pe zonă
+(`feat/rules-engine`, `feat/config-ui`), amândouă izolate de deploy,
+integrate prin PR. `AGENTS.md` se actualizează **după** confirmare.
+
+## Ce rămâne valabil din protocolul existent
+
+- `gates.authorize_order` / `authorize_close` rămân singurele porți spre broker.
+- Nu se modifică `PAPER_TRADING`, `CTRADER_ENV`, `BROKER`.
+- Testele în `tests/`, suita completă verde înainte de commit.
+- Nu se comută `EV_GATE_MODE` — decizia operatorului.
+
+---
+
 # 🛑 CODEX E INDISPONIBIL — cotă epuizată 2026-09-09 ~17:45 UTC
 
 Codex a lovit limita de utilizare în mijlocul task-ului („You've hit your usage
