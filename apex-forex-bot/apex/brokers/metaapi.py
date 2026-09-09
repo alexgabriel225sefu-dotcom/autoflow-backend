@@ -9,15 +9,26 @@ Set in Render env vars:
     METAAPI_ACCOUNT_ID=your_account_id_from_metaapi.cloud
     PAPER_TRADING=true    (or false for real orders)
 """
+import os
 import time
 import threading
 import requests
 from apex import config as cfg
 
+# This module is NOT reachable in this build. config._resolve_broker() refuses
+# BROKER=metaapi at import and apex.brokers._REGISTRY holds cTrader alone, so
+# get_broker() cannot load it either. It is kept because it has tests.
+#
+# Its setting lives here rather than in apex/config.py: a credential declared
+# in the production config reads like one the product still uses, and this one
+# configures an execution path that cannot run.
+AUTH_TOKEN = os.getenv("METAAPI_TOKEN", "")
+
+
 # MetaAPI REST endpoints (London region — lowest latency for EU accounts)
 _BASE = "https://mt-client-api-v1.london.agiliumtrade.ai"
 _HEADERS = lambda: {
-    "auth-token": cfg.METAAPI_TOKEN,
+    "auth-token": AUTH_TOKEN,
     "Content-Type": "application/json",
 }
 

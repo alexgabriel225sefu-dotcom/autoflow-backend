@@ -23,35 +23,35 @@ def _is_fx(s: str) -> bool:
 
 _METALS = {"XAU", "XAG", "XPT", "XPD"}   # gold, silver, platinum, palladium
 
-_CRYPTO = {"BTC", "ETH", "SOL", "XRP", "LTC", "BNB", "ADA", "DOT", "DOGE",
-           "LINK", "BCH", "AVAX", "MATIC", "UNI", "SHIB", "ATOM", "APT",
-           "ARB", "OP", "FIL", "NEAR", "ICP", "ALGO", "FTM", "SAND", "MANA"}
-
-
 def is_tradeable(instrument: str) -> bool:
-    """Whitelist for the FOREX bot: spot FX pairs and metals (XAU/XAG/XPT/XPD
-    quoted vs a fiat) ONLY. Rejects crypto CFDs (BTCUSD…), indices (US30…),
-    stocks and anything else a cTrader/Pepperstone account also lists. This is a
-    forex product — crypto has its own bot — and mixing them confuses clients
-    ("crypto intră peste forex"). Accepts EUR_USD / EURUSD / XAUUSD."""
+    """What this bot trades: spot FX with a USD leg, plus metals.
+
+    A positive allowlist, deliberately — not a list of things to block. The
+    accepted set is (_CCY x _CCY with a USD leg) plus (_METALS x _CCY), and
+    anything outside it is refused because it was never named, not because a
+    blocklist happened to remember it. That is why no list of coins exists
+    anywhere in this module: a symbol nobody allowed is already refused.
+
+    The notes below are therefore why each class is ABSENT from the allowlist,
+    not entries in a rejection table:
+
+      * INDICES, STOCKS, ETFs — they need per-exchange trading calendars that
+        do not exist here; the bot would believe Frankfurt is open at 03:00.
+      * FX CROSSES WITH NO USD LEG (GBP_JPY, EUR_GBP, AUD_CHF) — `calc_units`
+        needs a `quote_usd_rate` to value them and nothing passes one, so the
+        margin cap read one unit of GBP_JPY as $190 rather than its true
+        ~$1.21 and sized the position at about 1/31 of the intended risk.
+        docs/ASSETS.md states the rule: a risk calculation quietly off by 10x
+        is worse than a refused order.
+
+    Accepts EUR_USD / EURUSD / USD_JPY / XAUUSD.
+    """
     s = _norm(instrument)
     if len(s) != 6 or not s.isalpha():
         return False
     if _is_fx(s):
-        return True
+        return "USD" in (s[:3], s[3:])
     return s[:3] in _METALS and s[3:] in _CCY
-
-
-def is_crypto(instrument: str) -> bool:
-    """Whitelist for the CRYPTO bot: only crypto CFDs (BTCUSD, ETHUSD, etc.).
-    Rejects forex pairs, metals, indices, stocks."""
-    s = _norm(instrument)
-    if not s or len(s) < 4:
-        return False
-    for c in _CRYPTO:
-        if s.startswith(c):
-            return True
-    return False
 
 
 def pip_size(instrument: str, price: float = None) -> float:
@@ -59,10 +59,11 @@ def pip_size(instrument: str, price: float = None) -> float:
     /symbol, so this can't assume FX.
 
     Known conventions first (FX 0.0001 / JPY 0.01, gold 0.1, silver 0.01,
-    index points). Everything else (stocks, oil, gas, any crypto, exotic
-    CFDs) uses a magnitude rule when the price is known: 1 pip = 4 orders of
-    magnitude below the price (EURUSD 1.13→0.0001, USDJPY 150→0.01, gold
-    3350→0.1, US30 44k→1, BTC 104k→10) — the same convention, generalized."""
+    index points). Anything else uses a magnitude rule when the price is
+    known: 1 pip = 4 orders of magnitude below the price (EURUSD 1.13→0.0001,
+    USDJPY 150→0.01, gold 3350→0.1, US30 44k→1) — the same convention,
+    generalized. Nothing outside the allowlist can be traded, but /symbol lets
+    a client NAME anything, and a display path must not divide by zero."""
     s = _norm(instrument)
     if s.startswith("XAU"):
         return 0.1
@@ -79,9 +80,6 @@ def pip_size(instrument: str, price: float = None) -> float:
     if price and price > 0:
         import math
         return 10.0 ** (math.floor(math.log10(price)) - 4)
-    # No price context: coarse class guesses, then the FX default.
-    if s.startswith(("BTC", "ETH", "SOL", "XRP", "LTC", "BNB", "ADA", "DOG")):
-        return 1.0
     return 0.0001
 
 
@@ -91,7 +89,7 @@ def usd_exposure(instrument: str, side: str) -> int:
     are secretly the same macro bet (BUY EURUSD + BUY GBPUSD = both short USD)."""
     s = _norm(instrument)
     if not _is_fx(s) or "USD" not in s:
-        return 0  # non-FX (gold, indices, crypto) or non-USD cross → own bucket
+        return 0  # non-FX (metals, indices) or a cross without USD → own bucket
     if s.startswith("USD"):
         return 1 if side == "BUY" else -1     # BUY USDJPY = long USD
     if s.endswith("USD"):
@@ -100,12 +98,11 @@ def usd_exposure(instrument: str, side: str) -> int:
 
 
 def min_units(instrument: str):
-    """Order floor: 0.01 lot (1,000 units) for FX. For everything else
-    (crypto, metals, indices) 1 unit can be worth thousands (1 BTC ≈ $100k), so
-    the floor is a small FRACTION — otherwise a whole coin blows a small account
-    and risk-based sizing that lands below 1 unit would be forced up ~10×. The
-    broker's real per-symbol minimum/step is applied on top of this at order
-    time (see ctrader._vol_rules)."""
+    """Order floor: 0.01 lot (1,000 units) for FX. For metals one unit is one
+    ounce and can be worth thousands, so the floor is a small FRACTION —
+    otherwise risk-based sizing that lands below 1 unit would be forced up
+    ~10x on a small account. The broker's real per-symbol minimum/step is
+    applied on top of this at order time (see ctrader._vol_rules)."""
     s = _norm(instrument)
     return 1000 if (_is_fx(s) or s.endswith("JPY")) else 0.01
 
@@ -123,9 +120,9 @@ def safe_min_units(instrument: str, balance: float, price: float,
 
 
 def round_units(units: float, instrument: str):
-    """FX trades in whole units (thousands); crypto/metals/indices allow
-    fractional lots, so keep 2 decimals instead of truncating to int (which
-    zeroed out any sub-1-unit size like 0.34 BTC)."""
+    """FX trades in whole units (thousands); metals allow fractional size, so
+    keep 2 decimals instead of truncating to int — which zeroed out any
+    sub-1-unit size, e.g. 0.34 oz of gold."""
     s = _norm(instrument)
     if _is_fx(s) or s.endswith("JPY"):
         return int(units)
@@ -133,7 +130,7 @@ def round_units(units: float, instrument: str):
 
 
 def lots_to_units(lots: float, instrument: str) -> float:
-    """Convert lot size to units: FX 1 lot = 100,000 units; crypto/metals = units directly."""
+    """Convert lot size to units: FX 1 lot = 100,000 units; metals = units directly."""
     s = _norm(instrument)
     if _is_fx(s) or s.endswith("JPY"):
         return lots * 100_000
@@ -143,8 +140,8 @@ def lots_to_units(lots: float, instrument: str) -> float:
 def unit_label(instrument: str) -> str:
     """Human label for a manual-trade size, matching what lots_to_units actually
     does: 'lot' for FX (100,000 units each), 'oz' for metals, 'unit' for
-    everything else (crypto coins, index contracts) — those pass straight
-    through as raw quantities, not classic 100-unit-style lots."""
+    anything else a client names — those pass straight through as raw
+    quantities, not classic 100-unit-style lots."""
     s = _norm(instrument)
     if _is_fx(s) or s.endswith("JPY"):
         return "lot"
@@ -176,8 +173,8 @@ def pip_value_per_unit(instrument: str, price: float,
     instrument = instrument.upper()
     s = instrument.replace("_", "").replace("/", "").replace("-", "")
     ps = pip_size(instrument, price)
-    # USD-quoted: FX ending in USD, plus metals/indices/crypto CFDs (all
-    # priced in USD at cTrader brokers) → 1 pip on 1 unit = pip size in USD.
+    # USD-quoted: FX ending in USD, plus metals (priced in USD at cTrader
+    # brokers) → 1 pip on 1 unit = pip size in USD.
     if s.endswith("USD") or ps >= 0.01 and not s.endswith("JPY"):
         return ps
     if s.startswith("USD"):
@@ -211,15 +208,67 @@ def calc_units(balance: float, risk_pct: float, stop_pips: float,
     if sN.startswith("USD") and not sN.endswith("USD"):
         notional_per_unit = 1.0
     elif sN.endswith("USD") or (pip_size(inst, price) >= 0.01 and not sN.endswith("JPY")):
-        notional_per_unit = price  # USD-quoted FX + metals/indices/crypto CFDs
+        notional_per_unit = price  # USD-quoted FX and metals
     elif quote_usd_rate and quote_usd_rate > 0:
         notional_per_unit = price * quote_usd_rate
     else:
         notional_per_unit = price  # fallback conservator — supraestimează marja
     max_units = (balance * leverage * margin_cap) / notional_per_unit
     # Keep the fractional size — callers round per instrument (round_units).
-    # int() here silently zeroed crypto sizes below 1 unit (0.34 BTC → 0).
+    # int() here silently zeroed any sub-1-unit size (0.34 oz of gold → 0).
     return max(0.0, min(units, max_units))
+
+
+
+def floor_risk_at(units: float, instrument: str, price: float,
+                  stop_pips: float) -> float:
+    """What taking `units` actually loses if the stop is hit, in dollars."""
+    if not stop_pips:
+        return 0.0
+    return abs(units) * pip_value_per_unit(instrument, price) * abs(stop_pips)
+
+
+def floor_risk_ok(units: float, instrument: str, price: float,
+                  stop_pips: float, risk_budget_usd: float,
+                  hard_ceiling_usd: float = None,
+                  tolerance: float = 0.10) -> bool:
+    """Is it acceptable to take `units`, given the broker's minimum lot?
+
+    TWO different limits, and conflating them was the mistake here.
+
+    RISK_PER_TRADE is a SIZING TARGET. It says how big a position to compute,
+    not how big a position the account may ever hold. The hard limits are the
+    ones the client set as limits: MAX_DAILY_LOSS_PCT and MAX_DD_PCT.
+
+    That distinction matters because a broker minimum is not negotiable. Gold
+    at this broker is 1 oz minimum; 0.5% of $3,221 over a $48 ATR stop is
+    0.33 oz. There is no size that both clears the minimum and hits the
+    target — the only ways to "fix" it are a tighter stop (a $16 stop on an
+    instrument with a $19 ATR is inside the noise and would be stopped out for
+    nothing) or refusing gold entirely. Refusing was this function's first
+    answer, and it was wrong: 1 oz risks 1.49% of that account against a 4%
+    daily-loss limit the client themselves set. That is a trade they can
+    plainly afford.
+
+    What was ACTUALLY wrong with the original `max(units, floor)` was not that
+    it exceeded the target — it was that it did so SILENTLY and WITHOUT BOUND.
+    On a small enough account or a wide enough stop it could be 10x or 50x,
+    and nothing anywhere said so.
+
+    So: exceeding the target is allowed, exceeding `hard_ceiling_usd` is not,
+    and the caller discloses whenever it happens. With no ceiling given the
+    target is the only limit, which keeps every existing caller strict.
+
+    `tolerance` absorbs ordinary lot-step rounding.
+    """
+    if not risk_budget_usd or risk_budget_usd <= 0 or not stop_pips:
+        return True
+    loss = floor_risk_at(units, instrument, price, stop_pips)
+    if loss <= risk_budget_usd * (1.0 + tolerance):
+        return True
+    if hard_ceiling_usd and hard_ceiling_usd > 0:
+        return loss <= hard_ceiling_usd
+    return False
 
 
 def required_margin(units: int, instrument: str, price: float, leverage: float = 30) -> float:
@@ -236,15 +285,7 @@ def pnl_usd(side: str, entry: float, exit_price: float, units: int, instrument: 
 
 
 def is_market_open(now: datetime = None) -> bool:
-    """Forex trades 24/5: opens Sunday 21:00 UTC, closes Friday 21:00 UTC.
-    Crypto trades 24/7 — when the build is configured for crypto (MARKET_24_7),
-    the market is always open."""
-    try:
-        from apex import config as _cfg
-        if getattr(_cfg, "MARKET_24_7", False):
-            return True
-    except Exception:
-        pass
+    """Forex trades 24/5: opens Sunday 21:00 UTC, closes Friday 21:00 UTC."""
     now = now or datetime.now(timezone.utc)
     wd, hour = now.weekday(), now.hour  # Mon=0 … Sun=6
     if wd == 5:                        # Saturday

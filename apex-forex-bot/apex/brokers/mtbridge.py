@@ -23,9 +23,20 @@ Response:
     CMD=42|OPEN|BUY|0.12|1.08350|1.08800   id|action|side|lots|sl|tp
     CMD=43|CLOSE
 """
+import os
 import time
 import threading
 from apex import config as cfg
+
+# This module is NOT reachable in this build. config._resolve_broker() refuses
+# BROKER=mt at import and apex.brokers._REGISTRY holds cTrader alone, so
+# get_broker() cannot load it either. It is kept because it has tests.
+#
+# Its setting lives here rather than in apex/config.py: a credential declared
+# in the production config reads like one the product still uses, and this one
+# configures an execution path that cannot run.
+BRIDGE_SECRET = os.getenv("MT_BRIDGE_SECRET", "")
+
 
 STALE_AFTER = 90          # seconds without a sync → bridge considered offline
 UNITS_PER_LOT = 100_000
@@ -74,7 +85,7 @@ def handle_sync(body: str) -> tuple:
         else:
             fields[key] = val
 
-    if not cfg.MT_BRIDGE_SECRET or fields.get("SECRET") != cfg.MT_BRIDGE_SECRET:
+    if not BRIDGE_SECRET or fields.get("SECRET") != BRIDGE_SECRET:
         return 403, "ERR=bad secret"
 
     with _lock:

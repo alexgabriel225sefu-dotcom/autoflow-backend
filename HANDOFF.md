@@ -1,91 +1,327 @@
-# HANDOFF — Apex Trade Bot (context for continuing in a new session)
+# 🛑 CODEX E INDISPONIBIL — cotă epuizată 2026-09-09 ~17:45 UTC
 
-> ## 🛑 FIRST THING, BEFORE ANYTHING ELSE
-> **Run `git checkout claude/arcads-external-api-gExX7` immediately.**
-> ALL of our work (cTrader, copilot, Market Pulse, news, legal, lead funnel — 1000+
-> commits) lives ONLY on that branch. `main` is OLD and diverged: it still has
-> OANDA, has NO cTrader, and does NOT even contain this file. If you are reading
-> stale code (OANDA-only, no `/ctrader`, no `apex/market.py`), you are on the wrong
-> branch — switch now. Render deploys from `claude/arcads-external-api-gExX7`
-> (confirmed live via `/api/health` → `sale_ready:true`). Never work on `main`.
->
-> After switching branches, read the rest of this file. It carries the
-> **conversation** context (decisions, pending work, current bug) that isn't in code.
+Codex a lovit limita de utilizare în mijlocul task-ului („You've hit your usage
+limit"). Are ~158 de linii **necomise** pe laptop, care dublează limitatorul de
+rată deja livrat în `2d1517c`. **Nu se împing** — versiunea de pe branch e
+verde, 139/139, verificată pe două mutații.
 
-## What this project is
-- **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, Romania).
-- Two Telegram trading bots sold as one-time licenses + a sales site + affiliate program.
-  - `apex-crypto-bot/` — Python, Binance, **$297** crypto bot.
-  - `apex-forex-bot/` — Python, **$497** forex bot.
+Zona `apex/brokers/` e liberă. **Claude cloud o preia** și continuă cu pasul 2
+din `docs/CTRADER_CAPABILITIES.md`: `guaranteedStopLoss` + `slippageInPoints`.
 
-> **⚠️ BROKER — read this, don't get confused:** the forex bot uses **cTrader**
-> (the owner's cTrader account is hosted at **Pepperstone** — Pepperstone is just
-> the broker where the cTrader account lives, NOT a separate integration). The bot
-> connects via the **cTrader Open API** (`apex/brokers/ctrader.py`, `/ctrader`
-> onboarding). **OANDA is a LEGACY option still in the code and defaults/help text,
-> but it is NOT used** — do not "fix" the bot toward OANDA. `_make_broker()` picks
-> the broker per-user: cTrader token present → cTrader; else OANDA token → OANDA;
-> else paper → Yahoo. The owner trades via cTrader/Pepperstone. (Cleaning the
-> stale OANDA-worded defaults/help to say cTrader is a nice-to-do, not urgent.)
+---
 
-  - `server.js` + `public/` — Node sales site, Digistore24 checkout/IPN, license delivery, affiliate API.
-  - Affiliates are recruited via the Digistore24 marketplace (30% commission) — no in-house affiliate bot.
+# 🛑 CODEX — LIMITATORUL DE RATĂ E DEJA FĂCUT, OPREȘTE-TE
 
-## Render services (deploys from the working branch)
-- `autoflow-backend` — the Node site (`server.js`). `/api/health` → `sale_ready:true`.
-- `autoflow-backend-2` — the **forex** bot (Python). Callback: `/api/ctrader/callback`.
-- (crypto bot + affiliate bot are the other Python services.)
-- Free tier: ~3 weeks/month uptime, suspends late-month, auto-resumes on the 1st.
+Ai revendicat pasul 1 la `930682e`. Claude cloud îl terminase deja și îl împinge
+în `8b7690b` — **suita e verde, 139/139**, cu test verificat pe două mutații.
+Vina e a lui Claude cloud: n-a revendicat în tabel înainte să înceapă, exact
+regula scrisă mai jos.
 
-## What is BUILT & live (all committed + tested)
-- **Legal**: EU Art.16(m) withdrawal waiver at checkout + terms + emails; no-refund; cookie banner; refund/chargeback → license revoked.
-- **Security**: payment-authoritative `/verify-license`; `/api/health` diagnostic.
-- **Client onboarding** (both bots): welcome, Binance referral link, paper vs real, per-user AI keys (Groq/Gemini/Claude), any-coin/any-pair.
-- **cTrader integration** (forex): OAuth onboarding (`/ctrader`, `/ctaccount`), sync protobuf connector, `_make_broker` wiring. OAuth hardened (query-param token exchange + `state` fallback). Scope configurable via `CTRADER_SCOPE`.
-- **10 "copilot" features** (both bots): per-trade explanations in alerts; copilot mode (`/copilot on|off`, approve/reject buttons); smart "don't-trade" alerts; volatility-aware sizing (crypto); news guard + `/news`; flash-crash breaker.
-- **Market Pulse** (`/market`): crypto = volatility/volume/trend/momentum + funding/long-short (Binance futures); forex = same + **session awareness** (Sydney/Tokyo/London/NY from UTC clock).
-- **News**: FMP economic calendar support (set `NEWS_API_KEY`); default Forex Factory feed is blocked on Render datacenter IPs.
-- **Marketing**: `public/promo.html` — on-brand animated 9:16 promo (bg `#060608`, red `#ff2d4f`, Clash Display + JetBrains Mono). Affiliate recruitment DMs + UGC scripts written (in chat history).
-- **Lead funnel** (`public/free.html` + `POST /api/lead`): cold-DM traffic → free offer → email capture → shows promo → buy CTA. Preserves affiliate ref. **Owner's plan: send ~10k DMs pointing to `aicashsystem.space/free`** (NOT the $297 page directly).
-  - To actually STORE leads, create the Supabase table (endpoint is fail-soft without it):
-    ```sql
-    create table if not exists leads (
-      id bigserial primary key, email text not null,
-      ref text, source text default 'free',
-      created_at timestamptz default now()
-    );
-    ```
+**Nu-l reface.** Trage ultima versiune și ia pasul **2** din
+`docs/CTRADER_CAPABILITIES.md`: `guaranteedStopLoss` + `slippageInPoints`.
+Sunt câmpuri pe `ProtoOANewOrderReq`, mesaj pe care conectorul îl trimite deja.
 
-## PENDING / IN PROGRESS
-1. **🔴 CURRENT BUG (unresolved): forex bot "stays in place" / repeats errors.**
-   Suspected cause: the **news-feed fetch blocks the loop** — `news._load()` does a
-   `requests.get(timeout=10)` to a host that may hang (not fast-403), freezing the
-   tick for up to 10s every 30 min. Proposed fix (not yet applied): lower timeout,
-   move the feed fetch to a background thread so it NEVER blocks the loop, add
-   back-off on repeated failures. **Get the exact error first if possible.**
-   Files: `apex-*/apex/news.py`, `apex-*/apex/user_loop.py`.
-2. **cTrader KYC**: app status **"Submitted"** (~3 business days to "Active"). Trading
-   scope needs "Active". For now set `CTRADER_SCOPE=accounts` (paper works on read-only
-   data). When Active → `CTRADER_SCOPE=trading` for live orders. Then test `/ctrader`.
-   Client ID/Secret already created at openapi.ctrader.com (owner has them).
-   Redirect URI: `https://autoflow-backend-2.onrender.com/api/ctrader/callback`.
-3. **`session_secrets:false`** on `/api/health` → set `JWT_SECRET` on `autoflow-backend`
-   (affects affiliate login only, not sales).
-4. **News real data**: set `NEWS_API_KEY` (free FinancialModelingPrep key) on both bots.
+Ce e livrat: fereastră glisantă, două bugete (5/s istoric, 50/s restul), câte o
+pereche per conexiune, iar așteptarea se ia **înainte** de lock-ul pe socket.
 
-## Env vars to set (Render)
-- forex bot (`autoflow-backend-2`): `CTRADER_CLIENT_ID`, `CTRADER_CLIENT_SECRET`,
+---
+
+# HANDOFF — Apex Trade Bot
+
+> **Fișier de stare partajat între agenți (Claude Code și Codex).**
+> Se citește la începutul fiecărei sesiuni și se actualizează la sfârșit.
+> Protocolul de ștafetă e în `AGENTS.md`.
+
+---
+
+# STARE CURENTĂ
+
+**Ultima actualizare:** 2026-09-07
+**Branch de lucru:** `claude/arcads-external-api-gexx7-6n4pr9`
+**Teste:** suita completă `python apex-forex-bot/tests/run_all.py` e verde
+(fus orar rezolvat de Claude cloud; a se reverifica numărul exact după acest merge).
+
+---
+
+# 📘 CE POATE FACE cTRADER — `docs/CTRADER_CAPABILITIES.md`
+
+Harta completă a API-ului, din introspecție directă a bibliotecii instalate.
+**40 de cereri disponibile, 15 folosite. 23 de câmpuri de ordin, 8 folosite.
+6 tipuri de ordine, 1 folosit.**
+
+Citește-o înainte să propui ceva pe partea de broker. Conține câmpurile exacte
+ale fiecărei cereri și ordinea de lucru recomandată. Prima poziție e
+**limitatorul de rată** — conectorul nu are niciunul, iar cTrader dă 5 cereri
+istorice/secundă per conexiune indiferent de câți clienți.
+
+---
+
+# ⚠️ ÎNAINTE DE URMĂTORUL DEPLOY — citește asta
+
+Fixul C3 schimbă comportamentul **contului tău**, nu doar al clienților viitori.
+
+`automation.mode()` întorcea `"full"` când nu era setat niciun câmp. Contul
+proprietarului (7585109158) **nu are nici `automation`, nici `copilot`** — deci
+rula pe `full` prin exact acest fallback. După deploy va rula pe `approval`:
+botul va cere aprobare pentru fiecare intrare în loc să deschidă singur.
+
+**O singură comandă îl aduce înapoi:** `/automation full` în Telegram.
+Dă-o după deploy, altfel botul pare că „s-a oprit din tranzacționat".
+
+Conturile care au `copilot` setat explicit nu sunt afectate — `False` rămâne
+o decizie și rezolvă tot la `full`.
+
+---
+
+# ✅ AUDIT 2026-09-07 — TOATE CELE 7 CRITICE REZOLVATE
+
+Audit complet al `apex-forex-bot/` (90 fișiere, 6 recenzori paraleli). Claude
+cloud a verificat 3 din 7 afirmații direct în cod — **toate trei reale**.
+
+**Context care schimbă urgența:** există **un singur utilizator (proprietarul),
+pe cont demo**. Șase din șapte sunt blocaje **înainte de primul client**, nu
+incendii de azi. Două ating contul chiar acum.
+
+| # | Constatare | Zonă | Cine |
+|---|---|---|---|
+| C1 | ✅ **REZOLVAT** — unealta de execuție scoasă, test cu mutație | `apex/assistant.py` | Claude cloud |
+| C2 | ✅ **REZOLVAT** — toate cele 6 închideri sub poartă, `fc412af` | `apex/user_loop.py` | Claude cloud |
+| C3 | ✅ **REZOLVAT** — absent ≠ False; vezi avertismentul de deploy sus | `apex/automation.py` | Claude cloud |
+| C4 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
+| C5 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
+| C6 | ✅ **REZOLVAT** — CAS pe jurnal, append reîncearcă, `3b26cab` | `apex/user_store.py` | Claude cloud |
+| C7 | ✅ **REZOLVAT** — revalidare din watchdog, `0ac4998` | `apex/user_loop.py` | Claude cloud |
+| M4 | ✅ **REZOLVAT** — o literă | `apex/dashboard.py` | Claude cloud |
+
+**Regula rămâne: nu ieși din zona ta.** Rulează suita înainte de commit (136/136).
+
+## C4 + C5 — Codex, `apex/brokers/ctrader.py`
+
+Sunt aceeași familie cu ce ai reparat deja în `place_order` (98d7705) — dar pe
+calea de **închidere**, nu de deschidere.
+
+**C5 — `ctrader.py:1093-1100`, fail-closed.** După un amend de stop eșuat,
+codul recitește poziția ca să verifice că stopul chiar există. Dacă acea
+recitire aruncă excepție (socket, reconectare — exact ce descriu comentariile
+din modul), se setează `protected = True`, adică *„n-am putut verifica, deci
+presupun că e bine"*. Ramura de panic-close și statusul `UNPROTECTED` nu mai
+rulează niciodată. Rezultat: poziție reală, fără stop loss, raportată ca
+`FILLED` normal.
+**Fix:** implicit `protected = False` la excepție. Necunoscut ≠ protejat.
+
+**C4 — `close_position()` vs `place_order()`.** `place_order` așteaptă
+evenimentul **terminal** — comentariul lui explică de ce: un singur ordin
+produce mai multe frame-uri, iar primul nu poartă confirmare de execuție.
+`close_position` trimite cererea și acceptă **primul frame sosit**, fără să
+verifice `errorCode` sau tipul execuției. Dacă primul frame e doar o
+confirmare de primire, codul cade pe ramura „fără fill", cere o cotație
+proaspătă și raportează `FILLED` oricum.
+**Fix:** aceeași așteptare terminală și aceeași verificare de eroare pe care
+le are deja `place_order`. Refolosește `_is_terminal_execution`.
+**Scenariu:** brokerul respinge închiderea pe un frame ulterior, care nu mai e
+citit niciodată. Poziția rămâne deschisă la broker în timp ce toate evidențele
+interne spun „flat", cu un preț de ieșire inventat.
+
+Ambele au nevoie de test în `tests/` (nu în `apex/brokers/`).
+
+
+# 🔴 CINE CE LUCREAZĂ ACUM (actualizat 2026-09-07)
+
+Agenții lucrează **în paralel**, pe zone care nu se ating. Nu ieși din zona ta.
+
+> **Notă:** Codex rulează în aplicația **Codex Desktop**, separat de VS Code —
+> nu în panourile Claude. Trebuie să i se deschidă proiectul ca „local project"
+> (folderul `proiect-codex`), altfel stă într-un folder gol.
+Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi lucrează.
+
+| Agent | Zona lui — NUMAI aici | Task |
+|---|---|---|
+| **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
+| ~~Claude local #2~~ | ✅ TERMINAT | ~~Fix fus orar~~ — preluat și livrat de Claude cloud (nu fusese început) |
+| **Codex Desktop** | `apex-forex-bot/apex/brokers/` | ✅ C4+C5 terminate (`6d75bdb`) — acum: **Pasul 1 din ORDINEA DE LUCRU RECOMANDATĂ** (limitator de rată cTrader, `docs/CTRADER_CAPABILITIES.md`) |
+| **Claude local #1** (VS Code) | `apex-forex-bot/apex/user_loop.py` | **C2** — 3 din 6 închideri ocolesc `gates.authorize_close` (linii ~2790/3210/4684) |
+
+**Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
+întreabă operatorul. Nu rezolva conflicte peste munca altui agent.
+
+## Detaliile task-urilor
+
+### ✅ Fus orar — REZOLVAT
+`_ts()` din `scripts/backfill_trades.py` parsează acum explicit UTC
+(`.replace(tzinfo=timezone.utc)`). Verificat: testul trece și pe
+`TZ=Europe/Bucharest`, și pe `TZ=UTC`. Suita nu mai e roșie pe mașinile din
+România.
+
+**Rămas nereparat, intenționat:** `apex/cot.py:217` folosește `time.mktime`,
+tot oră locală. Aceeași clasă de bug, dar rezultatul e vechimea unui raport
+în zile, rotunjită la o zecimală, pentru rapoarte săptămânale — un decalaj de
+3h înseamnă 0,125 zile. Imaterial, și nu există test care să acopere modulul,
+deci o schimbare acolo ar fi mai riscantă decât artefactul de rotunjire.
+
+### Codex — ✅ CORECTAT în 98d7705 (verificat de Claude cloud)
+
+Diagnosticul a fost corect și suita e verde (135/135), dar două lucruri:
+
+**1. Testul nu rulează niciodată.**
+`apex/brokers/test_ctrader_order_failures.py` nu e în `tests/`, deci `run_all.py`
+nu-l vede — numărul a rămas 135, neschimbat. Rulat singur pică cu
+`ModuleNotFoundError: No module named 'apex'`, fiindcă doar `tests/conftest.py`
+pregătește calea. Cu `PYTHONPATH=.` trece, deci logica e bună — dar testul e
+mort și nu va prinde nicio regresie. **Mută-l în `tests/`.**
+
+**2. Compromis de siguranță neanunțat — bani reali în joc.**
+`_is_terminal_execution` a fost inversat: tip necunoscut însemna „acceptă",
+acum înseamnă „așteaptă, apoi ridică excepție". Asta chiar repară eșecul tăcut.
+
+Dar `place_order` atașează stop loss-ul **după** fill. Deci dacă un ordin
+**chiar se execută** cu un tip de execuție pe care protobuf-ul instalat nu-l
+recunoaște (ex. cTrader adaugă un enum nou), codul nou ridică excepție
+**înainte** să ajungă la atașarea stopului → **poziție deschisă la broker,
+fără stop loss**, iar botul crede că ordinul a eșuat.
+
+| | Eșec vechi | Eșec nou |
+|---|---|---|
+| Ce se întâmplă | poziție inexistentă, botul crede că există | poziție reală, botul crede că nu există |
+| Risc | enervant | **poziție neprotejată, fără stop** |
+
+Ordinea corectă: la lipsă de confirmare, **întâi verifică dacă există poziție**
+(`get_open_position`, cu retry — codul are deja bucla asta mai jos). Dacă
+există → atașează stopul, nu ridica excepție. Ridică excepție **doar** dacă
+brokerul chiar nu are nicio poziție.
+
+### Codex — ordine trimise în gol
+Pe 6 sept, două ordine SELL USDCHF au fost autorizate și trimise la 21:06:51 și
+21:12:46 UTC (identice: 23.063 unități, SL 0.812953, TP 0.804095). În log apare
+`order` + `AUTHORIZED` pentru amândouă, dar **niciun eveniment `trade`** după,
+și poziția nu apare la broker. Nicio eroare logată.
+
+Comparație — un ordin reușit arată așa (USDCAD, 21:35):
+`order` → `AUTHORIZED` → ~10s → `trade  BUY USDCAD price=1.38376`.
+La USDCHF, al treilea pas lipsește de două ori.
+
+Caută în `apex/brokers/ctrader.py`, `place_order()` (linia ~978): ce se întâmplă
+când brokerul respinge sau nu confirmă execuția? Se înghite excepția? Se ignoră
+un cod de eroare? Un ordin care eșuează trebuie să lase urmă în log.
+**Zona ta: `apex/brokers/` — atât.** Nu atinge `user_loop.py` sau `scripts/`.
+
+### Claude local — contorul zilnic ✅ REZOLVAT (2026-09-07)
+**Cauza:** nici una din cele două ipoteze — resetarea (`_reset_daily_if_needed`,
+apelată din `should_stop()`) SE declanșează la fiecare tick, dar nu se persista
+NICIODATĂ pe disc (doar `record_trade()` scria sesiunea, ca efect secundar).
+`record_trade()` rulează ÎNAINTEA lui `should_stop()` în 6 din 9 puncte din
+`user_loop.py` (liniile 1880/2249/2761/2825/3043/3272 vs. 3493) — o poziție
+închisă devreme într-un tick, imediat după un restart, incrementa și persista
+contorul ZILEI ANTERIOARE în loc să pornească ziua nouă de la 1. Exact tabloul
+raportat: `dailyTrades: 5, lastResetDay:` trei zile în urmă.
+
+**Fix** (`apex/strategies.py`, ~30 linii, fără atingere `public/` sau `scripts/`):
+1. Reset-ul persistă imediat (`_persist_session` chemat din interiorul reset-ului).
+2. `record_trade()` face rollover-ul ZILEI ÎNAINTE de a incrementa — nu mai
+   depinde de ordinea apelurilor din tick.
+3. `get_session()` face rollover chiar la încărcare — un cititor care nu trece
+   niciodată prin `should_stop()`/`record_trade()` (dashboard-ul, `/report`)
+   nu mai vede contorul zilei precedente imediat după un restart.
+
+**Test nou:** `tests/test_daily_reset_persist.py` (RED pe codul vechi, GREEN
+după fix). `test_strategies.py` și `test_loss_streak_rollover.py` — fără
+regresii. Suita completă: 134/135 (singurul eșec e bug-ul de fus orar al lui
+Codex, neatins).
+
+**Următorul pas, dacă preiei aici:** niciunul — task-ul e închis. Zona e liberă
+pentru un task nou.
+
+### Claude cloud — limbajul
+`public/ad.html` conține cifre **inventate** prezentate ca rezultate
+(`+$191.80`, „30-Day Results", citat „+$284") și perechi crypto care nu mai
+sunt produsul. Risc de chargeback și de închidere Digistore24. Se rescrie pe
+execuție/control al riscului, fără promisiuni de performanță.
+
+
+## Ce s-a terminat recent
+
+Analiza jurnalului a găsit de ce pierdea botul și de unde venea `-27k`:
+
+- **Artefacte în jurnal.** 4 rânduri din 2026-08-19 cu `balance: 470.586` (unul pe
+  `US400`, index pe care platforma nici nu-l poate tranzacționa) însumând
+  **-26.586**, plus XAUUSD **-779,74** pe un cont de 3.002 (26% din cont, față de
+  o limită de 2,5%). **Istoricul real: 71 trade-uri, +264,16, 45,1% win, R 1:1,60, PF 1,35.**
+- **Cauzele pierderilor (94% explicat):** fibonacci în regim `trending`
+  (5 trade-uri, **-202,37**) și poziții ținute peste NFP (2 trade-uri, **-116,67**).
+- **Patru remedii livrate 2026-09-04:** `REGIME_GATE` (default `enforce` în cod),
+  `NEWS_EXIT_MIN=15` (default în cod), `MIN_EXIT_R` și `INSTITUTIONAL_GATE`
+  (setate prin env pe Render — verifică valorile acolo, defaults în cod sunt
+  `1.0` respectiv `shadow`).
+
+## 🔴 URMĂTORUL PAS — nefăcut
+
+1. **`/markartefacts` NU a fost rulat încă.** Jurnalul arată în continuare 84 de
+   rânduri, iar `/report` îi spune clientului **-$27.052**, cifră falsă.
+   Comanda trebuie tastată de proprietarul contului (e în `_MSG_DENY`), din
+   Telegram. Scriptul echivalent: `apex-forex-bot/scripts/mark_journal_artefacts.py`
+   (dry-run implicit, `--apply` scrie, e idempotent).
+2. **Verifică datele de luni.** Cele patru remedii au prins doar ~6 ore de piață
+   deschisă vineri 2026-09-04. Fără o săptămână de date, nu se poate spune dacă
+   au funcționat.
+3. **`git fetch --unshallow`** în clonele locale — clonă shallow strică `git log`
+   ca mecanism de transfer de context între agenți.
+
+## Mediu local (laptop Windows)
+
+`pip install -r requirements.txt` eșuează pe Python 3.14: **`twisted-iocpsupport`**
+(dependință a `ctrader-open-api`) nu publică wheel pentru 3.14 pe Windows, deci
+cere compilator C++. Soluție: **Python 3.11 sau 3.12**, unde există wheel
+precompilat. Alternativ, Visual Studio Build Tools cu workload C++.
+
+---
+
+# CONTEXT PERMANENT
+
+## Ce e proiectul
+- **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, România).
+- Bot de trading Telegram vândut ca licență one-time + site de vânzări + program de afiliere.
+  - `apex-forex-bot/` — Python, bot forex **$497**.
+  - `server.js` + `public/` — site Node, checkout/IPN Digistore24, livrare licențe, API afiliere.
+  - Afiliații se recrutează prin marketplace-ul Digistore24 (30% comision).
+
+> **⚠️ BROKER:** botul forex folosește **cTrader** (contul e găzduit la
+> **Pepperstone** — Pepperstone e doar brokerul unde stă contul cTrader, NU o
+> integrare separată). Conectarea se face prin **cTrader Open API**
+> (`apex/brokers/ctrader.py`, onboarding `/ctrader`). **OANDA e opțiune LEGACY
+> rămasă în cod și în textele default, dar NU se folosește** — nu "repara" botul
+> spre OANDA. `_make_broker()` alege brokerul per utilizator: token cTrader →
+> cTrader; altfel token OANDA → OANDA; altfel paper → Yahoo.
+
+## Servicii Render
+- `autoflow-backend` — site-ul Node (`server.js`). `/api/health` → `sale_ready:true`.
+- `autoflow-backend-2` — botul forex (Python). Callback: `/api/ctrader/callback`.
+- Tier gratuit: ~3 săptămâni/lună uptime, se suspendă la final de lună, revine pe 1.
+
+## Ce e construit și live
+- **Legal**: renunțare Art.16(m) UE la checkout + termeni + emailuri; fără refund;
+  banner cookies; refund/chargeback → licență revocată.
+- **Securitate**: `/verify-license` autoritativ pe plată; `/api/health` diagnostic.
+- **Onboarding client**: welcome, link referral Binance, paper vs real, chei AI
+  per utilizator (Groq/Gemini/Claude), orice pereche.
+- **cTrader**: OAuth onboarding (`/ctrader`, `/ctaccount`), conector protobuf sync,
+  wiring `_make_broker`. Scope configurabil prin `CTRADER_SCOPE`.
+- **Copilot (10 funcții)**: explicații per trade în alerte; mod copilot
+  (`/copilot on|off`, butoane approve/reject); alerte "nu tranzacționa"; news
+  guard + `/news`; breaker flash-crash.
+- **Market Pulse** (`/market`): volatilitate/volum/trend/momentum + sesiuni
+  (Sydney/Tokyo/London/NY din ceasul UTC).
+- **News**: calendar economic FMP (`NEWS_API_KEY`); feed-ul default Forex Factory
+  e blocat pe IP-uri de datacenter Render.
+- **Lead funnel** (`public/free.html` + `POST /api/lead`): trafic DM → ofertă
+  gratuită → captare email → promo → CTA cumpărare. Păstrează ref-ul de afiliat.
+
+## Env vars (Render)
+- bot forex (`autoflow-backend-2`): `CTRADER_CLIENT_ID`, `CTRADER_CLIENT_SECRET`,
   `CTRADER_REDIRECT_URI=https://autoflow-backend-2.onrender.com/api/ctrader/callback`,
-  `CTRADER_SCOPE=accounts` (→ `trading` after KYC).
-- both bots: `NEWS_API_KEY=<FMP key>` (optional, makes `/news` show real events).
-- site (`autoflow-backend`): `JWT_SECRET=<random 40+ chars>`.
+  `CTRADER_SCOPE`.
+- ambele: `NEWS_API_KEY=<cheie FMP>`.
+- site (`autoflow-backend`): `JWT_SECRET=<random 40+ caractere>`.
 
-## Business plan / strategy
-- Growth model = **affiliate-driven** (like 3Commas), 30% commission — infra already built (`public/affiliate.html`, affiliate API, affiliate bot).
-- Ads: `public/promo.html` screen-recorded for TikTok/Reels. Compliance: never promise guaranteed returns; say "risk-free paper testing", "you control the risk".
-- Crypto bot is fully ready to sell now; forex live waits on cTrader KYC.
-
-## Conventions
-- Commit trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` + `Claude-Session:` line.
-- Keep files <500 lines; tests: `apex-forex-bot/tests/run_all.py` (7 files).
-- Never commit secrets. Push to the working branch only.
+## Convenții
+- Fișiere sub 500 de linii. Teste: `apex-forex-bot/tests/run_all.py`.
+- Nu comite niciodată secrete. Push doar pe branch-ul de lucru.
+- Restul regulilor: `CLAUDE.md` (Claude Code) și `AGENTS.md` (Codex + ștafetă).

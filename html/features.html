@@ -90,6 +90,31 @@ body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoo
 .gi:nth-child(4){grid-area:2/1/3/7}
 .gi:nth-child(5){grid-area:2/7/3/13}
 
+/* How it works */
+.steps-section{max-width:1100px;width:100%;padding:20px 24px 20px;margin:0 auto;position:relative;z-index:1}
+.steps-head{text-align:center;margin-bottom:38px}
+.steps-head h2{font:700 clamp(24px,3.5vw,36px)/1.1 var(--d);letter-spacing:-.03em;color:#fff;margin-bottom:12px}
+.steps-head p{font:400 15px/1.6 var(--f);color:var(--t1);max-width:480px;margin:0 auto}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:1000px;margin:0 auto}
+@media(max-width:900px){.steps-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.steps-grid{grid-template-columns:1fr;max-width:400px}}
+.step-card{position:relative;background:rgba(16,16,20,.5);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:1rem;padding:24px 20px;transition:all .3s var(--ease)}
+.step-card:hover{border-color:rgba(230,57,70,.18);transform:translateY(-2px)}
+.step-num{font:700 12px/1 var(--f);color:var(--acc2);letter-spacing:.14em;margin-bottom:12px}
+.step-card h3{font:600 15.5px/1.35 var(--d);color:#fff;letter-spacing:-.02em;margin-bottom:7px}
+.step-card p{font:400 13.5px/1.6 var(--f);color:var(--t1)}
+
+/* Assurances */
+.assure-section{max-width:1100px;width:100%;padding:20px 24px 60px;margin:0 auto;position:relative;z-index:1}
+.assure-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:900px;margin:0 auto}
+@media(max-width:760px){.assure-grid{grid-template-columns:1fr;max-width:420px}}
+.assure-card{background:rgba(16,16,20,.55);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:1rem;padding:24px 22px;transition:all .3s var(--ease)}
+.assure-card:hover{border-color:rgba(230,57,70,.18);transform:translateY(-2px)}
+.assure-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(230,57,70,.1);border:1px solid rgba(230,57,70,.16);margin-bottom:14px}
+.assure-ico svg{width:19px;height:19px;stroke:var(--acc2);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.assure-card h3{font:600 16px/1.3 var(--d);color:#fff;letter-spacing:-.02em;margin-bottom:7px}
+.assure-card p{font:400 13.5px/1.6 var(--f);color:var(--t1)}
+
 /* Footer */
 .footer{text-align:center;padding:40px 24px 32px;border-top:1px solid var(--border);margin-top:40px;position:relative;z-index:1}
 .footer p{font:400 13px/1.5 var(--f);color:var(--t2)}
@@ -123,6 +148,57 @@ body{background:var(--bg);color:var(--t0);font-family:var(--f);-webkit-font-smoo
   <li class="gi"><div class="gi-inner"><div class="gi-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="gi-content"><h3>Full Telegram control — every trade explained</h3><p>Instant alert on every entry and exit with the AI's reasoning. /status and /report show balance, position, and P&L any time.</p></div></div></li>
   <li class="gi"><div class="gi-inner"><div class="gi-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><div class="gi-content"><h3>Your funds never leave your account</h3><p>Connects with trade-only API keys — withdrawals disabled at the broker level. Your cTrader account stays 100% yours.</p></div></div></li>
 </ul>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="steps-section">
+  <div class="steps-head">
+    <h2>From payment to first trade.</h2>
+    <p>Four steps, and most people are through them in under ten minutes.</p>
+  </div>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-num">STEP 01</div>
+      <h3>Pick your bot</h3>
+      <p>Crypto or forex. One payment — no subscription, no renewal, updates included.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">STEP 02</div>
+      <h3>Get your licence key</h3>
+      <p>Emailed to you the moment the payment clears, together with the setup guide.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">STEP 03</div>
+      <h3>Connect cTrader</h3>
+      <p>Link your own broker account and set your risk — position size, stop-loss, drawdown cap.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">STEP 04</div>
+      <h3>It trades</h3>
+      <p>Runs on our servers 24/7 within the limits you set. Close your laptop; it keeps going.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ASSURANCES ═══ -->
+<section class="assure-section">
+  <div class="assure-grid">
+    <div class="assure-card">
+      <div class="assure-ico"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 3 3 9 9 9"/></svg></div>
+      <h3>14-day money back</h3>
+      <p>If it isn't for you, email us within 14 days of purchase and you get a full refund. No forms, no interrogation.</p>
+    </div>
+    <div class="assure-card">
+      <div class="assure-ico"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="7" rx="2"/><rect x="2" y="13" width="20" height="7" rx="2"/><line x1="6" y1="7.5" x2="6.01" y2="7.5"/><line x1="6" y1="16.5" x2="6.01" y2="16.5"/></svg></div>
+      <h3>Hosted 24/7 — nothing to install</h3>
+      <p>Runs on our servers around the clock. No VPS to rent, no PC left switched on, no setup on your machine.</p>
+    </div>
+    <div class="assure-card">
+      <div class="assure-ico"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <h3>We never touch your funds</h3>
+      <p>Your money stays in your own broker account, in your name. We provide the software — we can't withdraw anything.</p>
+    </div>
+  </div>
+</section>
 
 <div class="footer"><p>Apex Trading Suite &copy; 2026. All rights reserved.</p></div>
 </body>

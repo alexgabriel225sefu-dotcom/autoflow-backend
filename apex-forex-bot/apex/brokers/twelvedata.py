@@ -8,11 +8,22 @@ Set in .env:
     TWELVE_DATA_KEY=your_api_key
     PAPER_TRADING=true   (required — TD does not execute real orders)
 """
+import os
 import time
 import calendar
 import threading
 import requests
 from apex import config as cfg
+
+# This module is NOT reachable in this build. config._resolve_broker() refuses
+# BROKER=td at import and apex.brokers._REGISTRY holds cTrader alone, so
+# get_broker() cannot load it either. It is kept because it has tests.
+#
+# Its setting lives here rather than in apex/config.py: a credential declared
+# in the production config reads like one the product still uses, and this one
+# configures an execution path that cannot run.
+API_KEY = os.getenv("TWELVE_DATA_KEY", "")
+
 
 BASE_URL = "https://api.twelvedata.com"
 SPREAD_PIPS = 1.0      # simulated bid/ask spread
@@ -71,7 +82,7 @@ def _fetch_price(symbol: str) -> dict:
     if c and now - c["time"] < PRICE_TTL:
         return c
 
-    params = {"symbol": _to_td_symbol(symbol), "apikey": cfg.TWELVE_DATA_KEY}
+    params = {"symbol": _to_td_symbol(symbol), "apikey": API_KEY}
     data = _get_with_retry(f"{BASE_URL}/price", params, timeout=10)
     if "price" not in data:
         with _lock:
@@ -93,11 +104,11 @@ def _fetch_price(symbol: str) -> dict:
 # ─── Broker interface ─────────────────────────────────────
 
 def is_connected() -> bool:
-    if not cfg.TWELVE_DATA_KEY:
+    if not API_KEY:
         return False
     try:
         r = requests.get(f"{BASE_URL}/price",
-                         params={"symbol": "EUR/USD", "apikey": cfg.TWELVE_DATA_KEY},
+                         params={"symbol": "EUR/USD", "apikey": API_KEY},
                          timeout=5)
         return r.status_code == 200 and "price" in r.json()
     except Exception:
@@ -131,7 +142,7 @@ def get_candles(instrument=None, interval=None, limit=None):
         "symbol": td_sym,
         "interval": td_interval,
         "outputsize": min(count + 10, 5000),  # TD permite max 5000 (1 credit) — backtest-ul are nevoie de istoric lung
-        "apikey": cfg.TWELVE_DATA_KEY,
+        "apikey": API_KEY,
         "order": "ASC",
     }
     data = _get_with_retry(f"{BASE_URL}/time_series", params, timeout=15)

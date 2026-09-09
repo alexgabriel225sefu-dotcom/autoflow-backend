@@ -9,7 +9,6 @@ on:
     branches: [main, claude/arcads-external-api-gExX7]
     paths:
       - apex-forex-bot/**
-      - apex-trade-bot/**
       - .github/workflows/docker-publish.yml
 
 jobs:
@@ -18,14 +17,18 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # ONE image. The retired `apex-crypto` image was built from the
+    # apex-trade-bot/ context — a legacy implementation that is not part of
+    # this product's architecture and clears none of its safety gates — and
+    # the sales site handed customers a Railway deploy command for it. That
+    # is exactly the "alternative production path" this repository must not
+    # have, so both the image and its source are gone.
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: apex-forex
             context: apex-forex-bot
-          - name: apex-crypto
-            context: apex-trade-bot
     steps:
       - uses: actions/checkout@v4
 

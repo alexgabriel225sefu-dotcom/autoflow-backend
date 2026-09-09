@@ -264,16 +264,36 @@ def fibonacci_levels(candles, lookback=50):
             levels[f"{r*100:.1f}%"] = round(swing_low + diff * r, 6)
         levels["ext_1.272"] = round(swing_low - diff * 0.272, 6)
         levels["ext_1.618"] = round(swing_low - diff * 0.618, 6)
-    nearest = min(levels.items(), key=lambda kv: abs(kv[1] - price))
+    # Extensions sit at least 0.272*diff away while every retracement level is
+    # within 0.084*diff of another, so an extension can never be `nearest` —
+    # exclude them explicitly rather than leaving dead entries in the search.
+    retracements = {k: v for k, v in levels.items() if not k.startswith("ext_")}
+    nearest = min(retracements.items(), key=lambda kv: abs(kv[1] - price))
     tolerance = diff * 0.02
     signal = None
-    if abs(price - nearest[1]) < tolerance:
-        if trend == "UP" and price <= nearest[1]:
-            signal = "BUY"
-        elif trend == "DOWN" and price >= nearest[1]:
-            signal = "SELL"
+    rejected = False
+
+    # Require a REJECTION, not a touch. `price <= level` in an uptrend fires
+    # while price is still below the level and moving down — buying into a live
+    # down-move. A rejection is: the previous bar pierced the level, and the
+    # current bar closed back on the trade's side of it. That is the difference
+    # between "price reached support" and "support held".
+    if len(candles) >= 2:
+        prev, cur = candles[-2], candles[-1]
+        lvl = nearest[1]
+        if trend == "UP":
+            rejected = prev["low"] <= lvl and cur["close"] > lvl
+        else:
+            rejected = prev["high"] >= lvl and cur["close"] < lvl
+
+    if rejected and abs(price - nearest[1]) < tolerance * 3:
+        signal = "BUY" if trend == "UP" else "SELL"
+
     return {"levels": levels, "trend": trend, "nearest": nearest[0],
             "nearestPrice": nearest[1], "signal": signal,
+            "rejected": rejected,
+            "swingRange": round(diff, 6),
+            "target": round(swing_high if trend == "UP" else swing_low, 6),
             "swingHigh": round(swing_high, 6), "swingLow": round(swing_low, 6)}
 
 
@@ -459,7 +479,20 @@ def _fmt(v, n):
     return None if v is None else f"{v:.{n}f}"
 
 
-def analyze(candles):
+def analyze(candles, symbol=None):
+    """…and, when the caller knows it, WHICH instrument these are.
+
+    Carrying the symbol in the indicator dict lets a downstream engine ask
+    which instrument it is looking at without threading a new argument through
+    a fixed dispatch table. Nothing branches on it today — the thresholds that
+    once did belonged to the retired crypto product — but the news guard and
+    any future per-instrument tuning need the answer to be available at all,
+    and a signal engine that cannot name its own instrument is how a threshold
+    silently gets applied to the wrong thing.
+
+    Optional on purpose: callers that do not pass it get exactly the old
+    behaviour.
+    """
     closes = [c["close"] for c in candles]
     highs = [c["high"] for c in candles]
     lows = [c["low"] for c in candles]
@@ -499,7 +532,9 @@ def analyze(candles):
     liq_sweep = liquidity_sweep(candles)
     evc_data = evc(candles)
 
+    _out_symbol = symbol
     return {
+        "symbol": _out_symbol,
         "price": price,
         "rsi": _fmt(rsi_values[last], 2),
         "macd": _fmt(macd_data["macd"][last], 6),
