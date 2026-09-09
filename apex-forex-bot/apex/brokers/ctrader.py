@@ -1089,6 +1089,31 @@ class CtraderBroker:
             else:
                 mn, st = 1, 1
         req.volume = max(mn, (vol_h // st) * st)
+        # Slippage ceiling, when the operator has set one. MARKET takes
+        # whatever the book offers; MARKET_RANGE refuses a fill further than
+        # `slippageInPoints` from the price we actually decided on, and a
+        # refused entry is recoverable in a way a bad fill is not.
+        #
+        # The base price must be the side we would cross — ask to buy, bid to
+        # sell — or the range is measured from the wrong end of the spread and
+        # silently allows a whole spread more than asked for. If the quote
+        # cannot be read, the order stays MARKET: sending MARKET_RANGE without
+        # a base price would let the broker choose the reference itself, which
+        # is the protection removed while appearing to be present.
+        _slip = int(getattr(cfg, "CTRADER_MAX_SLIPPAGE_POINTS", 0) or 0)
+        if _slip > 0:
+            try:
+                _bid, _ask = self.get_bid_ask(instrument)
+                _base = float(_ask if side == "BUY" else _bid)
+            except Exception:
+                _base = 0.0
+            if _base > 0:
+                req.orderType = ProtoOAOrderType.MARKET_RANGE
+                req.slippageInPoints = _slip
+                req.baseSlippagePrice = _base
+            else:
+                print(f"[cTrader] no quote for {sym} — sending MARKET without "
+                      f"a slippage ceiling")
         # NOTE: we do NOT put relativeStopLoss/TP on the order — its 1e-5 unit
         # doesn't match every instrument's tick size (gold moves in 0.01, so
         # the relative value fails 'invalid precision'). Instead the position

@@ -80,6 +80,20 @@ CTRADER_SCOPE         = (os.getenv("CTRADER_SCOPE") or "trading").lower()
 # Where cTrader redirects after the client authorizes (OAuth callback):
 CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "")
 
+# Maximum slippage tolerated on entry, in POINTS — the quote's last decimal, so
+# 10 points is one pip on a 5-digit pair and on a 3-digit JPY pair. Points, not
+# pips, because that is the unit cTrader takes; converting would introduce a
+# per-instrument guess for the sake of a friendlier number.
+#
+# Above zero the order goes out as MARKET_RANGE instead of MARKET: the broker
+# fills it only within this distance of the quote we decided on, and REJECTS it
+# otherwise. That is the point — a rejected entry costs nothing, while a fill
+# 11 pips past the intended price is how a 20-pip stop becomes a 31-pip loss
+# (EURUSD, 4 September, during NFP).
+#
+# Zero — the default — keeps plain MARKET orders and changes nothing.
+CTRADER_MAX_SLIPPAGE_POINTS = int(os.getenv("CTRADER_MAX_SLIPPAGE_POINTS") or 0)
+
 # The MetaTrader bridge, Twelve Data and MetaAPI settings used to be declared
 # here. Their brokers are refused by _resolve_broker() above and unreachable
 # through apex.brokers.get_broker(), so a credential in the production config
