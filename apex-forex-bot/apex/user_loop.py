@@ -4915,6 +4915,30 @@ def start_watchdog(alert_fn=None, interval=180):
             time.sleep(interval)
             try:
                 for uid in (user_store.all_active() or []):
+                    # Re-check the LICENCE SERVER, not just the local grant.
+                    # _entitled below reads the access store and the stored
+                    # key, and a refund or chargeback changes neither: it
+                    # changes the verifier's answer. That answer was only ever
+                    # requested from inside the incoming-text handler, so a
+                    # client who set the bot up and walked away — the product's
+                    # own advertised use case — kept trading live on a refunded
+                    # licence indefinitely, with no time bound at all.
+                    #
+                    # _revalidate_license self-throttles to once per
+                    # _REVALIDATE_SEC per user, so at 180s this is almost
+                    # always an immediate return; it revokes access and stops
+                    # the loop itself, and the _entitled check below then sees
+                    # that and completes the shutdown.
+                    #
+                    # Lazily imported, like the two other telegram uses in this
+                    # module: telegram imports user_loop, so a module-level
+                    # import here would be circular.
+                    try:
+                        from apex import telegram as _tg
+                        _tg._revalidate_license(uid)
+                    except Exception as e:
+                        print(f"[Watchdog] licence re-check failed for {uid} "
+                              f"({e}) — leaving the loop alone")
                     # Enforcement sweep. start() refuses new loops for chats
                     # that lost access, but a loop ALREADY running when the
                     # grant was revoked kept trading forever — nothing ever
