@@ -111,7 +111,7 @@ Dacă ai terminat și vrei alt task, actualizează tabelul ăsta ÎNTÂI, apoi l
 | **Claude cloud** (claude.ai/code) | `public/*.html` | Rescrie limbajul: platformă de automatizare, nu „bot care câștigă" |
 | ~~Claude local #2~~ | ✅ TERMINAT | ~~Fix fus orar~~ — preluat și livrat de Claude cloud (nu fusese început) |
 | **Codex Desktop** | `apex-forex-bot/apex/brokers/` | ✅ C4+C5 terminate (`6d75bdb`) — acum: **Pasul 1 din ORDINEA DE LUCRU RECOMANDATĂ** (limitator de rată cTrader, `docs/CTRADER_CAPABILITIES.md`) |
-| **Claude local #1** (VS Code) | ✅ TERMINAT | ~~Contorul zilnic blocat~~ — livrat în 9add7d5, 135/135 verde |
+| **Claude local #1** (VS Code) | `apex-forex-bot/apex/user_loop.py` | **C2** — 3 din 6 închideri ocolesc `gates.authorize_close` (linii ~2790/3210/4684) |
 
 **Regula:** dacă `git pull` îți aduce modificări în fișierele tale, oprește-te și
 întreabă operatorul. Nu rezolva conflicte peste munca altui agent.
