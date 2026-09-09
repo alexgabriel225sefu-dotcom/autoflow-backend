@@ -85,12 +85,12 @@ incendii de azi. Două ating contul chiar acum.
 | # | Constatare | Zonă | Cine |
 |---|---|---|---|
 | C1 | ✅ **REZOLVAT** — unealta de execuție scoasă, test cu mutație | `apex/assistant.py` | Claude cloud |
-| C2 | 3 din 6 închideri ocolesc `gates.authorize_close` | `apex/user_loop.py` | Claude local #1 |
+| C2 | 🔵 **ÎN LUCRU — Claude cloud**, preluat: nimic livrat de Claude local #1 | `apex/user_loop.py` | Claude cloud |
 | C3 | ✅ **REZOLVAT** — absent ≠ False; vezi avertismentul de deploy sus | `apex/automation.py` | Claude cloud |
 | C4 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
 | C5 | ✅ **REZOLVAT** de Codex în `6d75bdb`, verificat | `apex/brokers/` | Codex |
-| C6 | Jurnalul n-are compare-and-set (două scrieri se pierd) | `apex/user_store.py` | Claude local #2 |
-| C7 | Refund/chargeback nu oprește botul fără mesaj text | `apex/telegram.py` | Claude local #2 |
+| C6 | ✅ **REZOLVAT** — CAS pe jurnal, append reîncearcă, `3b26cab` | `apex/user_store.py` | Claude cloud |
+| C7 | ✅ **REZOLVAT** — revalidare din watchdog, `0ac4998` | `apex/user_loop.py` | Claude cloud |
 | M4 | ✅ **REZOLVAT** — o literă | `apex/dashboard.py` | Claude cloud |
 
 **Regula rămâne: nu ieși din zona ta.** Rulează suita înainte de commit (136/136).
