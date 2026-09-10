@@ -315,3 +315,24 @@ def active_sessions(now: datetime = None) -> list:
 
 def spread_pips(bid: float, ask: float, instrument: str) -> float:
     return to_pips(ask - bid, instrument, bid)
+
+
+# The timeframes this platform offers, as the client spells them.
+#
+# THIS IS A MIRROR, AND THE MIRRORING IS ENFORCED BY A TEST.
+# The authority is the `_period()` map inside the cTrader broker module, whose
+# keys are the only strings that translate into a broker period; anything else
+# falls to its
+# "M5" default, so a client asking for M15 would silently receive M5 candles.
+# The obvious implementation — importing _period() where the check is needed —
+# is not available to the operator interface: tests/test_failure_matrix.py
+# forbids any module outside the trading core from importing a broker, so that
+# the ops path cannot reach one however it is called. That invariant is worth
+# more than the convenience.
+#
+# So the set lives here, in the module that already says what this platform
+# trades, and tests/test_setting_value_validation.py asserts it equals
+# _period()'s keys exactly. Add a timeframe to the broker and that test fails
+# until it is added here too — which is the drift a second copy would
+# otherwise cause, caught at the only moment it can be fixed cheaply.
+TIMEFRAMES = ("1m", "5m", "15m", "30m", "1h", "4h", "1d")

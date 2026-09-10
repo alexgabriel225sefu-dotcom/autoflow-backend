@@ -92,18 +92,94 @@ _LIST_KEYS = {"autopilot_universe", "watchlist", "session_filter"}
 _INT_KEYS = {"min_confidence", "max_trades_day", "maxpos", "loss_streak"}
 _FLOAT_KEYS = {"risk", "sl_pips", "tp_pips", "leverage", "max_dd_pct",
                "max_daily_loss_pct", "breakeven_r", "max_total_risk"}
-# Keys whose value is one of a fixed set. Passing these through untyped is not
-# harmless: apex.automation.mode() falls back to the MOST PERMISSIVE level for
-# anything it does not recognise, so `automation=aproval` (typo) would have
-# stored fine and silently traded the account unattended.
+# Keys whose VALUE is checked, not just its type. Passing these through untyped
+# is not harmless: every consumer downstream substitutes a default for a value
+# it does not recognise, so a rejected write here is the difference between the
+# client being told "no" and the account quietly running on something else.
+# apex.automation.mode() falls back to the MOST PERMISSIVE level, so
+# `automation=aproval` (typo) would have stored fine and traded unattended.
+# The fixed sets live here; the ones that must be resolved at call time are in
+# _allowed_values below.
 _ENUM_KEYS = {"automation": automation.MODES}
+
+# `symbol` is checked by a predicate rather than a list: forex.is_tradeable is
+# a positive allowlist over currency pairs and metals, and enumerating it here
+# would be a second copy that drifts from the one the loop actually trades by.
+_PREDICATE_KEYS = ("symbol",)
+
+
+def _allowed_values(key):
+    """Valid values for `key`, or None when it is not value-checked.
+
+    RESOLVED AT CALL TIME, DELIBERATELY. The strategy registry fills as a side
+    effect of importing the strategy modules, and this module imports none of
+    them: at import time `strategy_api.available()` is EMPTY (0 entries, vs 17
+    once they are loaded). A list built at module level here would therefore
+    reject every valid strategy rather than only the invalid ones — the
+    opposite of what this check is for. telegram._handle_strategy already
+    resolves the same set this way, at call time.
+
+    Every set comes from the registry or map the runtime itself reads, so a
+    strategy or timeframe added later is accepted without editing this file.
+    """
+    if key in _ENUM_KEYS:
+        return set(_ENUM_KEYS[key])
+    if key == "strategy":
+        from apex import ai, strategy_api
+        # MEASURED, not assumed: the registry holds 17 ids and is a strict
+        # SUPERSET of STRATEGY_MODES (10) — "auto" included, as a registered
+        # module like any other. STRATEGY_MODES therefore adds nothing today
+        # and is here as a floor against one specific failure, not as a
+        # description of the sets.
+        #
+        # That failure: the registry is populated by IMPORT SIDE EFFECT, and
+        # this module imports no strategy module (it cannot — the cycle runs
+        # back through user_loop). available() is non-empty here only because
+        # user_loop, imported at the top of this file, pulls them in
+        # transitively. An import reorder upstream would empty it, and a
+        # validator whose allowlist is empty rejects EVERYTHING — taking the
+        # product down rather than degrading. STRATEGY_MODES is the floor that
+        # keeps the core modes writable if that happens, and
+        # tests/test_setting_value_validation.py stubs available() to [] to
+        # prove it.
+        #
+        # A third term, | {"auto"}, was specified and written, then removed:
+        # it is reachable only if the registry is empty AND "auto" has left
+        # STRATEGY_MODES, and no mutation of this function could make the
+        # tests notice its absence. Dead code that cannot fail is worse than
+        # no code — it reads as a guarantee while guaranteeing nothing.
+        return set(strategy_api.available()) | set(ai.STRATEGY_MODES)
+    if key == "timeframe":
+        # forex.TIMEFRAMES rather than the broker's own `_period()` map, even
+        # though that map is the authority: test_failure_matrix.py forbids any
+        # module outside the trading core from importing a broker, and this
+        # module is the operator interface — precisely the one that rule
+        # exists to keep away from a broker. forex.TIMEFRAMES mirrors
+        # _period()'s keys and a test asserts the two are equal, so the check
+        # is still against the real set without the layering violation.
+        from apex import forex
+        return set(forex.TIMEFRAMES)
+    return None
+
 
 _FALSEY = {"false", "0", "no", "off", "none", "null", ""}
 
 
 def coerce_setting(key, val):
-    """Type a control-plane value by its key, so what gets stored is what the
-    loop will actually read. Unknown keys pass through untouched."""
+    """Type AND value-check a control-plane value by its key, so what gets
+    stored is what the loop will actually read.
+
+    Raises ValueError for a recognised key given a value the runtime would not
+    honour. That refusal is the point: `strategy`, `symbol` and `timeframe`
+    each have a consumer that substitutes a default for anything it does not
+    recognise, so storing an unchecked value left the client reading back one
+    setting while the account ran on another. A rejected write is visible; a
+    substituted value is not.
+
+    Unknown keys still pass through untouched — this is a typing and
+    validation table, not a blocklist. A key nobody listed here is stored as
+    given, exactly as before.
+    """
     if key in _BOOL_KEYS:
         if isinstance(val, bool):
             return val
@@ -125,11 +201,27 @@ def coerce_setting(key, val):
         return int(float(val))
     if key in _FLOAT_KEYS:
         return float(val)
-    if key in _ENUM_KEYS:
-        v = str(val).strip().lower()
-        if v not in _ENUM_KEYS[key]:
+    if key in _PREDICATE_KEYS:
+        from apex import forex
+        v = str(val).strip()
+        if not forex.is_tradeable(v):
             raise ValueError(
-                f"'{key}' must be one of {', '.join(_ENUM_KEYS[key])} (got {val!r})")
+                f"'{key}' is not an instrument this platform trades (got "
+                f"{val!r}). Spot FX with a USD leg, plus metals.")
+        return v
+    allowed = _allowed_values(key)
+    if allowed is not None:
+        v = str(val).strip().lower()
+        if v not in allowed:
+            # Rejected value FIRST, allowed set last. apex/control.py:532
+            # truncates a failed command's message to 300 chars before the
+            # caller ever sees it, and the strategy list is already ~200 of
+            # them: written the other way round, registering a few more
+            # strategies would silently start cutting off the one part of the
+            # message that says what was actually wrong.
+            raise ValueError(
+                f"{val!r} is not a valid '{key}'. Must be one of: "
+                f"{', '.join(sorted(allowed))}")
         return v
     return val
 
