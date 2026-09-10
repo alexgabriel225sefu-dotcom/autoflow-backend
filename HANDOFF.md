@@ -58,6 +58,100 @@ integrate prin PR. `AGENTS.md` se actualizează **după** confirmare.
 
 ---
 
+# ✅ A — IMPLEMENTAT pe `feat/no-silent-strategy-substitution` (fără deploy)
+
+Ordinea confirmată A → B → C. **A e gata; B și C nu au început.**
+
+`apex/control_actions.py` — `coerce_setting()` validează acum și VALOAREA, nu
+doar tipul, pentru `strategy`, `symbol`, `timeframe`. `automation` era deja
+validat și rămâne neschimbat. Test nou: `tests/test_setting_value_validation.py`
+(42 verificări, 12/12 mutanți omorâți, 0 supraviețuitori).
+
+Fișiere atinse: `apex/control_actions.py`, `apex/forex.py` (+`TIMEFRAMES`),
+`tests/test_setting_value_validation.py`. **Nu am atins** `gates.py`, setările
+de mediu, `public/` sau `apex/brokers/ctrader.py`.
+
+Suita completă: 143/143.
+
+## Trei devieri de la specificație — verificate direct, nu presupuse
+
+1. **`| {"auto"}` a fost specificat, scris, apoi ȘTERS.** Măsurat: registrul are
+   17 id-uri și e un SUPERSET strict al lui `STRATEGY_MODES` (10). `auto` e el
+   însuși un modul înregistrat, deci al treilea termen e accesibil doar dacă
+   registrul e gol ȘI `auto` a ieșit din `STRATEGY_MODES`. Niciun mutant nu l-a
+   putut omorî. L-am scos în loc să scriu un test artificial care să-l justifice.
+   `| set(ai.STRATEGY_MODES)` a rămas — acela E omorât de un mutant, fiindcă
+   testul înlocuiește `available()` cu `[]` (scenariul reordonării importurilor).
+
+2. **`symbol` nu e o listă, e un predicat** — `forex.is_tradeable()`. Aceeași
+   funcție e deja folosită de `user_loop.py:1526-1532`, care curăță simbolurile
+   străine la pornirea buclei. Deci A nu inventează o regulă: mută una existentă
+   mai devreme, la scriere. `US400` (instrumentul din rândurile-artefact de −26k)
+   și `GBPJPY` sunt respinse.
+
+3. **Nu pot citi `_period()` direct din `control_actions.py`.** Prima versiune
+   îl importa; `tests/test_failure_matrix.py` a picat imediat pe invariantul
+   „niciun modul din afara nucleului de tranzacționare nu importă direct un
+   broker". Testul are dreptate și e exact despre acest modul —
+   `control_actions.py` E interfața de operator, adică fix cea pe care regula
+   o ține departe de broker. **Nu am slăbit testul.** Am inversat dependența:
+   setul stă acum în `apex/forex.py::TIMEFRAMES` (modulul care spune deja ce
+   tranzacționează platforma și pe care `control_actions` îl importa oricum
+   pentru predicatul de simbol), iar sincronizarea cu `_period()` e asertată
+   în fișierul de test — un test nu e legat de invariant, deci acolo
+   comparația se poate face cu autoritatea reală. Mutanți verificați în ambele
+   direcții: și scoaterea unui timeframe din oglindă, și adăugarea unuia pe
+   care brokerul nu-l are, pică testul.
+
+   Notă: regula caută șirul literal `brokers.ctrader`, deci până și un COMENTARIU
+   care îl menționa o încălca. Comentariile sunt reformulate.
+
+4. **Ordinea din mesajul de eroare contează.** `apex/control.py:532` taie
+   mesajul la 300 de caractere înainte ca apelantul să-l vadă, iar lista de
+   strategii are deja ~200. Valoarea respinsă e acum PRIMA, lista ultima — altfel
+   înregistrarea câtorva strategii noi ar fi început să taie exact partea care
+   spune ce a fost greșit. Testat la limita reală, nu la una comodă.
+
+## Ce nu am schimbat, deliberat
+
+- **Cazul literelor la `symbol`.** `eurusd` se stochează ca `eurusd`.
+  `brokers/ctrader.py:80` face uppercase și scoate separatorii înainte de
+  căutarea simbolului, iar harta de la `:477` e cheiată la fel — deci nu e
+  nevoie de normalizare, iar a o adăuga ar fi o schimbare de comportament în
+  afara domeniului lui A.
+- **Chei necunoscute trec în continuare neatinse.** E un tabel de validare, nu
+  o listă de blocare.
+
+## Am verificat și celelalte chei — trei e numărul corect
+
+Auditul spunea „3 din 16 chei". Am recalculat din sursă: `_SETTABLE` are 30 de
+chei, iar după scăderea celor acoperite de `_BOOL/_LIST/_INT/_FLOAT/_ENUM`
+rămân neverificate `strategy`, `symbol`, `timeframe` **plus `exit_mode` și
+`style`**. Le-am urmărit pe ultimele două înainte de a decide:
+
+- **`exit_mode`** — `user_loop.py:1127` îl pune în cfg ca `EXIT_MODE`, și
+  `EXIT_MODE` **nu e citit nicăieri** în tot codul. Comportamentul real de
+  ieșire vine din `trailing` (bool, deja validat) și `breakeven_r` (float, deja
+  validat), pe care `builder.py` le scrie odată cu el. O valoare greșită e
+  inertă, nu substituită.
+- **`style`** — folosit doar de onboarding: `bool(u.get("style"))` ca test de
+  completitudine și `.title()` ca etichetă. Nu ajunge la nicio decizie de
+  tranzacționare.
+
+Deci niciuna nu are un consumator care substituie un COMPORTAMENT, care e
+criteriul lui A. Rămân nevalidate deliberat, nu din omisiune. Dacă `EXIT_MODE`
+se conectează vreodată la buclă, intră în același tabel.
+
+## Ce urmează (neînceput)
+
+- **B** — `user_loop.py::_rule_signal()`: modul absent → HOLD care numește
+  strategia cerută.
+- **C (C-HOLD)** — `ai.py:1053-1055`: mod necunoscut → HOLD explicit, fără
+  substituție cu mean_reversion.
+- Cele 10 teste marcate „în risc" — de actualizat deliberat la B/C.
+
+---
+
 # 🛑 CODEX E INDISPONIBIL — cotă epuizată 2026-09-09 ~17:45 UTC
 
 Codex a lovit limita de utilizare în mijlocul task-ului („You've hit your usage
