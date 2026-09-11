@@ -58,6 +58,77 @@ integrate prin PR. `AGENTS.md` se actualizează **după** confirmare.
 
 ---
 
+# ✅ A + B + C — TOATE IMPLEMENTATE pe `feat/no-silent-strategy-substitution`
+
+Fără deploy. Nicio ramură cu deploy automat nu e atinsă: toate workflow-urile
+țintesc `gExX7`/`main`, iar `feat/no-silent-strategy-substitution` nu apare în
+niciunul.
+
+| | Fișier | Ce face acum |
+|---|---|---|
+| **A** | `apex/control_actions.py` | valoare invalidă respinsă la scriere, listă leneșă |
+| **B** | `apex/user_loop.py` | modul absent → HOLD care numește strategia cerută |
+| **C** | `apex/ai.py::signal_for_mode` | mod necunoscut → HOLD explicit, fără fallback |
+| **D** | `apex/ai.py::get_signal` | **instanță nouă, găsită de test** — vezi mai jos |
+
+## ⚠️ A patra instanță — C era ocolit pe calea principală
+
+Testul structural nou (`test_no_silent_strategy_substitution.py`) a găsit-o
+imediat ce a fost scris. `ai.get_signal()`, linia 213, avea:
+
+```python
+mode = (mode or "mean_reversion").lower()
+if mode not in _MODE_INTRO:
+    mode = "mean_reversion"
+```
+
+O linie **înainte** de apelul la `signal_for_mode()`. Adică: modul invalid era
+rescris în `mean_reversion` înainte ca refuzul adăugat de C să apuce să se
+declanșeze. **C ar fi fost cod mort exact pe calea pe care trece fiecare
+intrare confirmată de AI.** Fixul lui C, singur, nu ar fi rezolvat nimic acolo.
+
+Rescrierea e ștearsă. Un mod necunoscut ajunge acum la `signal_for_mode()`,
+primește HOLD, și iese pe return-ul timpuriu de la `if rule_action in ("CLOSE",
+"HOLD")` — deci nu ajunge niciodată la prompt și nici la `_MODE_INTRO[mode]`.
+
+`_MODE_INTRO` avea 9 chei, `STRATEGY_MODES` are 10: lipsea `auto`. Fără
+rescriere, `_MODE_INTRO["auto"]` ar fi dat KeyError dacă engine-ul auto returna
+BUY/SELL. Am adăugat intrarea `auto` și un test care cere egalitatea celor două
+seturi, ca o strategie nouă să nu poată fi adăugată fără textul ei de prompt.
+
+## Teste
+
+| Test | Verificări | Mutanți |
+|---|---|---|
+| `test_setting_value_validation.py` (A) | 42 | 12/12 |
+| `test_unknown_strategy_holds.py` (B) | 38 | 8/8 |
+| `test_signal_for_mode_refuses.py` (C) | 49 | 8/8 |
+| `test_no_silent_strategy_substitution.py` (structural) | 20 | 2/2 |
+
+B nu se poate apela direct — `_rule_signal` e un closure la ~3.600 de linii în
+`_loop()`. Testul îi extrage sursa REALĂ cu `ast` și o execută pe stub-uri, deci
+testează codul livrat, nu o copie a lui.
+
+Criteriile cerute, acoperite explicit:
+- invalid respins la scriere → A, secțiunea 1
+- strategie necunoscută → HOLD → B secț. 1, C secț. 1
+- **zero place_order** → B secț. 7: poarta de intrare cere `action in ("BUY",
+  "SELL")`, iar verdictul refuzului pică acel test. Legătura e asertată, nu
+  presupusă.
+- motivul conține valoarea invalidă → B secț. 1, C secț. 6
+- nicio substituție spre mean_reversion → C secț. 2 (înlocuiesc TOATE engine-urile
+  cu înregistratoare și verific că niciunul nu e apelat)
+
+## Un test vechi actualizat deliberat
+
+`test_strategy_registry.py` cerea textual un fallback NECONDIȚIONAT la engine.
+Jumătatea corectă a intenției — „o problemă de registru nu trebuie să oprească
+un cont care tranzacționează un mod pe care engine-ul chiar îl are" — e
+păstrată; cealaltă jumătate e acum condiționată, deci verific și garda lângă
+fallback. Restul celor „10 teste în risc" au trecut nemodificate.
+
+---
+
 # ✅ A — IMPLEMENTAT pe `feat/no-silent-strategy-substitution` (fără deploy)
 
 Ordinea confirmată A → B → C. **A e gata; B și C nu au început.**

@@ -124,7 +124,18 @@ def _validate_verdict(raw, *, symbol=None, user_id=None):
     return out
 
 
+# One entry per STRATEGY_MODES key, and tests/test_no_silent_strategy_substitution.py
+# asserts the two sets are equal. The prompt reads _MODE_INTRO[mode] with a bare
+# subscript on purpose: a .get(mode, "") default would hand the model a generic
+# preamble for a mode nobody wrote one for, and it would answer confidently
+# about a strategy it was never told the rules of. Missing is better as a
+# failure than as a silence — and the equality test means it never gets that far.
 _MODE_INTRO = {
+    "auto": ("You are running REGIME-ADAPTIVE: the engine reads the live regime "
+             "(trending, ranging, volatile, quiet) and applies the method that "
+             "fits it, so judge the setup on the evidence in front of you "
+             "rather than against one fixed style. Do not assume a trend, and "
+             "do not assume a range."),
     "mean_reversion": ("Forex ranges far more than it trends, so your PRIMARY edge is MEAN REVERSION: "
                        "fade overbought/oversold extremes back to the mean (RSI + Bollinger Bands), and only "
                        "ride a move when the higher-timeframe trend is genuinely strong. This is the opposite "
@@ -210,9 +221,25 @@ def get_signal(ind, balance, open_position, strategy_data=None, mode="mean_rever
     user's. Since the AI can veto an entry outright, that was an arbitrary
     verdict on seven symbols out of eight.
     """
-    mode = (mode or "mean_reversion").lower()
-    if mode not in _MODE_INTRO:
-        mode = "mean_reversion"
+    # NO REWRITE HERE. This used to be:
+    #
+    #     mode = (mode or "mean_reversion").lower()
+    #     if mode not in _MODE_INTRO:
+    #         mode = "mean_reversion"
+    #
+    # which silently retargeted an unrecognised mode at the mean reversion
+    # engine — and did it BEFORE signal_for_mode() could refuse, so the refusal
+    # added there was dead on this path, the one every AI-confirmed entry takes.
+    # The client's chosen method was replaced one call before the check meant
+    # to catch exactly that.
+    #
+    # Unknown modes are now left alone and refused below. signal_for_mode()
+    # answers them with HOLD, which takes the early return a few lines down, so
+    # an unknown mode never reaches the prompt and never reaches
+    # _MODE_INTRO[mode]. The keyword default in the signature still applies
+    # when a caller omits `mode` — that is a declared default, visible at the
+    # call site, not a substitution behind one.
+    mode = str(mode or "").strip().lower()
 
     rule_sig = signal_for_mode(mode, ind, strategy_data, open_position)
     rule_action = rule_sig.get("action", "HOLD")
@@ -1051,5 +1078,43 @@ STRATEGY_MODES = {
 
 
 def signal_for_mode(mode, ind, strat=None, open_position=None):
-    m = STRATEGY_MODES.get((mode or "mean_reversion").lower(), STRATEGY_MODES["mean_reversion"])
+    """The rule verdict for `mode`, or an explicit HOLD if nothing implements it.
+
+    THERE IS NO FALLBACK, DELIBERATELY. This used to read
+
+        STRATEGY_MODES.get((mode or "mean_reversion").lower(),
+                           STRATEGY_MODES["mean_reversion"])
+
+    so every unrecognised mode — a typo, a strategy that exists only in the
+    module registry, an id from an older build — was answered by the mean
+    reversion engine. Nothing raised and nothing was logged, so the verdict
+    came back looking exactly like a verdict for the mode that was asked for,
+    and was journalled under that name. A client could hold the setting they
+    chose, see it in every trade, and still be wrong about what was running.
+
+    Substituting a strategy is not a graceful degradation. The client chose a
+    method, and trading a different one is a worse outcome than trading
+    nothing: not trading is visible in the journal as an absence, while the
+    substitution is invisible by construction. So an unknown mode returns a
+    HOLD that names it.
+
+    `mode` is a required parameter, so None is a bad value rather than a
+    request for the default, and it is refused the same way.
+
+    Callers are unaffected: every live one passes a mode it has already
+    constrained — ai.rule_and_ai() normalises against _MODE_INTRO first,
+    StrategyModule passes its own registered id, telegram iterates
+    STRATEGY_MODES itself, user_loop._engine_or_hold only calls this for modes
+    in STRATEGY_MODES, and backtest.py routes "criteria" to its own signal.
+    The remaining paths (a typo'd BT_STRATEGY, a scanner mode) previously got
+    a mean reversion backtest or scan labelled as something else; they now get
+    an empty result, which is the true answer.
+    """
+    m = STRATEGY_MODES.get(str(mode or "").strip().lower())
+    if m is None:
+        return {"action": "HOLD", "confidence": 0, "criteriaScore": 0,
+                "riskLevel": "LOW",
+                "reasoning": f"no engine implements {mode!r} — holding rather "
+                             f"than substituting a different strategy",
+                "keyFactors": []}
     return m["engine"](ind, strat, open_position)

@@ -325,8 +325,28 @@ check("and populates it, or every lookup would miss silently",
       "strategy_api.load_builtins()" in loop_src)
 check("the rule verdict goes through the module",
       "_strategy.signal(_frame)" in loop_src)
-check("with a fallback to the engine if the module is missing or raises",
-      loop_src.count("ai.signal_for_mode(active_mode, ind, strat_data, open_pos)") >= 1)
+# UPDATED DELIBERATELY. This asserted an UNCONDITIONAL fallback: any missing
+# or broken module fell through to ai.signal_for_mode(). That was right while
+# the engine was assumed to answer for every mode, and wrong once the registry
+# could hold strategies the engine has never implemented — for those,
+# signal_for_mode() resolved the lookup to mean_reversion, so "the module is
+# missing" quietly became "trade a different strategy under the chosen name".
+#
+# The half of the intent that was always right is kept: a registry problem must
+# not stop an account trading a mode the ENGINE implements. The other half now
+# has to be conditional, so the guard is asserted alongside the fallback.
+# Behaviour is covered for real in tests/test_unknown_strategy_holds.py, which
+# executes the closure's actual source.
+check("with a fallback to the engine for the modes the engine implements",
+      "ai.signal_for_mode(active_mode, ind, strat_data," in loop_src)
+check("...gated on the engine actually implementing the mode",
+      "active_mode in ai.STRATEGY_MODES" in loop_src)
+check("...so an unknown mode holds rather than becoming mean_reversion",
+      '"action": "HOLD"' in loop_src and "_engine_or_hold" in loop_src)
+check("...and that behaviour is asserted, not just its shape",
+      os.path.exists(os.path.join(
+          os.path.dirname(os.path.abspath(__file__)),
+          "test_unknown_strategy_holds.py")))
 check("the frame is NOT named `market` — that name is the apex.market module",
       "market = strategy_api.Market(" not in loop_src
       and "_frame = strategy_api.Market(" in loop_src)
