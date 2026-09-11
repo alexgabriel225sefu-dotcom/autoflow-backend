@@ -3177,6 +3177,35 @@ def _loop(user_id, alert_fn, gen=None):
                 _strategy, _frame = None, None
             _provenance = strategy_api.provenance_for(active_mode) or {}
 
+            def _engine_or_hold(why):
+                """The verdict when the strategy module cannot answer.
+
+                Falling through to the engine is correct ONLY when the engine
+                actually implements `active_mode`. ai.signal_for_mode()
+                resolves anything it does not recognise to mean_reversion, so
+                for any other id "the module could not answer" would silently
+                become "trade a different strategy" — journalled under the
+                name the client chose, which is worse than not trading. The
+                client picked one method; the honest answer to "that method
+                is unavailable" is no new position, not another method.
+
+                The HOLD names `active_mode` so the reason says which strategy
+                was asked for and did not run.
+                """
+                if active_mode in ai.STRATEGY_MODES:
+                    print(f"[UserLoop:{user_id}] {why} — using the engine "
+                          f"directly")
+                    return ai.signal_for_mode(active_mode, ind, strat_data,
+                                              open_pos)
+                print(f"[UserLoop:{user_id}] {why} — holding; the engine does "
+                      f"not implement {active_mode} and would substitute "
+                      f"mean_reversion")
+                return {"action": "HOLD", "confidence": 0,
+                        "criteriaScore": 0, "riskLevel": "LOW",
+                        "reasoning": f"{why} — holding rather than trading a "
+                                     f"different strategy than {active_mode}",
+                        "keyFactors": []}
+
             def _rule_signal():
                 """This tick's rule verdict, through the module when there is one."""
                 if _strategy is not None and _frame is not None:
@@ -3185,22 +3214,16 @@ def _loop(user_id, alert_fn, gen=None):
                     except Exception as e:
                         print(f"[UserLoop:{user_id}] strategy module "
                               f"{active_mode} signal() failed ({e})")
-                        # ai.signal_for_mode() answers an UNKNOWN mode with
-                        # mean_reversion. For a registry-only strategy that
-                        # turns "my strategy broke" into "silently trade a
-                        # different strategy", which is worse than not
-                        # trading: the client picked one method and would get
-                        # another, journalled under the name they chose.
-                        if active_mode not in ai.STRATEGY_MODES:
-                            return {"action": "HOLD", "confidence": 0,
-                                    "criteriaScore": 0, "riskLevel": "LOW",
-                                    "reasoning": f"{active_mode} module failed "
-                                                 f"({str(e)[:80]}) — holding "
-                                                 f"rather than trading a "
-                                                 f"different strategy",
-                                    "keyFactors": []}
-                        print(f"[UserLoop:{user_id}] using the engine directly")
-                return ai.signal_for_mode(active_mode, ind, strat_data, open_pos)
+                        return _engine_or_hold(
+                            f"{active_mode} module failed ({str(e)[:80]})")
+                # No module for this id. Before, control fell straight to
+                # ai.signal_for_mode() here, which is the substitution path:
+                # an id nothing registers resolved to mean_reversion and the
+                # account traded it under the chosen name. _engine_or_hold
+                # keeps the legacy engine for the modes the engine really has
+                # and refuses for the rest.
+                return _engine_or_hold(
+                    f"no strategy module is loaded for {active_mode}")
 
             # Market Pulse: store a plain-language read for /market, and ping the
             # user (throttled) when the market gets notable (elevated volatility).
