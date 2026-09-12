@@ -29,6 +29,10 @@ const has = (n) => argv.includes(n);
 
 const ROUNDS = Number(arg("--rounds", 1));
 const PUSH = has("--push");
+// --watch: rulează la nesfârșit, cu pauză între runde. Fără VPS, „non-stop"
+// înseamnă „cât e laptopul treaz" — asta e tot ce poate oferi cinstit.
+const WATCH = has("--watch");
+const EVERY_MIN = Number(arg("--every", 15));
 const TEST_CMD = arg("--test", "cd apex-forex-bot && python3 tests/test_no_silent_strategy_substitution.py");
 
 const line = (s = "") => console.log(s);
@@ -146,12 +150,36 @@ if (has("--check")) { line(pre.ready ? "Gata de pornire." : "Rezolvă ❌-urile 
 if (!pre.branch) process.exit(1);
 if (!checkAgents().find((a) => a.key === "claude")?.ok) { line("Claude Code lipsește — bucla nu poate porni."); process.exit(1); }
 
-let done = 0;
-for (let i = 1; i <= ROUNDS; i++) {
-  if (!(await round(i))) { line(`\nOprit la runda ${i}. Rundele terminate: ${done}.`); break; }
-  done++;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+let done = 0, i = 0;
+// Ctrl+C o oprește curat, fără să lase o rundă la jumătate.
+let stopping = false;
+process.on("SIGINT", () => {
+  if (stopping) process.exit(130);
+  stopping = true;
+  line("\n\n⏹  Opresc după runda curentă. Încă un Ctrl+C forțează.");
+});
+
+while (!stopping) {
+  i++;
+  const ok = await round(i);
+  if (ok) done++;
+  else {
+    line(`\nOprit la runda ${i}. Rundele terminate: ${done}.`);
+    // În --watch o rundă picată nu e sfârșitul lumii, DAR nu insistăm orbește:
+    // dacă testele pică, problema nu se rezolvă repetând. Ieșim.
+    break;
+  }
+  if (!WATCH && i >= ROUNDS) break;
+  if (stopping) break;
+  if (WATCH) {
+    line(`\n⏸  Pauză ${EVERY_MIN} min. Ctrl+C oprește. (runde reușite: ${done})\n`);
+    await sleep(EVERY_MIN * 60_000);
+  }
 }
 rule();
-line(`${done}/${ROUNDS} runde. Jurnale în .agent-loop/`);
+line(`${done} ${done === 1 ? "rundă reușită" : "runde reușite"}. Jurnale în .agent-loop/`);
 line(`Ramura: ${currentBranch()}${PUSH ? " (pushată)" : " (nepushată — adaugă --push)"}`);
+if (!WATCH) line(`Continuu: node scripts/agent-loop/run.mjs --watch --every 15 --push`);
 rule();

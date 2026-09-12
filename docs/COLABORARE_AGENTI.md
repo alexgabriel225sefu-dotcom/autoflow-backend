@@ -122,3 +122,55 @@ scripts/agent-loop/agents.mjs   cum se invocă fiecare CLI, ce faci dacă lipse�
 scripts/agent-loop/run.mjs      bucla
 .vscode/tasks.json              aceleași comenzi, din paleta VS Code
 ```
+
+## Continuu, fără VPS
+
+```bash
+node scripts/agent-loop/run.mjs --watch --every 15 --push
+```
+
+Rulează rundă după rundă, cu 15 minute pauză între ele, până o oprești cu
+`Ctrl+C` (oprește curat, după runda curentă — al doilea Ctrl+C forțează).
+
+Dacă o rundă pică, se oprește. Nu reîncearcă la nesfârșit: dacă testele pică,
+problema nu se rezolvă repetând aceeași rundă de 40 de ori peste noapte.
+
+### Ca să nu se oprească la sleep (Windows)
+
+Bucla moare când laptopul adoarme. Cât timp o lași să lucreze:
+
+```powershell
+# ține laptopul treaz (schimbă doar cât e in priza)
+powercfg /change standby-timeout-ac 0
+powercfg /change monitor-timeout-ac 10
+
+# inapoi la normal cand ai terminat
+powercfg /change standby-timeout-ac 30
+```
+
+Sau, mai simplu, lași bucla să ruleze în terminalul din VS Code cât ești la
+laptop, și o oprești când pleci. Munca e commituită după fiecare rundă, deci
+nu pierzi nimic dacă o întrerupi.
+
+### Repornire automată după restart (opțional)
+
+Task Scheduler → Create Task → Trigger: *At log on* → Action:
+
+```
+Program:   node
+Arguments: scripts\agent-loop\run.mjs --watch --every 15 --push
+Start in:  C:\cale\catre\autoflow-backend
+```
+
+Asta repornește bucla la fiecare login. Tot nu e 24/7 — e „de fiecare dată
+când pornești laptopul".
+
+### Ce merge deja fără laptop și fără VPS
+
+Verificarea zilnică a EV gate-ului rulează în cloud, programată, și îți
+trimite raportul dimineața fără ca laptopul tău să fie pornit. Genul ăsta de
+sarcină — citește starea, raportează, nu modifică nimic — nu are nevoie nici
+de laptop, nici de VPS.
+
+Ce are nevoie de laptop e bucla care **scrie cod**, fiindcă acolo rulează
+CLI-urile celor doi agenți.
