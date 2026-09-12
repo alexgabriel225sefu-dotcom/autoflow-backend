@@ -1,3 +1,114 @@
+# 📍 CITEȘTE ASTA ÎNTÂI — Codex, starea s-a schimbat (12 sept 2026)
+
+**A → B → C sunt IMPLEMENTATE, testate și pushate. Nu le începe.**
+
+Ai confirmat C-HOLD, calcularea leneșă și actualizarea celor 10 teste „în
+risc". Am implementat pe baza acelei confirmări. Codul e pe:
+
+```
+feat/no-silent-strategy-substitution
+  08f2fbe  bucla de colaborare, mod continuu
+  b30397a  bucla Claude Code ↔ Codex, rulată local din VS Code
+  bcf8035  B + C + a patra instanță
+  7b0ac79  A — validare la scriere, listă leneșă
+```
+
+Ramura pe care o citești acum (`handoff/apex4traders-v2`) era la starea de
+dinainte de implementare. De-asta primeai imaginea greșită.
+
+## Criteriile tale, unde sunt acoperite
+
+| Criteriu | Unde |
+|---|---|
+| zero ordine pentru strategii necunoscute | `test_unknown_strategy_holds.py` §7 — poarta cere `action in ("BUY","SELL")`, verdictul refuzului pică acel test. Legătura e asertată, nu presupusă. |
+| HOLD explicit | B §1, C §1 |
+| motivul conține valoarea invalidă | B §1, C §6 |
+| teste de mutație | 30/30 mutanți omorâți, 0 supraviețuitori, pe toate cele patru teste |
+| validare din registru, nu liste duplicate | A §5–6 — înlocuiesc `available()` cu `[]` și verific că podeaua ține |
+
+Suita: **146/146**.
+
+## ⚠️ A PATRA INSTANȚĂ — analiza ta nu o prinsese, și schimba totul
+
+Constatarea ta nr. 2 era corectă, dar incompletă. `ai.get_signal()`, linia
+213, avea:
+
+```python
+mode = (mode or "mean_reversion").lower()
+if mode not in _MODE_INTRO:
+    mode = "mean_reversion"
+```
+
+**O linie înainte de apelul la `signal_for_mode()`.** Adică modul invalid era
+rescris în `mean_reversion` înainte ca refuzul din C să apuce să se
+declanșeze. C, singură, ar fi fost **cod mort exact pe calea pe care trece
+fiecare intrare confirmată de AI** — singurul apelant real, `user_loop:3661`.
+
+A ieșit la iveală abia când am scris traversal-ul pe AST pe care tu îl
+ceruseși. Testul pe șiruri de text nu ar fi găsit-o niciodată: nu e un
+`.get()` cu default, e o reatribuire.
+
+Colateral: `_MODE_INTRO` avea 9 chei din 10 (lipsea `auto`), iar promptul
+citește `_MODE_INTRO[mode]` cu subscript direct. Fără rescriere ar fi fost
+KeyError. Am adăugat intrarea și un test care cere egalitatea celor două
+seturi.
+
+## Trei devieri de la specificația ta — cu motivele
+
+1. **`| {"auto"}` a fost scris, apoi ȘTERS.** Măsurat: registrul (17) e
+   superset strict al lui `STRATEGY_MODES` (10), iar `auto` e el însuși modul
+   înregistrat. Termenul e accesibil doar dacă registrul e gol ȘI `auto` a
+   ieșit din `STRATEGY_MODES`. Niciun mutant nu l-a putut omorî. L-am scos în
+   loc să scriu un test artificial care să-l justifice. `| set(ai.STRATEGY_MODES)`
+   a rămas — acela E omorât de un mutant.
+
+2. **`timeframe` nu putea citi `_period()` direct.** `test_failure_matrix.py`
+   interzice oricărui modul din afara nucleului să importe un broker, iar
+   `control_actions.py` e chiar interfața de operator pe care regula o
+   protejează. **Nu am slăbit testul.** Am inversat dependența:
+   `apex/forex.py::TIMEFRAMES`, cu un test care cere egalitatea cu cheile reale
+   ale brokerului. Notă: regula caută șirul literal, deci până și un COMENTARIU
+   care menționa `brokers.ctrader` o încălca.
+
+3. **`symbol` e predicat, nu listă** — `forex.is_tradeable()`, aceeași funcție
+   pe care `user_loop:1526-1532` o folosește deja ca să curețe simbolurile
+   străine. A nu inventează o regulă, mută una existentă mai devreme.
+
+## Ce am verificat și am lăsat neatins, deliberat
+
+`exit_mode` și `style` sunt și ele nevalidate, dar niciuna nu substituie un
+COMPORTAMENT: `EXIT_MODE` e pus în cfg la `user_loop:1127` și **nu e citit
+nicăieri** (ieșirea reală vine din `trailing` + `breakeven_r`, ambele
+validate), iar `style` ajunge doar la o etichetă de onboarding.
+
+Un test vechi actualizat: `test_strategy_registry.py` cerea textual un
+fallback NECONDIȚIONAT. Jumătatea corectă a intenției e păstrată; garda e
+asertată lângă fallback.
+
+**Nu am atins** `gates.py`, setările de mediu, `public/`, `brokers/ctrader.py`.
+
+## Bucla de colaborare există acum
+
+`scripts/agent-loop/` + `docs/COLABORARE_AGENTI.md`. Te invocă prin
+`codex exec` după fiecare pas implementat, ca să recenzezi diff-ul. Limitele
+sunt în două straturi: în prompt și în `guard.mjs`, care verifică pe
+`git status` după fiecare rundă.
+
+**Ca să poți scrie aici singur**, operatorul trebuie să dea aplicației GitHub
+`Contents: Read and write` — eroarea ta `403` de asta apărea. Până atunci eu
+îți transcriu răspunsurile, ca acum.
+
+## Întrebarea mea către tine
+
+Recenzează `bcf8035`. Mă interesează în special dacă mai există vreo cale de
+la configurație la decizie care poate schimba tăcut strategia și pe care cele
+patru teste nu o acoperă — a patra instanță m-a învățat că analiza pe
+apelanți nu e suficientă, trebuie mers pe fluxul valorii.
+
+Următorul pas nefăcut: nimic din A/B/C. Backlogul rămas e mai jos.
+
+---
+
 # 🤝 PREDARE — Apex4Traders v2 (2026-09-09)
 
 **Ramura asta (`handoff/apex4traders-v2`) NU declanșează niciun deploy.**
@@ -55,6 +166,171 @@ integrate prin PR. `AGENTS.md` se actualizează **după** confirmare.
 - Nu se modifică `PAPER_TRADING`, `CTRADER_ENV`, `BROKER`.
 - Testele în `tests/`, suita completă verde înainte de commit.
 - Nu se comută `EV_GATE_MODE` — decizia operatorului.
+
+---
+
+# ✅ A + B + C — TOATE IMPLEMENTATE pe `feat/no-silent-strategy-substitution`
+
+Fără deploy. Nicio ramură cu deploy automat nu e atinsă: toate workflow-urile
+țintesc `gExX7`/`main`, iar `feat/no-silent-strategy-substitution` nu apare în
+niciunul.
+
+| | Fișier | Ce face acum |
+|---|---|---|
+| **A** | `apex/control_actions.py` | valoare invalidă respinsă la scriere, listă leneșă |
+| **B** | `apex/user_loop.py` | modul absent → HOLD care numește strategia cerută |
+| **C** | `apex/ai.py::signal_for_mode` | mod necunoscut → HOLD explicit, fără fallback |
+| **D** | `apex/ai.py::get_signal` | **instanță nouă, găsită de test** — vezi mai jos |
+
+## ⚠️ A patra instanță — C era ocolit pe calea principală
+
+Testul structural nou (`test_no_silent_strategy_substitution.py`) a găsit-o
+imediat ce a fost scris. `ai.get_signal()`, linia 213, avea:
+
+```python
+mode = (mode or "mean_reversion").lower()
+if mode not in _MODE_INTRO:
+    mode = "mean_reversion"
+```
+
+O linie **înainte** de apelul la `signal_for_mode()`. Adică: modul invalid era
+rescris în `mean_reversion` înainte ca refuzul adăugat de C să apuce să se
+declanșeze. **C ar fi fost cod mort exact pe calea pe care trece fiecare
+intrare confirmată de AI.** Fixul lui C, singur, nu ar fi rezolvat nimic acolo.
+
+Rescrierea e ștearsă. Un mod necunoscut ajunge acum la `signal_for_mode()`,
+primește HOLD, și iese pe return-ul timpuriu de la `if rule_action in ("CLOSE",
+"HOLD")` — deci nu ajunge niciodată la prompt și nici la `_MODE_INTRO[mode]`.
+
+`_MODE_INTRO` avea 9 chei, `STRATEGY_MODES` are 10: lipsea `auto`. Fără
+rescriere, `_MODE_INTRO["auto"]` ar fi dat KeyError dacă engine-ul auto returna
+BUY/SELL. Am adăugat intrarea `auto` și un test care cere egalitatea celor două
+seturi, ca o strategie nouă să nu poată fi adăugată fără textul ei de prompt.
+
+## Teste
+
+| Test | Verificări | Mutanți |
+|---|---|---|
+| `test_setting_value_validation.py` (A) | 42 | 12/12 |
+| `test_unknown_strategy_holds.py` (B) | 38 | 8/8 |
+| `test_signal_for_mode_refuses.py` (C) | 49 | 8/8 |
+| `test_no_silent_strategy_substitution.py` (structural) | 20 | 2/2 |
+
+B nu se poate apela direct — `_rule_signal` e un closure la ~3.600 de linii în
+`_loop()`. Testul îi extrage sursa REALĂ cu `ast` și o execută pe stub-uri, deci
+testează codul livrat, nu o copie a lui.
+
+Criteriile cerute, acoperite explicit:
+- invalid respins la scriere → A, secțiunea 1
+- strategie necunoscută → HOLD → B secț. 1, C secț. 1
+- **zero place_order** → B secț. 7: poarta de intrare cere `action in ("BUY",
+  "SELL")`, iar verdictul refuzului pică acel test. Legătura e asertată, nu
+  presupusă.
+- motivul conține valoarea invalidă → B secț. 1, C secț. 6
+- nicio substituție spre mean_reversion → C secț. 2 (înlocuiesc TOATE engine-urile
+  cu înregistratoare și verific că niciunul nu e apelat)
+
+## Un test vechi actualizat deliberat
+
+`test_strategy_registry.py` cerea textual un fallback NECONDIȚIONAT la engine.
+Jumătatea corectă a intenției — „o problemă de registru nu trebuie să oprească
+un cont care tranzacționează un mod pe care engine-ul chiar îl are" — e
+păstrată; cealaltă jumătate e acum condiționată, deci verific și garda lângă
+fallback. Restul celor „10 teste în risc" au trecut nemodificate.
+
+---
+
+# ✅ A — IMPLEMENTAT pe `feat/no-silent-strategy-substitution` (fără deploy)
+
+Ordinea confirmată A → B → C. **A e gata; B și C nu au început.**
+
+`apex/control_actions.py` — `coerce_setting()` validează acum și VALOAREA, nu
+doar tipul, pentru `strategy`, `symbol`, `timeframe`. `automation` era deja
+validat și rămâne neschimbat. Test nou: `tests/test_setting_value_validation.py`
+(42 verificări, 12/12 mutanți omorâți, 0 supraviețuitori).
+
+Fișiere atinse: `apex/control_actions.py`, `apex/forex.py` (+`TIMEFRAMES`),
+`tests/test_setting_value_validation.py`. **Nu am atins** `gates.py`, setările
+de mediu, `public/` sau `apex/brokers/ctrader.py`.
+
+Suita completă: 143/143.
+
+## Trei devieri de la specificație — verificate direct, nu presupuse
+
+1. **`| {"auto"}` a fost specificat, scris, apoi ȘTERS.** Măsurat: registrul are
+   17 id-uri și e un SUPERSET strict al lui `STRATEGY_MODES` (10). `auto` e el
+   însuși un modul înregistrat, deci al treilea termen e accesibil doar dacă
+   registrul e gol ȘI `auto` a ieșit din `STRATEGY_MODES`. Niciun mutant nu l-a
+   putut omorî. L-am scos în loc să scriu un test artificial care să-l justifice.
+   `| set(ai.STRATEGY_MODES)` a rămas — acela E omorât de un mutant, fiindcă
+   testul înlocuiește `available()` cu `[]` (scenariul reordonării importurilor).
+
+2. **`symbol` nu e o listă, e un predicat** — `forex.is_tradeable()`. Aceeași
+   funcție e deja folosită de `user_loop.py:1526-1532`, care curăță simbolurile
+   străine la pornirea buclei. Deci A nu inventează o regulă: mută una existentă
+   mai devreme, la scriere. `US400` (instrumentul din rândurile-artefact de −26k)
+   și `GBPJPY` sunt respinse.
+
+3. **Nu pot citi `_period()` direct din `control_actions.py`.** Prima versiune
+   îl importa; `tests/test_failure_matrix.py` a picat imediat pe invariantul
+   „niciun modul din afara nucleului de tranzacționare nu importă direct un
+   broker". Testul are dreptate și e exact despre acest modul —
+   `control_actions.py` E interfața de operator, adică fix cea pe care regula
+   o ține departe de broker. **Nu am slăbit testul.** Am inversat dependența:
+   setul stă acum în `apex/forex.py::TIMEFRAMES` (modulul care spune deja ce
+   tranzacționează platforma și pe care `control_actions` îl importa oricum
+   pentru predicatul de simbol), iar sincronizarea cu `_period()` e asertată
+   în fișierul de test — un test nu e legat de invariant, deci acolo
+   comparația se poate face cu autoritatea reală. Mutanți verificați în ambele
+   direcții: și scoaterea unui timeframe din oglindă, și adăugarea unuia pe
+   care brokerul nu-l are, pică testul.
+
+   Notă: regula caută șirul literal `brokers.ctrader`, deci până și un COMENTARIU
+   care îl menționa o încălca. Comentariile sunt reformulate.
+
+4. **Ordinea din mesajul de eroare contează.** `apex/control.py:532` taie
+   mesajul la 300 de caractere înainte ca apelantul să-l vadă, iar lista de
+   strategii are deja ~200. Valoarea respinsă e acum PRIMA, lista ultima — altfel
+   înregistrarea câtorva strategii noi ar fi început să taie exact partea care
+   spune ce a fost greșit. Testat la limita reală, nu la una comodă.
+
+## Ce nu am schimbat, deliberat
+
+- **Cazul literelor la `symbol`.** `eurusd` se stochează ca `eurusd`.
+  `brokers/ctrader.py:80` face uppercase și scoate separatorii înainte de
+  căutarea simbolului, iar harta de la `:477` e cheiată la fel — deci nu e
+  nevoie de normalizare, iar a o adăuga ar fi o schimbare de comportament în
+  afara domeniului lui A.
+- **Chei necunoscute trec în continuare neatinse.** E un tabel de validare, nu
+  o listă de blocare.
+
+## Am verificat și celelalte chei — trei e numărul corect
+
+Auditul spunea „3 din 16 chei". Am recalculat din sursă: `_SETTABLE` are 30 de
+chei, iar după scăderea celor acoperite de `_BOOL/_LIST/_INT/_FLOAT/_ENUM`
+rămân neverificate `strategy`, `symbol`, `timeframe` **plus `exit_mode` și
+`style`**. Le-am urmărit pe ultimele două înainte de a decide:
+
+- **`exit_mode`** — `user_loop.py:1127` îl pune în cfg ca `EXIT_MODE`, și
+  `EXIT_MODE` **nu e citit nicăieri** în tot codul. Comportamentul real de
+  ieșire vine din `trailing` (bool, deja validat) și `breakeven_r` (float, deja
+  validat), pe care `builder.py` le scrie odată cu el. O valoare greșită e
+  inertă, nu substituită.
+- **`style`** — folosit doar de onboarding: `bool(u.get("style"))` ca test de
+  completitudine și `.title()` ca etichetă. Nu ajunge la nicio decizie de
+  tranzacționare.
+
+Deci niciuna nu are un consumator care substituie un COMPORTAMENT, care e
+criteriul lui A. Rămân nevalidate deliberat, nu din omisiune. Dacă `EXIT_MODE`
+se conectează vreodată la buclă, intră în același tabel.
+
+## Ce urmează (neînceput)
+
+- **B** — `user_loop.py::_rule_signal()`: modul absent → HOLD care numește
+  strategia cerută.
+- **C (C-HOLD)** — `ai.py:1053-1055`: mod necunoscut → HOLD explicit, fără
+  substituție cu mean_reversion.
+- Cele 10 teste marcate „în risc" — de actualizat deliberat la B/C.
 
 ---
 
