@@ -41,6 +41,38 @@ npm i -g @openai/codex
 codex login
 ```
 
+### Dacă PowerShell refuză npm
+
+```
+npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded because
+running scripts is disabled on this system.
+```
+
+Nu e o problemă de npm și nici de Codex — npm pe Windows are un wrapper
+`.ps1`, iar politica de execuție PowerShell îl refuză. Orice comandă npm ar
+pica la fel.
+
+Cea mai simplă rezolvare, fără să schimbi nimic în sistem — adaugă `.cmd`:
+
+```powershell
+npm.cmd i -g @openai/codex
+npm.cmd i -g @anthropic-ai/claude-code
+```
+
+Sau rezolvi o dată, pentru contul tău:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+`CurrentUser`, nu tot sistemul. `RemoteSigned` lasă scripturile locale să
+ruleze și cere semnătură pentru cele descărcate — e setarea normală de lucru.
+Nu folosi `Unrestricted` sau `Bypass` permanent: alea dezactivează protecția
+cu totul, iar aici nu ai nevoie de asta.
+
+`node` e un `.exe`, nu un `.ps1`, deci bucla însăși rulează chiar dacă
+politica ramane restrictiva.
+
 ⚠️ **Codex Desktop e o aplicație separată și nu îți dă comanda `codex`.**
 Aici a fost confuzia data trecută. Bucla are nevoie de comanda din terminal.
 Verifici cu `codex --version`. Dacă zice „command not found", nu e instalat,
