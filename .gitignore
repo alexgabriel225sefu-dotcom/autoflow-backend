@@ -31,3 +31,4 @@ apex-forex-bot/data/history/
 # whatever account exported it — committing one hands over the account.
 cookies.txt
 *cookies*.txt
+.agent-loop/

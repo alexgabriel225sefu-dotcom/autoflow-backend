@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Agenti: verifica mediul",
+      "type": "shell",
+      "command": "node scripts/agent-loop/run.mjs --check",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "detail": "Ce e instalat, pe ce ramura esti, e arborele curat. Ruleaza asta prima."
+    },
+    {
+      "label": "Agenti: o runda",
+      "type": "shell",
+      "command": "node scripts/agent-loop/run.mjs --rounds 1",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "detail": "Claude Code implementeaza -> teste -> Codex recenzeaza. Fara push."
+    },
+    {
+      "label": "Agenti: trei runde",
+      "type": "shell",
+      "command": "node scripts/agent-loop/run.mjs --rounds 3",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "detail": "Trei runde la rand. Se opreste singura daca pica testele."
+    },
+    {
+      "label": "Agenti: o runda + push",
+      "type": "shell",
+      "command": "node scripts/agent-loop/run.mjs --rounds 1 --push",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "detail": "Ca mai sus, plus push pe ramura curenta. Refuza ramurile cu deploy."
+    },
+    {
+      "label": "Teste: suita completa",
+      "type": "shell",
+      "command": "cd apex-forex-bot && for f in tests/test_*.py; do python3 \"$f\" >/dev/null 2>&1 || echo \"PICAT: $f\"; done; echo gata",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "detail": "146 de fisiere. Cateva minute."
+    }
+  ]
+}
