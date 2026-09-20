@@ -1,6 +1,6 @@
 # A → B → C — predare pentru recenzia Codex
 
-**STATUS:** READY_FOR_CODEX_REVIEW
+**STATUS:** READY_FOR_CODEX_REVIEW *(revizia 2 — ambele cereri din review rezolvate)*
 
 **BRANCH:** `claude/apex4traders-ab-c-hold` (pornit din `handoff/apex4traders-v2`)
 
@@ -43,12 +43,12 @@ Cele patru teste noi, cu numărul de verificări și mutanți omorâți:
 
 | Test | Verificări | Mutanți |
 |---|---|---|
-| `test_setting_value_validation.py` | 42 | 12/12 |
+| `test_setting_value_validation.py` | 45 | 13/13 |
 | `test_unknown_strategy_holds.py` | 35 | 8/8 |
-| `test_signal_for_mode_refuses.py` | 59 | 8/8 |
+| `test_signal_for_mode_refuses.py` | 80 | 9/9 |
 | `test_no_silent_strategy_substitution.py` | 21 | 2/2 |
 
-Total **157 verificări**, **30 de mutanți omorâți, zero supraviețuitori**.
+Total **181 verificări**, **32 de mutanți omorâți, zero supraviețuitori**.
 
 Cele opt teste marcate „în risc" în brief — toate trec:
 `test_control_actions`, `test_remote_config_allowlist`, `test_config_reaches_loop`,
@@ -86,27 +86,58 @@ Niciunul nu aruncă excepție. Niciunul nu poate produce o intrare.
 `user_loop.py` cere `action in ("BUY", "SELL")`; verdictul refuzului pică acel
 test. Asta e verificat în `test_unknown_strategy_holds.py`, secțiunea 7.
 
-**`gates.authorize_order` / `authorize_close` — necoate, neocolite.**
+**`gates.authorize_order` / `authorize_close` — neatinse, neocolite.**
+
+### Cei șase apelanți — acum exercitați în test, nu doar verificați manual
+
+Cerut de review. `test_signal_for_mode_refuses.py` secțiunea 8 invocă fiecare
+apelant cu un mod invalid și verifică patru lucruri: nu crapă, nu produce
+BUY/SELL, nu creează nimic executabil, și păstrează modul invalid acolo unde
+API-ul expune un motiv.
+
+| Apelant | Ce se asertează în plus |
+|---|---|
+| `ai.get_signal()` | motivul conține modul invalid |
+| `strategy_modules.signal()` | motivul conține modul invalid |
+| `strategy_modules.advise_risk()` | întoarce multiplicator, nu ordin; valoarea rămâne în banda 0,4–1,2 |
+| `strategy_modules.exit()` | `exit is False` — un refuz nu forțează ieșirea |
+| `telegram._sim_strategy()` | **zero tranzacții deschise**, sold neatins |
+| `scanner.scan_symbol()` | status `WATCH`/`INVALID`, **niciodată `READY`**; dovada păstrează modul |
+
+Apelanții sunt **exercitați, nu mock-uiți**. Un mock ar demonstra că ideea
+testului despre apelant e sigură, ceea ce nu e afirmația făcută aici.
+
+Mutant verificat: reintroducerea fallback-ului în `signal_for_mode()` face să
+pice **7 verificări doar în această secțiune**. Cel mai elocvent rezultat —
+`telegram._sim_strategy` trece de la `{"n": 0}` la **`{"n": 8}`**: opt
+tranzacții reale deschise pentru o strategie care nu există. Asta e exact ce
+făcea defectul.
 
 ---
 
 ## KNOWN_LIMITATIONS
 
-### 1. Termenul `| {"auto"}` nu e scris literal — dar mulțimea e identică
+### 1. ~~Termenul `| {"auto"}` nu e scris literal~~ — REZOLVAT în revizia 2
 
-Brief-ul cere o sursă **echivalentă cu**
-`set(strategy_api.available()) | set(ai.STRATEGY_MODES) | {"auto"}`.
+Cerut de review. Allowlist-ul e acum literal:
 
-Implementarea scrie `set(strategy_api.available()) | set(ai.STRATEGY_MODES)`.
+```python
+return set(strategy_api.available()) | set(ai.STRATEGY_MODES) | {"auto"}
+```
 
-Verificat prin execuție: **ambele produc exact 17 valori, diferență zero,
-`auto` prezent**. Motivul: `auto` e el însuși un modul înregistrat în registru
-ȘI o cheie în `STRATEGY_MODES`, deci al treilea termen e matematic redundant.
+Calcularea rămâne **leneșă, la apel** — `available()` apare în fișier doar în
+corpul funcției `_allowed_values()` și în docstring-ul ei, niciodată la nivel
+de modul. Comportamentul e neschimbat: aceleași 17 valori ca înainte.
 
-Fusese scris inițial, apoi eliminat: niciun mutant al funcției nu putea face
-testele să observe absența lui. Cod care nu poate eșua se citește ca o
-garanție fără să garanteze nimic. Dacă preferi termenul literal pentru
-lizibilitate, îl pun înapoi — nu schimbă comportamentul.
+Cu termenul restaurat am adăugat și **testul care îl face verificabil**.
+Motivul observației mele inițiale era că niciun mutant nu-i putea observa
+absența; acum `test_setting_value_validation.py` secțiunea 6 anulează
+**ambele** celelalte surse simultan (`available()` → `[]` și `STRATEGY_MODES`
+→ `{}`) și cere ca `auto` să supraviețuiască, iar restul nu. Mutant verificat:
+ștergerea termenului face testul să pice cu exact acea verificare.
+
+Un termen scris literal fără un test care să-l poată omorî ar fi rămas cod ce
+nu poate eșua. Acum nu mai e.
 
 ### 2. `timeframe` nu citește direct `_period()` — invariantul de arhitectură o interzice
 
@@ -142,7 +173,21 @@ with a USD leg, plus metals."`
 
 Conține cheia și valoarea respinsă. Dacă vrei totuși o enumerare, spune.
 
-### 5. `exit_mode` și `style` rămân nevalidate — deliberat
+### 5. Fixture-ul celor șase apelanți a cerut lumânări cu mișcare reală
+
+Prima versiune a secțiunii 8 folosea 260 de lumânări identice. Două teste au
+picat — `telegram._sim_strategy` cu `ZeroDivisionError`, iar
+`scanner.scan_symbol` cu „indicators failed". Cauza nu era codul testat:
+ATR-ul și indicatorii normalizați pe interval împart la amplitudinea barei, iar
+o serie constantă are amplitudine zero, deci apelantul nici nu ajungea la
+refuz.
+
+Am corectat **datele**, nu aserțiunile: o undă deterministă (sinus + drift
+ușor) menține toți indicatorii bine definiți fără ca testul să depindă de
+valori aleatoare. Motivul e scris în docstring-ul fixture-ului, ca următorul
+care îl atinge să nu creadă că lumânările plate sunt un fixture neutru.
+
+### 6. `exit_mode` și `style` rămân nevalidate — deliberat
 
 Sunt singurele alte chei din `_SETTABLE` fără validare de valoare, dar niciuna
 nu substituie un **comportament**: `EXIT_MODE` e pus în cfg la
@@ -194,9 +239,10 @@ textul ei de prompt.
    apelanți nu e suficientă — trebuie urmărit fluxul valorii, nu doar cine
    cheamă pe cine.
 
-2. **Decizia operatorului** pe cele două puncte deschise din limitări:
-   termenul `| {"auto"}` literal (nota 1) și enumerarea pentru `symbol`
-   (nota 4). Ambele sunt cosmetice; niciuna nu schimbă comportamentul.
+2. **Rămâne un singur punct deschis**: enumerarea pentru `symbol` în mesajul
+   de eroare (nota 4). `is_tradeable()` e predicat, nu listă — mesajul spune
+   regula. Dacă vrei totuși enumerare, spune. Cosmetic; nu schimbă
+   comportamentul.
 
 3. **Abia apoi** contractele RuleDoc și dashboard-ul din `ARCHITECTURE_V2.md`.
    Runda asta a închis substituția tăcută și a lăsat motorul fail-closed, care

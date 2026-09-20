@@ -159,7 +159,156 @@ check("nor is a normal verdict", call_raw("mean_reversion") is not None)
 check("both are dicts", isinstance(call_raw("trend_following"), dict)
       and isinstance(call_raw("mean_reversion"), dict))
 
-print("\n8. STRATEGY_MODES was left exactly as it was found")
+print("\n8. Every one of the six callers, exercised for real")
+# Sections 1-7 prove the FUNCTION refuses. This proves the refusal is safe
+# everywhere it lands. Each caller is invoked with an invalid mode and checked
+# on four things: it does not raise, it yields no BUY/SELL, it produces nothing
+# executable, and it keeps the invalid mode wherever its API exposes a reason.
+#
+# Callers are exercised, not mocked. A mock would prove the test's idea of the
+# caller is safe, which is not the claim being made.
+BAD = "strategie_inexistenta"
+
+def _make_candles(n=260):
+    """Candles with real movement.
+
+    Flat candles are not a neutral fixture: ATR and range-normalised
+    indicators divide by the bar range, so a constant series raises
+    ZeroDivisionError inside indicators.analyze() and the caller never reaches
+    the refusal this section is about. A deterministic wave keeps every
+    indicator well-defined without making the test depend on random data.
+    """
+    import math
+    out = []
+    for i in range(n):
+        base = 1.10 + 0.004 * math.sin(i / 9.0) + 0.00002 * i
+        hi = base + 0.0012 + 0.0004 * abs(math.cos(i / 4.0))
+        lo = base - 0.0012 - 0.0004 * abs(math.sin(i / 5.0))
+        out.append({"open": round(base - 0.0002, 6), "high": round(hi, 6),
+                    "low": round(lo, 6), "close": round(base, 6),
+                    "volume": 100 + (i % 17),
+                    "time": 1789000000 + i * 3600})
+    return out
+
+
+_candles = _make_candles()
+
+
+def _market(pos=None):
+    from apex import strategy_api as _sa
+    return _sa.Market(_candles, symbol="EURUSD", indicators={}, strat={},
+                      open_position=pos, price=1.1, balance=1000,
+                      timeframe="1h")
+
+
+def _module_with_bad_mode():
+    """A real StrategyModule subclass whose mode is the invalid one.
+
+    The strategy modules are imported HERE, not at the top: the registry fills
+    as a side effect of importing them, and every section above this one needs
+    it in whatever state it already was.
+    """
+    import apex.strategy_modules  # noqa: F401  (registers by import)
+    from apex import strategy_api as _sa
+    _trend = _sa.get("trend")
+    assert _trend is not None, "registry did not populate — cannot build probe"
+    base = _trend.__class__
+
+    class _Probe(base):
+        strategy_id = "probe_invalid_mode"
+        strategy_version = "0.0.1-test"
+        mode = BAD
+
+    return _Probe()
+
+
+def caller(name, fn, *, reason_of=None):
+    """Run one caller; report raise / entry action / invalid-mode retention."""
+    try:
+        out = fn()
+    except Exception as e:
+        check(f"{name}: does not raise", False, f"{type(e).__name__}: {e}")
+        return None
+    check(f"{name}: does not raise", True)
+    act = (out or {}).get("action") if isinstance(out, dict) else None
+    check(f"{name}: no BUY/SELL", act not in ("BUY", "SELL"), f"action={act!r}")
+    if reason_of is not None:
+        why = reason_of(out) or ""
+        check(f"{name}: the reason still names {BAD!r}", BAD in why, why[:70])
+    return out
+
+
+# 1 — ai.get_signal()
+caller("ai.get_signal", lambda: ai.get_signal({}, 1000, None, {}, mode=BAD),
+       reason_of=lambda o: o.get("reasoning", ""))
+
+# 2-4 — the three StrategyModule entry points
+_probe = _module_with_bad_mode()
+caller("strategy_modules.signal", lambda: _probe.signal(_market()),
+       reason_of=lambda o: o.get("reasoning", ""))
+
+_adv = caller("strategy_modules.advise_risk",
+              lambda: _probe.advise_risk(_market()))
+check("strategy_modules.advise_risk: returns a multiplier, not an order",
+      isinstance(_adv, dict) and "multiplier" in _adv, str(_adv)[:70])
+check("...and the multiplier stays inside the clamped band",
+      _adv and 0.4 <= _adv.get("multiplier", 0) <= 1.2,
+      str(_adv.get("multiplier") if _adv else None))
+
+_pos = {"side": "BUY", "entryPrice": 1.1, "quantity": 1000, "symbol": "EURUSD"}
+_ex = caller("strategy_modules.exit", lambda: _probe.exit(_market(_pos)),
+             reason_of=lambda o: o.get("reason", ""))
+check("strategy_modules.exit: does not force an exit on a refusal",
+      _ex is not None and _ex.get("exit") is False, str(_ex)[:70])
+
+# 5 — telegram._sim_strategy(): a backtest loop. A refusal must open no trade.
+from apex import telegram as _tg  # noqa: E402
+
+_sim = None
+try:
+    _sim = _tg._sim_strategy(BAD, _candles, "EURUSD", 20, 40, 0.01, 1000.0)
+    check("telegram._sim_strategy: does not raise", True)
+except Exception as e:
+    check("telegram._sim_strategy: does not raise", False,
+          f"{type(e).__name__}: {e}")
+check("telegram._sim_strategy: zero trades opened",
+      _sim is not None and _sim.get("n") == 0, str(_sim))
+check("telegram._sim_strategy: balance untouched",
+      _sim is not None and abs(_sim.get("net", 1)) < 1e-9, str(_sim))
+
+# 6 — scanner.scan_symbol(): must yield no executable setup.
+from apex import scanner as _scanner, setups as _setups  # noqa: E402
+
+
+class _Broker:
+    def get_candles(self, symbol, timeframe, n):
+        return _candles
+
+
+class _Cfg:
+    TIMEFRAME = "1h"
+    STRATEGY = BAD
+    STOP_LOSS_PIPS = 20
+
+
+_cand = None
+try:
+    _cand = _scanner.scan_symbol(_Broker(), _Cfg(), "EURUSD")
+    check("scanner.scan_symbol: does not raise", True)
+except Exception as e:
+    check("scanner.scan_symbol: does not raise", False,
+          f"{type(e).__name__}: {e}")
+check("scanner.scan_symbol: no executable setup",
+      _cand is not None and _cand.status in (_setups.WATCH, _setups.INVALID),
+      str(getattr(_cand, "status", None)))
+check("scanner.scan_symbol: status is never READY",
+      _cand is not None and _cand.status != _setups.READY,
+      str(getattr(_cand, "status", None)))
+check("scanner.scan_symbol: the evidence keeps the invalid mode",
+      _cand is not None and BAD in str(getattr(_cand, "evidence", "")),
+      str(getattr(_cand, "evidence", ""))[:80])
+
+print("\n9. STRATEGY_MODES was left exactly as it was found")
 check("all engines restored after the recorder swaps",
       all(callable(m["engine"]) and not isinstance(m["engine"], _Recorder)
           for m in ai.STRATEGY_MODES.values()))

@@ -126,29 +126,30 @@ def _allowed_values(key):
         return set(_ENUM_KEYS[key])
     if key == "strategy":
         from apex import ai, strategy_api
-        # MEASURED, not assumed: the registry holds 17 ids and is a strict
-        # SUPERSET of STRATEGY_MODES (10) — "auto" included, as a registered
-        # module like any other. STRATEGY_MODES therefore adds nothing today
-        # and is here as a floor against one specific failure, not as a
-        # description of the sets.
+        # Three terms, spelled out, because this is the agreed contract for
+        # what a client may set — not a derivation to be re-optimised.
         #
-        # That failure: the registry is populated by IMPORT SIDE EFFECT, and
-        # this module imports no strategy module (it cannot — the cycle runs
-        # back through user_loop). available() is non-empty here only because
-        # user_loop, imported at the top of this file, pulls them in
-        # transitively. An import reorder upstream would empty it, and a
-        # validator whose allowlist is empty rejects EVERYTHING — taking the
-        # product down rather than degrading. STRATEGY_MODES is the floor that
-        # keeps the core modes writable if that happens, and
-        # tests/test_setting_value_validation.py stubs available() to [] to
-        # prove it.
+        # MEASURED today: the registry holds 17 ids and is a strict SUPERSET
+        # of STRATEGY_MODES (10), "auto" among them as a registered module
+        # like any other. So the second and third terms add no value to the
+        # union RIGHT NOW, and that is fine: each is a floor, and a floor is
+        # supposed to be redundant until the day it is not.
         #
-        # A third term, | {"auto"}, was specified and written, then removed:
-        # it is reachable only if the registry is empty AND "auto" has left
-        # STRATEGY_MODES, and no mutation of this function could make the
-        # tests notice its absence. Dead code that cannot fail is worse than
-        # no code — it reads as a guarantee while guaranteeing nothing.
-        return set(strategy_api.available()) | set(ai.STRATEGY_MODES)
+        # What STRATEGY_MODES defends: the registry is populated by IMPORT
+        # SIDE EFFECT, and this module imports no strategy module (it cannot —
+        # the cycle runs back through user_loop). available() is non-empty
+        # here only because user_loop, imported at the top of this file, pulls
+        # them in transitively. An import reorder upstream would empty it, and
+        # a validator whose allowlist is empty rejects EVERYTHING, taking the
+        # product down rather than degrading. tests/
+        # test_setting_value_validation.py stubs available() to [] to prove
+        # the core modes stay writable.
+        #
+        # What {"auto"} defends: "auto" is what onboarding writes and what the
+        # loop reads to mean "pick per regime". It is the one value whose
+        # unsettability would be felt by every new client at once, so it is
+        # named here rather than inherited from either map.
+        return set(strategy_api.available()) | set(ai.STRATEGY_MODES) | {"auto"}
     if key == "timeframe":
         # forex.TIMEFRAMES rather than the broker's own `_period()` map, even
         # though that map is the authority: test_failure_matrix.py forbids any

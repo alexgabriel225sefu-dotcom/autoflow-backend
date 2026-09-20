@@ -214,6 +214,27 @@ finally:
 check("registry restored", len(strategy_api.available()) == 17,
       str(len(strategy_api.available())))
 
+# The {"auto"} term is a third floor, below the other two. With the registry
+# empty it is still covered by STRATEGY_MODES, so proving it needs BOTH other
+# sources gone at once. That is a contrived state — and it is exactly why the
+# assertion has to exist: a term no test can kill is a term that reads as a
+# guarantee while guaranteeing nothing. Codex asked for the term spelled out;
+# this is what makes spelling it out mean something.
+_sa, _sm = strategy_api.available, ai.STRATEGY_MODES
+strategy_api.available = lambda: []
+ai.STRATEGY_MODES = {}
+try:
+    check("with BOTH the registry and STRATEGY_MODES empty, auto survives",
+          accepts("strategy", "auto"),
+          "the {\"auto\"} term is the only thing left holding it")
+    check("...and nothing else does",
+          rejects("strategy", "mean_reversion") and rejects("strategy", "trend"),
+          "the floor must hold one value, not re-open the gate")
+finally:
+    strategy_api.available, ai.STRATEGY_MODES = _sa, _sm
+check("both sources restored",
+      len(strategy_api.available()) == 17 and "auto" in ai.STRATEGY_MODES)
+
 print("\n7. forex.TIMEFRAMES still mirrors the broker's map exactly")
 # The validator cannot read _period() directly: test_failure_matrix.py forbids
 # any module outside the trading core from importing a broker, and
