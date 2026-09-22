@@ -13,7 +13,7 @@ const transitionVariants = {
       opacity: 1,
       filter: 'blur(0px)',
       y: 0,
-      transition: { type: 'spring', bounce: 0.3, duration: 1.5 },
+      transition: { type: 'spring' as const, bounce: 0.3, duration: 1.5 },
     },
   },
 };
@@ -37,7 +37,7 @@ export function HeroSection() {
                 container: { visible: { transition: { delayChildren: 1 } } },
                 item: {
                   hidden: { opacity: 0, y: 20 },
-                  visible: { opacity: 1, y: 0, transition: { type: 'spring', bounce: 0.3, duration: 2 } },
+                  visible: { opacity: 1, y: 0, transition: { type: 'spring' as const, bounce: 0.3, duration: 2 } },
                 },
               }}
               className="absolute inset-0 -z-20">
