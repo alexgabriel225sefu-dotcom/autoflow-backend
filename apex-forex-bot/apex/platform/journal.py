@@ -1,0 +1,141 @@
+"""JournalEntry — the record that answers "why was this order opened, or not?"
+
+Every evaluation and every execution produces one. The entry links the
+configuration, the reading, the verdict, the request and the broker's answer,
+so the question can be answered from stored data rather than reconstructed
+from logs.
+
+THE CORRELATION ID IS THE POINT. One evaluation may produce a decision, a
+request, a broker call and an error. All of them carry the same
+`correlation_id`, so the chain can be pulled back out in one query. Without it
+the pieces exist but cannot be joined, which is the same as not having them.
+
+NO SECRETS. `redact()` is applied on the way in, not on the way out: an entry
+that never held a token cannot leak one later through a log, an export or a
+support screenshot.
+"""
+
+import time
+import uuid
+
+# What produced the entry.
+EVALUATION = "evaluation"
+EXECUTION = "execution"
+BROKER_RESULT = "broker_result"
+ERROR = "error"
+KINDS = (EVALUATION, EXECUTION, BROKER_RESULT, ERROR)
+
+# Anything whose name looks like a credential is dropped, whatever its value.
+_SECRET_HINTS = ("token", "secret", "password", "apikey", "api_key",
+                 "client_secret", "access", "refresh", "authorization",
+                 "cookie", "session")
+
+
+def new_correlation_id():
+    return uuid.uuid4().hex
+
+
+def redact(obj, *, _depth=0):
+    """A copy with credential-looking keys removed.
+
+    Matches on the KEY, not the value: a token is still a token when it looks
+    like an ordinary string, and guessing from values would both miss real
+    secrets and mangle innocent data.
+    """
+    if _depth > 8:
+        return "<too deep>"
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            low = str(k).lower()
+            if any(h in low for h in _SECRET_HINTS):
+                out[k] = "<redacted>"
+            else:
+                out[k] = redact(v, _depth=_depth + 1)
+        return out
+    if isinstance(obj, (list, tuple)):
+        return [redact(v, _depth=_depth + 1) for v in obj]
+    return obj
+
+
+class JournalEntry:
+    """One link in the chain, already redacted."""
+
+    __slots__ = ("entry_id", "kind", "ts", "correlation_id", "user_id",
+                 "account_id", "rule_doc_id", "rule_doc_version", "symbol",
+                 "snapshot", "decision", "execution_request", "broker_result",
+                 "position", "error")
+
+    def __init__(self, *, kind, correlation_id, user_id, account_id=None,
+                 rule_doc_id=None, rule_doc_version=None, symbol=None,
+                 snapshot=None, decision=None, execution_request=None,
+                 broker_result=None, position=None, error=None, ts=None,
+                 entry_id=None):
+        if kind not in KINDS:
+            raise ValueError(f"kind must be one of {KINDS}, got {kind!r}")
+        if not correlation_id:
+            raise ValueError("a journal entry without a correlation id cannot "
+                             "be joined to the rest of its chain")
+        self.entry_id = entry_id or uuid.uuid4().hex
+        self.kind = kind
+        self.ts = float(ts if ts is not None else time.time())
+        self.correlation_id = correlation_id
+        self.user_id = str(user_id)
+        self.account_id = account_id
+        self.rule_doc_id = rule_doc_id
+        self.rule_doc_version = rule_doc_version
+        self.symbol = symbol
+        self.snapshot = redact(snapshot) if snapshot else None
+        self.decision = redact(decision) if decision else None
+        self.execution_request = (redact(execution_request)
+                                  if execution_request else None)
+        self.broker_result = redact(broker_result) if broker_result else None
+        self.position = redact(position) if position else None
+        self.error = error
+
+    def as_dict(self):
+        return {
+            "entryId": self.entry_id, "kind": self.kind, "ts": self.ts,
+            "correlationId": self.correlation_id, "userId": self.user_id,
+            "accountId": self.account_id, "ruleDocId": self.rule_doc_id,
+            "ruleDocVersion": self.rule_doc_version, "symbol": self.symbol,
+            "snapshot": self.snapshot, "decision": self.decision,
+            "executionRequest": self.execution_request,
+            "brokerResult": self.broker_result, "position": self.position,
+            "error": self.error,
+        }
+
+    def __repr__(self):
+        return (f"<JournalEntry {self.kind} {self.symbol or '-'} "
+                f"corr={self.correlation_id[:8]}>")
+
+
+def for_evaluation(decision, snapshot, *, correlation_id, user_id,
+                   account_id=None, ts=None):
+    """The entry every evaluation writes — including the ones that do nothing.
+
+    A HOLD is journalled too. "Why did nothing happen today?" is a question
+    clients ask, and it is unanswerable if only trades are recorded.
+    """
+    return JournalEntry(
+        kind=EVALUATION, correlation_id=correlation_id, user_id=user_id,
+        account_id=account_id, rule_doc_id=decision.rule_doc_id,
+        rule_doc_version=decision.rule_doc_version, symbol=decision.symbol,
+        snapshot=snapshot.as_dict() if snapshot else None,
+        decision=decision.as_dict(), ts=ts)
+
+
+def for_execution(request, *, correlation_id, ts=None):
+    return JournalEntry(
+        kind=EXECUTION, correlation_id=correlation_id,
+        user_id=request.user_id, account_id=request.account_id,
+        rule_doc_id=request.rule_doc_id,
+        rule_doc_version=request.rule_doc_version, symbol=request.symbol,
+        execution_request=request.as_dict(), ts=ts)
+
+
+def for_error(message, *, correlation_id, user_id, account_id=None,
+              symbol=None, ts=None):
+    return JournalEntry(
+        kind=ERROR, correlation_id=correlation_id, user_id=user_id,
+        account_id=account_id, symbol=symbol, error=str(message)[:500], ts=ts)
