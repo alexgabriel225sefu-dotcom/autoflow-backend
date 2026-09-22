@@ -221,13 +221,23 @@ try:
           "BUY" not in json.dumps(b) and "SELL" not in json.dumps(b))
 
     print("\n8. what is not built yet says so")
-    for cap in ("accounts", "positions", "orders", "journal",
-                "notifications"):
+    for cap in ("positions", "orders", "journal", "notifications"):
         st, b = call("GET", f"/api/v1/{cap}")
         check(f"{cap} answers 501 UNSUPPORTED, not an empty list",
               st == 501 and b["error"]["code"] == "UNSUPPORTED", str(st))
         check(f"{cap} returns no fabricated data",
               "ok" in b and b["ok"] is False)
+    # accounts left this list once the cTrader link was built. Its empty list
+    # is now a FACT — the link says nothing is connected — rather than the
+    # placeholder an unbuilt endpoint would have returned.
+    st, b = call("GET", "/api/v1/accounts")
+    check("accounts reports the real link state instead of 501",
+          st == 200 and b["connected"] is False, f"{st} {b}")
+    check("and its empty list is backed by a stated connection status",
+          b["accounts"] == [] and "liveAllowed" in b, str(b))
+    check("live accounts are not permitted in this environment",
+          b["liveAllowed"] is False)
+
     st, b = call("POST", f"/api/v1/rules/{rid}/preview")
     check("a decision preview without a broker is 501, not a made-up verdict",
           st == 501 and b["error"]["code"] == "UNSUPPORTED", str(st))

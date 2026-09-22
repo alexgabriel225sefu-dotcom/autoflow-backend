@@ -501,7 +501,47 @@ def _start_dashboard_server():
             self.end_headers()
             self.wfile.write(body)
 
+        def _platform_api(self):
+            """The Apex4Traders platform API, mounted at /api/v1/.
+
+            TRANSPORT ONLY. Every decision — who the caller is, what they own,
+            whether they are licensed — is made in apex/platform/api.py, which
+            is tested without a socket anywhere near it. This method reads the
+            request and writes the reply, and that is all it is allowed to do.
+
+            Returns True when it handled the request. Anything outside the
+            /api/v1/ prefix returns False untouched, so the routes that were
+            here before behave exactly as they did: the body is read only
+            AFTER the prefix matches, because consuming it first would starve
+            whichever existing handler the request was actually for.
+            """
+            from apex.platform import api as platform_api
+            if not self.path.startswith(platform_api.PREFIX):
+                return False
+            raw = None
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if 0 < length <= 1_000_000:
+                    raw = self.rfile.read(length)
+            except Exception:
+                raw = None
+            # Only the Authorization header is forwarded. The platform API has
+            # no business reading cookies: the operator's dashboard session
+            # lives in one, and a client bearer token must never be able to
+            # ride in on it.
+            out = platform_api.handle(
+                self.command, self.path,
+                {"Authorization": self.headers.get("Authorization") or ""},
+                raw)
+            if out is None:
+                return False
+            status, payload = out
+            self._json(status, payload)
+            return True
+
         def do_POST(self):
+            if self._platform_api():
+                return
             # ── Dashboard login: the ONLY place the operator token is
             # presented, and it arrives in a body rather than a URL. What goes
             # back is a short-lived session id in an HttpOnly cookie.
@@ -791,6 +831,8 @@ def _start_dashboard_server():
                 self.end_headers()
 
         def do_GET(self):
+            if self._platform_api():
+                return
             # Railway healthcheck — fără auth, nu expune date
             if self.path.startswith("/health"):
                 self.send_response(200)

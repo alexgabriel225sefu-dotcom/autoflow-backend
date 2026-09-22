@@ -27,6 +27,7 @@ import json
 import re
 
 from apex.platform import conditions as _cond
+from apex.platform import ctrader_link as _link
 from apex.platform import identity as _id
 from apex.platform import licence as _lic
 from apex.platform import ruledoc as _rd
@@ -38,7 +39,6 @@ PREFIX = "/api/v1/"
 # frontend can grey a button out instead of discovering a 404, and so that
 # nothing here quietly returns a plausible empty answer in the meantime.
 _NOT_YET = {
-    "accounts": "connecting a cTrader account",
     "positions": "reading open positions",
     "orders": "reading orders",
     "journal": "the decision journal",
@@ -87,6 +87,13 @@ _RULE_VERSION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/versions/(\d{1,9})$")
 
 
+def _query(path):
+    """The query string as a flat dict. Only the callback needs it."""
+    from urllib.parse import parse_qs, urlparse
+    return {k: v[0] for k, v in
+            parse_qs(urlparse(path).query or "").items()}
+
+
 def handle(method, path, headers=None, body=None):
     """(status, payload), or None when the path is not ours.
 
@@ -98,7 +105,8 @@ def handle(method, path, headers=None, body=None):
     route = path[len(PREFIX):].split("?", 1)[0].strip("/")
     method = (method or "GET").upper()
     try:
-        return _dispatch(method, route, headers or {}, body)
+        return _dispatch(method, route, headers or {}, body,
+                         _query(path))
     except _id.AuthFailed as e:
         return _err(401, "AUTH_REQUIRED", str(e))
     except _id.AuthUnavailable as e:
@@ -106,6 +114,12 @@ def handle(method, path, headers=None, body=None):
         # the platform that cannot check right now, and telling them their
         # login is invalid would be a lie that also hides the real fault.
         return _err(503, "AUTH_UNAVAILABLE", str(e))
+    except _link.LinkConfigError as e:
+        # The platform is misconfigured, which is not the client's fault and
+        # must not read as one. 503, like every other "we cannot", never 400.
+        return _err(503, e.code, e.detail)
+    except _link.LinkError as e:
+        return _err(400, e.code, e.detail)
     except _lic.LicenceRequired as e:
         return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
     except _store.NotFound:
@@ -122,13 +136,53 @@ def handle(method, path, headers=None, body=None):
         return _err(400, "BAD_REQUEST", str(e))
 
 
-def _dispatch(method, route, headers, body):
+def _dispatch(method, route, headers, body, query=None):
     head = route.split("/", 1)[0]
     if head in _NOT_YET:
         _authenticate(headers)          # still refuse anonymous callers first
         return _err(501, "UNSUPPORTED",
                     f"{_NOT_YET[head]} is not connected yet",
                     capability=head)
+
+    # ── cTrader linking ─────────────────────────────────────────────────
+    # The callback is the ONLY unauthenticated route on this API, and it has
+    # to be: cTrader redirects the client's browser here, and a browser
+    # arriving from a redirect carries no bearer token. It is safe because it
+    # finishes nothing — it parks the code and hands back a nonce, and the
+    # link is completed by an authenticated call below.
+    if route == "ctrader/callback" and method == "GET":
+        return _ok(_link.handle_callback(query or {}), pendingOnly=True)
+
+    if route.startswith("ctrader/"):
+        action = route.split("/", 1)[1]
+        if method != "POST" and action not in ("status",):
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        # Connecting a broker account and disconnecting one are both
+        # irreversible from the client's point of view, so neither trusts a
+        # cached session.
+        p = _authenticate(headers, fresh=action in ("complete", "disconnect"))
+        if action == "status":
+            return _ok({"ctrader": _link.public_status(p.user_id)})
+        if action == "connect":
+            _id.require_verified_email(p)
+            return _ok(_link.begin(p.user_id))
+        if action == "complete":
+            _id.require_verified_email(p)
+            nonce = (_body(body) or {}).get("nonce")
+            return _ok({"ctrader": _link.complete(p.user_id, nonce)})
+        if action == "select":
+            return _ok({"ctrader": _link.select_account(
+                p.user_id, (_body(body) or {}).get("ctid"))})
+        if action == "disconnect":
+            return _ok(_link.disconnect(p.user_id))
+        return _err(404, "NOT_FOUND", "no such cTrader action")
+
+    # Accounts are the connected ones, read from the link. Never fabricated:
+    # a client with nothing connected gets connected=false and an empty list
+    # that is a FACT, not a placeholder.
+    if route == "accounts" and method == "GET":
+        p = _authenticate(headers)
+        return _ok(_link.public_status(p.user_id))
 
     if route == "me" and method == "GET":
         p = _authenticate(headers)
