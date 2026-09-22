@@ -30,6 +30,9 @@ from apex.platform import conditions as _cond
 from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
 from apex.platform import identity as _id
+from apex.platform import journal_store as _jstore
+from apex.platform import notifications as _notify
+from apex.platform import preview as _preview
 from apex.platform import licence as _lic
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
@@ -39,10 +42,10 @@ PREFIX = "/api/v1/"
 # Capabilities that arrive with the broker phase. Listed explicitly so the
 # frontend can grey a button out instead of discovering a 404, and so that
 # nothing here quietly returns a plausible empty answer in the meantime.
-_NOT_YET = {
-    "journal": "the decision journal",
-    "notifications": "the notification centre",
-}
+# Everything here is built. The map stays because the next capability to be
+# wired will use it, and because an endpoint that answers 501 by design is
+# better declared in one place than scattered through the dispatcher.
+_NOT_YET = {}
 
 
 def _err(status, code, message, **extra):
@@ -78,6 +81,8 @@ def _authenticate(headers, *, fresh=False):
 
 
 # ── routes ──────────────────────────────────────────────────────────────────
+_NOTIFY_RE = re.compile(r"^notifications/([A-Za-z0-9_-]{1,64})/read$")
+_JOURNAL_RE = re.compile(r"^journal/([A-Za-z0-9_-]{1,64})$")
 _ACCOUNT_RE = re.compile(
     r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders))?$")
 _RULE_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})$")
@@ -86,6 +91,20 @@ _RULE_ACTION_RE = re.compile(
     r"|version|preview)$")
 _RULE_VERSION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/versions/(\d{1,9})$")
+
+
+def _num(value, field):
+    """A number from a query string, or a refusal. Never a silent default.
+
+    A caller who writes ?limit=abc has a bug, and answering with the default
+    50 hides it behind a page that looks right.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field} must be a number, got {value!r}")
 
 
 def _query(path):
@@ -123,6 +142,15 @@ def handle(method, path, headers=None, body=None):
         return _err(400, e.code, e.detail)
     except _lic.LicenceRequired as e:
         return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
+    except _preview.PreviewRefused as e:
+        # INSUFFICIENT_DATA is a 422: the request was understood and the data
+        # to answer it was not there. A 400 would say the client malformed it.
+        return _err(422 if e.code == "INSUFFICIENT_DATA" else 400,
+                    e.code, e.detail)
+    except _notify.NotificationNotFound:
+        return _err(404, "NOT_FOUND", "no such notification")
+    except _jstore.JournalNotFound:
+        return _err(404, "NOT_FOUND", "no such journal entry")
     except _store.NotFound:
         return _err(404, "NOT_FOUND", "no such rule")
     except _store.OwnershipViolation:
@@ -205,6 +233,47 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         fn = _read.positions if route == "positions" else _read.orders
         return _ok(fn(p.user_id))
+
+    # ── notifications ───────────────────────────────────────────────────
+    if route == "notifications":
+        p = _authenticate(headers)
+        q = query or {}
+        if method == "GET":
+            return _ok(_notify.query(
+                p.user_id, type=q.get("type"),
+                unread_only=str(q.get("unread", "")).lower()
+                in ("1", "true", "yes"),
+                limit=_num(q.get("limit"), "limit") or 50,
+                offset=_num(q.get("offset"), "offset") or 0))
+        return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+
+    if route == "notifications/read-all" and method == "POST":
+        p = _authenticate(headers)
+        return _ok(_notify.mark_all_read(
+            p.user_id, type=(_body(body) or {}).get("type")))
+
+    m = _NOTIFY_RE.match(route)
+    if m and method == "POST":
+        p = _authenticate(headers)
+        return _ok(_notify.mark_read(p.user_id, m.group(1)))
+
+    # ── journal ─────────────────────────────────────────────────────────
+    if route == "journal" and method == "GET":
+        p = _authenticate(headers)
+        q = query or {}
+        return _ok(_jstore.query(
+            p.user_id,
+            account_id=q.get("accountId"), symbol=q.get("symbol"),
+            since=_num(q.get("since"), "since"),
+            until=_num(q.get("until"), "until"),
+            rule_doc_id=q.get("ruleDocId"), status=q.get("status"),
+            limit=_num(q.get("limit"), "limit") or 50,
+            offset=_num(q.get("offset"), "offset") or 0))
+
+    m = _JOURNAL_RE.match(route)
+    if m and method == "GET":
+        p = _authenticate(headers)
+        return _ok({"entry": _jstore.get(p.user_id, m.group(1))})
 
     if route == "me" and method == "GET":
         p = _authenticate(headers)
@@ -311,12 +380,12 @@ def _rule_action(action, rid, headers, body):
         return _ok({"rule": _store.next_version(p.user_id, rid)})
 
     if action == "preview":
-        # Deliberately 501 rather than a fabricated decision. A preview needs
-        # a real MarketSnapshot, which needs the broker connection that has
-        # not been built yet, and a made-up one would be the single most
-        # misleading screen on the platform.
-        return _err(501, "UNSUPPORTED",
-                    "previewing a decision needs a connected cTrader account",
-                    capability="preview")
+        # Read-only, and it stays that way because of what it does NOT touch:
+        # no broker is built, force_trade is never called, no gate is entered
+        # and no ExecutionRequest is created. The bars come from the caller,
+        # so a preview can never be a verdict reached on invented data.
+        doc = _store.get(p.user_id, rid)
+        return _ok(_preview.preview(doc,
+                                    (_body(body) or {}).get("snapshot")))
 
     return _err(404, "NOT_FOUND", "no such action")

@@ -189,11 +189,15 @@ try:
     check("the account is not connected until it is completed",
           b["ctrader"]["connected"] is False, str(b))
 
-    print("\n5. what is still unbuilt says so over HTTP too")
-    for cap in ("journal", "notifications"):
+    print("\n5. reads answer with a stated status, never a bare empty list")
+    # Nothing is 501 any more. What replaced it is a stronger claim: each of
+    # these says the store WAS read. Sections 8 and 9 then put real entries
+    # behind them.
+    for cap, key in (("journal", "entries"), ("notifications",
+                                              "notifications")):
         st, b = call("GET", f"/api/v1/{cap}")
-        check(f"{cap} is 501 UNSUPPORTED", st == 501 and
-              b["error"]["code"] == "UNSUPPORTED", str(st))
+        check(f"{cap} reads ok and empty", st == 200
+              and b["status"] == "ok" and b[key] == [], f"{st} {b}")
     st, b = call("GET", "/api/v1/accounts")
     check("accounts is no longer 501 — it reports the real link state",
           st == 200 and b["connected"] is False, f"{st} {b}")
@@ -340,6 +344,178 @@ try:
           st == 200 and b["connected"] is False, f"{st} {b}")
     check("and claims no positions", "positions" not in b, str(b))
 
+    print("\n8. the journal: real entries, filtered and paged")
+    from apex.platform import decision as _D
+    from apex.platform import journal_store as JS
+    from apex.platform import notifications as NF
+
+    st, b = call("GET", "/api/v1/journal")
+    check("a client who has done nothing gets an ok read, not a placeholder",
+          st == 200 and b["status"] == "ok" and b["entries"] == []
+          and b["total"] == 0, f"{st} {b}")
+
+    def _dec(verdict, symbol, code=None):
+        return _D.RuleDecision(verdict=verdict, rule_doc_id="rule-a",
+                               rule_doc_version=1, symbol=symbol,
+                               snapshot_ts=1000.0, reason="t",
+                               refusal_code=code,
+                               side=verdict if verdict in ("BUY", "SELL")
+                               else None)
+
+    JS.record_evaluation(_dec("HOLD", "EUR_USD"), None, correlation_id="c1",
+                         user_id=ALICE, account_id="501", ts=1000.0)
+    JS.record_evaluation(_dec("REJECT", "EUR_USD", "INSUFFICIENT_DATA"), None,
+                         correlation_id="c2", user_id=ALICE,
+                         account_id="501", ts=2000.0)
+    JS.record_evaluation(_dec("BUY", "GBP_USD"), None, correlation_id="c3",
+                         user_id=ALICE, account_id="502", ts=3000.0)
+    JS.record_error("cTrader socket closed", correlation_id="c4",
+                    user_id=ALICE, account_id="501", symbol="EUR_USD",
+                    ts=4000.0)
+    JS.record_position_closed({"symbol": "EUR_USD", "pnl": 12.5},
+                              correlation_id="c5", user_id=ALICE,
+                              account_id="501", ts=5000.0)
+    JS.record_evaluation(_dec("HOLD", "EUR_USD"), None, correlation_id="c9",
+                         user_id=BOB, account_id="777", ts=9000.0)
+
+    st, b = call("GET", "/api/v1/journal")
+    check("every entry comes back, newest first",
+          st == 200 and b["total"] == 5
+          and b["entries"][0]["correlationId"] == "c5", f"{st} {b['total']}")
+    check("each entry names which of the nine things it is",
+          [e["status"] for e in b["entries"]] ==
+          ["position_closed", "broker_error", "evaluated", "reject", "hold"],
+          str([e["status"] for e in b["entries"]]))
+    st, b = call("GET", "/api/v1/journal?status=hold")
+    check("filtering by status works",
+          b["total"] == 1 and b["entries"][0]["status"] == "hold", str(b))
+    st, b = call("GET", "/api/v1/journal?status=reject")
+    check("a REJECT is distinguishable from a HOLD",
+          b["total"] == 1 and b["entries"][0]["status"] == "reject", str(b))
+    st, b = call("GET", "/api/v1/journal?symbol=GBP_USD")
+    check("filtering by symbol works", b["total"] == 1, str(b["total"]))
+    st, b = call("GET", "/api/v1/journal?accountId=501")
+    check("filtering by account works", b["total"] == 4, str(b["total"]))
+    st, b = call("GET", "/api/v1/journal?ruleDocId=rule-a")
+    check("filtering by RuleDoc works", b["total"] == 3, str(b["total"]))
+    st, b = call("GET", "/api/v1/journal?since=2500&until=4500")
+    check("filtering by period works", b["total"] == 2, str(b["total"]))
+    st, b = call("GET", "/api/v1/journal?limit=2")
+    check("paging returns a page and says there is more",
+          len(b["entries"]) == 2 and b["hasMore"] is True and b["total"] == 5,
+          str(b["total"]))
+    st, b2 = call("GET", "/api/v1/journal?limit=2&offset=4")
+    check("the last page says there is no more",
+          len(b2["entries"]) == 1 and b2["hasMore"] is False, str(b2))
+    check("pages do not overlap",
+          b["entries"][0]["entryId"] != b2["entries"][0]["entryId"])
+    st, b = call("GET", "/api/v1/journal?status=not-a-status")
+    check("an unknown status is refused, not silently ignored",
+          st == 400, f"{st} {b}")
+    st, b = call("GET", "/api/v1/journal?limit=abc")
+    check("a non-numeric limit is refused rather than defaulted",
+          st == 400, f"{st} {b}")
+
+    one = call("GET", "/api/v1/journal?limit=1")[1]["entries"][0]
+    st, b = call("GET", f"/api/v1/journal/{one['entryId']}")
+    check("a single entry can be fetched", st == 200 and
+          b["entry"]["entryId"] == one["entryId"], f"{st} {b}")
+    as_user(BOB)
+    st, b = call("GET", f"/api/v1/journal/{one['entryId']}")
+    check("another client cannot read it", st == 404, f"{st} {b}")
+    st, b = call("GET", "/api/v1/journal")
+    check("and sees only their own", b["total"] == 1
+          and b["entries"][0]["correlationId"] == "c9", str(b["total"]))
+    as_user(ALICE)
+    check("no token appears anywhere in a journal page",
+          "ALICE-TOKEN-SECRET" not in json.dumps(
+              call("GET", "/api/v1/journal")[1]))
+
+    print("\n9. notifications, in the platform and not in Telegram")
+    st, b = call("GET", "/api/v1/notifications")
+    check("an empty centre is an ok read", st == 200
+          and b["notifications"] == [] and b["unread"] == 0, f"{st} {b}")
+    NF.notify(ALICE, type=NF.ACCOUNT, title="cTrader connected", ts=1000.0)
+    NF.notify(ALICE, type=NF.ORDER, title="Order refused",
+              level=NF.WARNING, ts=2000.0)
+    NF.notify(BOB, type=NF.SYSTEM, title="Bob only", ts=3000.0)
+    st, b = call("GET", "/api/v1/notifications")
+    check("both of Alice's arrive, newest first",
+          b["total"] == 2 and b["unread"] == 2
+          and b["notifications"][0]["title"] == "Order refused", str(b))
+    check("Bob's is not among them",
+          "Bob only" not in json.dumps(b))
+    st, b = call("GET", "/api/v1/notifications?type=order")
+    check("filtering by type works", b["total"] == 1, str(b["total"]))
+    check("but the unread badge still counts everything",
+          b["unread"] == 2, str(b["unread"]))
+    nid = b["notifications"][0]["id"]
+    st, b = call("POST", f"/api/v1/notifications/{nid}/read")
+    check("one can be marked read", st == 200 and b["unread"] == 1,
+          f"{st} {b}")
+    as_user(BOB)
+    st, b = call("POST", f"/api/v1/notifications/{nid}/read")
+    check("another client cannot mark it", st == 404, f"{st} {b}")
+    as_user(ALICE)
+    st, b = call("POST", "/api/v1/notifications/read-all")
+    check("all can be marked read", st == 200 and b["marked"] == 1
+          and b["unread"] == 0, f"{st} {b}")
+    st, b = call("POST", "/api/v1/notifications/read-all")
+    check("marking again marks nothing and is not an error",
+          st == 200 and b["marked"] == 0, f"{st} {b}")
+    st, b = call("GET", "/api/v1/notifications?unread=true")
+    check("nothing is unread afterwards", b["total"] == 0, str(b))
+
+    print("\n10. preview: a verdict, on the caller's bars, changing nothing")
+    import math as _math
+    bars = []
+    for i in range(120):
+        c = 1.1000 + 0.0050 * _math.sin(2 * _math.pi * i / 41)
+        bars.append({"open": c, "high": c + 0.0006, "low": c - 0.0006,
+                     "close": c})
+    rule = call("POST", "/api/v1/rules", body={
+        "name": "preview rule", "symbols": ["EUR_USD"], "timeframe": "1h",
+        "accountId": "501", "sides": "BUY",
+        "entry": {"combine": "AND", "conditions": [
+            {"id": "rsi", "params": {"op": "below", "value": 100}}]},
+        "exit": {"combine": "OR", "conditions": [
+            {"id": "rsi", "params": {"op": "above", "value": 70}}]}})[1]["rule"]
+    prid = rule["ruleDocId"]
+    before = call("GET", "/api/v1/journal")[1]["total"]
+
+    st, b = call("POST", f"/api/v1/rules/{prid}/preview",
+                 body={"snapshot": {"candles": bars, "ts": 1758542400.0}})
+    check("a preview on supplied bars returns a decision",
+          st == 200 and b["decision"]["verdict"] == "BUY", f"{st} {b}")
+    check("and states plainly that it is not executable",
+          b["executable"] is False and b["wouldTrade"] is True, str(b))
+    check("the decision names every condition it evaluated",
+          len(b["decision"]["conditions"]) == 1, str(b["decision"]))
+    check("previewing wrote nothing to the journal",
+          call("GET", "/api/v1/journal")[1]["total"] == before,
+          str(call("GET", "/api/v1/journal")[1]["total"]))
+    check("a draft can be previewed before it is ever activated",
+          rule["state"] == "draft")
+
+    st, b = call("POST", f"/api/v1/rules/{prid}/preview", body={"snapshot": {}})
+    check("no candles is INSUFFICIENT_DATA, not a verdict",
+          st == 422 and b["error"]["code"] == "INSUFFICIENT_DATA", f"{st} {b}")
+    st, b = call("POST", f"/api/v1/rules/{prid}/preview",
+                 body={"snapshot": {"candles": bars}})
+    check("no timestamp is refused — the evaluator must not pick one",
+          st == 422 and "ts" in b["error"]["message"], f"{st} {b}")
+    st, b = call("POST", f"/api/v1/rules/{prid}/preview", body={
+        "snapshot": {"candles": [{"open": 1, "high": 1, "low": 1}],
+                     "ts": 1758542400.0}})
+    check("a malformed candle is refused, not guessed at",
+          st == 422, f"{st} {b}")
+    as_user(BOB)
+    st, b = call("POST", f"/api/v1/rules/{prid}/preview",
+                 body={"snapshot": {"candles": bars, "ts": 1758542400.0}})
+    check("another client cannot preview somebody else's rule",
+          st == 404, f"{st} {b}")
+    as_user(ALICE)
+
     print("\n7. the read path cannot trade")
     import ast as _ast
     called = set()
@@ -353,6 +529,35 @@ try:
               forbidden not in called)
     check("it calls only the three read methods",
           {"get_all_positions", "get_pending_orders", "get_balance"} <= called)
+
+    # Preview must be just as incapable. It is checked the same way, and for
+    # imports too: a module that cannot reach a broker, a gate, the ledger or
+    # the execution controller has no expression that could place an order,
+    # whatever anyone later writes inside it.
+    _ptree = _ast.parse(open(os.path.join(
+        ROOT, "apex", "platform", "preview.py")).read())
+    p_called, p_imported = set(), set()
+    for node in _ast.walk(_ptree):
+        if isinstance(node, _ast.Attribute):
+            p_called.add(node.attr)
+        elif isinstance(node, _ast.Import):
+            p_imported.update(a.name for a in node.names)
+        elif isinstance(node, _ast.ImportFrom):
+            p_imported.add(node.module or "")
+    for forbidden in ("place_order", "close_position", "force_trade",
+                      "authorize_order", "authorize_close", "claim",
+                      "record", "submit", "build"):
+        check(f"preview.py never calls {forbidden}()",
+              forbidden not in p_called)
+    for module in ("broker", "gates", "ledger", "user_loop", "bridge",
+                   "journal", "execution"):
+        check(f"preview.py imports nothing from {module}",
+              not any(module in m for m in p_imported), str(p_imported))
+    check("and no telegram anywhere in the notification centre",
+          not any("telegram" in m.lower() for m in {
+              n.module or "" for n in _ast.walk(_ast.parse(open(os.path.join(
+                  ROOT, "apex", "platform", "notifications.py")).read()))
+              if isinstance(n, _ast.ImportFrom)}))
 finally:
     requests.get = _real_get
     shutil.rmtree(_TMP, ignore_errors=True)

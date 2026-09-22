@@ -221,12 +221,18 @@ try:
           "BUY" not in json.dumps(b) and "SELL" not in json.dumps(b))
 
     print("\n8. what is not built yet says so")
-    for cap in ("journal", "notifications"):
-        st, b = call("GET", f"/api/v1/{cap}")
-        check(f"{cap} answers 501 UNSUPPORTED, not an empty list",
-              st == 501 and b["error"]["code"] == "UNSUPPORTED", str(st))
-        check(f"{cap} returns no fabricated data",
-              "ok" in b and b["ok"] is False)
+    # journal and notifications are built now. Their empty answers are the
+    # result of a real read: status ok, total 0. That is a different claim
+    # from the 501 they used to give, and a stronger one — it says the store
+    # was consulted.
+    st, b = call("GET", "/api/v1/journal")
+    check("an empty journal is an ok read, not a placeholder",
+          st == 200 and b["status"] == "ok" and b["entries"] == []
+          and b["total"] == 0, f"{st} {b}")
+    st, b = call("GET", "/api/v1/notifications")
+    check("an empty notification centre is the same",
+          st == 200 and b["notifications"] == [] and b["unread"] == 0,
+          f"{st} {b}")
     # positions and orders left this list once the read-only broker views
     # were built. They answer 200 with connected:false for a client who has
     # linked nothing — and crucially WITHOUT a positions key, so nothing is
@@ -250,9 +256,14 @@ try:
     check("live accounts are not permitted in this environment",
           b["liveAllowed"] is False)
 
+    # Preview no longer refuses for want of a broker — it never needed one.
+    # It refuses for want of DATA, which is the honest reason, and it still
+    # never invents a verdict.
     st, b = call("POST", f"/api/v1/rules/{rid}/preview")
-    check("a decision preview without a broker is 501, not a made-up verdict",
-          st == 501 and b["error"]["code"] == "UNSUPPORTED", str(st))
+    check("a preview with no snapshot is 422 INSUFFICIENT_DATA",
+          st == 422 and b["error"]["code"] == "INSUFFICIENT_DATA", f"{st} {b}")
+    check("and no verdict is invented",
+          "decision" not in b and "BUY" not in json.dumps(b), str(b)[:90])
 
     print("\n9. malformed requests get a reason, not a stack trace")
     st, b = A.handle("POST", "/api/v1/rules", as_user("alice"), "{not json")

@@ -41,6 +41,7 @@ from apex import forex, indicators
 from apex.platform import decision as _dec
 from apex.platform import execution as _exec
 from apex.platform import journal as _journal
+from apex.platform import journal_store as _jstore
 
 # What the execution path can actually honour today, checked against
 # brokers/ctrader.py place_order(side, units, instrument, sl, tp).
@@ -170,10 +171,10 @@ def submit(rule_doc, decision, snapshot, *, user_id, account_id, mode,
                     account_id=account_id, mode=mode, balance=balance,
                     decision_id=decision_id)
     except (_exec.ExecutionRefused, BridgeRefused) as e:
-        entry = _journal.for_error(
+        entry = _jstore.append(_journal.for_error(
             f"{e.code}: {getattr(e, 'detail', str(e))}",
             correlation_id=correlation_id, user_id=user_id,
-            account_id=account_id, symbol=decision.symbol)
+            account_id=account_id, symbol=decision.symbol))
         return {"ok": False, "request": None, "result": None,
                 "refusal": {"code": e.code,
                             "detail": getattr(e, "detail", str(e))},
@@ -192,12 +193,18 @@ def submit(rule_doc, decision, snapshot, *, user_id, account_id, mode,
     lots = (float(sizing["fixedVolume"])
             if sizing.get("mode") == "fixed_volume" else None)
 
+    # Written BEFORE the controller is called. The gap between "sent" and
+    # whatever comes back is exactly where an ambiguous broker failure lives:
+    # if this process dies mid-call, the journal still shows an order left the
+    # platform, which is the only way anyone can go looking for it.
+    _jstore.record_order_sent(req, correlation_id=correlation_id)
+
     result = executor(user_id, req.side, symbol=req.symbol, lots=lots,
                       sl_override=req.stop_loss, tp_override=req.take_profit,
                       risk_override=risk, origin="rule")
 
-    entry = _journal.for_execution(req, correlation_id=correlation_id,
-                                   result=result)
+    entry = _jstore.record_execution(req, correlation_id=correlation_id,
+                                     result=result)
     return {"ok": bool((result or {}).get("ok", True)) and
             "error" not in (result or {}),
             "request": req, "result": result, "journal": entry}
