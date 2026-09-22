@@ -93,6 +93,36 @@ def stoch_rsi(closes, rsi_period=14, stoch_period=14, k_period=3, d_period=3):
     return {"k": last_k, "d": last_d}
 
 
+def stochastic(candles, k_period=14, d_period=3, smooth=3):
+    """Classic Stochastic Oscillator — %K/%D over price, not over RSI.
+
+    stoch_rsi() above is a DIFFERENT indicator (the stochastic OF the RSI) and
+    gives different numbers; a rule asking for "Stochastic" means this one.
+
+        raw %K = 100 x (close - lowest low) / (highest high - lowest low)
+        %K     = SMA(raw %K, smooth)      %D = SMA(%K, d_period)
+
+    A window where every bar shares one high and low makes that denominator
+    zero. That is a real market state (a dead session, a halted instrument),
+    not a bug, so it yields None rather than raising - the caller decides what
+    an undefined oscillator means.
+    """
+    n = len(candles)
+    raw = []
+    for i in range(n):
+        if i < k_period - 1:
+            raw.append(None)
+            continue
+        window = candles[i - k_period + 1: i + 1]
+        hh = max(c["high"] for c in window)
+        ll = min(c["low"] for c in window)
+        rng = hh - ll
+        raw.append(None if rng == 0 else 100.0 * (candles[i]["close"] - ll) / rng)
+    k = _positional_sma(raw, smooth)
+    d = _positional_sma(k, d_period)
+    return {"k": k, "d": d}
+
+
 def macd(closes, fast=12, slow=26, signal=9):
     ema_fast = ema(closes, fast)
     ema_slow = ema(closes, slow)

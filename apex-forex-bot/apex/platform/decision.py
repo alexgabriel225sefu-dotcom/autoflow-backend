@@ -46,6 +46,38 @@ MAX_POSITIONS_REACHED = "MAX_POSITIONS_REACHED"
 OUTSIDE_SCHEDULE = "OUTSIDE_SCHEDULE"
 SIDE_NOT_ALLOWED = "SIDE_NOT_ALLOWED"
 INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+DIRECTION_AMBIGUOUS = "DIRECTION_AMBIGUOUS"
+
+# Every code above stops the trade, but they do not mean the same thing to the
+# person reading the screen, and collapsing them would be dishonest in both
+# directions: it would make a broken rule look like a quiet market, and make a
+# spread ceiling doing its job look like a bug.
+#
+#   CONFIG_ERROR_CODES  the rule as written cannot run. The client must fix
+#                       something. Surface it loudly - this rule is dead until
+#                       they do.
+#   LIMIT_CODES         the rule is fine and a limit the client set stopped
+#                       this particular bar. Nothing to fix. Showing these as
+#                       errors would train clients to ignore real ones.
+CONFIG_ERROR_CODES = (RULE_INVALID, RULE_NOT_ACTIVE, UNKNOWN_CONDITION,
+                      CONDITION_ERROR, SYMBOL_NOT_IN_RULE, TIMEFRAME_MISMATCH,
+                      DIRECTION_AMBIGUOUS)
+LIMIT_CODES = (SPREAD_LIMIT_EXCEEDED, MAX_POSITIONS_REACHED, OUTSIDE_SCHEDULE,
+               SIDE_NOT_ALLOWED)
+#   DATA_CODES          neither. The rule is well-formed and no limit fired;
+#                       the inputs were not there. It is deliberately its own
+#                       category because it can be transient (a fresh symbol
+#                       with 40 bars of history will fix itself) or permanent
+#                       (an EMA(200) on a symbol that only ever returns 100
+#                       bars never will), and only the detail string knows
+#                       which. Filed under either of the other two it would be
+#                       either ignored forever or escalated forever.
+DATA_CODES = (INSUFFICIENT_DATA,)
+
+
+def is_config_error(code):
+    """True when a human has to change the rule before it can trade again."""
+    return code in CONFIG_ERROR_CODES
 
 
 class ConditionResult:
