@@ -516,6 +516,181 @@ try:
           st == 404, f"{st} {b}")
     as_user(ALICE)
 
+    print("\n11. demo automation: an explicit act, never a side effect")
+    from apex import user_loop as _UL
+    from apex.platform import automation as AU
+    from apex.platform import licence as LC
+
+    started_for, stopped_for = [], []
+    _real_start, _real_stop = _UL.start, _UL.stop
+    try:
+        _UL.start = lambda uid, alert_fn=None: (started_for.append(uid), True)[1]
+        _UL.stop = lambda uid: stopped_for.append(uid)
+
+        st, b = call("GET", "/api/v1/automation")
+        check("automation starts out stopped", st == 200
+              and b["state"] == "stopped", f"{st} {b}")
+        check("connecting cTrader did NOT start anything",
+              started_for == [], str(started_for))
+
+        active = call("POST", "/api/v1/rules", body={
+            "name": "demo rule", "symbols": ["EUR_USD"], "timeframe": "1h",
+            "accountId": "501", "sides": "BUY",
+            "entry": {"combine": "AND", "conditions": [
+                {"id": "rsi", "params": {"op": "below", "value": 30}}]},
+            "exit": {"combine": "OR", "conditions": [
+                {"id": "rsi", "params": {"op": "above", "value": 70}}]}
+        })[1]["rule"]
+        arid = active["ruleDocId"]
+
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("without a licence, nothing starts", st == 402, f"{st} {b}")
+        LC.grant(ALICE, plan="pro")
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("a DRAFT rule cannot be automated",
+              st == 409 and b["error"]["code"] == "RULE_NOT_ACTIVE",
+              f"{st} {b}")
+        call("POST", f"/api/v1/rules/{arid}/activate")
+        check("nothing started merely by activating the rule",
+              started_for == [], str(started_for))
+
+        # Alice is still connected to the DEMO account 501 from section 6?
+        # No — section 6 disconnected her. Reconnect, demo.
+        s2 = call("POST", "/api/v1/ctrader/connect")[1]
+        st2 = s2["authorizeUrl"].split("state=")[1].split("&")[0]
+        call("GET", f"/api/v1/ctrader/callback?code=c&state={st2}", auth=None)
+        CL.complete(ALICE, s2["nonce"],
+                    exchanger=lambda c, u: {"accessToken": "ALICE-TOKEN-SECRET",
+                                            "refreshToken": "R",
+                                            "expiresIn": 2592000},
+                    lister=lambda a: [{"ctid": 501, "live": False},
+                                      {"ctid": 502, "live": True}])
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("a connected-but-unselected account does not start it",
+              st == 409 and b["error"]["code"] == "NO_ACCOUNT", f"{st} {b}")
+        call("POST", "/api/v1/ctrader/select", body={"ctid": 501})
+        check("selecting an account still did not start anything",
+              started_for == [], str(started_for))
+
+        before_j = call("GET", "/api/v1/journal")[1]["total"]
+        paper_before = user_store.load(ALICE).get("paper")
+        # Section 8 wrote a deliberate broker_error, so the assertion below
+        # has to be "no NEW one", not "none at all".
+        errs_before = call("GET",
+                           "/api/v1/journal?status=broker_error")[1]["total"]
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("with licence, active rule and a demo account it starts",
+              st == 200 and b["state"] == "running" and b["started"] is True,
+              f"{st} {b}")
+        check("and the engine was actually asked to run",
+              started_for == [ALICE], str(started_for))
+        check("the mode is recorded as demo", b["mode"] == "demo", str(b))
+        st, b = call("GET", "/api/v1/journal?status=automation_started")
+        check("the start is journalled as a start, not as an error",
+              b["total"] == 1, str(b["total"]))
+        st, b = call("GET", "/api/v1/journal?status=broker_error")
+        check("and no fake broker error was written alongside it",
+              b["total"] == errs_before, f"{b['total']} vs {errs_before}")
+        st, b = call("GET", "/api/v1/notifications?unread=true")
+        check("the client is notified in the platform",
+              b["total"] == 1 and "started" in
+              b["notifications"][0]["title"].lower(), str(b))
+
+        # Automation deliberately does NOT write the live/demo flag — one
+        # writer only, and it is the gated one. So the demo guarantee has to
+        # come from somewhere else, and this is it: the broker config is
+        # derived from the connected account's own mode.
+        _u = user_store.load(ALICE)
+        check("starting did not touch the live/demo flag — it is what "
+              "section 6 set and nothing since",
+              _u.get("paper") is True and paper_before == _u.get("paper"),
+              f"{paper_before!r} -> {_u.get('paper')!r}")
+        _brk, _cfg = _UL._make_broker(_u, ALICE)
+        check("yet the broker built for this client is in paper mode",
+              _cfg.PAPER_TRADING is True, str(_cfg.PAPER_TRADING))
+        check("and points at the selected demo account",
+              str(_cfg.CTRADER_ACCOUNT_ID) == "501"
+              and _cfg.CTRADER_ENV == "demo",
+              f"{_cfg.CTRADER_ACCOUNT_ID}/{_cfg.CTRADER_ENV}")
+
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("starting again is idempotent, not a second loop",
+              st == 200 and b["alreadyRunning"] is True
+              and b["started"] is False, f"{st} {b}")
+        check("and the engine was not asked twice",
+              started_for == [ALICE], str(started_for))
+
+        other = call("POST", "/api/v1/rules", body={
+            "name": "other", "symbols": ["GBP_USD"], "timeframe": "1h",
+            "accountId": "501", "sides": "BUY",
+            "entry": {"combine": "AND", "conditions": [
+                {"id": "rsi", "params": {"op": "below", "value": 30}}]},
+            "exit": {"combine": "OR", "conditions": [
+                {"id": "rsi", "params": {"op": "above", "value": 70}}]}
+        })[1]["rule"]["ruleDocId"]
+        call("POST", f"/api/v1/rules/{other}/activate")
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": other})
+        check("a second rule cannot run alongside the first",
+              st == 409 and b["error"]["code"] == "ALREADY_RUNNING",
+              f"{st} {b}")
+
+        st, b = call("POST", "/api/v1/automation/pause")
+        check("pausing reports paused", st == 200 and b["state"] == "paused",
+              f"{st} {b}")
+        check("and the engine was actually stopped, not just flagged",
+              stopped_for == [ALICE], str(stopped_for))
+        st, b = call("POST", "/api/v1/automation/resume")
+        check("resuming runs again", st == 200 and b["state"] == "running",
+              f"{st} {b}")
+        check("and re-checked everything by starting afresh",
+              started_for == [ALICE, ALICE], str(started_for))
+        st, b = call("POST", "/api/v1/automation/stop")
+        check("stopping reports stopped", st == 200 and b["state"] == "stopped"
+              and b["stopped"] is True, f"{st} {b}")
+        st, b = call("POST", "/api/v1/automation/stop")
+        check("stopping again is not an error",
+              st == 200 and b["alreadyStopped"] is True, f"{st} {b}")
+        st, b = call("POST", "/api/v1/automation/pause")
+        check("pausing something stopped is refused clearly",
+              st == 409 and b["error"]["code"] == "NOT_RUNNING", f"{st} {b}")
+
+        st, b = call("POST", "/api/v1/ctrader/select", body={"ctid": 502})
+        check("a live account cannot even be selected here",
+              st == 400 and b["error"]["code"] == "LIVE_BLOCKED", f"{st} {b}")
+        # That is the first lock. Force the record past it to prove the
+        # SECOND one — _preflight's own mode check — is really there and not
+        # just shadowed by the selection guard.
+        _conn = CL._read_conn(ALICE)
+        CL._store._write(CL._k_conn(ALICE),
+                         dict(_conn, selectedCtid=502, selectedMode="live"))
+        asked = len(started_for)
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("and a live selection forced past that still cannot automate",
+              st in (400, 409), f"{st} {b}")
+        check("the engine was never asked for the live account",
+              len(started_for) == asked, str(started_for))
+        CL._store._write(CL._k_conn(ALICE),
+                         dict(_conn, selectedCtid=501, selectedMode="demo"))
+
+        as_user(BOB)
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("another client cannot automate somebody else's rule",
+              st in (402, 404), f"{st} {b}")
+        st, b = call("GET", "/api/v1/automation")
+        check("and their own automation is untouched",
+              b["state"] == "stopped", str(b))
+        as_user(ALICE)
+    finally:
+        _UL.start, _UL.stop = _real_start, _real_stop
+
     print("\n7. the read path cannot trade")
     import ast as _ast
     called = set()
@@ -553,6 +728,24 @@ try:
                    "journal", "execution"):
         check(f"preview.py imports nothing from {module}",
               not any(module in m for m in p_imported), str(p_imported))
+    # Demo automation may start and stop the engine — that is its job — but
+    # it must never place, close or authorise an order itself. It delegates,
+    # and delegation is the only thing it is allowed to do.
+    _atree = _ast.parse(open(os.path.join(
+        ROOT, "apex", "platform", "automation.py")).read())
+    a_called = {n.attr for n in _ast.walk(_atree)
+                if isinstance(n, _ast.Attribute)}
+    for forbidden in ("place_order", "close_position", "amend_sltp",
+                      "force_trade", "authorize_order", "authorize_close"):
+        check(f"automation.py never calls {forbidden}()",
+              forbidden not in a_called)
+    check("it drives the engine through start and stop only",
+          {"start", "stop"} <= a_called)
+    check("and no telegram anywhere in demo automation",
+          not any("telegram" in (n.module or "").lower()
+                  for n in _ast.walk(_atree)
+                  if isinstance(n, _ast.ImportFrom)))
+
     check("and no telegram anywhere in the notification centre",
           not any("telegram" in m.lower() for m in {
               n.module or "" for n in _ast.walk(_ast.parse(open(os.path.join(

@@ -24,7 +24,8 @@ EXECUTION = "execution"
 BROKER_RESULT = "broker_result"
 ERROR = "error"
 POSITION = "position"
-KINDS = (EVALUATION, EXECUTION, BROKER_RESULT, ERROR, POSITION)
+AUTOMATION = "automation"
+KINDS = (EVALUATION, EXECUTION, BROKER_RESULT, ERROR, POSITION, AUTOMATION)
 
 # ── status ──────────────────────────────────────────────────────────────────
 # `kind` says which STAGE an entry belongs to. `status` says which of the nine
@@ -41,8 +42,19 @@ ORDER_CONFIRMED = "order_confirmed"           # the broker took it
 ORDER_REJECTED = "order_rejected"  # the broker or a gate refused it
 POSITION_CLOSED = "position_closed"
 BROKER_ERROR = "broker_error"
+
+# Turning automation on and off is evidence too — "who started this, and
+# when" is a question an account owner asks. It is NOT filed under
+# BROKER_ERROR, which is what recording a successful start through
+# for_error() would have done: a journal whose errors include every ordinary
+# success is a journal nobody can search for real errors in.
+AUTOMATION_STARTED = "automation_started"
+AUTOMATION_PAUSED = "automation_paused"
+AUTOMATION_STOPPED = "automation_stopped"
+
 STATUSES = (EVALUATED, HOLD, REJECT, EXECUTION_REQUESTED, ORDER_SENT,
-            ORDER_CONFIRMED, ORDER_REJECTED, POSITION_CLOSED, BROKER_ERROR)
+            ORDER_CONFIRMED, ORDER_REJECTED, POSITION_CLOSED, BROKER_ERROR,
+            AUTOMATION_STARTED, AUTOMATION_PAUSED, AUTOMATION_STOPPED)
 
 # Anything whose name looks like a credential is dropped, whatever its value.
 _SECRET_HINTS = ("token", "secret", "password", "apikey", "api_key",
@@ -201,6 +213,19 @@ def for_order_sent(request, *, correlation_id, ts=None):
         rule_doc_id=request.rule_doc_id,
         rule_doc_version=request.rule_doc_version, symbol=request.symbol,
         execution_request=request.as_dict(), ts=ts)
+
+
+def for_automation(status, *, correlation_id, user_id, account_id=None,
+                   rule_doc_id=None, rule_doc_version=None, detail=None,
+                   ts=None):
+    if status not in (AUTOMATION_STARTED, AUTOMATION_PAUSED,
+                      AUTOMATION_STOPPED):
+        raise ValueError(f"not an automation status: {status!r}")
+    return JournalEntry(
+        kind=AUTOMATION, correlation_id=correlation_id, status=status,
+        user_id=user_id, account_id=account_id, rule_doc_id=rule_doc_id,
+        rule_doc_version=rule_doc_version, error=None,
+        position={"detail": detail} if detail else None, ts=ts)
 
 
 def for_position_closed(position, *, correlation_id, user_id,

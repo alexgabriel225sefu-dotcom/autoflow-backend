@@ -1103,6 +1103,13 @@ def _make_broker(user, user_id=None):
         if _conn:
             ct_token = _conn["accessToken"]
             ct_account = _conn["ctid"]
+            # The mode is DERIVED from the account we are actually connected
+            # to, not written into the user record. telegram._handle_paper
+            # stays the only writer of the live/demo flag (an invariant
+            # test_live_path_invariants.py enforces), and deriving it here is
+            # also simply more truthful: a stored boolean can drift from the
+            # account, the connection cannot.
+            paper = _conn["mode"] != "live"
             user = dict(user, ctrader_env=_conn["mode"])
     fake_cfg = types.SimpleNamespace(
         CTRADER_ACCESS_TOKEN  = ct_token,
@@ -4878,6 +4885,20 @@ def _entitled(user_id):
     Only a definite "denied" with no license on file stops a loop.
     """
     user_id = str(user_id)
+    # An Apex4Traders identity is not in access.py — that store is keyed by
+    # Telegram chat_id and always answers "denied" for a Supabase id. Its
+    # entitlement lives in the platform licence store instead, so the same
+    # question is asked of the store that can answer it. This ADDS an
+    # authority for platform identities; it removes none. A platform user with
+    # no active licence falls through to the checks below and is refused
+    # exactly as before, and gates.live_entitlement — the gate that decides
+    # real money — is untouched.
+    try:
+        from apex.platform import licence as _plic
+        if _plic.status_for(user_id).get("state") == _plic.ACTIVE:
+            return True
+    except Exception:
+        pass
     try:
         state = access.allowed_state(user_id)
     except Exception as e:

@@ -27,6 +27,7 @@ import json
 import re
 
 from apex.platform import conditions as _cond
+from apex.platform import automation as _auto
 from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
 from apex.platform import identity as _id
@@ -142,6 +143,8 @@ def handle(method, path, headers=None, body=None):
         return _err(400, e.code, e.detail)
     except _lic.LicenceRequired as e:
         return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
+    except _auto.AutomationRefused as e:
+        return _err(409, e.code, e.detail)
     except _preview.PreviewRefused as e:
         # INSUFFICIENT_DATA is a 422: the request was understood and the data
         # to answer it was not there. A 400 would say the client malformed it.
@@ -233,6 +236,34 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         fn = _read.positions if route == "positions" else _read.orders
         return _ok(fn(p.user_id))
+
+    # ── automation control (demo only) ──────────────────────────────────
+    # Separate from connecting an account, deliberately: linking cTrader to
+    # look at a balance is not consent to be traded for.
+    if route.startswith("automation"):
+        action = route.split("/", 1)[1] if "/" in route else ""
+        if not action and method == "GET":
+            p = _authenticate(headers)
+            return _ok(_auto.status(p.user_id))
+        if method != "POST":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        # Every one of these changes whether money moves, so none of them
+        # trusts a cached session.
+        p = _authenticate(headers, fresh=True)
+        if action == "start":
+            _id.require_verified_email(p)
+            rid = (_body(body) or {}).get("ruleDocId")
+            if not rid:
+                raise ValueError("ruleDocId is required to start automation")
+            return _ok(_auto.start(p.user_id, rid))
+        if action == "pause":
+            return _ok(_auto.pause(p.user_id))
+        if action == "resume":
+            _id.require_verified_email(p)
+            return _ok(_auto.resume(p.user_id))
+        if action == "stop":
+            return _ok(_auto.stop(p.user_id))
+        return _err(404, "NOT_FOUND", "no such automation action")
 
     # ── notifications ───────────────────────────────────────────────────
     if route == "notifications":

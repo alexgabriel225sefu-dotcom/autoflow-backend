@@ -186,6 +186,11 @@ def record_error(message, *, correlation_id, user_id, account_id=None,
                                symbol=symbol, ts=ts))
 
 
+def record_automation(status, *, correlation_id, user_id, **kw):
+    return append(_j.for_automation(status, correlation_id=correlation_id,
+                                    user_id=user_id, **kw))
+
+
 def record_position_closed(position, *, correlation_id, user_id, **kw):
     return append(_j.for_position_closed(
         position, correlation_id=correlation_id, user_id=user_id, **kw))
