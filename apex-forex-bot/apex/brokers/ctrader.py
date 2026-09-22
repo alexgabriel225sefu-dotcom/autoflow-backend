@@ -63,7 +63,7 @@ try:
     )
     from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
-        ProtoOAExecutionType,
+        ProtoOAExecutionType, ProtoOAOrderStatus,
     )
     _SDK_OK = True
     _SDK_ERR = ""
@@ -971,6 +971,47 @@ class CtraderBroker:
                 "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
                 "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
                 "positionId": p.positionId,
+            })
+        return out
+
+    def get_pending_orders(self):
+        """Orders that are placed but not yet filled.
+
+        Same ProtoOAReconcileReq that get_all_positions() already sends —
+        the response carries `position` AND `order`, and only the first half
+        was ever read. This adds no request to the account's rate budget.
+
+        Read-only. Nothing here places, amends or cancels anything.
+
+        In PAPER mode this returns [] because there genuinely are no broker
+        orders — the paper path never sends one. That is a fact about the
+        mode, not a placeholder standing in for a call we could not make.
+        """
+        if getattr(self._c, "PAPER_TRADING", True):
+            return []
+        req = ProtoOAReconcileReq()
+        req.ctidTraderAccountId = self._ctid()
+        res = self._rpc(req, ProtoOAReconcileRes)
+        self._load_symbols()
+        id2name = {v: k for k, v in self._sym_id.items()}
+        out = []
+        for o in res.order:
+            td = o.tradeData
+            out.append({
+                "orderId": o.orderId,
+                "symbol": id2name.get(td.symbolId, str(td.symbolId)),
+                "side": ("BUY" if td.tradeSide == ProtoOATradeSide.BUY
+                         else "SELL"),
+                "units": round(td.volume / 100.0, 8),
+                "orderType": (ProtoOAOrderType.Name(o.orderType)
+                              if o.HasField("orderType") else None),
+                "status": (ProtoOAOrderStatus.Name(o.orderStatus)
+                           if o.HasField("orderStatus") else None),
+                "limitPrice": o.limitPrice if o.HasField("limitPrice") else None,
+                "stopPrice": o.stopPrice if o.HasField("stopPrice") else None,
+                "stopLoss": o.stopLoss if o.HasField("stopLoss") else None,
+                "expiresAt": (o.expirationTimestamp
+                              if o.HasField("expirationTimestamp") else None),
             })
         return out
 

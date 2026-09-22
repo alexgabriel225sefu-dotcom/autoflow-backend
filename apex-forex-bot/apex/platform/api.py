@@ -27,6 +27,7 @@ import json
 import re
 
 from apex.platform import conditions as _cond
+from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
 from apex.platform import identity as _id
 from apex.platform import licence as _lic
@@ -39,8 +40,6 @@ PREFIX = "/api/v1/"
 # frontend can grey a button out instead of discovering a 404, and so that
 # nothing here quietly returns a plausible empty answer in the meantime.
 _NOT_YET = {
-    "positions": "reading open positions",
-    "orders": "reading orders",
     "journal": "the decision journal",
     "notifications": "the notification centre",
 }
@@ -79,6 +78,8 @@ def _authenticate(headers, *, fresh=False):
 
 
 # ── routes ──────────────────────────────────────────────────────────────────
+_ACCOUNT_RE = re.compile(
+    r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders))?$")
 _RULE_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})$")
 _RULE_ACTION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/(validate|activate|pause|resume|archive"
@@ -183,6 +184,27 @@ def _dispatch(method, route, headers, body, query=None):
     if route == "accounts" and method == "GET":
         p = _authenticate(headers)
         return _ok(_link.public_status(p.user_id))
+
+    # ── read-only broker views ──────────────────────────────────────────
+    # Every one of these answers {connected, status, ...} and omits its data
+    # key unless status is "ok". An empty list of positions is a claim, and it
+    # is only made when the broker was actually asked and actually answered.
+    m = _ACCOUNT_RE.match(route)
+    if m:
+        if method != "GET":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers)
+        ctid, sub_route = m.group(1), m.group(2)
+        if sub_route == "positions":
+            return _ok(_read.positions(p.user_id, ctid=ctid))
+        if sub_route == "orders":
+            return _ok(_read.orders(p.user_id, ctid=ctid))
+        return _ok(_read.account(p.user_id, ctid=ctid))
+
+    if route in ("positions", "orders") and method == "GET":
+        p = _authenticate(headers)
+        fn = _read.positions if route == "positions" else _read.orders
+        return _ok(fn(p.user_id))
 
     if route == "me" and method == "GET":
         p = _authenticate(headers)

@@ -419,6 +419,55 @@ def access_token_for(user_id, *, now=None, refresher=None, skew_s=120):
     return access
 
 
+def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None):
+    """THE one way anything server-side reads a client's cTrader credentials.
+
+    There is exactly one canonical store for these: this namespace, keyed by
+    supabase_user_id. Nothing copies the tokens into the user record, because
+    two namespaces holding the same secret means two places to rotate, two to
+    revoke and two to leak — and the user record's ctrader_* fields belong to
+    the Telegram-era flow, which must not blend with a Supabase identity.
+
+    Returns None when nothing usable is connected, so a caller can tell
+    "not connected" from "connected but broken" without catching anything.
+    Raises LinkError only when the connection exists and cannot be made
+    usable — an expired token whose refresh fails, which the API turns into
+    reauth_required rather than an empty list of positions.
+
+    NEVER hand the result to anything that serialises to a browser. It holds a
+    live access token. public_status() is the one shaped for that.
+    """
+    try:
+        rec = _read_conn(user_id)
+    except LinkError:
+        return None
+    if ctid is None:
+        want_ctid, want_mode = rec.get("selectedCtid"), rec.get("selectedMode")
+        if not want_ctid:
+            return None
+    else:
+        # An explicit account must be one of THIS client's. Looking it up in
+        # their own record is the ownership check: another client's account
+        # id simply is not in the list.
+        match = next((a for a in rec.get("accounts") or []
+                      if str(a.get("ctid")) == str(ctid)), None)
+        if not match:
+            raise LinkError("NO_SUCH_ACCOUNT",
+                            "that account is not one of the connected ones")
+        want_ctid, want_mode = match["ctid"], match["mode"]
+    if want_mode == LIVE and not live_allowed():
+        # Read-only or not, opening a live account means a live broker
+        # session. The environment gate is the same one select_account uses;
+        # having two different answers to "may this touch live?" is how one of
+        # them ends up being the wrong one.
+        raise LinkError("LIVE_BLOCKED",
+                        "live accounts are blocked in this environment")
+    token = access_token_for(user_id, now=now, refresher=refresher)
+    return {"userId": str(user_id), "accessToken": token,
+            "ctid": want_ctid, "mode": want_mode,
+            "expiresAt": rec.get("expiresAt")}
+
+
 def disconnect(user_id):
     """Forget the tokens. Does not revoke them at cTrader — say so plainly
     rather than implying a revocation that never happened."""

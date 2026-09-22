@@ -1076,13 +1076,34 @@ def _persist_open_position(user_id, cfg, pos):
         print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
 
 
-def _make_broker(user):
-    """Create the per-user broker with isolated config — cTrader exclusively."""
+def _make_broker(user, user_id=None):
+    """Create the per-user broker with isolated config — cTrader exclusively.
+
+    ONE construction path, TWO places credentials can come from, and never
+    both for the same client.
+
+    A Telegram-era client has their cTrader tokens on their user record, put
+    there by apex/ctrader_oauth.py. An Apex4Traders client has them in the
+    platform namespace, keyed by their Supabase id, and the user record holds
+    none — the tokens are deliberately not copied across, because one secret
+    living in two namespaces is two places to rotate, revoke and leak.
+
+    So the record is consulted first and the platform accessor only when it is
+    empty. `user_id` is optional purely so every existing caller keeps working
+    unchanged; without it the behaviour is exactly what it was.
+    """
     import types
     from apex import config as _appcfg
     paper = user.get("paper", False)
     ct_token = user.get("ctrader_access_token", "")
     ct_account = user.get("ctrader_account_id", "")
+    if not ct_token and user_id:
+        from apex.platform import ctrader_link as _link
+        _conn = _link.get_ctrader_connection(user_id)
+        if _conn:
+            ct_token = _conn["accessToken"]
+            ct_account = _conn["ctid"]
+            user = dict(user, ctrader_env=_conn["mode"])
     fake_cfg = types.SimpleNamespace(
         CTRADER_ACCESS_TOKEN  = ct_token,
         CTRADER_REFRESH_TOKEN = user.get("ctrader_refresh_token", ""),

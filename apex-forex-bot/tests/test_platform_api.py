@@ -221,12 +221,24 @@ try:
           "BUY" not in json.dumps(b) and "SELL" not in json.dumps(b))
 
     print("\n8. what is not built yet says so")
-    for cap in ("positions", "orders", "journal", "notifications"):
+    for cap in ("journal", "notifications"):
         st, b = call("GET", f"/api/v1/{cap}")
         check(f"{cap} answers 501 UNSUPPORTED, not an empty list",
               st == 501 and b["error"]["code"] == "UNSUPPORTED", str(st))
         check(f"{cap} returns no fabricated data",
               "ok" in b and b["ok"] is False)
+    # positions and orders left this list once the read-only broker views
+    # were built. They answer 200 with connected:false for a client who has
+    # linked nothing — and crucially WITHOUT a positions key, so nothing is
+    # claimed about an account the platform cannot see.
+    for cap in ("positions", "orders"):
+        st, b = call("GET", f"/api/v1/{cap}")
+        check(f"{cap} reports the link state instead of 501",
+              st == 200 and b["connected"] is False, f"{st} {b}")
+        check(f"{cap} claims no data for an unlinked client",
+              cap not in b, str(b))
+        check(f"{cap} says why", b.get("status") == "not_connected", str(b))
+
     # accounts left this list once the cTrader link was built. Its empty list
     # is now a FACT — the link says nothing is connected — rather than the
     # placeholder an unbuilt endpoint would have returned.
