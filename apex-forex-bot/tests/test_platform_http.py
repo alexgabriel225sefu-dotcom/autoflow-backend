@@ -691,6 +691,116 @@ try:
     finally:
         _UL.start, _UL.stop = _real_start, _real_stop
 
+    print("\n12. candles: real market data, or an honest refusal")
+    import math as _m2
+
+    class _CandleBroker:
+        """Stands in for the connector. Returns bars shaped like real ones."""
+        def __init__(self, n=200):
+            self.n = n
+            self.asked = []
+
+        def get_candles(self, instrument=None, interval=None, limit=None,
+                        to_ts=None):
+            self.asked.append((instrument, interval, limit))
+            out = []
+            for i in range(min(int(limit or 200), self.n)):
+                c = 1.1000 + 0.004 * _m2.sin(2 * _m2.pi * i / 41)
+                out.append({"open": c, "high": c + 0.0006, "low": c - 0.0006,
+                            "close": c, "time": 1758542400 + i * 3600,
+                            "volume": 100 + i})
+            return out
+
+    spy_broker = _CandleBroker()
+    _real_mb2 = _UL._make_broker
+    try:
+        _UL._make_broker = lambda user, user_id=None: (spy_broker, {})
+
+        st, b = call("GET", "/api/v1/accounts/501/candles"
+                            "?symbol=EURUSD&timeframe=1h&limit=120")
+        check("an authorised client gets candles", st == 200
+              and b["status"] == "ok", f"{st} {b.get('status')}")
+        check("the bars carry the four prices a snapshot needs",
+              all(set(("open", "high", "low", "close")) <= set(c)
+                  for c in b["candles"]), str(b["candles"][:1]))
+        check("the count and the request are both reported",
+              b["count"] == 120 and b["requested"] == 120,
+              f"{b.get('count')}/{b.get('requested')}")
+        check("the symbol and timeframe are echoed back",
+              b["symbol"] == "EURUSD" and b["timeframe"] == "1h", str(b)[:80])
+        check("the account and its mode come with it",
+              b["accountId"] == 501 and b["mode"] == "demo", str(b)[:90])
+        check("the connector was asked for exactly what was requested",
+              spy_broker.asked[-1] == ("EURUSD", "1h", 120),
+              str(spy_broker.asked[-1]))
+        check("no token appears in a candles response",
+              "ALICE-TOKEN-SECRET" not in json.dumps(b))
+
+        st, b = call("GET", "/api/v1/accounts/501/candles"
+                            "?symbol=EURUSD&timeframe=1h", auth=None)
+        check("an unauthorised caller gets 401", st == 401, str(st))
+
+        st, b = call("GET", "/api/v1/accounts/999/candles"
+                            "?symbol=EURUSD&timeframe=1h")
+        check("an account that is not connected is refused",
+              st == 400 and b["error"]["code"] == "NO_SUCH_ACCOUNT", f"{st} {b}")
+
+        as_user(BOB)
+        st, b = call("GET", "/api/v1/accounts/501/candles"
+                            "?symbol=EURUSD&timeframe=1h")
+        check("another client cannot read candles on Alice's account",
+              st == 400 and b["error"]["code"] == "NO_SUCH_ACCOUNT", f"{st} {b}")
+        as_user(ALICE)
+
+        for q, why in (
+            ("symbol=BTCUSD&timeframe=1h", "an untradeable symbol"),
+            ("symbol=&timeframe=1h", "a missing symbol"),
+            ("symbol=EURUSD&timeframe=7h", "an unknown timeframe"),
+            ("symbol=EURUSD&timeframe=", "a missing timeframe"),
+            ("symbol=EURUSD&timeframe=1h&limit=99999", "an oversized limit"),
+            ("symbol=EURUSD&timeframe=1h&limit=1", "a limit below two"),
+            ("symbol=EURUSD&timeframe=1h&limit=abc", "a non-numeric limit"),
+        ):
+            st, b = call("GET", f"/api/v1/accounts/501/candles?{q}")
+            check(f"{why} is refused with 400", st == 400, f"{st} {b}")
+            check(f"{why} yields no candles", "candles" not in b, str(b)[:70])
+
+        before_asks = len(spy_broker.asked)
+        call("GET", "/api/v1/accounts/501/candles?symbol=BTCUSD&timeframe=1h")
+        check("a bad request never reaches the broker at all",
+              len(spy_broker.asked) == before_asks, str(spy_broker.asked[-1:]))
+
+        class _TimeoutBroker:
+            def get_candles(self, *a, **k):
+                raise TimeoutError("cTrader did not answer within 12s")
+        _UL._make_broker = lambda user, user_id=None: (_TimeoutBroker(), {})
+        st, b = call("GET", "/api/v1/accounts/501/candles"
+                            "?symbol=EURUSD&timeframe=1h")
+        check("a broker timeout reports unavailable, not an empty list",
+              st == 200 and b["status"] == "unavailable", f"{st} {b}")
+        check("and returns no candles key to evaluate",
+              "candles" not in b, str(b)[:80])
+        _UL._make_broker = lambda user, user_id=None: (spy_broker, {})
+
+        conn_ok = CL._read_conn(ALICE)
+        broken = dict(conn_ok, expiresAt=1.0, refreshToken="")
+        CL._store._write(CL._k_conn(ALICE), broken)
+        st, b = call("GET", "/api/v1/accounts/501/candles"
+                            "?symbol=EURUSD&timeframe=1h")
+        check("an unrefreshable token reports reauth_required",
+              st == 200 and b["status"] == "reauth_required", f"{st} {b}")
+        check("and claims no market data", "candles" not in b, str(b)[:80])
+        CL._store._write(CL._k_conn(ALICE), conn_ok)
+
+        call("POST", "/api/v1/ctrader/disconnect")
+        st, b = call("GET", "/api/v1/accounts/501/candles"
+                            "?symbol=EURUSD&timeframe=1h")
+        check("a disconnected account reads as not connected",
+              st == 200 and b["connected"] is False, f"{st} {b}")
+        check("and returns no candles", "candles" not in b, str(b)[:80])
+    finally:
+        _UL._make_broker = _real_mb2
+
     print("\n7. the read path cannot trade")
     import ast as _ast
     called = set()
@@ -702,8 +812,23 @@ try:
                       "force_trade", "authorize_order"):
         check(f"broker_read.py never calls {forbidden}()",
               forbidden not in called)
-    check("it calls only the three read methods",
-          {"get_all_positions", "get_pending_orders", "get_balance"} <= called)
+    check("it calls only the four read methods",
+          {"get_all_positions", "get_pending_orders", "get_balance",
+           "get_candles"} <= called)
+    check("and the candles path adds no order call of its own",
+          not ({"place_order", "close_position", "amend_sltp", "claim",
+                "release_claim"} & called), str(called & {"place_order"}))
+    _btree = _ast.parse(open(os.path.join(
+        ROOT, "apex", "platform", "broker_read.py")).read())
+    _bimports = set()
+    for n in _ast.walk(_btree):
+        if isinstance(n, _ast.Import):
+            _bimports.update(a.name for a in n.names)
+        elif isinstance(n, _ast.ImportFrom):
+            _bimports.add(n.module or "")
+    for module in ("gates", "ledger", "bridge", "execution"):
+        check(f"broker_read.py imports nothing from {module}",
+              not any(module in m for m in _bimports), str(_bimports))
 
     # Preview must be just as incapable. It is checked the same way, and for
     # imports too: a module that cannot reach a broker, a gate, the ledger or

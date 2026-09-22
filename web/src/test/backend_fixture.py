@@ -85,6 +85,37 @@ from apex import user_loop, user_store  # noqa: E402
 user_loop.start = lambda uid, alert_fn=None: True
 user_loop.stop = lambda uid: None
 
+# The BROKER is stubbed too, and only the broker. get_candles has no paper
+# short-circuit the way get_all_positions does — trendbars are public market
+# data, so the engine fetches them for real even on a paper account. That is
+# correct, and it also means an unstubbed test would sit waiting on a cTrader
+# socket it has no credentials for. Everything above the connector — routing,
+# validation, ownership, the status contract — is still the shipping code.
+import math as _math
+
+
+class _StubBroker:
+    def get_candles(self, instrument=None, interval=None, limit=None,
+                    to_ts=None):
+        out = []
+        for i in range(int(limit or 200)):
+            c = 1.1000 + 0.004 * _math.sin(2 * _math.pi * i / 41)
+            out.append({"open": c, "high": c + 0.0006, "low": c - 0.0006,
+                        "close": c, "time": 1758542400 + i * 3600})
+        return out
+
+    def get_all_positions(self):
+        return []
+
+    def get_pending_orders(self):
+        return []
+
+    def get_balance(self):
+        return 5000.0
+
+
+user_loop._make_broker = lambda user, user_id=None: (_StubBroker(), {})
+
 bot._start_dashboard_server()
 
 

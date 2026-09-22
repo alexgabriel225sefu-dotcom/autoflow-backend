@@ -154,6 +154,12 @@ export type Order = {
   limitPrice: number | null; stopPrice: number | null;
 };
 
+export type Candle = { open: number; high: number; low: number; close: number; time?: number };
+export type CandlesRead = Omit<PositionsRead, "positions"> & {
+  candles?: Candle[]; symbol?: string; timeframe?: string;
+  count?: number; requested?: number;
+};
+
 export type RuleSummary = {
   ruleDocId: string; name: string; state: "draft" | "active" | "paused" | "archived";
   version: number; symbols: string[]; timeframe: string; updatedAt: number;

@@ -10,8 +10,9 @@ cTrader access token never reaches this application.
 
 ## Environment
 
-`.env*` is git-ignored in this project, so there is no committed example file.
-Create `web/.env.local` with:
+Copy `web/env.example` to `web/.env.local` and fill it in there. The example
+holds placeholders only and is committed; `.env*` stays git-ignored so a real
+one cannot be committed by accident.
 
 ```
 # Supabase Auth — the platform's identity provider.

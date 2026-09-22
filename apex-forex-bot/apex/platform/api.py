@@ -85,7 +85,7 @@ def _authenticate(headers, *, fresh=False):
 _NOTIFY_RE = re.compile(r"^notifications/([A-Za-z0-9_-]{1,64})/read$")
 _JOURNAL_RE = re.compile(r"^journal/([A-Za-z0-9_-]{1,64})$")
 _ACCOUNT_RE = re.compile(
-    r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders))?$")
+    r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders|candles))?$")
 _RULE_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})$")
 _RULE_ACTION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/(validate|activate|pause|resume|archive"
@@ -230,6 +230,13 @@ def _dispatch(method, route, headers, body, query=None):
             return _ok(_read.positions(p.user_id, ctid=ctid))
         if sub_route == "orders":
             return _ok(_read.orders(p.user_id, ctid=ctid))
+        if sub_route == "candles":
+            # Market data for a preview. Read-only: broker_read imports no
+            # gate, no ledger and no order function, and a test asserts it.
+            q = query or {}
+            return _ok(_read.candles(
+                p.user_id, ctid=ctid, symbol=q.get("symbol"),
+                timeframe=q.get("timeframe"), limit=q.get("limit")))
         return _ok(_read.account(p.user_id, ctid=ctid))
 
     if route in ("positions", "orders") and method == "GET":

@@ -1,10 +1,11 @@
 "use client";
 import { use, useState } from "react";
-import { api, type ApiError, type AutomationState, type CtraderStatus,
-         type Me, type PreviewResult, type RuleDoc } from "@/lib/api";
+import { api, type ApiError, type AutomationState, type CandlesRead,
+         type CtraderStatus, type Me, type PreviewResult,
+         type RuleDoc } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
-import { ErrorNotice, LicencePill, Spinner, StatusPill } from "@/components/app/state";
+import { ErrorNotice, LicencePill, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
 
 function Verdict({ p }: { p: PreviewResult }) {
   const v = p.decision.verdict;
@@ -54,8 +55,10 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
 
   const [problems, setProblems] = useState<string[] | null>(null);
   const [actErr, setActErr] = useState<ApiError | null>(null);
-  const [candles, setCandles] = useState("");
-  const [ts, setTs] = useState(String(Math.floor(Date.now() / 1000)));
+  const [bars, setBars] = useState<CandlesRead | null>(null);
+  const [barsErr, setBarsErr] = useState<ApiError | null>(null);
+  const [symbol, setSymbol] = useState("");
+  const [timeframe, setTimeframe] = useState("");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [previewErr, setPreviewErr] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,6 +69,12 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
   const isDemo = selected?.mode === "demo";
   const running = auto.result?.ok ? auto.result.data : null;
   const runningThis = running?.state !== "stopped" && running?.ruleDocId === id;
+  const ruleSymbols = (doc?.symbols as string[] | undefined) ?? [];
+  const sym = symbol || ruleSymbols[0] || "";
+  const tf = timeframe || String(doc?.timeframe ?? "1h");
+  // The evaluator refuses a snapshot whose timeframe is not the rule's, so a
+  // mismatch is flagged here rather than delivered as a puzzling REJECT.
+  const tfMismatch = !!doc && tf !== String(doc.timeframe);
 
   async function validate() {
     setBusy(true); setActErr(null);
@@ -84,21 +93,43 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
     return "Activated";
   }
 
+  /**
+   * Fetch real bars, then evaluate against exactly those.
+   *
+   * The two steps are kept apart on screen because they fail differently. If
+   * the candles request fails, the preview is NOT run and no verdict is
+   * shown: a HOLD rendered over a failed market read would say "no setup"
+   * about data nobody ever received.
+   */
+  async function loadBars() {
+    setBusy(true); setBarsErr(null); setBars(null); setPreview(null);
+    const q = new URLSearchParams({
+      symbol: sym, timeframe: tf, limit: "300",
+    });
+    const r = await api<CandlesRead>(
+      `accounts/${selected!.ctid}/candles?${q.toString()}`);
+    setBusy(false);
+    if (!r.ok) return setBarsErr(r);
+    setBars(r.data);
+  }
+
   async function runPreview() {
+    if (!bars || bars.status !== "ok" || !bars.candles?.length) return;
     setBusy(true); setPreviewErr(null); setPreview(null);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(candles);
-    } catch {
-      setBusy(false);
-      // Parsed here so the client sees it at once — but the server validates
-      // every bar again regardless, and is the authority.
-      return setPreviewErr({ ok: false, status: 0, code: "INVALID_JSON",
-                             message: "Candles must be a JSON array of bars." });
-    }
+    // ts comes from the DATA, not from this browser's clock: the snapshot
+    // must describe the moment those bars describe, or every session and
+    // weekday condition answers a question about now instead of about them.
+    const last = bars.candles[bars.candles.length - 1];
+    const ts = typeof last.time === "number" ? last.time : Math.floor(Date.now() / 1000);
     const r = await api<PreviewResult>(`rules/${id}/preview`, {
       method: "POST",
-      body: { snapshot: { candles: parsed, ts: Number(ts) } },
+      body: {
+        snapshot: {
+          candles: bars.candles.map(({ open, high, low, close }) =>
+            ({ open, high, low, close })),
+          ts, symbol: bars.symbol, timeframe: bars.timeframe,
+        },
+      },
     });
     setBusy(false);
     if (!r.ok) return setPreviewErr(r);
@@ -162,23 +193,77 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
       <section className="card">
         <h2>Preview a decision</h2>
         <p className="muted">
-          Read-only. The rule is evaluated against candles you supply — nothing
-          is placed, nothing is recorded, and no broker is contacted.
+          Read-only. Bars are fetched from your connected account and the rule
+          is evaluated against exactly those — nothing is placed, no order is
+          created, and nothing is written to the execution journal.
         </p>
-        <p className="muted">
-          Live market preview needs a candle feed that is not wired yet, so
-          bars are pasted here rather than fetched. Format:{" "}
-          <code>{`[{"open":1.1,"high":1.11,"low":1.09,"close":1.1}, …]`}</code>
-        </p>
-        <label className="field"><span>Candles (JSON)</span>
-          <textarea rows={5} value={candles} onChange={(e) => setCandles(e.target.value)} /></label>
-        <label className="field"><span>Snapshot timestamp (unix seconds)</span>
-          <input value={ts} onChange={(e) => setTs(e.target.value)} /></label>
-        <button className="btn" onClick={runPreview} disabled={busy || !candles.trim()}>
-          {busy ? "Evaluating…" : "Preview"}
-        </button>
-        {previewErr ? <ErrorNotice error={previewErr} /> : null}
-        {preview ? <div style={{ marginTop: "1rem" }}><Verdict p={preview} /></div> : null}
+
+        {!selected ? (
+          <p className="notice">
+            Select a cTrader account to fetch market data.{" "}
+            <a href="/accounts">Accounts</a>
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-2">
+              <label className="field"><span>Account</span>
+                <input readOnly value={`#${selected.ctid} (${selected.mode})`} /></label>
+              <label className="field"><span>Instrument</span>
+                <select value={sym} onChange={(e) => { setSymbol(e.target.value); setBars(null); setPreview(null); }}>
+                  {ruleSymbols.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select></label>
+              <label className="field"><span>Timeframe</span>
+                <select value={tf} onChange={(e) => { setTimeframe(e.target.value); setBars(null); setPreview(null); }}>
+                  {["1m", "5m", "15m", "30m", "1h", "4h", "1d"].map((t) =>
+                    <option key={t} value={t}>{t}</option>)}
+                </select>
+                {tfMismatch ? (
+                  <span className="muted">
+                    This rule runs on {String(doc.timeframe)}. Previewing on
+                    another timeframe will be refused.
+                  </span>
+                ) : null}
+              </label>
+            </div>
+
+            <div className="btn-row">
+              <button className="btn btn-ghost" onClick={loadBars} disabled={busy || !sym}>
+                {busy && !bars ? "Fetching…" : "Fetch market data"}
+              </button>
+              <button className="btn" onClick={runPreview}
+                      disabled={busy || !bars || bars.status !== "ok" || !bars.candles?.length}>
+                {busy && bars ? "Evaluating…" : "Preview"}
+              </button>
+            </div>
+
+            {/* A failed market read is shown as a failed market read. The
+                preview is not run, so no verdict can be mistaken for one
+                reached on data that never arrived. */}
+            {barsErr ? <ErrorNotice error={barsErr} onRetry={loadBars} /> : null}
+            {bars && bars.status !== "ok" ? (
+              <ReadPanel read={bars}><span /></ReadPanel>
+            ) : null}
+
+            {bars?.status === "ok" ? (
+              <p className="muted" style={{ marginTop: ".5rem" }}>
+                {/* Source and as-of, on screen. Numbers without a time are a
+                    screenshot, not data. */}
+                Source: cTrader account <span className="mono">#{bars.accountId}</span> ·{" "}
+                {bars.count} bars of {bars.symbol} {bars.timeframe}
+                {bars.count !== bars.requested ? ` (asked for ${bars.requested})` : ""} ·{" "}
+                as of{" "}
+                <span className="mono">
+                  {typeof bars.candles?.[bars.candles.length - 1]?.time === "number"
+                    ? new Date(bars.candles[bars.candles.length - 1].time! * 1000).toISOString()
+                    : "unknown"}
+                </span>
+              </p>
+            ) : null}
+
+            {previewErr ? <ErrorNotice error={previewErr} /> : null}
+            {preview ? <div style={{ marginTop: "1rem" }}><Verdict p={preview} /></div> : null}
+          </>
+        )}
       </section>
 
       <section className="card">
