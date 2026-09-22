@@ -31,11 +31,12 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files. Real values live in .env.local and never leave the machine.
+# No exceptions to this pattern, deliberately: the documented variables live
+# in env.example (no leading dot), which this rule does not match. An
+# exception for .env.example would create one filename under which a file
+# full of real values could be committed by accident, and the whole point of
+# the pattern is that no such filename exists.
 .env*
-# .env.example is the one exception: it holds placeholders only, and it is
-# the file that tells the next person which variables exist at all. Without
-# it committed, that knowledge lives in somebody's shell history.
-!.env.example
 
 # vercel
 .vercel

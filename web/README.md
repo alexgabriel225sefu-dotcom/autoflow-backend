@@ -10,9 +10,13 @@ cTrader access token never reaches this application.
 
 ## Environment
 
-Copy `web/env.example` to `web/.env.local` and fill it in there. The example
-holds placeholders only and is committed; `.env*` stays git-ignored so a real
-one cannot be committed by accident.
+Copy `web/env.example` to `web/.env.local` and fill it in there.
+
+`env.example` has no leading dot on purpose, matching `nova/env.example`
+elsewhere in this repository. `.gitignore` ignores `.env*` with **no
+exceptions**: that way there is no filename beginning with `.env` under which
+a file of real values could be committed by mistake. The documented variable
+names live in `env.example`; the values live only in `.env.local`.
 
 ```
 # Supabase Auth — the platform's identity provider.

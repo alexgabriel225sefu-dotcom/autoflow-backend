@@ -337,6 +337,29 @@ try:
           not any(m.startswith("apex.telegram") for m in sys.modules))
     check("nor the deprecated Telegram-era OAuth module",
           "apex.ctrader_oauth" not in sys.modules)
+    # Not just this module: NOTHING in apex/platform may import Telegram.
+    # Checked across the whole package through the AST, because the one file
+    # that reintroduces it will be a file nobody thought to test.
+    import glob
+    offenders = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "apex", "platform",
+                                              "*.py"))):
+        tree_ = ast.parse(open(path, encoding="utf-8").read())
+        for node in ast.walk(tree_):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""] + [
+                    f"{node.module or ''}.{a.name}" for a in node.names]
+            if any("telegram" in n.lower() for n in names):
+                offenders.append(os.path.basename(path))
+    check("no module in apex/platform imports telegram, anywhere",
+          offenders == [], str(offenders))
+    check("the platform package is not empty, so the check above means "
+          "something",
+          len(glob.glob(os.path.join(ROOT, "apex", "platform", "*.py"))) >= 10)
+
     check("the old module is marked deprecated so nobody extends it",
           open(os.path.join(ROOT, "apex", "ctrader_oauth.py")
                ).read().lstrip().startswith('"""DEPRECATED'))
