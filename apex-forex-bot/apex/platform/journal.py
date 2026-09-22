@@ -125,13 +125,20 @@ def for_evaluation(decision, snapshot, *, correlation_id, user_id,
         decision=decision.as_dict(), ts=ts)
 
 
-def for_execution(request, *, correlation_id, ts=None):
+def for_execution(request, *, correlation_id, result=None, ts=None):
+    """The request, and what came back.
+
+    `result` is recorded even when it is a refusal. An execution entry that
+    only ever appears on success would make the journal answer "why was this
+    order opened?" while staying silent on "why was this one not?", which is
+    the question a client asks far more often.
+    """
     return JournalEntry(
         kind=EXECUTION, correlation_id=correlation_id,
         user_id=request.user_id, account_id=request.account_id,
         rule_doc_id=request.rule_doc_id,
         rule_doc_version=request.rule_doc_version, symbol=request.symbol,
-        execution_request=request.as_dict(), ts=ts)
+        execution_request=request.as_dict(), broker_result=result, ts=ts)
 
 
 def for_error(message, *, correlation_id, user_id, account_id=None,

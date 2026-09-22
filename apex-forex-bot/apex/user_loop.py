@@ -5147,9 +5147,29 @@ def broker_result_ambiguous(err) -> bool:
     return True
 
 
-def force_trade(user_id, side, symbol=None, lots=None):
-    """Open a manual trade immediately (called from AI assistant or /buy /sell commands).
-    If lots is specified, use that lot size instead of auto-calculating from risk."""
+def force_trade(user_id, side, symbol=None, lots=None, *,
+                sl_override=None, tp_override=None, risk_override=None,
+                origin="manual"):
+    """Open a trade immediately (AI assistant, /buy /sell, or a platform rule).
+
+    If lots is specified, use that lot size instead of auto-calculating from risk.
+
+    THE OVERRIDES EXIST SO THE PLATFORM DOES NOT NEED A SECOND EXECUTION PATH.
+
+    A RuleDoc carries its own stop, target and risk percentage. Without these
+    arguments the only way to honour them would be a parallel controller that
+    re-implemented ownership, gates.authorize_order, the audit line and the
+    ledger claim - four things that must never exist twice. They are passed in
+    here instead, so every order still converges on the same gate.
+
+    All four default to the previous behaviour exactly: omit them and this
+    function computes stop, target and size from cfg as it always has.
+
+    `sl_override` also re-derives the stop distance used for sizing. Overriding
+    the price while sizing off the engine's ATR stop would silently size the
+    position against a stop it is not using - the position would be the wrong
+    size and nothing would look wrong.
+    """
     user_id = str(user_id)
     user = user_store.load(user_id)
 
@@ -5205,6 +5225,28 @@ def force_trade(user_id, side, symbol=None, lots=None):
     sl_price = round(price - sl_dist if side == "BUY" else price + sl_dist, 6)
     tp_price = round(price + tp_dist if side == "BUY" else price - tp_dist, 6)
 
+    # A caller-supplied stop replaces both the price AND the distance sizing
+    # reads, so the two can never disagree.
+    if sl_override is not None:
+        sl_price = round(float(sl_override), 6)
+        stop_pips_eff = abs(forex.to_pips(price - sl_price, sym, price))
+        # Not just "> 0". Rounding leaves a stop AT the entry price a fraction
+        # of a pip away rather than exactly zero, and sizing divides by this
+        # number: a hundredth of a pip would ask for a position a hundred times
+        # larger than the risk allows. A stop closer than the live spread is
+        # also unusable on its own terms - it would be hit the moment the
+        # position opened. Refused rather than widened, because widening a
+        # client's stop to something we chose is the substitution this engine
+        # is built to refuse.
+        if stop_pips_eff <= max(spread, 0.1):
+            return {"ok": False, "side": side, "symbol": sym,
+                    "error": f"the requested stop is {stop_pips_eff:.2f} pips "
+                             f"from entry, inside the {spread:.1f} pip spread "
+                             f"— it would be hit on entry and leaves no "
+                             f"usable risk to size against"}
+    if tp_override is not None:
+        tp_price = round(float(tp_override), 6)
+
     balance = user.get("paper_balance") or cfg.PAPER_BALANCE
     dash = get_dash(user_id)
     if dash:
@@ -5219,16 +5261,20 @@ def force_trade(user_id, side, symbol=None, lots=None):
         units = forex.lots_to_units(lots, sym)
     else:
         # Same per-instrument leverage as the automatic path.
-        units = forex.calc_units(sizing_balance, cfg.RISK_PER_TRADE, stop_pips_eff,
-                                 sym, price,
+        units = forex.calc_units(sizing_balance,
+                                 (risk_override if risk_override is not None
+                                  else cfg.RISK_PER_TRADE),
+                                 stop_pips_eff, sym, price,
                                  leverage=leverage_for_symbol(broker, cfg, sym))
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
     # Same unbounded-floor defect the automatic path had: when the risk-correct
     # size lands below the minimum lot, taking the lot anyway spends more than
     # the configured risk, without limit. An explicit `lots` is the client
     # overriding sizing on purpose and is left alone.
-    if lots is None and not forex.floor_risk_ok(units, sym, price, stop_pips_eff,
-                                                sizing_balance * cfg.RISK_PER_TRADE):
+    if lots is None and not forex.floor_risk_ok(
+            units, sym, price, stop_pips_eff,
+            sizing_balance * (risk_override if risk_override is not None
+                              else cfg.RISK_PER_TRADE)):
         return {"ok": False, "side": side, "symbol": sym,
                 "error": "minimum lot on this instrument would risk more than "
                          "your configured risk per trade"}
@@ -5236,7 +5282,7 @@ def force_trade(user_id, side, symbol=None, lots=None):
     try:
         from apex import control as _ctl
         _ctl.event("order", f"{side} {sym} units={units} @~{price} "
-                   f"SL={sl_price} TP={tp_price} (manual)", user_id=user_id)
+                   f"SL={sl_price} TP={tp_price} ({origin})", user_id=user_id)
     except Exception:
         pass
     # Same ownership gate as the automatic path. A manual order from the
@@ -5245,13 +5291,13 @@ def force_trade(user_id, side, symbol=None, lots=None):
     _own_ok, _own_why = ownership.may_trade(
         user_id, live=not user.get("paper", True))
     if not _own_ok:
-        print(f"[UserLoop:{user_id}] manual {side} {sym} refused: {_own_why}")
+        print(f"[UserLoop:{user_id}] {origin} {side} {sym} refused: {_own_why}")
         return {"ok": False, "error": f"not the owning instance ({_own_why})"}
 
     _decision, _rid = gates.authorize_order(
         user_id, symbol=sym, side=side, units=units, sl=sl_price, tp=tp_price,
-        origin="manual", user=user)
-    gates.audit(user_id, f"{side} {sym}", _decision, origin="manual", rid=_rid)
+        origin=origin, user=user)
+    gates.audit(user_id, f"{side} {sym}", _decision, origin=origin, rid=_rid)
     _claim_ok, _claim_why = _decision.allowed, _decision.reason
     if not _claim_ok:
         # Manual /buy and the MCP open_trade land here. A double-tap on the

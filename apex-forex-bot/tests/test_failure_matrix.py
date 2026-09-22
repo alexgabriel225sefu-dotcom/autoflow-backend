@@ -411,9 +411,15 @@ import glob as _glob
 CORE = {"user_loop.py", "brokers", "position.py", "bot.py", "webapp.py",
         "dashboard.py", "telegram.py", "strategies.py", "shadow.py"}
 _offenders = []
-for _f in sorted(_glob.glob(os.path.join(ROOT, "apex", "*.py"))):
+# apex/platform/*.py is included explicitly. The glob below does not recurse,
+# so the whole platform package used to sit outside this invariant - the one
+# part of the codebase written most recently, and the part whose entire design
+# depends on never reaching a broker itself.
+_scan = (sorted(_glob.glob(os.path.join(ROOT, "apex", "*.py")))
+         + sorted(_glob.glob(os.path.join(ROOT, "apex", "platform", "*.py"))))
+for _f in _scan:
     _base = os.path.basename(_f)
-    if _base in CORE:
+    if _base in CORE and os.path.basename(os.path.dirname(_f)) == "apex":
         continue
     _src = open(_f, encoding="utf-8").read()
     if "brokers.ctrader" in _src or "CtraderBroker" in _src:
