@@ -335,6 +335,11 @@ try:
           not any("telegram" in m.lower() for m in imported), str(imported))
     check("and no telegram module was loaded by running the flow",
           not any(m.startswith("apex.telegram") for m in sys.modules))
+    check("nor the deprecated Telegram-era OAuth module",
+          "apex.ctrader_oauth" not in sys.modules)
+    check("the old module is marked deprecated so nobody extends it",
+          open(os.path.join(ROOT, "apex", "ctrader_oauth.py")
+               ).read().lstrip().startswith('"""DEPRECATED'))
     # The old module signs state with the bot token; this one must not, and
     # the surest way to show it is that the whole flow just ran without one.
     check("state signing works with no bot token present",

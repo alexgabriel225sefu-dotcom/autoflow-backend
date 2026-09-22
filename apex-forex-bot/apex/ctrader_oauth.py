@@ -1,4 +1,30 @@
-"""cTrader OAuth2 onboarding — links a client's cTrader account to the bot.
+"""DEPRECATED — the Telegram-era cTrader onboarding. Do not extend.
+
+SUPERSEDED BY apex/platform/ctrader_link.py, which is the flow Apex4Traders
+uses. Nothing in the platform imports this module, and a test asserts that.
+
+It is kept, unchanged and working, for one reason: clients onboarded through
+Telegram have tokens stored by this code, and deleting it would strand them.
+It is not a fallback for the new flow and must not become one.
+
+Why it could not simply be reused, rather than replaced:
+
+  IDENTITY.   Everything here is keyed by Telegram chat_id. The platform is
+              keyed by supabase_user_id, and a client may have no Telegram
+              account at all.
+  SIGNING.    `_secret()` below signs the OAuth state with TELEGRAM_BOT_TOKEN,
+              putting a Telegram dependency inside a security primitive. The
+              new flow derives its key from TOKEN_ENCRYPTION_KEY instead.
+  BINDING.    handle_callback() completes the link on the spot, so whoever
+              opens the authorize link binds an account to the chat named in
+              the state. An attacker who starts a flow for their own account
+              and gets a victim to approve it captures the victim's trading
+              account. The new flow parks the code and requires an
+              authenticated completion by the user who began it.
+
+──────────────────────────────────────────────────────────────────────────────
+
+cTrader OAuth2 onboarding — links a client's cTrader account to the bot.
 
 Flow (all from the client's phone, no PC needed):
   1. Client sends /ctrader in Telegram.
