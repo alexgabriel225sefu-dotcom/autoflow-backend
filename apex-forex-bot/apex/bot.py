@@ -525,13 +525,16 @@ def _start_dashboard_server():
                     raw = self.rfile.read(length)
             except Exception:
                 raw = None
-            # Only the Authorization header is forwarded. The platform API has
-            # no business reading cookies: the operator's dashboard session
-            # lives in one, and a client bearer token must never be able to
-            # ride in on it.
+            # Only these two headers are forwarded. The platform API has no
+            # business reading cookies: the operator's dashboard session lives
+            # in one, and a client bearer token must never be able to ride in
+            # on it. Stripe-Signature is the payment webhook's only credential
+            # — it has no session — and it is verified against the raw body
+            # inside apex/platform/billing.py, not here.
             out = platform_api.handle(
                 self.command, self.path,
-                {"Authorization": self.headers.get("Authorization") or ""},
+                {"Authorization": self.headers.get("Authorization") or "",
+                 "Stripe-Signature": self.headers.get("Stripe-Signature") or ""},
                 raw)
             if out is None:
                 return False

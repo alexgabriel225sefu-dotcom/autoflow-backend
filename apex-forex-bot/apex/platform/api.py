@@ -28,6 +28,7 @@ import re
 
 from apex.platform import conditions as _cond
 from apex.platform import automation as _auto
+from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
 from apex.platform import identity as _id
@@ -182,6 +183,17 @@ def _dispatch(method, route, headers, body, query=None):
     # arriving from a redirect carries no bearer token. It is safe because it
     # finishes nothing — it parks the code and hands back a nonce, and the
     # link is completed by an authenticated call below.
+    # The payment webhook. Unauthenticated by necessity and safe by
+    # signature: the provider's server has no session, and the body is only
+    # acted on when it verifies against the webhook secret. It is listed here,
+    # beside the OAuth callback, so the two unauthenticated routes in this API
+    # are visible together rather than discovered one at a time.
+    if route == "billing/webhook" and method == "POST":
+        return _billing.handle_event(
+            body if isinstance(body, (bytes, bytearray)) else (body or "").encode(),
+            (headers or {}).get("Stripe-Signature")
+            or (headers or {}).get("stripe-signature") or "")
+
     if route == "ctrader/callback" and method == "GET":
         return _ok(_link.handle_callback(query or {}), pendingOnly=True)
 
