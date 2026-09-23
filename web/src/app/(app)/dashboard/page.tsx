@@ -1,38 +1,92 @@
 "use client";
-import {
-  Activity, Plug, Receipt, ShieldCheck, TrendingUp, Wallet,
-} from "lucide-react";
+/**
+ * The dashboard answers five questions, in this order:
+ *
+ *   1. What account am I using?
+ *   2. Is automation running?
+ *   3. What rule is active?
+ *   4. What did the system decide?
+ *   5. Was an order placed?
+ *
+ * Everything else is one click away. The previous version led with four
+ * counters and the word STOPPED, which is accurate and answers none of them.
+ *
+ * No state on this page is optimistic. A control that changes whether money
+ * can move goes through ConfirmAction and shows the API's own answer, and a
+ * read that failed shows why it failed rather than an empty list.
+ */
+import { useState } from "react";
+import Link from "next/link";
+import { Activity, Plug, RefreshCw } from "lucide-react";
+import { api } from "@/lib/api";
 import { useRead, whenSynced } from "@/lib/use-api";
-import {
-  ErrorNotice, LicencePill, ReadPanel, Skeleton, Spinner, Stat, StatusPill,
-} from "@/components/app/state";
+import { ConfirmAction } from "@/components/app/shell";
+import { ErrorNotice, Spinner, StatusPill } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
+import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import type {
-  AutomationState, CtraderStatus, JournalPage, Me, NotificationPage,
-  OrdersRead, PositionsRead, Position,
+  AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
+  Position, PositionsRead, RuleSummary,
 } from "@/lib/api";
 
-/** The decision statuses that mean "the engine ran and chose not to act". */
-const QUIET = new Set(["hold", "reject"]);
+/** A read that failed, said plainly, with the action that fixes it. */
+function Unavailable({ status, reason }: { status: string; reason?: string }) {
+  const p = plainRead(status, reason);
+  if (!p) return null;
+  return (
+    <div className={p.tone === "short" ? "notice notice-warn" : "notice"} role="status">
+      <p style={{ fontWeight: 600 }}>{p.label}</p>
+      {p.detail ? <p className="muted" style={{ fontSize: ".82rem" }}>{p.detail}</p> : null}
+      {status === "not_connected" ? (
+        <Link className="btn btn-sm" href="/connect">Connect cTrader</Link>
+      ) : status === "reauth_required" ? (
+        <Link className="btn btn-sm" href="/connect">Reconnect cTrader</Link>
+      ) : null}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const me = useRead<Me>("me", 120_000);
-  const ct = useRead<CtraderStatus>("accounts", 60_000);
-  const auto = useRead<AutomationState>("automation", 30_000);
+  const ct = useRead<CtraderStatus>("ctrader/status", 60_000);
+  const auto = useRead<AutomationState>("automation", 20_000);
   const pos = useRead<PositionsRead>("positions", 30_000);
   const ord = useRead<OrdersRead>("orders", 60_000);
-  const jr = useRead<JournalPage>("journal?limit=6", 60_000);
-  const nt = useRead<NotificationPage>("notifications?limit=4", 60_000);
-
-  const lastSync = Math.max(...[me, ct, auto, pos, ord].map((r) => r.lastSync ?? 0)) || null;
+  const jr = useRead<JournalPage>("journal?limit=8", 30_000);
+  const rules = useRead<{ rules: RuleSummary[] }>("rules", 120_000);
+  const [busy, setBusy] = useState(false);
 
   const account = ct.result?.ok ? ct.result.data : null;
   const selected = account?.selected ?? null;
   const running = auto.result?.ok ? auto.result.data : null;
-  const positions = pos.result?.ok && pos.result.data.status === "ok"
-    ? pos.result.data.positions ?? [] : null;
-  const orders = ord.result?.ok && ord.result.data.status === "ok"
-    ? ord.result.data.orders ?? [] : null;
+  const licence = me.result?.ok ? me.result.data.licence.state : undefined;
+  const allRules = rules.result?.ok ? rules.result.data.rules : [];
+  const activeRule = allRules.find((r) => r.ruleDocId === running?.ruleDocId)
+    ?? allRules.find((r) => r.state === "active")
+    ?? null;
+
+  const lastSync = Math.max(...[ct, auto, pos, jr].map((r) => r.lastSync ?? 0)) || null;
+  const autoPlain = plainAutomation(running?.state, !!activeRule);
+  const licPlain = plainLicence(licence);
+  const isDemo = selected?.mode === "demo";
+  const runningThis = running && running.state !== "stopped";
+
+  async function select(ctid: number | string) {
+    setBusy(true);
+    await api("ctrader/select", { method: "POST", body: { ctid } });
+    setBusy(false);
+    void ct.reload();
+  }
+
+  async function control(action: "start" | "pause" | "resume" | "stop") {
+    const body = action === "start" && activeRule
+      ? { ruleDocId: activeRule.ruleDocId } : undefined;
+    const r = await api<AutomationState>(`automation/${action}`, { method: "POST", body });
+    void auto.reload();
+    void jr.reload();
+    if (!r.ok) return `${r.code}: ${r.message}`;
+    return `Automation is now ${r.data.state}`;
+  }
 
   return (
     <main>
@@ -41,84 +95,214 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <span className="sub">Last synced {whenSynced(lastSync)}</span>
         </div>
-        {!account?.connected && ct.result?.ok ? (
-          <a className="btn" href="/connect"><Plug className="ico" aria-hidden /> Connect cTrader</a>
-        ) : null}
+        <button className="btn btn-ghost btn-sm" onClick={() => { void ct.reload(); void auto.reload(); void pos.reload(); void jr.reload(); }}>
+          <RefreshCw className="ico" aria-hidden /> Refresh
+        </button>
       </div>
 
-      {/* ── the four numbers, before anything else ───────────────────── */}
-      <div className="grid grid-4">
-        <Stat
-          label="Account"
-          icon={Wallet}
-          href={account?.connected ? "/accounts" : "/connect"}
-          small={!selected}
-          value={
-            account === null ? <Skeleton w={90} />
-              : !account.connected ? <span className="dim">Not connected</span>
-              : selected ? <span className="mono">#{selected.ctid}</span>
-              : <span className="dim">None selected</span>
-          }
-          foot={account?.connected
-            ? <StatusPill mode={selected?.mode} />
-            : <span>Orders are placed through an account you connect.</span>}
-        />
+      <div className="workspace">
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
 
-        <Stat
-          label="Automation"
-          icon={Activity}
-          tone={running?.state === "running" ? "accent" : undefined}
-          href={running?.ruleDocId ? `/rules/${running.ruleDocId}` : "/rules"}
-          value={running === null ? <Skeleton w={80} /> : running.state.toUpperCase()}
-          foot={running?.ruleDocId
-            ? <span className="mono">rule {running.ruleDocId.slice(0, 8)}</span>
-            : <span>No rule running</span>}
-        />
+          {/* ── 1 + 2: which account, and is it running ─────────────── */}
+          <section className="card">
+            <div className="card-head">
+              <h2>Automation</h2>
+              <span className="btn-row">
+                <StatusPill mode={selected?.mode} />
+                {licence && licence !== "active" ? (
+                  <Link className={tonePill(licPlain.tone)} href="/license">
+                    Licence: {licPlain.label}
+                  </Link>
+                ) : null}
+              </span>
+            </div>
 
-        <Stat
-          label="Open positions"
-          icon={TrendingUp}
-          href="/positions"
-          value={
-            pos.result === null ? <Skeleton w={30} />
-              : positions === null ? <span className="dim">—</span>
-              : positions.length
-          }
-          foot={positions === null
-            ? <span>{pos.result?.ok ? pos.result.data.reason ?? "Not available" : "Not available"}</span>
-            : <span>Confirmed by the broker</span>}
-        />
+            {ct.result && !ct.result.ok ? <ErrorNotice error={ct.result} onRetry={ct.reload} /> : null}
 
-        <Stat
-          label="Pending orders"
-          icon={Receipt}
-          href="/orders"
-          value={
-            ord.result === null ? <Skeleton w={30} />
-              : orders === null ? <span className="dim">—</span>
-              : orders.length
-          }
-          foot={orders === null
-            ? <span>{ord.result?.ok ? ord.result.data.reason ?? "Not available" : "Not available"}</span>
-            : <span>Waiting at the broker</span>}
-        />
-      </div>
+            {account === null ? <Spinner label="Checking your broker link" />
+              : !account.connected ? (
+                <div className="notice">
+                  <p style={{ fontWeight: 600 }}>cTrader account not connected</p>
+                  <p className="muted" style={{ fontSize: ".82rem" }}>
+                    Orders are placed through an account you connect yourself.
+                    Nothing runs until one is connected and selected.
+                  </p>
+                  <Link className="btn btn-sm" href="/connect">
+                    <Plug className="ico" aria-hidden /> Connect cTrader
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <label className="field">
+                    <span>Account</span>
+                    <select
+                      value={selected ? String(selected.ctid) : ""}
+                      disabled={busy}
+                      onChange={(e) => { if (e.target.value) void select(e.target.value); }}
+                    >
+                      <option value="" disabled>Choose an account</option>
+                      {account.accounts.map((a) => (
+                        <option
+                          key={String(a.ctid)}
+                          value={String(a.ctid)}
+                          /* A live account is never selectable here. The
+                             backend refuses it too; this only avoids
+                             offering it. */
+                          disabled={a.mode === "live" && !account.liveAllowed}
+                        >
+                          #{a.ctid} — {a.mode === "live" ? "live (not available)" : "demo"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-      <div className="grid grid-main" style={{ marginTop: ".85rem" }}>
-        <div>
-          {/* ── positions ───────────────────────────────────────────── */}
+                  <div
+                    className="verdict-banner"
+                    data-kind={autoPlain.tone === "long" ? "buy" : undefined}
+                    style={{ marginTop: "var(--sp-2)" }}
+                  >
+                    <Activity
+                      className="ico" aria-hidden
+                      style={{ width: 20, height: 20, flex: "none", color: "var(--a4t-link)" }}
+                    />
+                    <div className="vb-body" style={{ flex: 1 }}>
+                      <p className={`verdict ${toneClass(autoPlain.tone)}`} style={{ fontSize: "1.15rem" }}>
+                        {autoPlain.label}
+                      </p>
+                      {autoPlain.detail ? <p className="vb-note">{autoPlain.detail}</p> : null}
+                    </div>
+                  </div>
+
+                  {!selected ? (
+                    <p className="muted" style={{ fontSize: ".82rem", marginTop: "var(--sp-2)" }}>
+                      Choose an account above before starting.
+                    </p>
+                  ) : !isDemo ? (
+                    <div className="notice notice-warn" role="alert">
+                      The selected account is not a demo account. Automation
+                      runs on demo accounts only.
+                    </div>
+                  ) : (
+                    <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>
+                      {!runningThis ? (
+                        <ConfirmAction
+                          label="Start"
+                          question={activeRule ? `Start watching with "${activeRule.name || "this rule"}"?` : "Start?"}
+                          disabled={!activeRule || licence !== "active"}
+                          disabledReason={
+                            !activeRule ? "Activate a rule first"
+                              : licence !== "active" ? "An active licence is required" : undefined
+                          }
+                          onConfirm={() => control("start")}
+                        />
+                      ) : null}
+                      {running?.state === "running" ? (
+                        <ConfirmAction label="Pause" question="Pause automation?" onConfirm={() => control("pause")} />
+                      ) : null}
+                      {running?.state === "paused" ? (
+                        <ConfirmAction label="Resume" question="Resume automation?" onConfirm={() => control("resume")} />
+                      ) : null}
+                      {runningThis ? (
+                        <ConfirmAction label="Stop" danger question="Stop automation?" onConfirm={() => control("stop")} />
+                      ) : null}
+                    </div>
+                  )}
+                </>
+              )}
+          </section>
+
+          {/* ── 4 + 5: what did it decide, and was anything placed ──── */}
+          <section className="card">
+            <div className="card-head">
+              <h2>What the rule decided</h2>
+              <Link className="link-sm" href="/journal">Full journal →</Link>
+            </div>
+            <p className="muted" style={{ fontSize: ".8rem", marginBottom: "var(--sp-3)" }}>
+              Every check is recorded, including the ones that decided to do
+              nothing.
+            </p>
+            {jr.result && !jr.result.ok ? <ErrorNotice error={jr.result} onRetry={jr.reload} /> : null}
+            {jr.result?.ok ? (
+              jr.result.data.entries.length ? (
+                <div className="records">
+                  {jr.result.data.entries.map((e) => {
+                    const p = plainDecision(e);
+                    return (
+                      <article className="record" key={e.entryId}>
+                        <div className="record-head">
+                          <span className="record-title">
+                            <span className={toneClass(p.tone)}>{p.label}</span>
+                            {e.symbol ? <span className="muted"> · {e.symbol}</span> : null}
+                          </span>
+                          <span className="dim" style={{ fontSize: ".74rem" }}><When ts={e.ts} /></span>
+                        </div>
+                        {p.detail ? (
+                          <p className="muted" style={{ fontSize: ".82rem" }}>{p.detail}</p>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="empty">
+                  Nothing recorded yet. Once automation is watching, every
+                  check appears here.
+                </p>
+              )
+            ) : jr.result ? null : <Spinner />}
+          </section>
+        </div>
+
+        {/* ── inspector ───────────────────────────────────────────────── */}
+        <aside className="inspector">
+
+          {/* 3: what rule is active */}
+          <section className="card">
+            <div className="card-head">
+              <h2>Active rule</h2>
+              <Link className="link-sm" href="/rules">All rules →</Link>
+            </div>
+            {rules.result && !rules.result.ok ? <ErrorNotice error={rules.result} /> : null}
+            {rules.result?.ok ? (
+              activeRule ? (
+                <>
+                  <p style={{ fontWeight: 600 }}>
+                    <Link href={`/rules/${activeRule.ruleDocId}`}>
+                      {activeRule.name || "(untitled)"}
+                    </Link>
+                  </p>
+                  <div className="btn-row" style={{ marginTop: "var(--sp-2)" }}>
+                    <span className="pill pill-muted">{(activeRule.symbols ?? []).join(", ") || "no market"}</span>
+                    <span className="pill pill-muted">{activeRule.timeframe}</span>
+                    <span className="pill pill-muted mono">v{activeRule.version}</span>
+                  </div>
+                  <p className="dim" style={{ fontSize: ".78rem", marginTop: "var(--sp-2)" }}>
+                    Open the rule to preview what it would decide right now.
+                  </p>
+                </>
+              ) : (
+                <div className="notice">
+                  <p>No active rule.</p>
+                  <Link className="btn btn-sm" href="/rules/new">Create a rule</Link>
+                </div>
+              )
+            ) : <Spinner />}
+          </section>
+
+          {/* 5: positions and orders, from the broker or not at all */}
           <section className="card">
             <div className="card-head">
               <h2>Open positions</h2>
-              <a className="link-sm" href="/positions">All positions →</a>
+              <Link className="link-sm" href="/positions">All →</Link>
             </div>
+            {pos.result && !pos.result.ok ? <ErrorNotice error={pos.result} onRetry={pos.reload} /> : null}
             {pos.result?.ok ? (
-              <ReadPanel read={pos.result.data}>
+              pos.result.data.status === "ok" ? (
                 <DataTable<Position>
                   rows={pos.result.data.positions ?? []}
                   rowKey={(p) => String(p.positionId)}
-                  /* An empty list only after status ok — so this sentence is a
-                     fact the broker confirmed, not a guess. */
+                  /* Only ever said after status ok, so it is a fact the
+                     broker confirmed rather than a guess. */
                   empty="No open positions."
                   cardTitle={(p) => p.symbol}
                   cardBadge={(p) => <Side side={p.side} />}
@@ -127,158 +311,40 @@ export default function Dashboard() {
                     { key: "side", header: "Side", cell: (p) => <Side side={p.side} />, hideOnCard: true },
                     { key: "units", header: "Units", num: true, cell: (p) => <Num value={p.units} /> },
                     { key: "entry", header: "Entry", num: true, cell: (p) => <Num value={p.entryPrice} /> },
-                    { key: "sl", header: "Stop", num: true, cell: (p) => <Num value={p.stopLoss} /> },
-                    { key: "tp", header: "Target", num: true, cell: (p) => <Num value={p.takeProfit} /> },
                   ]}
                 />
-              </ReadPanel>
-            ) : pos.result && !pos.result.ok ? (
-              <ErrorNotice error={pos.result} onRetry={pos.reload} />
+              ) : (
+                <Unavailable status={pos.result.data.status} reason={pos.result.data.reason} />
+              )
             ) : <Spinner />}
           </section>
 
-          {/* ── the journal, front and centre ───────────────────────── */}
-          <section className="card">
-            <div className="card-head">
-              <h2>Recent decisions</h2>
-              <a className="link-sm" href="/journal">Journal →</a>
-            </div>
-            <p className="muted" style={{ fontSize: ".8rem", marginBottom: ".6rem" }}>
-              Including the evaluations that decided to do nothing.
-            </p>
-            {jr.result?.ok ? (
-              jr.result.data.entries.length ? (
-                <div className="records">
-                  {jr.result.data.entries.map((e) => (
-                    <div className="record" key={e.entryId}>
-                      <div className="record-head">
-                        <span className="record-title">
-                          <span className={
-                            e.decision?.verdict === "BUY" ? "side-long"
-                              : e.decision?.verdict === "SELL" ? "side-short"
-                              : undefined
-                          }>
-                            {e.decision?.verdict ?? e.status ?? e.kind}
-                          </span>
-                          {e.symbol ? <span className="muted"> · {e.symbol}</span> : null}
-                        </span>
-                        <span className="dim" style={{ fontSize: ".72rem" }}><When ts={e.ts} /></span>
-                      </div>
-                      <p className="muted" style={{ fontSize: ".8rem" }}>
-                        {e.error ?? e.decision?.reason ?? e.status ?? "—"}
-                      </p>
-                      {e.status && QUIET.has(e.status) ? (
-                        <span className="pill pill-muted" style={{ marginTop: ".4rem" }}>
-                          No order placed
-                        </span>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              ) : <p className="empty">Nothing recorded yet.</p>
-            ) : jr.result && !jr.result.ok ? <ErrorNotice error={jr.result} /> : <Spinner />}
-          </section>
-        </div>
-
-        <div>
-          {/* ── licence ─────────────────────────────────────────────── */}
-          <section className="card">
-            <div className="card-head">
-              <h2>Licence</h2>
-              <a className="link-sm" href="/license">Details →</a>
-            </div>
-            {me.result?.ok ? (
-              <>
-                <div className="btn-row">
-                  <LicencePill state={me.result.data.licence.state} />
-                  {me.result.data.licence.plan ? (
-                    <span className="pill">{me.result.data.licence.plan}</span>
-                  ) : null}
-                </div>
-                <p className="muted" style={{ marginTop: ".5rem", fontSize: ".82rem" }}>
-                  {me.result.data.user.email}
-                </p>
-                {!me.result.data.user.emailVerified ? (
-                  <div className="notice notice-warn" role="alert">
-                    Confirm your email to activate rules.
-                  </div>
-                ) : null}
-              </>
-            ) : me.result && !me.result.ok ? (
-              <ErrorNotice error={me.result} onRetry={me.reload} />
-            ) : <Spinner />}
-          </section>
-
-          {/* ── pending orders ──────────────────────────────────────── */}
           <section className="card">
             <div className="card-head">
               <h2>Pending orders</h2>
-              <a className="link-sm" href="/orders">All orders →</a>
+              <Link className="link-sm" href="/orders">All →</Link>
             </div>
+            {ord.result && !ord.result.ok ? <ErrorNotice error={ord.result} onRetry={ord.reload} /> : null}
             {ord.result?.ok ? (
-              <ReadPanel read={ord.result.data}>
-                {orders?.length ? (
-                  <div className="records">
-                    {orders.slice(0, 4).map((o) => (
-                      <div className="record" key={String(o.orderId)}>
-                        <div className="record-head">
-                          <span className="record-title">{o.symbol}</span>
-                          <Side side={o.side} />
-                        </div>
-                        <div className="record-grid">
-                          <div><span className="k">Type</span><span className="v">{o.orderType ?? "—"}</span></div>
-                          <div><span className="k">Units</span><span className="v mono"><Num value={o.units} /></span></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <p className="empty">No pending orders.</p>}
-              </ReadPanel>
-            ) : ord.result && !ord.result.ok ? <ErrorNotice error={ord.result} /> : <Spinner />}
+              ord.result.data.status === "ok" ? (
+                (ord.result.data.orders ?? []).length ? (
+                  <p>{(ord.result.data.orders ?? []).length} waiting at the broker.</p>
+                ) : <p className="empty">No pending orders.</p>
+              ) : (
+                <Unavailable status={ord.result.data.status} reason={ord.result.data.reason} />
+              )
+            ) : <Spinner />}
           </section>
 
-          {/* ── alerts ──────────────────────────────────────────────── */}
-          <section className="card">
-            <div className="card-head">
-              <h2>Recent alerts</h2>
-              <a className="link-sm" href="/notifications">All alerts →</a>
-            </div>
-            {nt.result?.ok ? (
-              nt.result.data.notifications.length ? (
-                <div className="records">
-                  {nt.result.data.notifications.map((n) => (
-                    <div className="record" key={n.id}
-                         style={{ opacity: n.readAt ? 0.62 : 1 }}>
-                      <div className="record-head">
-                        <span className="record-title" style={{ fontSize: ".84rem" }}>{n.title}</span>
-                        {n.level !== "info" ? (
-                          <span className="pill pill-warn">{n.level}</span>
-                        ) : null}
-                      </div>
-                      <span className="dim" style={{ fontSize: ".72rem" }}><When ts={n.ts} /></span>
-                    </div>
-                  ))}
-                </div>
-              ) : <p className="empty">No alerts.</p>
-            ) : nt.result && !nt.result.ok ? <ErrorNotice error={nt.result} /> : <Spinner />}
-          </section>
-
-          {/* Demo-first, stated where the client is looking at their account,
-              not only in a footer on the marketing page. */}
           <section className="card card-flat">
-            <div className="card-head" style={{ marginBottom: ".4rem" }}>
-              <h2 style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
-                <ShieldCheck className="ico" aria-hidden style={{ width: 15, height: 15 }} />
-                Demo first
-              </h2>
-            </div>
             <p className="muted" style={{ fontSize: ".8rem", lineHeight: 1.6 }}>
-              Automation runs on demo accounts. Live trading is not enabled in
-              this release, and nothing starts because you connected an
-              account — starting is a separate, deliberate step.
+              <strong style={{ color: "var(--a4t-text)" }}>Demo only.</strong>{" "}
+              Live trading is not available in this release. Orders are placed
+              on the cTrader account you connected, and you can disconnect it
+              at any time.
             </p>
           </section>
-        </div>
+        </aside>
       </div>
     </main>
   );
