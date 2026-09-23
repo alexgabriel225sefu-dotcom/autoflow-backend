@@ -458,6 +458,36 @@ body {
 .usermenu a:hover, .usermenu button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
 .usermenu button { color: var(--a4t-short); }
 
+/* ── step rail ─────────────────────────────────────────────────────
+   Navigation, not a gate. Every step is always clickable. */
+
+.steps {
+  display: flex; gap: var(--sp-1); flex-wrap: wrap;
+  margin-bottom: var(--sp-3); padding-bottom: var(--sp-2);
+  border-bottom: var(--a4t-border-soft);
+}
+.steps button {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .32rem .6rem; border-radius: 999px;
+  border: var(--a4t-border); background: var(--a4t-surface);
+  color: var(--a4t-muted); font: inherit; font-size: var(--fs-2xs);
+  font-weight: 600; cursor: pointer; min-height: 34px; white-space: nowrap;
+}
+.steps button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.steps button[aria-current="step"] {
+  background: var(--a4t-accent); border-color: var(--a4t-accent-strong);
+  color: var(--a4t-on-accent);
+}
+.steps .n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 999px; flex: none;
+  background: var(--a4t-surface-3); color: var(--a4t-muted);
+  font-size: var(--fs-3xs); font-variant-numeric: tabular-nums;
+}
+.steps button[aria-current="step"] .n {
+  background: rgba(244, 240, 232, .22); color: var(--a4t-on-accent);
+}
+
 /* ── chart ─────────────────────────────────────────────────────────── */
 
 .ohlc {

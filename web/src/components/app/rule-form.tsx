@@ -192,16 +192,42 @@ function ConditionList({
   );
 }
 
+/**
+ * The steps, in the order a trader thinks about a rule.
+ *
+ * Progressive disclosure, not hidden fields: every step is reachable from the
+ * rail at any time, Review shows all of them at once, and nothing is dropped
+ * from the document because it was not visited. A field the client never
+ * opened still takes a value, and that value is shown rather than implied.
+ */
+export const STEPS = [
+  { id: "basics", label: "Market" },
+  { id: "entry", label: "Entry" },
+  { id: "exit", label: "Exit" },
+  { id: "risk", label: "Risk" },
+  { id: "stop", label: "Stop loss" },
+  { id: "target", label: "Take profit" },
+  { id: "management", label: "Management" },
+  { id: "limits", label: "Limits" },
+  { id: "schedule", label: "Schedule" },
+  { id: "order", label: "Order" },
+  { id: "review", label: "Review" },
+] as const;
+
+export type StepId = (typeof STEPS)[number]["id"];
+
 export function RuleForm({
-  draft, set, specs,
+  draft, set, specs, step,
 }: {
   draft: Draft;
   set: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   specs: Record<string, ConditionSpec>;
+  /** One step, or every section at once for the Review page. */
+  step?: StepId | "all";
 }) {
   const d = draft;
-
-  return (
+  const sections: Record<string, React.ReactNode> = {
+  basics: (
     <>
       <Section title="Basics">
         <div className="grid grid-2">
@@ -240,21 +266,30 @@ export function RuleForm({
           </span>
         </div>
       </Section>
-
+    </>
+  ),
+  entry: (
+    <>
       <ConditionList
         title="Entry conditions" specs={specs}
         combine={d.entryCombine} onCombine={(v) => set("entryCombine", v)}
         list={d.entry} onList={(v) => set("entry", v)}
         emptyNote="No entry condition yet. A rule with none cannot open anything."
       />
-
+    </>
+  ),
+  exit: (
+    <>
       <ConditionList
         title="Exit conditions" specs={specs}
         combine={d.exitCombine} onCombine={(v) => set("exitCombine", v)}
         list={d.exit} onList={(v) => set("exit", v)}
         emptyNote="No exit condition. The stop and target will close the trade."
       />
-
+    </>
+  ),
+  risk: (
+    <>
       <Section
         title="Risk and size"
         note="How large a position this rule opens. Risk percent derives the size from the stop distance, so the stop and the size are one decision."
@@ -275,7 +310,10 @@ export function RuleForm({
           )}
         </div>
       </Section>
-
+    </>
+  ),
+  stop: (
+    <>
       <Section
         title="Stop loss"
         note="Not optional. Without a stop the position has no defined worst case and the size cannot be derived from risk."
@@ -295,7 +333,10 @@ export function RuleForm({
           )}
         </div>
       </Section>
-
+    </>
+  ),
+  target: (
+    <>
       <Section title="Take profit" note="Optional. A rule may manage its exit with exit conditions instead.">
         <div className="field"><span>Target</span>
           <Seg value={d.tpMode} options={["rr", "pips", "none"]} onChange={(v) => set("tpMode", v)} />
@@ -317,7 +358,10 @@ export function RuleForm({
           )}
         </div>
       </Section>
-
+    </>
+  ),
+  management: (
+    <>
       <Section
         title="Trade management"
         note="Stored on the rule and shown in its terms. The execution engine does not apply these yet, so they are recorded rather than enforced."
@@ -347,7 +391,10 @@ export function RuleForm({
           </label>
         ) : null}
       </Section>
-
+    </>
+  ),
+  limits: (
+    <>
       <Section title="Limits" note="What this rule refuses to exceed. Leave a field empty for no cap.">
         <div className="grid grid-2">
           <label className="field"><span>Max open positions</span>
@@ -375,7 +422,10 @@ export function RuleForm({
           </span>
         </div>
       </Section>
-
+    </>
+  ),
+  schedule: (
+    <>
       <Section title="Schedule" note="All times are UTC, which is also what the evaluator uses. Leave empty to run whenever the market is open.">
         <div className="field"><span>Trading days</span>
           <div className="btn-row">
@@ -405,7 +455,10 @@ export function RuleForm({
                    onChange={(e) => set("windowTo", e.target.value)} /></label>
         </div>
       </Section>
-
+    </>
+  ),
+  order: (
+    <>
       <Section title="Order" note="How the order reaches the broker.">
         <div className="field"><span>Order type</span>
           <Seg value={d.orderType} options={["MARKET", "LIMIT", "STOP"]}
@@ -441,5 +494,11 @@ export function RuleForm({
         </div>
       </Section>
     </>
-  );
+  ),
+  };
+
+  if (!step || step === "all" || step === "review") {
+    return <>{Object.values(sections)}</>;
+  }
+  return <>{sections[step]}</>;
 }
