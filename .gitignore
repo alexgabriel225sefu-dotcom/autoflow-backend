@@ -31,3 +31,6 @@ apex-forex-bot/data/history/
 # whatever account exported it — committing one hands over the account.
 cookies.txt
 *cookies*.txt
+
+# Local UI audit output (screenshots, harness results) — not part of the product.
+ui-audit/
