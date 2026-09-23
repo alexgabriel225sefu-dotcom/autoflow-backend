@@ -535,7 +535,11 @@ def _start_dashboard_server():
                 self.command, self.path,
                 {"Authorization": self.headers.get("Authorization") or "",
                  "Stripe-Signature": self.headers.get("Stripe-Signature") or ""},
-                raw)
+                raw,
+                # The caller's address. Only the transport knows it, and the
+                # platform API uses it as the rate-limiting key of last
+                # resort — an authenticated request is limited per user.
+                client_key=http_security.client_key(self))
             if out is None:
                 return False
             status, payload = out

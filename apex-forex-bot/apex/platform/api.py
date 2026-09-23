@@ -35,6 +35,7 @@ from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
 from apex.platform import preview as _preview
+from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
@@ -116,8 +117,13 @@ def _query(path):
             parse_qs(urlparse(path).query or "").items()}
 
 
-def handle(method, path, headers=None, body=None):
+def handle(method, path, headers=None, body=None, *, client_key=None):
     """(status, payload), or None when the path is not ours.
+
+    `client_key` is the caller's network identity, supplied by the transport
+    because only the transport knows it. It is used for rate limiting, and
+    only as a fallback: an authenticated request is limited per user so one
+    client behind a shared address cannot lock out another.
 
     Returning None rather than a 404 lets this mount inside an existing server
     whose other routes must keep working.
@@ -125,6 +131,18 @@ def handle(method, path, headers=None, body=None):
     if not path or not path.startswith(PREFIX):
         return None
     route = path[len(PREFIX):].split("?", 1)[0].strip("/")
+
+    # Before anything else, including authentication. A limiter that runs
+    # after the session is verified still pays for verifying the session, and
+    # the endpoints worth protecting — candles against the broker's shared
+    # historical budget, preview against the evaluator — are exactly the ones
+    # a loop would reach.
+    allowed, bucket, retry_after = _rl.check(
+        method, route, client_key=client_key,
+        auth_header=(headers or {}).get("Authorization")
+        or (headers or {}).get("authorization"))
+    if not allowed:
+        return _rl.refusal(bucket, retry_after)
     method = (method or "GET").upper()
     try:
         return _dispatch(method, route, headers or {}, body,

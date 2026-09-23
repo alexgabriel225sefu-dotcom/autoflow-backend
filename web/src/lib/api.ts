@@ -28,6 +28,8 @@ export type ApiError = {
   problems?: string[];
   licenceState?: string;
   capability?: string;
+  /** Present on RATE_LIMITED, so a retry can wait rather than hammer. */
+  retryAfterSec?: number;
 };
 
 export type ApiResult<T> = { ok: true; data: T } | ApiError;
@@ -41,6 +43,7 @@ export const CODES = {
   UNSUPPORTED: "UNSUPPORTED",
   RULE_INVALID: "RULE_INVALID",
   INSUFFICIENT_DATA: "INSUFFICIENT_DATA",
+  RATE_LIMITED: "RATE_LIMITED",
   NETWORK: "NETWORK",
 } as const;
 
@@ -107,6 +110,7 @@ export async function api<T>(
         problems: Array.isArray(err.problems) ? (err.problems as string[]) : undefined,
         licenceState: err.licenceState as string | undefined,
         capability: err.capability as string | undefined,
+        retryAfterSec: typeof err.retryAfterSec === "number" ? err.retryAfterSec : undefined,
       },
     );
   }
