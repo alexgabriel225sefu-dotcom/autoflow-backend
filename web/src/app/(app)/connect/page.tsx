@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { api, type CtraderStatus } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
-import { ErrorNotice, Spinner, StatusPill } from "@/components/app/state";
+import { ErrorNotice, Spinner } from "@/components/app/state";
 
 /**
  * Connecting a cTrader account. Three steps, and the third is the point.
@@ -43,30 +43,39 @@ export default function ConnectPage() {
 
   return (
     <main>
-      <h1>Connect cTrader</h1>
-      <p className="muted">
-        Apex4Traders places orders on a cTrader account you connect yourself.
+      <div className="page-head">
+        <div>
+          <h1>Connect cTrader</h1>
+          <span className="sub">
+            Orders are placed on an account you connect yourself.
+          </span>
+        </div>
+      </div>
+
+      {/* Said where the decision is made, not only in a footer. */}
+      <div className="notice notice-accent">
         Your broker tokens are stored encrypted on the server and are never
-        sent to this page.
-      </p>
+        sent to this page. Apex4Traders cannot move money in or out of your
+        account — it can only place and close trades on it.
+      </div>
 
       <section className="card">
-        <h2>Status</h2>
+        <div className="card-head"><h2>Status</h2></div>
         {status.loading && !status.result ? <Spinner /> : null}
         {status.result && !status.result.ok
           ? <ErrorNotice error={status.result} onRetry={status.reload} /> : null}
         {status.result?.ok ? (
           status.result.data.connected ? (
             <>
-              <p>Connected · {status.result.data.accounts.length} account(s)</p>
-              <a className="btn btn-ghost" href="/accounts">Choose which one to trade</a>
+              <p><span className="pill pill-ok">Connected</span>{" "}{status.result.data.accounts.length} account(s) available</p>
+              <a className="btn btn-ghost btn-sm" style={{ marginTop: ".6rem" }} href="/accounts">Choose which one to trade</a>
             </>
           ) : <p className="muted">No cTrader account is connected.</p>
         ) : null}
       </section>
 
       <section className="card">
-        <h2>{pending ? "Step 2 — finish here" : "Step 1 — authorise"}</h2>
+        <div className="card-head"><h2>{pending ? "Step 2 — finish here" : "Step 1 — authorise"}</h2><span className="pill pill-accent">{pending ? "2 of 2" : "1 of 2"}</span></div>
         {!pending ? (
           <>
             <p className="muted">

@@ -20,6 +20,10 @@ export default function ConfirmPage() {
   return (
     <main className="a4t">
       <div className="auth-wrap">
+        <div className="auth-brand">
+          <span className="side-mark" aria-hidden />
+          Apex4Traders
+        </div>
         <h1>Email confirmation</h1>
         <div className="card">
           {state === "checking" ? <p className="muted" role="status">Checking…</p> : null}

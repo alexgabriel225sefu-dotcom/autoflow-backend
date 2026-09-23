@@ -193,3 +193,106 @@ describe("Rule Detail — preview coupling", () => {
     expect(calls.some((c) => c.path.includes("/preview"))).toBe(false);
   });
 });
+
+/**
+ * The three outcomes a preview can reach, each as its own state on screen.
+ *
+ * These are the states a client acts on. A HOLD that renders as an empty
+ * panel and a REJECT that renders as an empty panel teach the reader that
+ * nothing happened, when one of the two means their rule cannot run at all.
+ */
+describe("Rule Detail — preview outcomes are first-class", () => {
+  const candlesOk = {
+    ok: true, data: {
+      connected: true, status: "ok", accountId: 501, mode: "demo",
+      candles: BARS, symbol: "EUR_USD", timeframe: "1h", count: 2, requested: 300,
+    },
+  };
+
+  async function previewWith(decision: Record<string, unknown>, wouldTrade: boolean) {
+    routes["accounts/501/candles"] = candlesOk;
+    routes["rules/r1/preview"] = {
+      ok: true,
+      data: { decision, executable: false, wouldTrade },
+    };
+    await renderPage();
+    await screen.findByRole("button", { name: /Fetch market data/ });
+    fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
+    await waitFor(() => expect(isDisabled(/^Preview$/)).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: /^Preview$/ }));
+    await waitFor(() => expect(container.querySelector(".verdict")).not.toBeNull());
+    return container.querySelector(".verdict")!;
+  }
+
+  it("a tradeable decision reads SETUP and names the side", async () => {
+    const v = await previewWith({
+      verdict: "BUY", reason: "all conditions met",
+      conditions: [{ id: "rsi", passed: true, detail: "RSI 61 > 55" }],
+      executable: true, refusalCode: null, confidence: null,
+    }, true);
+    expect(v.textContent).toContain("SETUP");
+    expect(v.textContent).toContain("BUY");
+    expect(screen.getByText(/would open a BUY position/)).toBeDefined();
+    // Even a tradeable preview must say it placed nothing.
+    expect(screen.getByText(/This preview placed nothing/)).toBeDefined();
+  });
+
+  it("HOLD says the rule ran and chose not to act", async () => {
+    const v = await previewWith({
+      verdict: "HOLD", reason: "RSI below the threshold",
+      conditions: [{ id: "rsi", passed: false, detail: "RSI 41 < 55" }],
+      executable: false, refusalCode: null, confidence: null,
+    }, false);
+    expect(v.textContent).toContain("HOLD");
+    expect(v.textContent).not.toContain("SETUP");
+    expect(screen.getByText(/ran and chose not to act/)).toBeDefined();
+  });
+
+  it("REJECT carries the refusal code and says no order would be placed", async () => {
+    const v = await previewWith({
+      verdict: "REJECT", reason: "not enough history for ATR(14)",
+      conditions: [{ id: "atr", passed: null, detail: "20 bars, needs 15" }],
+      executable: false, refusalCode: "INSUFFICIENT_DATA", confidence: null,
+    }, false);
+    expect(v.textContent).toContain("REJECT");
+    expect(screen.getByText(/INSUFFICIENT_DATA/)).toBeDefined();
+    expect(screen.getByText(/No order would be placed/)).toBeDefined();
+  });
+
+  it("an unknown condition is reported as unknown, never folded into 'not met'", async () => {
+    await previewWith({
+      verdict: "REJECT", reason: "not enough history",
+      conditions: [
+        { id: "atr", passed: null, detail: "20 bars, needs 15" },
+        { id: "rsi", passed: false, detail: "RSI 41 < 55" },
+      ],
+      executable: false, refusalCode: "INSUFFICIENT_DATA", confidence: null,
+    }, false);
+    expect(screen.getByText("unknown")).toBeDefined();
+    expect(screen.getByText("not met")).toBeDefined();
+    expect(screen.getByText(/1 condition could not be computed/)).toBeDefined();
+    // Counted as met/total, with unknown excluded from "met".
+    expect(screen.getByText("0/2")).toBeDefined();
+  });
+
+  it("shows the whole rule document, not only symbols and timeframe", async () => {
+    routes["rules/r1"] = { ok: true, data: { rule: {
+      ...RULE,
+      sizing: { mode: "risk_percent", riskPercent: 1.0 },
+      stopLoss: { mode: "atr", atrMultiple: 1.5 },
+      takeProfit: { mode: "rr", rr: 2 },
+      limits: { maxOpenPositions: 2, onLimit: "block", maxSpreadPips: 3 },
+      entry: { combine: "AND", conditions: [{ id: "rsi", params: { period: 14 } }] },
+    } } };
+    await renderPage();
+    await screen.findByText("Rule terms");
+    for (const term of ["Sizing", "Stop loss", "Take profit", "Trailing stop",
+                        "Break even", "Max open positions", "Max spread",
+                        "Schedule", "Order type", "Max slippage"]) {
+      expect(screen.getByText(term), `${term} is missing from the terms`).toBeDefined();
+    }
+    expect(screen.getByText("risk 1% per trade")).toBeDefined();
+    expect(screen.getByText("stop 1.5× ATR")).toBeDefined();
+    expect(screen.getByText("3 pips")).toBeDefined();
+  });
+});

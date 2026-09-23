@@ -29,8 +29,11 @@ function LoginPageInner() {
   return (
     <main className="a4t">
       <div className="auth-wrap">
+        <div className="auth-brand">
+          <span className="side-mark" aria-hidden />
+          Apex4Traders
+        </div>
         <h1>Sign in</h1>
-        <p className="muted">Apex4Traders</p>
         <form onSubmit={onSubmit} className="card" style={{ marginTop: "1rem" }}>
           <label className="field">
             <span>Email</span>
@@ -43,7 +46,7 @@ function LoginPageInner() {
                    onChange={(e) => setPassword(e.target.value)} />
           </label>
           {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-          <button className="btn" type="submit" disabled={busy} style={{ width: "100%" }}>
+          <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>

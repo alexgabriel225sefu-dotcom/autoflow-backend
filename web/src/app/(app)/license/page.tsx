@@ -7,13 +7,18 @@ export default function LicensePage() {
   const me = useRead<Me>("me");
   return (
     <main>
-      <h1>Licence</h1>
+      <div className="page-head">
+        <div>
+          <h1>Licence</h1>
+          <span className="sub">What this account is entitled to do.</span>
+        </div>
+        {me.result?.ok ? <LicencePill state={me.result.data.licence.state} /> : null}
+      </div>
       {me.loading && !me.result ? <Spinner /> : null}
       {me.result && !me.result.ok ? <ErrorNotice error={me.result} onRetry={me.reload} /> : null}
       {me.result?.ok ? (
         <section className="card">
-          <LicencePill state={me.result.data.licence.state} />
-          <table className="tbl" style={{ marginTop: ".75rem" }}>
+          <table className="tbl tbl-kv">
             <tbody>
               <tr><th>Account</th><td>{me.result.data.user.email}</td></tr>
               <tr><th>Email confirmed</th><td>{me.result.data.user.emailVerified ? "Yes" : "No"}</td></tr>

@@ -254,3 +254,111 @@ once on `/connect` and are among the strongest things the product can say.
 Legal, pricing and payment surfaces (`/terms`, `/privacy`, `/configurator`,
 the payment route) are deliberately excluded from this plan. They are business
 decisions and are listed here only so they are not forgotten.
+
+---
+
+# Redesign — what shipped
+
+**Date:** 2026-09-23 · Verified the same way as the audit above: built,
+served locally against the real `apex.platform.api.handle()`, and driven in
+Chromium at 1440×900 and 390×844.
+
+## The two blockers are closed
+
+| | Before | After |
+|---|---|---|
+| Unreadable filled controls | **15** across 8 routes | **0** across 18 routes |
+| Nav destinations reachable at 390 px | **1 of 8** | **8 of 8** |
+| Console errors | 0 | 0 |
+| Horizontal overflow, mobile | 0 px | 0 px |
+
+### Finding 1 — contrast
+
+`.a4t a` became `.a4t :where(a)`, which contributes zero specificity, so a
+link styled as a control now takes the control's colour. Every `.btn` variant
+also declares its own `color`, and `a.btn` reinforces it.
+
+`src/app/contrast.test.ts` makes the regression un-shippable. It does not read
+the `.btn` rule — that rule was always correct — it **runs the cascade**:
+globals.css is loaded, its custom properties are resolved, the result is given
+to jsdom as a stylesheet, the real markup is mounted, and the computed colours
+are read back and composited. Reintroducing the old selector fails two tests
+with the original 1.00:1 diagnosis. The same file asserts the palette has no
+amber, and that every token calling itself an accent sits in one hue band.
+
+### Finding 2 — mobile navigation
+
+A fixed bottom bar carries Dashboard, Rules, Positions and Journal; **More**
+opens a drawer listing all eight destinations plus sign-out. Desktop has a
+grouped sidebar instead. Measured after: nothing hidden.
+
+## Findings 3 and 4 — the rule is now the product
+
+The builder submits the whole document: sizing, stop, target, trailing stop,
+break even, limits, schedule, order type, slippage and expiry, alongside
+symbols, timeframe, sides, entry and exit. Defaults are shown as values rather
+than applied silently.
+
+Both the builder and the rule page carry a natural-language restatement built
+from the condition registry's own parameter order — not a phrasebook, which
+would drift from the evaluator the first time a condition was added:
+
+> Buy or sell EURUSD on 1h when Price vs MA(ema, 50, above) AND RSI(14, above,
+> 55); exit when RSI(14, below, 45); risk 1% per trade; stop 1.5× ATR; target
+> 2R; at most 1 open position.
+
+`Rule terms` on the detail page lists all nineteen fields.
+
+**Fields the engine does not enforce yet are labelled, not hidden.**
+`trailingStop`, `breakEven`, `limits.maxDailyTrades` and
+`limits.maxExposurePercent` are stored on the document and say so. A non-MARKET
+order type, a `maxSlippagePoints` or an `expiresAfterSec` each warn at the
+input that execution will **refuse the order** rather than send a different
+one — `bridge.SUPPORTED_CONSTRAINTS` is empty and `SUPPORTED_ORDER_TYPES` is
+`{MARKET}`.
+
+## Finding 5 — preview
+
+Preview is the main column of the rule page. The outcome is one of three
+first-class states — **SETUP** (with the side), **HOLD**, **REJECT** (with its
+refusal code) — each with a banner, a conditions-met count, and every condition
+listed as met / not met / unknown. Unknown is never folded into "not met", and
+a preview containing unknowns says so.
+
+Five tests cover this, and two mutations were run against them: removing the
+SETUP state and folding unknown into "not met" each fail a test.
+
+## Finding 6 — one accent
+
+`--primary: #f59e0b` is gone. The shadcn token block is aliased onto the
+platform palette, so the primitives in `components/ui` cannot reintroduce a
+second accent. `/configurator`'s amber shield is now the platform accent.
+
+## Legacy pages — restyled, not rewritten
+
+`/terms`, `/privacy` and `/configurator` were moved onto the platform's
+neutral surfaces so they no longer read as a second brand. **Not one word of
+their copy changed**, and their metadata titles were left alone.
+
+They therefore still carry, unchanged and still reachable:
+
+- `/terms` — "Apex Trade Bot is sold as a one-time purchase of software source
+  code"; the risk clause is about **cryptocurrency**. Linked from the landing
+  page footer.
+- `/privacy` — title "Privacy Policy — Apex Trade Bot"; contact address
+  `support@aicashsystem.space`, a different brand. Linked from the footer.
+- `/configurator` — "Setup Your Bot", "deploy your Apex Trade Bot", "source
+  code download link". Reachable by URL.
+- `POST /api/create-payment-intent` — `amount: 29700`, `product: "apex-bot"`.
+- `components/ui/modern-payment-form.tsx` — `$297`, unused.
+
+These are business and legal decisions and remain outside this work.
+
+## Still open
+
+- Positions and orders show what the broker returns. There is no P&L column
+  because the read contract does not carry one.
+- No chart. Preview states the bars' source, count and as-of time instead;
+  a candle chart is worth doing once there is a connected account to draw.
+- `/rules/{id}` shows the whole document but cannot edit it. Editing an active
+  rule has to create a new draft version, and that flow is not built.

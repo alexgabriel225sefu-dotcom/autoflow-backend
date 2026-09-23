@@ -1,5 +1,7 @@
 "use client";
+import { Trash2 } from "lucide-react";
 import type { ConditionParam, ConditionSpec } from "@/lib/api";
+import { humanise } from "./rule-summary";
 
 /**
  * One condition's form, generated from the backend's own spec.
@@ -98,7 +100,7 @@ export function ConditionEditor({
 }) {
   const spec = specs[value.id];
   return (
-    <div className="notice">
+    <div className="notice" style={{ marginBottom: ".55rem" }}>
       <div className="card-head">
         <label className="field" style={{ margin: 0, flex: 1 }}>
           <span>Condition</span>
@@ -113,16 +115,19 @@ export function ConditionEditor({
               onChange({ id: e.target.value, params: next ? defaultsFor(next) : {} });
             }}
           >
+            {/* The label is humanised; the VALUE stays the registry id, so
+                nothing here can drift from what the evaluator implements. */}
             {Object.keys(specs).sort().map((id) => (
-              <option key={id} value={id}>{id}</option>
+              <option key={id} value={id}>{humanise(id)}</option>
             ))}
           </select>
         </label>
-        <button className="btn btn-ghost" onClick={onRemove} aria-label="Remove condition">
-          Remove
+        <button className="btn btn-ghost btn-sm" onClick={onRemove}
+                aria-label="Remove condition" title="Remove condition">
+          <Trash2 className="ico" aria-hidden /> Remove
         </button>
       </div>
-      {spec ? <p className="muted">{spec.doc}</p> : (
+      {spec ? <p className="muted" style={{ fontSize: ".8rem", margin: ".1rem 0 .6rem" }}>{spec.doc}</p> : (
         <p className="notice notice-error">
           This condition is not one the engine implements.
         </p>

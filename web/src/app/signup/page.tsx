@@ -26,6 +26,10 @@ export default function SignUpPage() {
     return (
       <main className="a4t">
         <div className="auth-wrap">
+        <div className="auth-brand">
+          <span className="side-mark" aria-hidden />
+          Apex4Traders
+        </div>
           <h1>Check your email</h1>
           <div className="card">
             <p>We sent a confirmation link to <strong>{email}</strong>.</p>
@@ -61,7 +65,7 @@ export default function SignUpPage() {
                    onChange={(e) => setPassword(e.target.value)} />
           </label>
           {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-          <button className="btn" type="submit" disabled={busy} style={{ width: "100%" }}>
+          <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
             {busy ? "Creating…" : "Create account"}
           </button>
         </form>

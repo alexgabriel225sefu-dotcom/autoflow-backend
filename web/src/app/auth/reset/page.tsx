@@ -23,6 +23,10 @@ export default function ResetPage() {
   return (
     <main className="a4t">
       <div className="auth-wrap">
+        <div className="auth-brand">
+          <span className="side-mark" aria-hidden />
+          Apex4Traders
+        </div>
         <h1>Reset your password</h1>
         {sent ? (
           <div className="card">
@@ -40,7 +44,7 @@ export default function ResetPage() {
                      onChange={(e) => setEmail(e.target.value)} />
             </label>
             {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-            <button className="btn" type="submit" disabled={busy} style={{ width: "100%" }}>
+            <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
               {busy ? "Sending…" : "Send reset link"}
             </button>
           </form>
