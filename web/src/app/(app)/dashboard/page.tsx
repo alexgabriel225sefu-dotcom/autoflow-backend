@@ -24,6 +24,7 @@ import { ConfirmAction } from "@/components/app/shell";
 import { ErrorNotice, Spinner, StatusPill } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
+import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
   Position, PositionsRead, RuleSummary,
@@ -210,6 +211,15 @@ export default function Dashboard() {
                 </>
               )}
           </section>
+
+          {/* ── 3: the market the active rule is watching ───────────── */}
+          <MarketPanel
+            title="Market"
+            ctid={selected?.ctid ?? null}
+            mode={selected?.mode ?? null}
+            symbols={(activeRule?.symbols as string[] | undefined) ?? []}
+            timeframe={activeRule?.timeframe}
+          />
 
           {/* ── 4 + 5: what did it decide, and was anything placed ──── */}
           <section className="card">

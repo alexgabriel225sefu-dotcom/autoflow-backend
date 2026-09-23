@@ -85,7 +85,10 @@ describe("dashboard — account state", () => {
     await renderDash();
     await waitFor(() => expect(screen.getAllByText(/cTrader account not connected/).length)
       .toBeGreaterThan(0));
-    expect(screen.getByRole("link", { name: /Connect cTrader/ })).toBeDefined();
+    // Offered by both the automation card and the market panel — each is the
+    // fix for the state it is showing.
+    expect(screen.getAllByRole("link", { name: /Connect cTrader/ }).length)
+      .toBeGreaterThan(0);
     // Not offered a Start button it could not honour.
     expect(screen.queryByRole("button", { name: /^Start$/ })).toBeNull();
   });

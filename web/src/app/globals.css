@@ -458,6 +458,26 @@ body {
 .usermenu a:hover, .usermenu button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
 .usermenu button { color: var(--a4t-short); }
 
+/* ── chart ─────────────────────────────────────────────────────────── */
+
+.ohlc {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  font-size: var(--fs-2xs); color: var(--a4t-muted);
+  padding-bottom: var(--sp-2); margin-bottom: var(--sp-1);
+  border-bottom: var(--a4t-border-soft);
+}
+.ohlc .sym { font-weight: 700; color: var(--a4t-text); font-size: var(--fs-sm); letter-spacing: -.01em; }
+.ohlc i { font-style: normal; color: var(--a4t-dim); margin-right: .2rem; }
+.ohlc b { font-weight: 600; color: var(--a4t-text); }
+
+.candles {
+  width: 100%; height: auto; display: block;
+  background: var(--a4t-bg-2);
+  border: var(--a4t-border-soft); border-radius: var(--a4t-radius-sm);
+  touch-action: pan-y;
+}
+.chart-skeleton { padding: 0; }
+
 /* ── cards ─────────────────────────────────────────────────────────── */
 
 .card {
