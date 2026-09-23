@@ -169,6 +169,75 @@ try:
 finally:
     RL.LIMITERS["default"].check = _real
 
+# ── 10. the counter is shared when a shared backend exists ─────────────────
+# A fixed window held in one process is not a limit when there are two. This
+# is the positive case: when the backend can count, the limiter must use it
+# and must NOT fall back to the per-process window.
+print("\n[10] a shared backend is used, and the in-process window is not")
+from apex import user_store                      # noqa: E402
+
+_shared = {}
+
+
+def _fake_incr(key, ttl_s=60):
+    _shared[key] = _shared.get(key, 0) + 1
+    return _shared[key]
+
+
+_memory_hits = {"n": 0}
+_real_incr = user_store.incr
+_real_check = RL.LIMITERS["default"].check
+
+
+def _count_memory(key):
+    _memory_hits["n"] += 1
+    return _real_check(key)
+
+
+user_store.incr = _fake_incr
+RL.LIMITERS["default"].check = _count_memory
+try:
+    RL.reset_all()
+    _shared.clear()
+    check("store_mode reports shared", RL.store_mode() == "shared", RL.store_mode())
+    for _ in range(5):
+        RL.check("GET", "journal", client_key="4.4.4.4", auth_header="Bearer s")
+    check("the shared counter was written", any(":rl:" in k for k in _shared),
+          str(list(_shared)[:3]))
+    check("and the in-process window was never consulted",
+          _memory_hits["n"] == 0, str(_memory_hits["n"]))
+    check("the key is namespaced by product",
+          all(k.startswith("forex:a4t:rl:") for k in _shared), str(list(_shared)[:2]))
+    check("and carries no bearer token",
+          not any("Bearer" in k or "s" == k.split(":")[-2] for k in _shared),
+          str(list(_shared)[:2]))
+
+    # The shared counter refuses once the window is full, across what would
+    # be different processes — there is only one counter now.
+    RL.reset_all()
+    _shared.clear()
+    limit = RL.LIMITERS["default"].limit
+    outs = [RL.check("GET", "journal", client_key="4.4.4.4",
+                     auth_header="Bearer s")[0] for _ in range(limit + 2)]
+    check("the shared window eventually refuses", False in outs, str(set(outs)))
+    check("and it refuses within the configured limit",
+          outs.index(False) <= limit, f"{outs.index(False)} vs {limit}")
+
+    # A backend that cannot answer must not disable limiting altogether.
+    _memory_hits["n"] = 0
+    user_store.incr = lambda key, ttl_s=60: None
+    RL.reset_all()
+    allowed, bucket, _ = RL.check("GET", "journal", client_key="5.5.5.5")
+    check("a backend that cannot answer falls back to counting in process",
+          allowed is True and _memory_hits["n"] == 1,
+          f"{allowed} {_memory_hits['n']}")
+    check("and store_mode says so rather than claiming shared",
+          RL.store_mode() == "memory", RL.store_mode())
+finally:
+    user_store.incr = _real_incr
+    RL.LIMITERS["default"].check = _real_check
+    RL.reset_all()
+
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()

@@ -26,19 +26,30 @@ have no user, so they fall back to the address.
 The token is never used as a key directly; only a SHA-256 prefix of it is, so
 a bearer token cannot be read back out of a limiter's key set.
 
-WHAT THIS IS NOT
+WHERE THE COUNTER LIVES
 
-`RateLimiter` is a fixed window held in one process. With more than one
-instance each holds its own window, so the effective limit is the configured
-one times the instance count. That is stated here and in the runbook rather
-than papered over; the fix is a shared counter, and it is a deliberate later
-decision.
+A fixed window held in one process is wrong the moment there are two: each
+holds its own window, so the effective limit becomes the configured one times
+the instance count. During a Render deploy two instances serve the same users
+at once — that has been observed, not assumed.
+
+So the counter is `user_store.incr`, a Redis/Upstash INCR with a TTL, which is
+the primitive a rate limit actually needs. Read-modify-write on a blob loses
+increments whenever two of anything race.
+
+The in-memory limiter remains, for development and tests only. When there is
+no shared backend the limiter still counts in memory — refusing to limit at
+all would be worse — but `store_mode()` reports `memory`, and `/readyz`
+refuses readiness in production on exactly that. A deployment that cannot
+share a counter should be told, not quietly served.
 """
 
 import hashlib
 import os
 import re
+import time
 
+from apex import user_store
 from apex.http_security import RateLimiter
 
 # Route class → (requests, window seconds). Every one is overridable by an
@@ -129,9 +140,18 @@ def check(method, route, *, client_key=None, auth_header=None):
     """
     bucket = classify(method, route)
     limiter = LIMITERS.get(bucket) or LIMITERS["default"]
+    key = key_for(client_key, auth_header)
     try:
-        ok = limiter.check(key_for(client_key, auth_header))
+        ok = None
+        if _MODE != "memory":
+            ok = _shared_check(key, limiter.limit, limiter.window_s)
+        if ok is None:
+            # No shared backend, or it could not answer. Counting in one
+            # process is weaker than counting across all of them, and it is
+            # far better than not counting. /readyz reports the degradation.
+            ok = limiter.check(key)
     except Exception:
+        # A bug in the limiter must not become an outage of the platform.
         return True, bucket, 0
     return bool(ok), bucket, (0 if ok else limiter.window_s)
 
@@ -144,6 +164,51 @@ def refusal(bucket, retry_after):
         "bucket": bucket,
         "retryAfterSec": retry_after,
     }}
+
+
+# ── where the counter lives ─────────────────────────────────────────────────
+
+# "auto" uses the shared backend when there is one. "memory" forces the
+# in-process limiter, which is a development choice and is reported as such.
+_MODE = (os.getenv("RATE_LIMIT_STORE") or "auto").strip().lower()
+
+
+def _shared_available():
+    """Whether a cross-process counter can be reached.
+
+    `user_store.incr` returns None both when there is no backend and when the
+    command failed, and those are the same answer for this question: we cannot
+    count across instances right now.
+    """
+    if _MODE == "memory":
+        return False
+    return user_store.incr(f"{_store_ns()}:rl:probe", ttl_s=60) is not None
+
+
+def _store_ns():
+    # Namespaced like every other key, so two products on one Redis do not
+    # share a rate-limit window.
+    return f"{os.getenv('PRODUCT', '').strip().lower() or 'forex'}:a4t"
+
+
+def store_mode():
+    """`shared`, `memory`, or `memory-forced`. Reported by /readyz."""
+    if _MODE == "memory":
+        return "memory-forced"
+    return "shared" if _shared_available() else "memory"
+
+
+def _shared_check(key, limit, window_s):
+    """True/False from the shared counter, or None when it cannot answer.
+
+    The window is a floor of the clock, so every instance agrees on which
+    bucket a request belongs to without any coordination between them.
+    """
+    slot = int(time.time() // window_s)
+    n = user_store.incr(f"{_store_ns()}:rl:{key}:{slot}", ttl_s=window_s * 2)
+    if n is None:
+        return None
+    return n <= limit
 
 
 def reset_all():

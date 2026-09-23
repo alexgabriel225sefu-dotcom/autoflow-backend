@@ -31,6 +31,7 @@ from apex.platform import automation as _auto
 from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
+from apex.platform import health as _health
 from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
@@ -342,6 +343,13 @@ def _dispatch(method, route, headers, body, query=None):
     if m and method == "GET":
         p = _authenticate(headers)
         return _ok({"entry": _jstore.get(p.user_id, m.group(1))})
+
+    # Operator diagnostics. Authenticated, because "which dependency is down"
+    # is not a thing to publish, and carrying no more secret material than
+    # /readyz does — being signed in is not a reason to start returning keys.
+    if route == "system/status" and method == "GET":
+        p = _authenticate(headers)
+        return _ok(_health.system_status(p))
 
     if route == "me" and method == "GET":
         p = _authenticate(headers)

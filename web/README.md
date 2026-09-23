@@ -84,5 +84,13 @@ is the code that ships.
 
 - Live trading. Automation runs on demo accounts only, and there is no branch
   that would start a live loop.
-- A market data feed for previews. Preview evaluates candles you supply; it
-  does not fetch them, and it never invents them.
+- A market data feed *inside* the evaluator. `POST /rules/{id}/preview`
+  evaluates the candles you hand it; it does not fetch them and it never
+  invents them. The bars come from `GET /accounts/{ctid}/candles`, which the
+  chart and the preview screen both read, so what the evaluator judged is the
+  same data the chart drew. Without a connected account there are no bars, and
+  every one of those screens says so rather than showing an empty chart.
+- Editing an active rule. Activation freezes a version; changing one must
+  create a new version, and that flow does not exist yet.
+- Automatic entitlement. A licence is granted by hand during the beta — see
+  `docs/MANUAL_LICENCE_OPERATIONS.md`.

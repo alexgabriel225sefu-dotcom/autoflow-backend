@@ -67,6 +67,9 @@ reach the browser. Nothing under `/api/v1/` carries `access_token`,
 | Journal, notifications | `tests/test_platform_api.py` |
 | Payment webhook, licence grant, duplicate, refund, wrong user | `tests/test_platform_billing.py` |
 | Rate limiting, all seven buckets | `tests/test_platform_rate_limit.py` |
+| Rate limit counters are shared, and the per-process fallback is reported | same file |
+| Liveness, readiness, production refusals, no secret in a health payload | `tests/test_platform_health.py` |
+| `/healthz` and `/readyz` over a real socket | `tests/test_platform_http.py` |
 | Mobile navigation, focus, reduced motion, touch targets | `src/components/app/shell.test.tsx` |
 | Visual contrast, in the real cascade | `src/app/contrast.test.ts` |
 | No fake data, no old copy, no trackers, no iframes | `src/app/content.test.ts` |
@@ -130,9 +133,12 @@ not exist here.
 
 ## Known limitations, stated rather than hidden
 
-- **Rate limiting is per process.** With N instances the effective limit is N
-  times the configured one. The fix is a shared counter; it is a deliberate
-  later decision, recorded in the module and in the runbook.
+- **Rate limiting falls back to per process.** Counters are `INCR` with a TTL
+  in the shared backend, so instances share one window. When the backend
+  cannot answer, the limiter counts in one process and the effective limit
+  becomes N times the configured one for N instances. That fallback is
+  reported, not hidden: `/readyz` answers `rate_limit_store: fail` in
+  production whenever it is in force.
 - **Webhook idempotency degrades without Redis.** `user_store.claim` cannot
   answer, and the fallback is a read-then-write, which is not atomic across
   instances. The grant is idempotent in effect — same user, same plan — so
@@ -143,15 +149,16 @@ not exist here.
   implementation of what the evaluator computes, and the two would disagree
   at the edges. A chart that disagrees with the verdict beside it is worse
   than a chart without a line.
-- **No `/healthz`.** The runbook gives interim checks.
+- **`/readyz` has never run against a real deployment.** The checks are
+  covered by `tests/test_platform_health.py`, including the production
+  refusals, but no instance of this platform has yet been deployed for one to
+  answer from.
 - **`/rules/{id}` cannot edit.** Editing an active rule must create a new
   draft version; that flow is not built.
-- **`AGENTS.md` at the repository root is stale.** It describes the project as
-  a Telegram forex bot and names the wrong branch. It is agent-coordination
-  content, deliberately in Romanian, but its facts are wrong.
-- **`web/README.md`** still says under *What is not built*: "A market data
-  feed for previews … it does not fetch them". The candles endpoint has
-  existed since `e1f991f42` and the chart now uses it.
+- **`AGENTS.md` is deliberately Romanian.** Its facts were corrected in this
+  phase — it now names both products, both branches, and the platform's own
+  prohibitions. Whether an agent-coordination file should be in Romanian at
+  all is an owner decision, not a cleanup one, and it has not been taken.
 
 ---
 

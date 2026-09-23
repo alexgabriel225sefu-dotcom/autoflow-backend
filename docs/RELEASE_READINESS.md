@@ -24,7 +24,7 @@ cTrader account is unverified, and that is one gate, not a detail.
 | 2 | cTrader demo OAuth works | ⚠️ **unverified** | `test_platform_ctrader_link.py` covers the flow including the account-injection case. No real authorisation has been completed. |
 | 3 | Payment/licence tested **or** intentionally disabled | ✅ | Both. The webhook has 12 test groups; checkout is disabled behind `A4T_CHECKOUT_ENABLED`, which is off. |
 | 4 | Legal blockers documented | ✅ | `docs/LEGAL_LAUNCH_BLOCKERS.md`, nine items, each a `[TO BE CONFIRMED]` in the product. |
-| 5 | Production configuration documented | ✅ | `docs/PRODUCTION_RUNBOOK.md`. |
+| 5 | Production configuration documented | ✅ | `docs/PRODUCTION_RUNBOOK.md`, `docs/BETA_CONFIGURATION.md`, `docs/MANUAL_LICENCE_OPERATIONS.md`. |
 | 6 | No critical security issue | ✅ | No token under `/api/v1/`; rate limiting on every route; webhook verifies before parsing; ownership is the storage key. |
 | 7 | No live trading path | ✅ | `test_live_path_invariants.py`; `SUPPORTED_ORDER_TYPES = {MARKET}`; `automation.start` refuses a non-demo account. |
 | 8 | Frontend tests pass | ✅ | 167 / 167 |
@@ -63,8 +63,8 @@ thing.
 | 5 | Production Redis / Upstash | ❌ X2 |
 | 6 | Production OAuth redirect works | ❌ X4 |
 | 7 | HTTPS and domain | ❌ X6 |
-| 8 | Rate limiting enabled | ✅ — with the per-process caveat |
-| 9 | Monitoring | ❌ X7 |
+| 8 | Rate limiting enabled | ✅ — shared counters, with a reported per-process fallback |
+| 9 | Monitoring | ⚠️ X7 — `/healthz` and `/readyz` exist and are tested; nothing scrapes them yet |
 | 10 | Demo onboarding manually tested | ❌ X1 |
 | 11 | Five external testers complete the flow | ❌ X9 |
 | 12 | All critical issues closed | ✅ none open |
@@ -132,7 +132,8 @@ testers (X9).
 | 6 | `b30b91a9c` | Verified payment-to-licence |
 | 7 | `82edd6044` | Product and legal copy |
 | 8 | `ce8496ac3` | Rate limiting, runbook |
-| 9–10 | this commit | QA report, release readiness |
+| 9–10 | `1925e49af` | QA report, release readiness |
+| E | this commit | Health endpoints, shared rate-limit counters, beta and licence runbooks |
 
 Tests went from 44 to 167 in the web client and from 153 to 155 files in the
 backend. Lint went from 13 errors to 0. Unreadable controls went from 15 to 0.

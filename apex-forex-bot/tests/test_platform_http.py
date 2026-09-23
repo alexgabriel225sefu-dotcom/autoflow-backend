@@ -133,6 +133,41 @@ try:
     check("an existing protected route still refuses anonymously",
           st in (401, 403, 503), str(st))
 
+    # /healthz starts with /health, and the route above matches on a prefix.
+    # Only a real request over the wire proves which one wins.
+    print("\n1b. the health endpoints answer, and /healthz is not swallowed")
+    st, body = call("GET", "/healthz", auth=None)
+    check("/healthz returns 200 without a token", st == 200, str(st))
+    check("and JSON, not the legacy plain-text 'ok'",
+          isinstance(body, dict), str(body)[:40])
+    check("and says the process is up",
+          isinstance(body, dict) and body.get("status") == "ok", str(body)[:80])
+    check("and reports an uptime rather than a dependency verdict",
+          isinstance(body, dict) and "uptimeSec" in body and "checks" not in body,
+          str(body)[:80])
+
+    st, body = call("GET", "/readyz", auth=None)
+    check("/readyz answers without a token", st in (200, 503), str(st))
+    check("with a checks list",
+          isinstance(body, dict) and isinstance(body.get("checks"), list)
+          and body["checks"], str(body)[:120])
+    check("and names the environment it thinks it is in",
+          isinstance(body, dict) and body.get("environment") in
+          ("development", "production"), str(body)[:80])
+    # This harness has no cTrader application configured, so readiness SHOULD
+    # refuse. A probe that passed here would be a probe that checks nothing.
+    check("and refuses, because cTrader OAuth is not configured here",
+          st == 503 and "ctrader_oauth" in (body.get("failed") or []),
+          f"{st} {str(body.get('failed'))}")
+
+    # Both are unauthenticated. This is what makes that safe.
+    blob = json.dumps(body) + json.dumps(call("GET", "/healthz", auth=None)[1])
+    check("no encryption key in either response",
+          os.environ["TOKEN_ENCRYPTION_KEY"] not in blob)
+    check("no operator dashboard token either",
+          os.environ["DASHBOARD_TOKEN"] not in blob)
+    check("nothing Fernet-shaped", "gAAAAA" not in blob)
+
     print("\n2. the platform API is mounted and authenticates over the wire")
     st, b = call("GET", "/api/v1/me", auth=None)
     check("no Authorization header is 401", st == 401, str(st))

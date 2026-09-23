@@ -501,6 +501,36 @@ def _start_dashboard_server():
             self.end_headers()
             self.wfile.write(body)
 
+        def _platform_health(self):
+            """/healthz and /readyz. TRANSPORT ONLY, like _platform_api.
+
+            Both answer JSON and neither requires a session: the thing that
+            probes them has no way to hold one. Neither returns any secret,
+            any key, or the value of any environment variable — only a check
+            name, a status and a sentence.
+
+            /healthz must stay ahead of the older plain-text /health route
+            below, which matches on a prefix and would otherwise swallow it.
+
+            Returns True when it handled the request.
+            """
+            path = (self.path or "").split("?", 1)[0]
+            if path not in ("/healthz", "/readyz"):
+                return False
+            from apex.platform import health as platform_health
+            status, payload = (platform_health.live() if path == "/healthz"
+                               else platform_health.ready())
+            body = json.dumps(payload).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            # A cached readiness verdict is not a thing an intermediary should
+            # hold on to; the whole point is that it is current.
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return True
+
         def _platform_api(self):
             """The Apex4Traders platform API, mounted at /api/v1/.
 
@@ -839,6 +869,10 @@ def _start_dashboard_server():
 
         def do_GET(self):
             if self._platform_api():
+                return
+            # Before the plain-text /health below, which matches on a prefix
+            # and would otherwise answer /healthz with "ok".
+            if self._platform_health():
                 return
             # Railway healthcheck — fără auth, nu expune date
             if self.path.startswith("/health"):
