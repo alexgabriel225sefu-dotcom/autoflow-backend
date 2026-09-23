@@ -163,6 +163,29 @@ check("the token is absent from a real process's output",
       SECRETS["TELEGRAM_BOT_TOKEN"] not in combined, combined[:160])
 check("the line itself was emitted", "startup:" in combined, combined[:160])
 
+# ── Fernet tokens ──────────────────────────────────────────────────────────
+# Every broker token this platform stores is one of these. The runbook has
+# told operators to grep logs for "gAAAAA" since before the redactor masked
+# it, which meant the instruction existed precisely because the output was
+# not safe.
+print("\nFernet-encrypted values")
+from cryptography.fernet import Fernet                       # noqa: E402
+
+_f = Fernet(Fernet.generate_key())
+real = _f.encrypt(b"a stored cTrader access token").decode()
+out = redact.scrub(f"failed to refresh: value={real} for account 47765456")
+check("a real Fernet token is masked", real not in out, out[:120])
+check("the surrounding message survives", "account 47765456" in out, out[:120])
+check("and the removal is marked", redact.MASK in out, out[:120])
+check("a second one in the same line goes too",
+      _f.encrypt(b"refresh").decode()
+      not in redact.scrub(f"{real} {_f.encrypt(b'refresh').decode()}"))
+# Not every string starting with those letters is a token; masking ordinary
+# words would make output unreadable and teach people to ignore the mask.
+for harmless in ("gAAAAA", "gAAAAAshort", "regarding AAAAA values"):
+    check(f"{harmless!r} is left alone", redact.scrub(harmless) == harmless,
+          redact.scrub(harmless))
+
 print("\n" + "=" * 50)
 if failures:
     print(f"FAILED {len(failures)}: {', '.join(failures[:8])}")

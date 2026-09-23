@@ -62,6 +62,8 @@ reach the browser. Nothing under `/api/v1/` carries `access_token`,
 | A paid plan does NOT unlock a live account in this release | same file |
 | Each of the three live locks refuses on its own | same file |
 | The UI and the backend refuse live trading in the same words | `src/app/content.test.ts` |
+| The smoke script's refusals, redaction and read-only call sequence | `tests/test_smoke_harness.py` |
+| Fernet-encrypted values never reach stdout | `tests/test_log_redaction.py` |
 | Rule creation, validation, activation, versioning | `tests/test_platform_api.py`, `tests/test_platform_contracts.py` |
 | Preview SETUP / HOLD / REJECT, unknown never folded into not-met | `src/app/(app)/rules/[id]/page.test.tsx` |
 | Preview cannot place, close or amend — structural | same file, three assertions |
@@ -123,7 +125,7 @@ not exist here.
 
 | # | Blocked | What it blocks |
 |---|---|---|
-| X1 | **A real cTrader demo account** | The entire connected path: OAuth end to end, account selection with real accounts, positions and orders with data, the chart with real candles, a preview on live bars, and automation actually running. All are covered by contract tests; none has been exercised against cTrader in this session. |
+| X1 | **A real cTrader demo account** — procedure and harness now exist in `docs/CTRADER_DEMO_SMOKE_TEST.md`, unrun | The entire connected path: OAuth end to end, account selection with real accounts, positions and orders with data, the chart with real candles, a preview on live bars, and automation actually running. All are covered by contract tests; none has been exercised against cTrader in this session. |
 | X2 | **Shared Redis or Upstash** | Cross-instance ownership, order idempotency and webhook idempotency. Locally the store runs in `ALLOW_LOCAL_BACKEND_DEV` mode, which production must not use. |
 | X3 | **A production Supabase project** | Real sign-up, real confirmation e-mail, real password reset. The local harness stands in for GoTrue. |
 | X4 | **A registered production OAuth redirect URI** | cTrader compares byte for byte; OAuth cannot work off localhost until it is registered. |
@@ -168,7 +170,9 @@ not exist here.
 
 ## Manual verification still required before a private beta
 
-In order, on a real cTrader **demo** account:
+Moved to `docs/CTRADER_DEMO_SMOKE_TEST.md`, which has the full procedure, the
+script that automates the read side of it, and what a pass and a failure each
+mean. The short version, in order, on a real cTrader **demo** account:
 
 1. Sign up, receive the confirmation e-mail, confirm, sign in.
 2. Connect the demo account through OAuth; confirm the callback returns only

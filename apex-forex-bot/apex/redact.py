@@ -57,6 +57,13 @@ _SHAPES = (
     (re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"), MASK),
     (re.compile(r"\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}"), MASK),
     (re.compile(r"\bwhsec_[A-Za-z0-9]{10,}"), MASK),
+    # A Fernet token — everything this platform encrypts at rest, including
+    # every stored cTrader access and refresh token. Version byte 0x80 plus a
+    # timestamp always base64url-encodes to a leading "gAAAAA", and the
+    # shortest possible ciphertext is far longer than this bound. The runbook
+    # has told operators to grep logs for exactly this shape since before it
+    # was masked here, which is the wrong way round.
+    (re.compile(r"\bgAAAAA[A-Za-z0-9_-]{20,}={0,2}"), MASK),
     # A JWT, three base64url segments.
     (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), MASK),
     # Telegram initData always carries hash= and auth_date=; mask the lot

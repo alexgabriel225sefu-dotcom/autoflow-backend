@@ -40,9 +40,11 @@ that matter most, because they are the product.
 
 ### What closes it
 
-One session on a real cTrader demo account, working through §"Manual
-verification still required" in `docs/LAUNCH_QA_REPORT.md`. If all nine steps
-pass, gates 1, 2 and 12 close and this becomes **BETA READY**. Also needed:
+One session on a real cTrader demo account, working through
+`docs/CTRADER_DEMO_SMOKE_TEST.md` — eleven steps, plus a script that
+automates the read side of four of them and refuses to run against anything
+that is not a demo account. If they pass, gates 1, 2 and 12 close and this
+becomes **BETA READY**. Also needed:
 a Supabase project (X3) and a registered redirect URI (X4), both of which are
 configuration rather than work.
 
@@ -140,7 +142,8 @@ testers (X9).
 | 8 | `ce8496ac3` | Rate limiting, runbook |
 | 9–10 | `1925e49af` | QA report, release readiness |
 | E | `319f58d0c` | Health endpoints, shared rate-limit counters, beta and licence runbooks |
-| F | this commit | free_demo / paid_live entitlement, server-derived execution capability |
+| F | `8fcefa39b` | free_demo / paid_live entitlement, server-derived execution capability |
+| G | this commit | cTrader demo smoke-test harness; Fernet tokens added to log redaction |
 
 Tests went from 44 to 167 in the web client and from 153 to 155 files in the
 backend. Lint went from 13 errors to 0. Unreadable controls went from 15 to 0.
