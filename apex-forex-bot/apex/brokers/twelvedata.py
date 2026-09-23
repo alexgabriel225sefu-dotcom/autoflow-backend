@@ -130,7 +130,7 @@ def get_candles(instrument=None, interval=None, limit=None):
     td_sym = _to_td_symbol(symbol)
     td_interval = _INTERVAL_MAP.get(interval or cfg.TIMEFRAME, "5min")
     count = limit or cfg.CANDLES
-    cache_key = f"{symbol}:{td_interval}"  # per interval — altfel 1h ar otrăvi cache-ul de 5m
+    cache_key = f"{symbol}:{td_interval}"  # per interval - otherwise 1h would poison the 5m cache
 
     now = time.time()
     with _lock:

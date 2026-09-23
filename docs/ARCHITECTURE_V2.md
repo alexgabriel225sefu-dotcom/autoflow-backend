@@ -1,192 +1,196 @@
-# Apex4Traders v2 — arhitectură propusă
+# Apex4Traders v2 — proposed architecture
 
-**Stare:** propunere. Nimic din ce urmează nu e implementat.
-**Bază:** commit `1bea525`, identic cu arhiva analizată de Codex.
-**Regulă:** sistemul care tranzacționează acum nu se atinge până nu există
-contracte agreate și o cale de migrare.
-
----
-
-## 1. Ce e produsul, exprimat ca invariant
-
-> Când condițiile definite de client sunt îndeplinite, execută acțiunea
-> configurată, respectând limitele activate.
-
-Din asta decurge tot ce urmează. Trei consecințe care nu sunt negociabile,
-pentru că fără ele propoziția de mai sus devine falsă:
-
-1. **Determinism.** Aceeași configurație + aceleași date de piață = aceeași
-   decizie. Fără selecție automată, fără fallback, fără AI în cale.
-2. **Trasabilitate.** Fiecare ordin trebuie să spună *care versiune de
-   configurație* l-a produs și *care condiții* s-au potrivit.
-3. **Refuz explicit.** Ce nu se poate executa conform specificației nu se
-   execută aproximativ. Se refuză și se înregistrează.
-
-Punctul 3 e cel mai des încălcat în codul actual — vezi §4.
+**State:** a proposal. Nothing that follows is implemented.
+**Base:** commit `1bea525`, identical to the archive Codex analysed.
+**Rule:** the system that trades today is not touched until there are agreed
+contracts and a migration path.
 
 ---
 
-## 2. Straturile
+## 1. What the product is, stated as an invariant
 
-| Strat | Rol | Sursă |
+> When the conditions the client defined are met, execute the configured
+> action, respecting the limits that are switched on.
+
+Everything below follows from that. Three consequences that are not
+negotiable, because without them the sentence above becomes false:
+
+1. **Determinism.** The same configuration + the same market data = the same
+   decision. No automatic selection, no fallback, no AI in the path.
+2. **Traceability.** Every order must say *which version of the configuration*
+   produced it and *which conditions* matched.
+3. **Explicit refusal.** What cannot be executed to specification is not
+   executed approximately. It is refused and recorded.
+
+Point 3 is the one most often violated in the current code — see §4.
+
+---
+
+## 2. The layers
+
+| Layer | Role | Source |
 |---|---|---|
-| **Config versionată** | documentul de reguli, imutabil după activare | **construit** |
-| **Evaluator determinist** | (config, snapshot) → decizie. Funcție pură. | **construit** |
-| **Bibliotecă de condiții** | indicatori și tipare, cu definiții matematice | **construit** |
-| **Verificări de risc** | limite, expunere, ownership, idempotency | **reutilizat** (`gates.py`) |
-| **Execuție + reconciliere** | ordine, confirmări, poziții la broker | **reutilizat** (`brokers/ctrader.py`) |
-| **Gestionarea pozițiilor** | SL/TP/trailing/parțiale, după restart | **adaptat** (din `user_loop.py`) |
-| **Jurnal + explicații** | ce s-a întâmplat și de ce | **adaptat** (`user_store` + `ev`) |
-| **Interfață** | conectare, grafice, constructor, automatizări, jurnal | **construit** |
-| **Acces și licențe** | drepturi, revalidare, revocare | **reutilizat** (`access.py`, `gates`) |
+| **Versioned config** | the rule document, immutable once activated | **built** |
+| **Deterministic evaluator** | (config, snapshot) → decision. A pure function. | **built** |
+| **Condition library** | indicators and patterns, with mathematical definitions | **built** |
+| **Risk checks** | limits, exposure, ownership, idempotency | **reused** (`gates.py`) |
+| **Execution + reconciliation** | orders, confirmations, broker positions | **reused** (`brokers/ctrader.py`) |
+| **Position management** | SL/TP/trailing/partials, across restarts | **adapted** (from `user_loop.py`) |
+| **Journal + explanations** | what happened and why | **adapted** (`user_store` + `ev`) |
+| **Interface** | connection, charts, builder, automation, journal | **built** |
+| **Access and licensing** | entitlement, revalidation, revocation | **reused** (`access.py`, `gates`) |
 
 ---
 
-## 3. Ce reutilizăm — și de ce merită
+## 3. What we reuse — and why it is worth it
 
-Nu pornim de la zero. Aceste componente au fost auditate și au teste care
-prind regresii reale:
+We are not starting from zero. These components have been audited and have
+tests that catch real regressions:
 
-- **`apex/gates.py`** — autorizare centralizată. `authorize_order` /
-  `authorize_close` verifică drepturi, expunere, ownership și idempotency
-  într-un singur loc. Un audit recent a confirmat că nu există scurtătură în
-  stratul de broker. **Rămâne singura poartă.**
-- **`apex/brokers/ctrader.py`** — OAuth, protobuf, reconectare, paginare,
-  limitator de rată (5/s istoric, 50/s restul, per conexiune), plafon de
-  alunecare. Aici sunt lunile de muncă pe care o rescriere le-ar pierde.
-- **`apex/ledger.py`** — registrul de idempotență a ordinelor.
-- **`apex/user_store.py`** — înregistrări versionate cu compare-and-set, acum
-  și pentru jurnal. **Exact primitiva de care are nevoie configurația
-  versionată.**
-- **`apex/access.py`** + serverul de licențe — drepturi și revocare.
-- **Disciplina de testare** — 142 de fișiere, inclusiv un meta-test care
-  respinge aserțiunile pe text de comentariu. Se păstrează ca standard.
+- **`apex/gates.py`** — centralised authorisation. `authorize_order` /
+  `authorize_close` check entitlement, exposure, ownership and idempotency in
+  one place. A recent audit confirmed there is no shortcut in the broker
+  layer. **It remains the only gate.**
+- **`apex/brokers/ctrader.py`** — OAuth, protobuf, reconnection, pagination,
+  rate limiter (5/s historical, 50/s the rest, per connection), slippage
+  ceiling. This is where the months of work are that a rewrite would lose.
+- **`apex/ledger.py`** — the order idempotency ledger.
+- **`apex/user_store.py`** — versioned records with compare-and-set, now for
+  the journal too. **Exactly the primitive a versioned configuration needs.**
+- **`apex/access.py`** + the licence server — entitlement and revocation.
+- **The testing discipline** — 142 files, including a meta-test that rejects
+  assertions made against comment text. Kept as the standard.
 
-## 4. Ce adaptăm
+## 4. What we adapt
 
-- **`apex/builder.py`** → devine autorarea configurației în interfață. Azi
-  produce *patch-uri* peste o configurație globală; trebuie să producă un
-  **document de reguli** de sine stătător.
-- **`apex/forex.py::calc_units`** → matematica dimensionării e corectă. Ce se
-  schimbă: riscul vine **exclusiv** din configurație, fără multiplicator.
-- **`apex/user_loop.py`** → bucla de tick, datele de piață și gestionarea
-  pozițiilor se păstrează. **Partea de decizie se înlocuiește** cu evaluatorul.
+- **`apex/builder.py`** → becomes configuration authoring in the interface.
+  Today it produces *patches* over a global configuration; it must produce a
+  self-contained **rule document**.
+- **`apex/forex.py::calc_units`** → the sizing mathematics is correct. What
+  changes: risk comes **exclusively** from the configuration, with no
+  multiplier.
+- **`apex/user_loop.py`** → the tick loop, the market data and position
+  management are kept. **The decision part is replaced** by the evaluator.
 
-## 5. Ce construim
+## 5. What we build
 
-### 5.1 Documentul de reguli (`RuleDoc`)
+### 5.1 The rule document (`RuleDoc`)
 
-Imutabil după activare. Versionat cu aceeași primitivă CAS ca înregistrarea
-utilizatorului. Fiecare ordin poartă `ruleDocId` + `version`.
+Immutable once activated. Versioned with the same CAS primitive as the user
+record. Every order carries `ruleDocId` + `version`.
 
-Acoperă exact ce a cerut clientul să controleze: cont și instrumente,
-timeframe și momentul evaluării (intrabar / la închidere), condiții de intrare
-și ieșire cu praguri și perioade, combinare AND/OR, direcții permise, tip de
-ordin și expirare, volum fix sau formulă de risc, SL/TP/trailing/break-even/
-parțiale, program și fus orar, limite de poziții și expunere, comportament la
-atingerea pragurilor, și starea (draft / activ / oprit).
+It covers exactly what the client asked to control: account and instruments,
+timeframe and evaluation moment (intrabar / at close), entry and exit
+conditions with thresholds and periods, AND/OR combination, permitted
+directions, order type and expiry, fixed volume or a risk formula,
+SL/TP/trailing/break-even/partials, schedule and timezone, position and
+exposure limits, behaviour when a threshold is hit, and state (draft / active
+/ stopped).
 
-**Cele trei comportamente la prag sunt câmpuri distincte**, nu un singur
-comutator: *blochează intrări noi*, *anulează ordine în așteptare*, *închide
-poziții*. Sunt operații diferite și se configurează separat.
+**The three threshold behaviours are distinct fields**, not a single switch:
+*block new entries*, *cancel pending orders*, *close positions*. They are
+different operations and are configured separately.
 
-### 5.2 Evaluatorul determinist
+### 5.2 The deterministic evaluator
 
 ```
 evaluate(rule_doc, snapshot) -> Decision
 ```
 
-Funcție **pură**: fără I/O, fără ceas, fără rețea. Ceasul și datele intră prin
-`snapshot`, ceea ce face evaluatorul testabil cu fișiere-etalon.
+A **pure** function: no I/O, no clock, no network. The clock and the data
+arrive through `snapshot`, which is what makes the evaluator testable with
+golden files.
 
-`Decision` conține acțiunea, **fiecare condiție evaluată cu rezultatul ei**, și
-motivul. Asta e sursa explicațiilor din interfață — nu un text generat separat
-care poate să nu corespundă.
+`Decision` carries the action, **every evaluated condition with its result**,
+and the reason. That is the source of the explanations in the interface — not
+a separately generated text that may not match.
 
-**Fără fallback.** O strategie sau condiție necunoscută e o eroare de
-validare, nu un motiv de substituție.
+**No fallback.** An unknown strategy or condition is a validation error, not a
+reason to substitute.
 
-### 5.3 Biblioteca de condiții — set inițial, definit
+### 5.3 The condition library — a defined initial set
 
-Nu promitem orice strategie imaginabilă. Set inițial propus, fiecare cu
-definiție matematică și parametri documentați:
+We do not promise every imaginable strategy. The proposed initial set, each
+with a mathematical definition and documented parameters:
 
-- **Indicatori:** EMA, SMA, RSI, MACD, ATR, Bollinger, Stochastic
-- **Structură:** HH/HL/LH/LL, break of structure
-- **Nivel:** preț vs nivel, vs indicator, vs bandă
-- **Timp:** sesiune, interval orar, zi a săptămânii
-- **Tipare, cu definiție explicită:** FVG, liquidity sweep, supply/demand
+- **Indicators:** EMA, SMA, RSI, MACD, ATR, Bollinger, Stochastic
+- **Structure:** HH/HL/LH/LL, break of structure
+- **Level:** price vs level, vs indicator, vs band
+- **Time:** session, time-of-day window, weekday
+- **Patterns, with an explicit definition:** FVG, liquidity sweep,
+  supply/demand
 
-Ultimele trei intră **numai** cu definiție matematică scrisă și parametri
-expuși clientului. Fără asta, un client nu poate ști ce a configurat, iar noi
-nu putem susține că platforma execută conform specificației.
+The last three go in **only** with a written mathematical definition and
+parameters exposed to the client. Without that, a client cannot know what they
+configured, and we cannot claim the platform executes to specification.
 
 ---
 
-## 6. Contractele — de stabilit ÎNAINTE de împărțirea muncii
+## 6. The contracts — to be settled BEFORE splitting the work
 
-Cinci contracte. Până nu sunt agreate, împărțirea pe agenți nu poate începe.
+Five contracts. Until they are agreed, splitting the work across agents cannot
+begin.
 
-| # | Contract | Cine depinde de el |
+| # | Contract | Who depends on it |
 |---|---|---|
-| 1 | `RuleDoc` — schema JSON, versionare, validare | interfața și motorul, amândoi |
-| 2 | `MarketSnapshot` — ce primește evaluatorul | motorul; interfața pentru previzualizare |
-| 3 | `Decision` — ce întoarce, inclusiv condiții evaluate | motorul produce, interfața afișează |
-| 4 | `ExecutionRequest` — inclusiv constrângeri obligatorii | motorul produce, execuția consumă |
-| 5 | Intrarea de jurnal — legată de versiunea configurației | toate |
+| 1 | `RuleDoc` — JSON schema, versioning, validation | the interface and the engine, both |
+| 2 | `MarketSnapshot` — what the evaluator receives | the engine; the interface for preview |
+| 3 | `Decision` — what it returns, including evaluated conditions | the engine produces, the interface displays |
+| 4 | `ExecutionRequest` — including mandatory constraints | the engine produces, execution consumes |
+| 5 | The journal entry — tied to the configuration version | everything |
 
-**Contractul 4 conține regula pe care Codex a propus-o și pe care o susțin:**
-o constrângere de execuție marcată obligatorie și care nu poate fi respectată
-**blochează intrarea**. Nu o degradează tăcut.
+**Contract 4 contains the rule Codex proposed and which I support:** an
+execution constraint marked mandatory that cannot be honoured **blocks the
+entry**. It is not silently degraded.
 
 ---
 
-## 7. Constatări tehnice care contrazic direcția — verificate în cod
+## 7. Technical findings that contradict the direction — verified in the code
 
-Fiecare a fost verificată pe `1bea525`, nu preluată din raport.
+Each was verified against `1bea525`, not taken from the report.
 
-| Loc | Ce face acum | De ce contrazice direcția |
+| Place | What it does today | Why it contradicts the direction |
 |---|---|---|
-| `ai.py:1054` | `STRATEGY_MODES.get(mode, STRATEGY_MODES["mean_reversion"])` | un mod **necunoscut** devine tăcut mean reversion — exact substituția interzisă |
-| `user_loop.py:3135-3148` | `active_mode == "auto"` → strategia aleasă după regim | selecție automată a strategiei |
-| `user_loop.py:4280→4317` | `druckenmiller_multiplier(...)` → `calc_units(mult=...)` | riscul variază **0,4×–1,2×** fără ca clientul să aleagă |
-| `user_loop.py:4303` | `if regime == "volatile": risk_mult *= 0.5` | plafonul efectiv coboară la **0,2×** |
-| `brokers/ctrader.py:1110-1116` | fără cotație → ordinul rămâne `MARKET`, fără plafon | protecția configurată e abandonată tăcut |
-| `builder.py` | wizard peste strategii existente | nu e constructor de condiții |
+| `ai.py:1054` | `STRATEGY_MODES.get(mode, STRATEGY_MODES["mean_reversion"])` | an **unknown** mode silently becomes mean reversion — exactly the forbidden substitution |
+| `user_loop.py:3135-3148` | `active_mode == "auto"` → strategy chosen by regime | automatic strategy selection |
+| `user_loop.py:4280→4317` | `druckenmiller_multiplier(...)` → `calc_units(mult=...)` | risk varies **0.4×–1.2×** without the client choosing |
+| `user_loop.py:4303` | `if regime == "volatile": risk_mult *= 0.5` | the effective floor drops to **0.2×** |
+| `brokers/ctrader.py:1110-1116` | no quote → the order stays `MARKET`, with no ceiling | the configured protection is silently abandoned |
+| `builder.py` | a wizard over existing strategies | it is not a condition builder |
 
-**Rafinare față de raportul Codex, punctul 4:** `advise_risk()` din
-`strategy_modules.py` **este** consultativ și **este** plafonat de
-`_sanitize_advice` în `[0.4, 1.2]` — dar **bucla nu îl consumă deloc**. Calea
-vie e apelul **direct** din `user_loop.py:4280`, care ocolește API-ul
-consultativ. Plafonarea vine din interiorul funcției, nu din `_sanitize_advice`.
-Deci: API consultativ dormant, apel direct viu. Ambele trebuie tratate, dar
-sunt lucruri diferite.
-
----
-
-## 8. Ce NU stabilim aici
-
-Faptul că un client își alege setările **nu decide de la sine** răspunderea
-furnizorului și nu stabilește încadrarea juridică a produsului. Constatările
-de mai sus sunt tehnice.
-
-Necesită verificare juridică, separat: încadrarea produsului, formularea
-răspunderii, ce se poate afirma despre praguri de pierdere, și obligațiile față
-de client. **Un prag de pierdere nu e o garanție împotriva gapurilor sau a
-alunecării** — asta e o constatare tehnică, dar formularea ei către client e
-juridică.
+**A refinement of Codex's report, point 4:** `advise_risk()` in
+`strategy_modules.py` **is** advisory and **is** clamped by `_sanitize_advice`
+to `[0.4, 1.2]` — but **the loop does not consume it at all**. The live path is
+the **direct** call from `user_loop.py:4280`, which bypasses the advisory API.
+The clamp comes from inside the function, not from `_sanitize_advice`. So: a
+dormant advisory API, a live direct call. Both need handling, but they are
+different things.
 
 ---
 
-## 9. Prima etapă concretă
+## 8. What we do NOT settle here
 
-Nu implementare. **Contractul 1 și scheletul contractului 3.**
+The fact that a client chooses their own settings **does not by itself
+determine** the provider's liability, nor does it establish the product's legal
+classification. The findings above are technical.
 
-1. Schema `RuleDoc` ca JSON Schema, cu validare care refuză explicit orice
-   condiție sau strategie necunoscută.
-2. Trei configurații-exemplu complete, scrise în schemă, ca fișiere-etalon.
-3. Structura `Decision`, cu fiecare condiție evaluată vizibilă.
-4. Teste care afirmă că **validarea refuză** — configurație invalidă, condiție
-   necunoscută, parametru lipsă, prag imposibil — fără substituție.
+Requiring separate legal review: the product's classification, how liability is
+worded, what may be claimed about loss thresholds, and the obligations towards
+the client. **A loss threshold is not a guarantee against gaps or slippage** —
+that is a technical finding, but how it is worded to the client is a legal one.
 
-Abia după ce astea sunt agreate se împarte munca.
+---
+
+## 9. The first concrete step
+
+Not implementation. **Contract 1 and the skeleton of contract 3.**
+
+1. The `RuleDoc` schema as JSON Schema, with validation that explicitly
+   refuses any unknown condition or strategy.
+2. Three complete example configurations, written in the schema, as golden
+   files.
+3. The `Decision` structure, with every evaluated condition visible.
+4. Tests asserting that **validation refuses** — invalid configuration, unknown
+   condition, missing parameter, impossible threshold — with no substitution.
+
+Only once those are agreed is the work split.

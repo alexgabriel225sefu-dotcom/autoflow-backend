@@ -1,199 +1,202 @@
-# cTrader — ce folosim și ce nu
+# cTrader — what we use and what we do not
 
-**Sursă:** introspecție directă a `ctrader-open-api==0.9.2` instalate, comparată
-cu `apex-forex-bot/apex/brokers/ctrader.py`. Nu sunt presupuneri — fiecare câmp
-de mai jos a fost citit din descriptorul protobuf.
+**Source:** direct introspection of the installed `ctrader-open-api==0.9.2`,
+compared against `apex-forex-bot/apex/brokers/ctrader.py`. Nothing here is an
+assumption — every field below was read out of the protobuf descriptor.
 
 | | |
 |---|---|
-| Tipuri de cereri oferite de API | **40** |
-| Folosite | **15** |
-| Câmpuri în `ProtoOANewOrderReq` | **23** |
-| Folosite | **8** |
-| Tipuri de ordine | **6** (`MARKET`, `LIMIT`, `STOP`, `STOP_LOSS_TAKE_PROFIT`, `MARKET_RANGE`, `STOP_LIMIT`) |
-| Folosite | **1** (`MARKET`) |
-| Limitare de rată în conector | **niciuna** |
+| Request types offered by the API | **40** |
+| Used | **15** |
+| Fields on `ProtoOANewOrderReq` | **23** |
+| Used | **8** |
+| Order types | **6** (`MARKET`, `LIMIT`, `STOP`, `STOP_LOSS_TAKE_PROFIT`, `MARKET_RANGE`, `STOP_LIMIT`) |
+| Used | **1** (`MARKET`) |
+| Rate limiting in the connector | **none** |
 
-**Concluzia:** platforma nu e limitată de cTrader. Folosește ~37% din el.
+**The conclusion:** the platform is not limited by cTrader. It uses ~37% of it.
 
 ---
 
-# PARTEA 1 — Câmpuri de ordin nefolosite
+# PART 1 — Unused order fields
 
-Cea mai mare valoare pentru cel mai puțin efort: sunt câmpuri pe un mesaj pe
-care conectorul îl trimite deja. Nicio instalație nouă, niciun endpoint nou.
+The most value for the least effort: these are fields on a message the
+connector already sends. No new plumbing, no new endpoint.
 
-| Câmp | Ce face | De ce contează |
+| Field | What it does | Why it matters |
 |---|---|---|
-| `guaranteedStopLoss` | brokerul **garantează** prețul de ieșire, chiar și peste gap | răspunsul direct la incidentul NFP din 4 sept: stop depășit cu 11,1 pips (**51% peste**). Cu stop garantat, ieșirea era la preț. **Cel mai vandabil câmp din listă.** |
-| `trailingStopLoss` | trailing gestionat **de broker** | acum bucla mută stopul manual (evenimentele `STOP_MOVED`, la câteva minute). Cu trailing la broker: mai puține cereri API, și **trailing-ul continuă când botul e oprit sau se redeployează** |
-| `slippageInPoints` + `baseSlippagePrice` | alunecare maximă acceptată (cu `MARKET_RANGE`) | ordinul **refuză** să se execute la preț prost în loc să înghită orice |
-| `clientOrderId` | cheie de idempotență **la broker** | registrul de idempotență există deja în cod; brokerul o oferă nativ. Dublă protecție contra ordinelor duplicate |
-| `label` / `comment` | etichetă pe ordin | ordinele devin identificabile în interfața cTrader și în rapoartele brokerului — clientul își vede trade-urile marcate |
-| `limitPrice` / `stopPrice` | preț pentru ordine în așteptare | vezi Partea 3 |
-| `timeInForce` / `expirationTimestamp` | cât trăiește ordinul | ordin care expire singur dacă setup-ul nu se materializează |
-| `stopTriggerMethod` | declanșare pe bid / ask / trade | evită declanșări false pe spread lărgit |
-| `relativeStopLoss` / `relativeTakeProfit` | SL/TP relativ la fill | **atenție:** comentariul din cod spune că au eșuat cu „invalid precision" pe non-FX. De aceea se face amend absolut după fill. Verifică înainte să reîncerci. |
+| `guaranteedStopLoss` | the broker **guarantees** the exit price, even across a gap | the direct answer to the NFP incident of 4 September: the stop was overshot by 11.1 pips (**51% beyond**). With a guaranteed stop, the exit would have been at price. **The most sellable field on this list.** |
+| `trailingStopLoss` | trailing managed **by the broker** | today the loop moves the stop manually (the `STOP_MOVED` events, every few minutes). With trailing at the broker: fewer API requests, and **the trailing continues while the automation is stopped or being redeployed** |
+| `slippageInPoints` + `baseSlippagePrice` | maximum accepted slippage (with `MARKET_RANGE`) | the order **refuses** to fill at a bad price instead of swallowing anything |
+| `clientOrderId` | an idempotency key **at the broker** | the idempotency ledger already exists in the code; the broker offers one natively. Double protection against duplicate orders |
+| `label` / `comment` | a label on the order | orders become identifiable in the cTrader interface and in the broker's reports — the client sees their trades marked |
+| `limitPrice` / `stopPrice` | the price for pending orders | see Part 3 |
+| `timeInForce` / `expirationTimestamp` | how long the order lives | an order that expires by itself if the setup does not materialise |
+| `stopTriggerMethod` | trigger on bid / ask / trade | avoids false triggers on a widened spread |
+| `relativeStopLoss` / `relativeTakeProfit` | SL/TP relative to the fill | **careful:** the comment in the code says these failed with "invalid precision" on non-FX. That is why the absolute amend is done after the fill. Check before retrying. |
 
 ---
 
-# PARTEA 2 — Cele 25 de cereri nefolosite
+# PART 2 — The 25 unused requests
 
-Câmpurile obligatorii sunt cele reale din descriptor. `ctidTraderAccountId` e
-implicit peste tot (conectorul îl are ca `self._ctid()`).
+The mandatory fields are the real ones from the descriptor.
+`ctidTraderAccountId` is implicit everywhere (the connector has it as
+`self._ctid()`).
 
-## Prioritate ÎNALTĂ — închid buguri sau vând platforma
+## HIGH priority — these close bugs or sell the platform
 
 ### `ProtoOAOrderListReq` → `Res`
 `fromTimestamp`, `toTimestamp`
-Istoricul **ordinelor**, inclusiv respinse și anulate.
-**De ce contează:** jurnalul citește doar **deal-uri**. Un ordin respins nu
-produce deal, deci e invizibil — exact de ce cele două ordine USDCHF din
-6 septembrie au dispărut în tăcere. Asta le-ar fi arătat imediat.
+The history of **orders**, including rejected and cancelled ones.
+**Why it matters:** the journal reads only **deals**. A rejected order produces
+no deal, so it is invisible — exactly why the two USDCHF orders of
+6 September disappeared silently. This would have shown them immediately.
 
 ### `ProtoOAExpectedMarginReq` → `Res`
-`symbolId`, opțional `volume`
-Marja necesară **înainte** de trimiterea ordinului.
-**De ce contează:** ar fi prins depășirea de pe XAUUSD (3,01% risc real față de
-2,48% țintă, din cauza lotului minim) **înainte** de intrare, nu după.
+`symbolId`, optional `volume`
+The margin required **before** the order is sent.
+**Why it matters:** it would have caught the overshoot on XAUUSD (3.01% real
+risk against a 2.48% target, because of the minimum lot) **before** entry, not
+after.
 
 ### `ProtoOAMarginCallListReq` → `Res` · `ProtoOAMarginCallUpdateReq` → `Res`
-`marginCall` (pentru update)
-Pragurile de margin call ale brokerului, și actualizarea lor.
-**De ce contează:** plasă de siguranță reală, verificabilă, pe care o poți
-afirma onest în marketing. Nu e o promisiune de profit — e o protecție.
+`marginCall` (for the update)
+The broker's margin call thresholds, and updating them.
+**Why it matters:** a real, verifiable safety net that can be stated honestly
+in marketing. It is not a promise of profit — it is a protection.
 
-### `ProtoOACashFlowHistoryListReq` → `Res` — ⚠️ INTERZIS DELIBERAT
+### `ProtoOACashFlowHistoryListReq` → `Res` — ⚠️ DELIBERATELY FORBIDDEN
 `fromTimestamp`, `toTimestamp`
-Depuneri, retrageri, swap, comisioane.
+Deposits, withdrawals, swap, commissions.
 
-**NU-L IMPLEMENTA fără decizia proprietarului.**
-`tests/test_positioning_claims.py` interzice explicit șirul `CashFlowHistory`
-oriunde în `apex/`, ca *„nu putem atinge banii tăi"* să fie un **fapt
-structural**, nu o promisiune: platforma nu doar că nu mută bani — nici măcar nu
-se uită la mișcările lor.
+**DO NOT IMPLEMENT IT without the owner's decision.**
+`tests/test_positioning_claims.py` explicitly forbids the string
+`CashFlowHistory` anywhere in `apex/`, so that *"we cannot touch your money"*
+is a **structural fact**, not a promise: the platform does not merely refrain
+from moving money — it does not even look at its movements.
 
-**Tensiunea reală:** fără el, P&L-ul e incomplet — swap-ul peste noapte și
-comisioanele nu apar în jurnal, iar un client care compară cu extrasul
-brokerului va găsi diferențe.
+**The real tension:** without it, P&L is incomplete — overnight swap and
+commissions do not appear in the journal, and a client comparing against the
+broker's statement will find discrepancies.
 
-E un compromis de poziționare, nu unul tehnic: **contabilitate completă** contra
-**„nici nu ne uităm"**. Decide proprietarul. Dacă alege contabilitatea, testul
-de poziționare trebuie actualizat în același commit, cu motivul scris.
+It is a positioning trade-off, not a technical one: **complete accounting**
+against **"we do not even look"**. The owner decides. If they choose the
+accounting, the positioning test must be updated in the same commit, with the
+reason written down.
 
 ### `ProtoOASubscribeLiveTrendbarReq` → `Res`
 `period`, `symbolId`
-Lumânări **împinse** de server, nu cerute.
-**De ce contează:** elimină majoritatea presiunii pe limita de 5 cereri
-istorice/secundă. Condiție practică pentru mai mulți clienți.
+Candles **pushed** by the server, rather than requested.
+**Why it matters:** it removes most of the pressure on the limit of 5 historical
+requests/second. A practical precondition for having more clients.
 
-## Prioritate MEDIE — capacități noi
+## MEDIUM priority — new capabilities
 
 ### `ProtoOASubscribeDepthQuotesReq` / `ProtoOAUnsubscribeDepthQuotesReq`
-opțional `symbolId`
-Adâncimea carnetului de ordine.
-**De ce contează:** măsori lichiditatea reală înainte de intrare și refuzi
-trade-uri pe care piața nu le poate absorbi. **Niciun bot retail nu face asta.**
+optional `symbolId`
+Order book depth.
+**Why it matters:** you measure real liquidity before entry and refuse trades
+the market cannot absorb. **No retail automation does this.**
 
-### `ProtoOAAmendOrderReq` / `ProtoOACancelOrderReq` → eveniment (nu `Res`)
-`orderId`; amend acceptă `volume`, `limitPrice`, `stopPrice`, `expirationTimestamp`
-Modifici sau anulezi un ordin în așteptare.
-**Atenție:** răspund cu `ProtoOAExecutionEvent`, nu cu un `Res` — folosiți
-aceeași așteptare de eveniment terminal ca `place_order`.
+### `ProtoOAAmendOrderReq` / `ProtoOACancelOrderReq` → an event (not a `Res`)
+`orderId`; the amend accepts `volume`, `limitPrice`, `stopPrice`, `expirationTimestamp`
+Modify or cancel a pending order.
+**Careful:** these answer with a `ProtoOAExecutionEvent`, not with a `Res` — use
+the same terminal-event wait as `place_order`.
 
 ### `ProtoOAGetTickDataReq` → `Res`
 `symbolId`, `type`, `fromTimestamp`, `toTimestamp`
-Istoric la nivel de tick.
-**De ce contează:** backtesting real. Cel actual folosește lumânări.
+Tick-level history.
+**Why it matters:** real backtesting. The current one uses candles.
 
 ### `ProtoOADealListByPositionIdReq` · `ProtoOAOrderListByPositionIdReq`
-`positionId` (+ interval pentru primul)
-Toate deal-urile/ordinele unei poziții.
-**De ce contează:** o poziție construită din mai multe fill-uri e acum
-reconstruită prin ghicit. Astea o dau exact.
+`positionId` (+ an interval for the first)
+All the deals/orders of one position.
+**Why it matters:** a position built out of several fills is currently
+reconstructed by guesswork. These give it exactly.
 
 ### `ProtoOADealOffsetListReq` → `Res`
 `dealId`
-Ce deal a închis ce deal.
-**De ce contează:** necesar pentru raport fiscal corect (FIFO). Fără el,
-raportul e o aproximare.
+Which deal closed which deal.
+**Why it matters:** required for a correct tax report (FIFO). Without it, the
+report is an approximation.
 
 ### `ProtoOAAssetListReq` · `ProtoOAAssetClassListReq` · `ProtoOASymbolCategoryListReq`
-doar contul
-Universul complet de instrumente.
-**De ce contează:** tranzacționezi **8 perechi**. Conectorul descarcă deja
-lista întreagă de la broker (`ProtoOASymbolsListReq`, linia ~389) și o aruncă:
-indici, mărfuri, acțiuni CFD. Extinderea universului e configurare, nu cod nou.
+the account only
+The complete instrument universe.
+**Why it matters:** we trade **8 pairs**. The connector already downloads the
+entire list from the broker (`ProtoOASymbolsListReq`, line ~389) and throws it
+away: indices, commodities, CFD shares. Widening the universe is configuration,
+not new code.
 
-## Prioritate JOASĂ — utilitare
+## LOW priority — utilities
 
-| Cerere | Câmpuri | Notă |
+| Request | Fields | Note |
 |---|---|---|
-| `ProtoOASymbolsForConversionReq` | `firstAssetId`, `lastAssetId` | conversie valutară corectă pentru conturi non-USD |
-| `ProtoOAGetCtidProfileByTokenReq` | `accessToken` | profilul clientului (nume, id) |
-| `ProtoOAOrderDetailsReq` | `orderId` | detaliile unui singur ordin |
-| `ProtoOAUnsubscribeSpotsReq` / `UnsubscribeLiveTrendbarReq` | `symbolId` / `period` | dezabonare — igienă la schimbarea universului |
-| `ProtoOAAccountLogoutReq` | contul | deconectare curată |
-| `ProtoOAVersionReq` | — | versiunea API |
-| `ProtoOARefreshTokenReq` | `refreshToken` | **deja tratat** în `apex/ctrader_oauth.py` — nu e o lipsă |
+| `ProtoOASymbolsForConversionReq` | `firstAssetId`, `lastAssetId` | correct currency conversion for non-USD accounts |
+| `ProtoOAGetCtidProfileByTokenReq` | `accessToken` | the client's profile (name, id) |
+| `ProtoOAOrderDetailsReq` | `orderId` | the details of a single order |
+| `ProtoOAUnsubscribeSpotsReq` / `UnsubscribeLiveTrendbarReq` | `symbolId` / `period` | unsubscribe — hygiene when the universe changes |
+| `ProtoOAAccountLogoutReq` | the account | a clean disconnect |
+| `ProtoOAVersionReq` | — | the API version |
+| `ProtoOARefreshTokenReq` | `refreshToken` | **already handled** in `apex/ctrader_oauth.py` — not a gap |
 
 ---
 
-# PARTEA 3 — Tipurile de ordine
+# PART 3 — The order types
 
-Se folosește doar `MARKET`.
+Only `MARKET` is used.
 
-| Tip | Ce permite |
+| Type | What it allows |
 |---|---|
-| `MARKET_RANGE` | ordin de piață care refuză execuția peste alunecarea maximă |
-| `LIMIT` | intrare la un preț mai bun, **păzită de broker** |
-| `STOP` | intrare pe breakout peste un nivel |
-| `STOP_LIMIT` | breakout, dar cu preț maxim acceptat |
-| `STOP_LOSS_TAKE_PROFIT` | ordin pur de protecție |
+| `MARKET_RANGE` | a market order that refuses to fill beyond the maximum slippage |
+| `LIMIT` | entry at a better price, **watched by the broker** |
+| `STOP` | entry on a breakout beyond a level |
+| `STOP_LIMIT` | a breakout, but with a maximum accepted price |
+| `STOP_LOSS_TAKE_PROFIT` | a pure protection order |
 
-**Schimbarea de arhitectură:** acum botul trebuie să fie **treaz exact în
-momentul potrivit**, iar bucla rulează la câteva secunde. Cu ordine în
-așteptare, strategia pune ordinul la nivel și **brokerul așteaptă**. Mai puține
-setup-uri ratate, mai puțină dependență de uptime, mai puține cereri API.
-
----
-
-# PARTEA 4 — ⚠️ Gaura care trebuie astupată prima
-
-**Conectorul nu are nicio limitare de rată.** Zero.
-
-cTrader impune **5 cereri istorice/secundă** și 50 non-istorice/secundă
-**per conexiune, indiferent de câți clienți** o folosesc.
-
-Cu un utilizator merge din noroc. Nu e o funcționalitate de adăugat mai târziu
-— e condiția ca platforma să suporte al doilea client.
+**The architectural change:** today the automation has to be **awake at exactly
+the right moment**, and the loop runs every few seconds. With pending orders,
+the strategy places the order at the level and **the broker waits**. Fewer
+missed setups, less dependence on uptime, fewer API requests.
 
 ---
 
-# ORDINEA DE LUCRU RECOMANDATĂ
+# PART 4 — ⚠️ The hole to plug first
 
-| # | Ce | De ce acum |
+**The connector has no rate limiting at all.** None.
+
+cTrader enforces **5 historical requests/second** and 50 non-historical/second
+**per connection, regardless of how many clients** use it.
+
+With one user it works by luck. This is not a feature to add later — it is the
+precondition for the platform to support a second client.
+
+---
+
+# THE RECOMMENDED ORDER OF WORK
+
+| # | What | Why now |
 |---|---|---|
-| 1 | ✅ **Limitator de rată** — LIVRAT | fereastră glisantă, per conexiune, două bugete |
-| 2 | **`guaranteedStopLoss` + `slippageInPoints`** | un câmp fiecare, cea mai mare valoare vizibilă |
-| 3 | **`trailingStopLoss` la broker** | scoate bucla `STOP_MOVED`; trailing-ul supraviețuiește repornirilor |
-| 4 | **`ProtoOAOrderListReq` în jurnal** | face vizibile ordinele respinse; închide clasa de bug USDCHF |
-| 5 | **`ProtoOAExpectedMarginReq`** înainte de fiecare ordin | prinde depășirile de risc înainte de intrare |
-| 6 | **`clientOrderId`** | idempotență la broker, peste cea din cod |
-| 7 | **Ordine în așteptare** (`LIMIT`/`STOP`) | schimbarea de arhitectură |
-| 8 | ~~`CashFlowHistoryList`~~ | **blocat de o garanție de produs** — vezi Partea 2. Decizie de poziționare, nu de inginerie. |
+| 1 | ✅ **Rate limiter** — DELIVERED | sliding window, per connection, two budgets |
+| 2 | **`guaranteedStopLoss` + `slippageInPoints`** | one field each, the most visible value |
+| 3 | **`trailingStopLoss` at the broker** | removes the `STOP_MOVED` loop; the trailing survives restarts |
+| 4 | **`ProtoOAOrderListReq` in the journal** | makes rejected orders visible; closes the USDCHF class of bug |
+| 5 | **`ProtoOAExpectedMarginReq`** before every order | catches risk overshoots before entry |
+| 6 | **`clientOrderId`** | idempotency at the broker, on top of the one in the code |
+| 7 | **Pending orders** (`LIMIT`/`STOP`) | the architectural change |
+| 8 | ~~`CashFlowHistoryList`~~ | **blocked by a product guarantee** — see Part 2. A positioning decision, not an engineering one. |
 
-Pașii 2–6 sunt câmpuri și cereri pe infrastructură care există deja. OAuth,
-protobuf, reconectarea și paginarea sunt scrise și testate.
+Steps 2–6 are fields and requests on infrastructure that already exists. OAuth,
+protobuf, reconnection and pagination are written and tested.
 
-## Reguli pentru agenți
+## Rules for agents
 
-- **Zona:** tot ce ține de asta e în `apex-forex-bot/apex/brokers/`.
-  Un singur agent acolo o dată.
-- **`gates.authorize_order` / `authorize_close` rămân singurele porți** spre un
-  ordin. Nicio capabilitate nouă nu le ocolește.
-- Fiecare capabilitate nouă are nevoie de test în `tests/`, nu în `apex/`.
-- Suita completă trebuie să treacă înainte de commit.
-- Mesajele care răspund cu **eveniment** (`AmendOrder`, `CancelOrder`) au
-  nevoie de aceeași așteptare de eveniment terminal ca `place_order` — vezi
-  `_is_terminal_execution`.
+- **The zone:** everything to do with this lives in
+  `apex-forex-bot/apex/brokers/`. One agent in there at a time.
+- **`gates.authorize_order` / `authorize_close` remain the only gates** to an
+  order. No new capability bypasses them.
+- Every new capability needs a test in `tests/`, not in `apex/`.
+- The full suite must pass before a commit.
+- Messages that answer with an **event** (`AmendOrder`, `CancelOrder`) need the
+  same terminal-event wait as `place_order` — see `_is_terminal_execution`.
