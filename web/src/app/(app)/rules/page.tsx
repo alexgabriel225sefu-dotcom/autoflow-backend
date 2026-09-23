@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
@@ -26,14 +27,14 @@ export default function RulesPage() {
             A rule is frozen once active. Editing one creates a new version.
           </span>
         </div>
-        <a className="btn" href="/rules/new"><Plus className="ico" aria-hidden /> New rule</a>
+        <Link className="btn" href="/rules/new"><Plus className="ico" aria-hidden /> New rule</Link>
       </div>
 
       {running && running.state !== "stopped" ? (
         <div className="notice notice-accent">
           Automation is <strong>{running.state}</strong>
           {running.ruleDocId ? (
-            <> on <a href={`/rules/${running.ruleDocId}`}>this rule</a></>
+            <> on <Link href={`/rules/${running.ruleDocId}`}>this rule</Link></>
           ) : null}.
         </div>
       ) : null}
@@ -48,13 +49,13 @@ export default function RulesPage() {
             rowKey={(r) => r.ruleDocId}
             empty="No rules yet. Create one to get started."
             cardTitle={(r) => (
-              <a href={`/rules/${r.ruleDocId}`}>{r.name || "(untitled)"}</a>
+              <Link href={`/rules/${r.ruleDocId}`}>{r.name || "(untitled)"}</Link>
             )}
             cardBadge={(r) => <StatePill state={r.state} />}
             columns={[
               {
                 key: "name", header: "Name",
-                cell: (r) => <a href={`/rules/${r.ruleDocId}`}>{r.name || "(untitled)"}</a>,
+                cell: (r) => <Link href={`/rules/${r.ruleDocId}`}>{r.name || "(untitled)"}</Link>,
                 hideOnCard: true,
               },
               { key: "state", header: "State", cell: (r) => <StatePill state={r.state} />, hideOnCard: true },

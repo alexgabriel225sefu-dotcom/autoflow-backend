@@ -35,7 +35,13 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     setLastSync(Date.now());
   }, [path]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // Queued rather than called straight from the effect body. `load` sets
+    // `loading` before it awaits, and doing that synchronously during commit
+    // is a cascading render. One microtask later is invisible to the reader
+    // and lets the first paint happen with the initial state.
+    queueMicrotask(() => { void load(); });
+  }, [load]);
 
   useEffect(() => {
     if (!intervalMs || !path) return;

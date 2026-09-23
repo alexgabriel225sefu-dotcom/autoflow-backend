@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
@@ -78,7 +79,7 @@ export default function NewRulePage() {
         <button className="btn btn-lg" onClick={save} disabled={busy}>
           <Save className="ico" aria-hidden /> {busy ? "Saving…" : "Save draft"}
         </button>
-        <a className="btn btn-ghost btn-lg" href="/rules">Cancel</a>
+        <Link className="btn btn-ghost btn-lg" href="/rules">Cancel</Link>
       </div>
     </main>
   );

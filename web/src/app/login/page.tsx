@@ -1,4 +1,5 @@
 "use client";
+import { BrandLockup } from "@/components/brand/logo";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -29,10 +30,7 @@ function LoginPageInner() {
   return (
     <main className="a4t">
       <div className="auth-wrap">
-        <div className="auth-brand">
-          <span className="side-mark" aria-hidden />
-          Apex4Traders
-        </div>
+        <div className="auth-brand"><BrandLockup size={26} /></div>
         <h1>Sign in</h1>
         <form onSubmit={onSubmit} className="card" style={{ marginTop: "1rem" }}>
           <label className="field">

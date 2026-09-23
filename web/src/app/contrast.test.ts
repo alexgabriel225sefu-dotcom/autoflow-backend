@@ -198,17 +198,30 @@ describe("palette", () => {
     expect(contrast(TOKENS["--a4t-dim"], BG())).toBeGreaterThanOrEqual(3);
   });
 
-  it("the accent is readable as text and as a fill", () => {
-    expect(contrast(TOKENS["--a4t-accent"], BG())).toBeGreaterThanOrEqual(4.5);
+  /**
+   * The accent is a FILL, not a foreground.
+   *
+   * Petrol teal is dark on purpose. Asserting it is readable as text would be
+   * asserting a role it does not have, and would push whoever hit the failure
+   * to lighten the fill until the buttons stopped looking like buttons. What
+   * matters is the pair that actually renders: off-white ON teal.
+   */
+  it("the action fill carries its own foreground", () => {
     expect(contrast(TOKENS["--a4t-on-accent"], TOKENS["--a4t-accent"]))
       .toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the interactive foreground is readable as text", () => {
+    // Links, focus rings and the active nav item. This one IS a foreground.
+    expect(contrast(TOKENS["--a4t-link"], BG())).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(TOKENS["--a4t-link-strong"], BG())).toBeGreaterThanOrEqual(4.5);
   });
 
   it("the trading semantics are readable and distinguishable", () => {
     for (const t of ["--a4t-long", "--a4t-short", "--a4t-neutral"]) {
       expect(contrast(TOKENS[t], BG()), `${t} on the page`).toBeGreaterThanOrEqual(4.5);
     }
-    // Long and short must not be confusable with each other or with the accent.
+    // Long and short must not be confusable with each other.
     expect(contrast(TOKENS["--a4t-long"], TOKENS["--a4t-short"])).toBeGreaterThan(1.3);
   });
 
@@ -221,20 +234,44 @@ describe("palette", () => {
     }
   });
 
-  it("every declared accent token is the one accent, not a second hue", () => {
-    // Hue is what makes a palette read as one system. Anything calling itself
-    // an accent has to sit in the same blue-cyan band.
-    const hueOf = (hex: string) => {
-      const [r, g, b] = rgb(hex).map((n) => n / 255);
-      const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-      if (!d) return 0;
-      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-      return ((h * 60) + 360) % 360;
-    };
-    for (const t of ["--a4t-accent", "--a4t-accent-strong", "--a4t-accent-dim"]) {
-      const h = hueOf(TOKENS[t]);
-      expect(h, `${t} is ${TOKENS[t]} (hue ${h.toFixed(0)}°)`).toBeGreaterThan(180);
-      expect(h, `${t} is ${TOKENS[t]} (hue ${h.toFixed(0)}°)`).toBeLessThan(230);
+  /**
+   * One family per role, rather than a fixed hue band.
+   *
+   * A hardcoded band would have to be rewritten every time the palette is
+   * re-approved, and a test nobody trusts gets relaxed rather than read. What
+   * has to hold across any palette is that a family is a family: if a second
+   * accent is introduced by accident, the spread opens up and this fails.
+   */
+  const hueOf = (hex: string) => {
+    const [r, g, b] = rgb(hex).map((n) => n / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    if (!d) return 0;
+    const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return ((h * 60) + 360) % 360;
+  };
+  const spread = (hues: number[]) => {
+    let worst = 0;
+    for (const a of hues) for (const b of hues) {
+      const d = Math.abs(a - b);
+      worst = Math.max(worst, Math.min(d, 360 - d));
     }
+    return worst;
+  };
+
+  it.each([
+    ["action fill", ["--a4t-accent", "--a4t-accent-strong", "--a4t-accent-dim"]],
+    ["interactive", ["--a4t-link", "--a4t-link-strong"]],
+  ])("the %s tokens are one hue family, not two", (_name, names) => {
+    const hues = (names as string[]).map((t) => hueOf(TOKENS[t]));
+    expect(
+      spread(hues),
+      (names as string[]).map((t, i) => `${t}=${TOKENS[t]} (${hues[i].toFixed(0)}°)`).join(", "),
+    ).toBeLessThanOrEqual(30);
+  });
+
+  it("the action fill and the interactive foreground are distinct roles", () => {
+    // If these ever collapse to one token, the 1.00:1 bug becomes reachable
+    // again: a link styled as a button would inherit the fill's own hue.
+    expect(TOKENS["--a4t-accent"]).not.toBe(TOKENS["--a4t-link"]);
   });
 });

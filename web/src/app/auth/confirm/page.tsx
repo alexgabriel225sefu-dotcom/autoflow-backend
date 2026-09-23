@@ -1,4 +1,5 @@
 "use client";
+import { BrandLockup } from "@/components/brand/logo";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,10 +21,7 @@ export default function ConfirmPage() {
   return (
     <main className="a4t">
       <div className="auth-wrap">
-        <div className="auth-brand">
-          <span className="side-mark" aria-hidden />
-          Apex4Traders
-        </div>
+        <div className="auth-brand"><BrandLockup size={26} /></div>
         <h1>Email confirmation</h1>
         <div className="card">
           {state === "checking" ? <p className="muted" role="status">Checking…</p> : null}

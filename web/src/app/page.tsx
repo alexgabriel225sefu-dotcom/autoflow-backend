@@ -1,3 +1,4 @@
+import { BrandLockup } from "@/components/brand/logo";
 import type { Metadata } from "next";
 import { BookOpen, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
 
@@ -21,10 +22,7 @@ export default function Landing() {
     <main className="a4t">
       <div className="lp">
         <nav className="lp-nav">
-          <span style={{ display: "flex", alignItems: "center", gap: ".55rem", fontWeight: 700, letterSpacing: "-.03em" }}>
-            <span className="side-mark" aria-hidden />
-            Apex4Traders
-          </span>
+          <BrandLockup size={24} />
           <span className="btn-row">
             <a className="btn btn-ghost" href="/login">Sign in</a>
             <a className="btn" href="/signup">Create account</a>

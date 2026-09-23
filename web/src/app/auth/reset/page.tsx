@@ -1,4 +1,5 @@
 "use client";
+import { BrandLockup } from "@/components/brand/logo";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,10 +24,7 @@ export default function ResetPage() {
   return (
     <main className="a4t">
       <div className="auth-wrap">
-        <div className="auth-brand">
-          <span className="side-mark" aria-hidden />
-          Apex4Traders
-        </div>
+        <div className="auth-brand"><BrandLockup size={26} /></div>
         <h1>Reset your password</h1>
         {sent ? (
           <div className="card">

@@ -9,48 +9,94 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Surfaces: graphite, five steps, so a card separates from the page
-     without a border doing all the work. */
-  --a4t-bg:        #07090e;
-  --a4t-bg-2:      #0a0d14;
-  --a4t-surface:   #0e1219;
-  --a4t-surface-2: #141925;
-  --a4t-surface-3: #1b2130;
-  --a4t-line:      #1f2635;
-  --a4t-line-soft: #171d29;
+  /* ── surfaces ───────────────────────────────────────────────────────
+     Deep midnight plum for the page, graphite for what sits on it, then
+     three steps up so a card separates from its background without a
+     border doing all the work. */
+  --a4t-bg:        #111322;   /* deep midnight plum */
+  --a4t-bg-2:      #141727;
+  --a4t-surface:   #171B25;   /* graphite */
+  --a4t-surface-2: #1E2331;
+  --a4t-surface-3: #272D3D;
+  --a4t-line:      #2A3042;
+  --a4t-line-soft: #212636;
 
-  /* Cold white, and two steps down. */
-  --a4t-text:  #eef2f8;
-  --a4t-muted: #93a0b8;
-  --a4t-dim:   #67738c;
+  /* ── text ───────────────────────────────────────────────────────────
+     Warm off-white, then muted slate, then a dim step for metadata. */
+  --a4t-text:  #F4F0E8;   /* warm off-white */
+  --a4t-muted: #98A0B4;   /* muted slate */
+  --a4t-dim:   #6F7791;
 
-  /* The only accent. */
-  --a4t-accent:        #1fb6ff;
-  --a4t-accent-strong: #52c7ff;
-  --a4t-accent-dim:    #10618a;
-  --a4t-accent-wash:   rgba(31, 182, 255, 0.10);
-  /* Text placed ON the accent. Named, so no button can forget it. */
-  --a4t-on-accent:     #04121c;
+  /* ── interaction ────────────────────────────────────────────────────
+     Petrol teal is the action FILL. It is dark, so it carries off-white
+     text, never dark text — 7.1:1.
+     Soft lilac is the interactive foreground: links, focus, the active
+     nav item. Teal on the page background is only 2.2:1 and cannot be
+     read as text, which is why the two are separate tokens rather than
+     one accent used both ways. */
+  --a4t-accent:        #0B5960;   /* petrol teal — fills */
+  --a4t-accent-strong: #0E6E77;
+  --a4t-accent-dim:    #1A3C4A;
+  --a4t-accent-wash:   rgba(11, 89, 96, 0.28);
+  --a4t-on-accent:     #F4F0E8;   /* text ON petrol teal */
 
-  /* Semantic, trading only. */
-  --a4t-long:    #22c98f;
-  --a4t-short:   #ff5f6d;
-  --a4t-neutral: #7c8aa5;
-  --a4t-long-wash:  rgba(34, 201, 143, 0.12);
-  --a4t-short-wash: rgba(255, 95, 109, 0.12);
+  --a4t-link:       #C7B8FF;      /* soft lilac */
+  --a4t-link-strong:#DCD2FF;
+  --a4t-link-dim:   #3B3357;
+  --a4t-link-wash:  rgba(199, 184, 255, 0.12);
+
+  /* ── trading semantics, and nothing else ────────────────────────────
+     Mint means long or confirmed. Coral means short, warning or
+     destructive. Neither is ever used for emphasis. */
+  --a4t-long:    #A5E7C5;   /* seafoam mint */
+  --a4t-short:   #FF8A73;   /* coral */
+  --a4t-neutral: #98A0B4;
+  --a4t-long-wash:  rgba(165, 231, 197, 0.13);
+  --a4t-short-wash: rgba(255, 138, 115, 0.13);
 
   --a4t-demo: var(--a4t-long);
   --a4t-live: var(--a4t-short);
 
+  /* ── type scale ─────────────────────────────────────────────────────
+     Six steps. A scale with more than that stops being a scale. */
+  --fs-3xs: .66rem;
+  --fs-2xs: .72rem;
+  --fs-xs:  .78rem;
+  --fs-sm:  .84rem;
+  --fs-md:  .92rem;
+  --fs-lg:  1.05rem;
+  --fs-xl:  1.35rem;
+  --fs-2xl: clamp(1.4rem, 3vw, 1.7rem);
+
+  /* ── spacing scale ──────────────────────────────────────────────────
+     A 4px base. Every gap and pad below is one of these. */
+  --sp-1: .25rem;
+  --sp-2: .5rem;
+  --sp-3: .75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+
+  /* ── borders and elevation ──────────────────────────────────────────── */
   --a4t-radius:    10px;
   --a4t-radius-sm: 8px;
+  --a4t-radius-lg: 14px;
+  --a4t-border:      1px solid var(--a4t-line);
+  --a4t-border-soft: 1px solid var(--a4t-line-soft);
 
+  --elev-0: none;
+  --elev-1: 0 1px 0 rgba(244, 240, 232, .03) inset, 0 6px 18px -12px rgba(0, 0, 0, .85);
+  --elev-2: 0 1px 0 rgba(244, 240, 232, .04) inset, 0 14px 34px -18px rgba(0, 0, 0, .9);
+
+  /* ── layout ─────────────────────────────────────────────────────────── */
   --a4t-sidebar: 232px;
+  --a4t-inspector: 320px;
   --a4t-topbar:  56px;
   --a4t-statusbar: 40px;
   --a4t-bottomnav: 62px;
 
-  --a4t-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px -12px rgba(0,0,0,.8);
+  --a4t-shadow: var(--elev-1);
 }
 
 /* The shadcn token layer is aliased onto the same palette. The primitives in
@@ -123,10 +169,10 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--a4t-line); }
 
-::selection { background: var(--a4t-accent-dim); color: var(--a4t-text); }
+::selection { background: var(--a4t-link-dim); color: var(--a4t-text); }
 
 :focus-visible {
-  outline: 2px solid var(--a4t-accent);
+  outline: 2px solid var(--a4t-link);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -147,8 +193,8 @@ body {
    takes the control's colour. This exact rule, written without :where(),
    made every primary call to action in the product unreadable: the label
    inherited the accent onto an accent fill at 1.00:1. */
-.a4t :where(a) { color: var(--a4t-accent); text-decoration: none; }
-.a4t :where(a):hover { color: var(--a4t-accent-strong); }
+.a4t :where(a) { color: var(--a4t-link); text-decoration: none; }
+.a4t :where(a):hover { color: var(--a4t-link-strong); }
 
 .a4t h1, .a4t h2, .a4t h3 { letter-spacing: -0.021em; margin: 0; font-weight: 600; }
 .a4t h1 { font-size: clamp(1.35rem, 3vw, 1.6rem); line-height: 1.2; }
@@ -196,10 +242,11 @@ body {
   font-weight: 700; letter-spacing: -.03em; font-size: 1rem;
   color: var(--a4t-text);
 }
+/* Kept as the fallback block for anything that has not moved to the
+   <BrandMark> component yet. */
 .side-mark {
   width: 22px; height: 22px; border-radius: 6px; flex: none;
-  background: linear-gradient(145deg, var(--a4t-accent), var(--a4t-accent-dim));
-  box-shadow: 0 0 0 1px rgba(31,182,255,.25), 0 0 18px -4px var(--a4t-accent);
+  background: linear-gradient(145deg, var(--a4t-accent-strong), var(--a4t-accent-dim));
 }
 .side-group { margin-top: .9rem; padding: 0 .55rem .35rem; }
 
@@ -217,10 +264,10 @@ body {
   content: ""; position: absolute; left: -.6rem; top: 50%;
   transform: translateY(-50%);
   width: 2px; height: 17px; border-radius: 0 2px 2px 0;
-  background: var(--a4t-accent);
+  background: var(--a4t-link);
 }
 .side-link .ico { width: 16px; height: 16px; flex: none; opacity: .85; }
-.side-link[data-active="true"] .ico { opacity: 1; color: var(--a4t-accent); }
+.side-link[data-active="true"] .ico { opacity: 1; color: var(--a4t-link); }
 .side-foot { margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--a4t-line-soft); }
 
 /* main column */
@@ -268,7 +315,7 @@ body {
 }
 .stat-chip .dot[data-tone="long"]  { background: var(--a4t-long);  box-shadow: 0 0 8px -1px var(--a4t-long); }
 .stat-chip .dot[data-tone="short"] { background: var(--a4t-short); box-shadow: 0 0 8px -1px var(--a4t-short); }
-.stat-chip .dot[data-tone="accent"]{ background: var(--a4t-accent); box-shadow: 0 0 8px -1px var(--a4t-accent); }
+.stat-chip .dot[data-tone="accent"]{ background: var(--a4t-link); box-shadow: 0 0 8px -1px var(--a4t-link); }
 .stat-chip .dot[data-live="true"]  { animation: a4t-pulse 2s ease-in-out infinite; }
 
 /* page body */
@@ -306,7 +353,7 @@ body {
   color: var(--a4t-dim); background: none; border: 0; cursor: pointer;
   position: relative; padding: 0; min-height: 44px;
 }
-.bottomnav a[data-active="true"], .bottomnav button[data-active="true"] { color: var(--a4t-accent); }
+.bottomnav a[data-active="true"], .bottomnav button[data-active="true"] { color: var(--a4t-link); }
 .bottomnav .ico { width: 19px; height: 19px; }
 
 /* drawer — the rest of the destinations on mobile */
@@ -337,8 +384,79 @@ body {
   color: var(--a4t-text); font-size: .875rem; font-weight: 500;
   min-height: 48px;
 }
-.drawer-links a[data-active="true"] { border-color: var(--a4t-accent-dim); color: var(--a4t-accent); }
+.drawer-links a[data-active="true"] { border-color: var(--a4t-link-dim); color: var(--a4t-link); }
 .drawer-links .ico { width: 17px; height: 17px; opacity: .8; }
+
+/* ── workspace: main column plus a responsive right inspector ────────
+   The inspector is a column on a wide screen and a stacked panel below
+   the workspace on a narrow one. It is never hidden: a panel that
+   disappears at a breakpoint takes its content with it. */
+
+.workspace { display: grid; gap: var(--sp-3); grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1180px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) var(--a4t-inspector); }
+}
+.workspace > * { min-width: 0; }
+
+.inspector { display: flex; flex-direction: column; gap: var(--sp-3); }
+@media (min-width: 1180px) {
+  .inspector { position: sticky; top: calc(var(--a4t-topbar) + var(--a4t-statusbar) + var(--sp-3)); }
+}
+
+/* ── bottom data tabs ────────────────────────────────────────────────
+   Positions / Orders / Journal under the workspace, the way a terminal
+   docks them. Tabs, not an accordion: the reader is comparing, not
+   browsing. */
+
+.dock { border: var(--a4t-border); border-radius: var(--a4t-radius); background: var(--a4t-surface); box-shadow: var(--elev-1); overflow: hidden; }
+.dock-tabs { display: flex; gap: 0; border-bottom: var(--a4t-border); background: var(--a4t-bg-2); overflow-x: auto; scrollbar-width: none; }
+.dock-tabs::-webkit-scrollbar { display: none; }
+.dock-tabs button {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--a4t-muted); padding: var(--sp-3) var(--sp-4);
+  min-height: 44px; white-space: nowrap; position: relative;
+}
+.dock-tabs button[aria-selected="true"] { color: var(--a4t-text); }
+.dock-tabs button[aria-selected="true"]::after {
+  content: ""; position: absolute; inset: auto 0 0 0; height: 2px;
+  background: var(--a4t-link);
+}
+.dock-tabs .count {
+  margin-left: var(--sp-2); font-variant-numeric: tabular-nums;
+  color: var(--a4t-dim); font-weight: 500;
+}
+.dock-body { padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+
+/* ── brand lockup ────────────────────────────────────────────────────
+   Drawn as vectors, not an image: it has to stay crisp at 20px in a
+   sidebar and at 40px on a sign-in screen, and it must inherit colour. */
+
+.brand-lockup { display: inline-flex; align-items: center; gap: .55rem; color: var(--a4t-text); }
+.brand-lockup .mark { flex: none; display: block; }
+.brand-lockup .word {
+  font-weight: 700; letter-spacing: -.028em; line-height: 1;
+  font-size: var(--fs-md); white-space: nowrap;
+}
+.brand-lockup .word b { font-weight: 700; color: var(--a4t-long); }
+
+/* user menu */
+.usermenu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50;
+  min-width: 190px; padding: var(--sp-1);
+  background: var(--a4t-surface); border: var(--a4t-border);
+  border-radius: var(--a4t-radius); box-shadow: var(--elev-2);
+  display: flex; flex-direction: column;
+}
+.usermenu a, .usermenu button {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--a4t-radius-sm);
+  font-size: var(--fs-sm); color: var(--a4t-text); text-align: left;
+  background: none; border: 0; cursor: pointer; font-family: inherit;
+  min-height: 40px;
+}
+.usermenu a:hover, .usermenu button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.usermenu button { color: var(--a4t-short); }
 
 /* ── cards ─────────────────────────────────────────────────────────── */
 
@@ -397,7 +515,7 @@ body {
 .stat-value-sm { font-size: 1.05rem; }
 .stat-foot { font-size: .75rem; color: var(--a4t-dim); display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 .stat .ico { width: 15px; height: 15px; color: var(--a4t-dim); }
-.stat[data-tone="accent"] .stat-value { color: var(--a4t-accent); }
+.stat[data-tone="accent"] .stat-value { color: var(--a4t-link); }
 .stat[data-tone="long"]   .stat-value { color: var(--a4t-long); }
 .stat[data-tone="short"]  .stat-value { color: var(--a4t-short); }
 
@@ -414,7 +532,7 @@ body {
 .pill-live { color: var(--a4t-live); border-color: color-mix(in oklab, var(--a4t-live) 45%, transparent); background: var(--a4t-short-wash); }
 .pill-ok   { color: var(--a4t-long); border-color: color-mix(in oklab, var(--a4t-long) 35%, transparent); background: var(--a4t-long-wash); }
 .pill-warn { color: var(--a4t-short); border-color: color-mix(in oklab, var(--a4t-short) 35%, transparent); background: var(--a4t-short-wash); }
-.pill-accent { color: var(--a4t-accent); border-color: var(--a4t-accent-dim); background: var(--a4t-accent-wash); }
+.pill-accent { color: var(--a4t-link); border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
 .pill-muted { color: var(--a4t-muted); }
 
 /* ── buttons ───────────────────────────────────────────────────────── */
@@ -479,7 +597,7 @@ body {
   text-transform: none; letter-spacing: normal; font-weight: 400; line-height: 1.5;
 }
 .field-inline { display: flex; align-items: center; gap: .5rem; margin-bottom: .7rem; }
-.field-inline input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; accent-color: var(--a4t-accent); }
+.field-inline input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; accent-color: var(--a4t-link); }
 .field-inline span { font-size: .85rem; color: var(--a4t-text); }
 
 .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--a4t-bg-2); border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius-sm); }
@@ -502,7 +620,7 @@ body {
 .notice p + .btn, .notice p + .btn-row { margin-top: .6rem; }
 .notice-error { border-color: color-mix(in oklab, var(--a4t-short) 42%, transparent); background: var(--a4t-short-wash); }
 .notice-warn  { border-color: color-mix(in oklab, var(--a4t-short) 30%, transparent); }
-.notice-accent { border-color: var(--a4t-accent-dim); background: var(--a4t-accent-wash); }
+.notice-accent { border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
 .notice-head { font-size: .72rem; margin-bottom: .3rem; letter-spacing: .04em; text-transform: uppercase; color: var(--a4t-muted); }
 .notice-head strong { color: var(--a4t-short); }
 .problems { margin: .4rem 0 0 1.1rem; color: var(--a4t-muted); font-size: .82rem; }
@@ -565,7 +683,7 @@ body {
 .verdict-sell   { color: var(--a4t-short); }
 .verdict-hold   { color: var(--a4t-neutral); }
 .verdict-reject { color: var(--a4t-short); }
-.verdict-close  { color: var(--a4t-accent); }
+.verdict-close  { color: var(--a4t-link); }
 
 .verdict-banner {
   display: flex; align-items: center; gap: .85rem;
@@ -575,7 +693,7 @@ body {
 .verdict-banner[data-kind="buy"]    { border-color: color-mix(in oklab, var(--a4t-long) 40%, transparent);  background: var(--a4t-long-wash); }
 .verdict-banner[data-kind="sell"]   { border-color: color-mix(in oklab, var(--a4t-short) 40%, transparent); background: var(--a4t-short-wash); }
 .verdict-banner[data-kind="reject"] { border-color: color-mix(in oklab, var(--a4t-short) 32%, transparent); }
-.verdict-banner[data-kind="close"]  { border-color: var(--a4t-accent-dim); background: var(--a4t-accent-wash); }
+.verdict-banner[data-kind="close"]  { border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
 .verdict-banner .vb-body { min-width: 0; }
 .verdict-banner .vb-note { font-size: .82rem; color: var(--a4t-muted); margin-top: .15rem; }
 
@@ -600,10 +718,10 @@ body {
 .summary-line {
   font-size: .9rem; line-height: 1.6; color: var(--a4t-text);
   background: var(--a4t-bg-2); border: 1px solid var(--a4t-line);
-  border-left: 2px solid var(--a4t-accent);
+  border-left: 2px solid var(--a4t-link);
   border-radius: var(--a4t-radius-sm); padding: .75rem .85rem;
 }
-.summary-line b { color: var(--a4t-accent); font-weight: 600; }
+.summary-line b { color: var(--a4t-link); font-weight: 600; }
 
 /* ── auth pages ────────────────────────────────────────────────────── */
 
@@ -622,7 +740,7 @@ body {
 .lp-hero p { font-size: clamp(.95rem, 1.6vw, 1.05rem); color: var(--a4t-muted); max-width: 56ch; margin-top: 1.1rem; line-height: 1.65; }
 .lp-glow {
   position: absolute; inset: -20% 40% auto -10%; height: 420px;
-  background: radial-gradient(circle at 30% 40%, rgba(31,182,255,.13), transparent 62%);
+  background: radial-gradient(circle at 30% 40%, rgba(11, 89, 96, .34), transparent 62%);
   pointer-events: none; filter: blur(12px);
 }
 .lp-foot { padding: 2.5rem 0; border-top: 1px solid var(--a4t-line); margin-top: 3rem; font-size: .82rem; color: var(--a4t-dim); display: flex; gap: .8rem; flex-wrap: wrap; justify-content: space-between; }

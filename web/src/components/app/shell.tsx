@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, MoreHorizontal, X } from "lucide-react";
+import { LogOut, MoreHorizontal, User, X } from "lucide-react";
+import { BrandLockup, BrandMark } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
 import type { AutomationState, CtraderStatus, Me, NotificationPage } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
@@ -21,8 +22,8 @@ import { StatusBar } from "./status-bar";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const [unread, setUnread] = useState(0);
   const [drawer, setDrawer] = useState(false);
+  const [menu, setMenu] = useState(false);
 
   // One fetch of each, shared with the status strip, rather than every page
   // asking again for the same three facts.
@@ -31,19 +32,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const auto = useRead<AutomationState>("automation", 30_000);
   const notes = useRead<NotificationPage>("notifications?limit=1", 60_000);
 
-  useEffect(() => {
-    if (notes.result?.ok) setUnread(notes.result.data.unread);
-  }, [notes.result]);
+  // Derived from the read, not copied into state by an effect: a second
+  // copy can only ever be the same value or a stale one.
+  const unread = notes.result?.ok ? notes.result.data.unread : 0;
 
-  // A route change must close the drawer, or the new page arrives underneath it.
-  useEffect(() => { setDrawer(false); }, [path]);
+  // Closed where the click happens rather than in an effect on `path`: the
+  // effect version fires a synchronous setState during render commit, and a
+  // navigation that lands on the same route would not fire it at all.
+  const close = () => { setDrawer(false); setMenu(false); };
 
   useEffect(() => {
-    if (!drawer) return;
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawer(false); };
+    if (!drawer && !menu) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setDrawer(false); setMenu(false); }
+    };
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [drawer]);
+  }, [drawer, menu]);
 
   async function signOut() {
     await createClient().auth.signOut();
@@ -61,9 +66,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="a4t app">
       <aside className="side">
-        <Link className="side-brand" href="/dashboard">
-          <span className="side-mark" aria-hidden />
-          Apex4Traders
+        <Link className="side-brand" href="/dashboard" aria-label="Apex4Traders — dashboard">
+          <BrandLockup size={22} />
         </Link>
 
         <p className="label-xs side-group" style={{ marginTop: 0 }}>Operations</p>
@@ -94,11 +98,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="main-col">
         <header className="topbar">
-          <Link className="topbar-brand" href="/dashboard">
-            <span className="side-mark" aria-hidden />
+          <Link className="topbar-brand" href="/dashboard" aria-label="Apex4Traders — dashboard">
+            <BrandMark size={22} />
           </Link>
           <span className="topbar-title">{titleFor(path)}</span>
           <span className="topbar-spacer" />
+
+          {/* The user menu. Present on every screen, so signing out and
+              reaching settings never depend on which page you are on. */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setMenu((v) => !v)}
+              aria-expanded={menu}
+              aria-haspopup="menu"
+            >
+              <User className="ico" aria-hidden />
+              <span className="only-desktop" style={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>
+                {me.result?.ok ? me.result.data.user.email ?? "Account" : "Account"}
+              </span>
+            </button>
+            {menu ? (
+              <div role="menu" className="usermenu">
+                <Link role="menuitem" href="/settings" onClick={close}>Settings</Link>
+                <Link role="menuitem" href="/license" onClick={close}>Licence</Link>
+                <Link role="menuitem" href="/accounts" onClick={close}>cTrader accounts</Link>
+                <button role="menuitem" onClick={signOut}>
+                  <LogOut className="ico" aria-hidden /> Sign out
+                </button>
+              </div>
+            ) : null}
+          </div>
           {/* Sign out lives in the sidebar on desktop and in the drawer on a
               phone, so the top bar does not carry a second copy of it. */}
         </header>
@@ -153,7 +183,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 which bar holds which one is the problem being fixed. */}
             <div className="drawer-links">
               {NAV.map(({ href, label, icon: Icon }) => (
-                <Link key={href} href={href} data-active={isActive(path, href)}>
+                <Link key={href} href={href} data-active={isActive(path, href)} onClick={close}>
                   <Icon className="ico" aria-hidden />
                   <span style={{ flex: 1 }}>{label}</span>
                   {badge(href)}

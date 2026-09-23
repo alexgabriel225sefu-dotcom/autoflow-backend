@@ -89,6 +89,16 @@ export function StatusBar({
         </a>
       ) : null}
 
+      {/* The broker link itself, separate from which account is selected:
+          "connected but nothing selected" and "not connected" need
+          different actions from the reader. */}
+      {account?.connected ? (
+        <a className="stat-chip" href="/accounts">
+          <span className="dot" data-tone="long" />
+          <span>cTrader</span><strong>Linked</strong>
+        </a>
+      ) : null}
+
       <span style={{ flex: 1 }} />
 
       {/* Stated on every screen, not only in a footer: this release does not
