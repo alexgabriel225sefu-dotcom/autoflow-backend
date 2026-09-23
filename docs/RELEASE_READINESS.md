@@ -143,7 +143,8 @@ testers (X9).
 | 9–10 | `1925e49af` | QA report, release readiness |
 | E | `319f58d0c` | Health endpoints, shared rate-limit counters, beta and licence runbooks |
 | F | `8fcefa39b` | free_demo / paid_live entitlement, server-derived execution capability |
-| G | this commit | cTrader demo smoke-test harness; Fernet tokens added to log redaction |
+| G | `b95dff0e6` | cTrader demo smoke-test harness; Fernet tokens added to log redaction |
+| H | this commit | Repo-wide copy audit with a reasoned allowlist; checkout answers about the product |
 
 Tests went from 44 to 167 in the web client and from 153 to 155 files in the
 backend. Lint went from 13 errors to 0. Unreadable controls went from 15 to 0.

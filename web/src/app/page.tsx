@@ -1,3 +1,4 @@
+import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import type { Metadata } from "next";
 import { BookOpen, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
@@ -79,6 +80,12 @@ export default function Landing() {
               Automation runs on demo accounts. Live trading is not enabled in
               this release, and nothing starts because you connected an account
               — starting is a separate, deliberate step.
+            </p>
+            {/* What it costs, on the page where somebody decides whether to
+                sign up. There is nothing to buy here and saying so is not a
+                disclaimer, it is the answer to the first question. */}
+            <p className="muted" style={{ fontSize: ".82rem", lineHeight: 1.65, marginTop: ".5rem" }}>
+              {PLAN_NOTICE}
             </p>
           </div>
         </section>

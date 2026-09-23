@@ -64,6 +64,9 @@ reach the browser. Nothing under `/api/v1/` carries `access_token`,
 | The UI and the backend refuse live trading in the same words | `src/app/content.test.ts` |
 | The smoke script's refusals, redaction and read-only call sequence | `tests/test_smoke_harness.py` |
 | Fernet-encrypted values never reach stdout | `tests/test_log_redaction.py` |
+| Legacy identity, price, SKU and promises, repo-wide with a reasoned allowlist | `tests/test_product_copy.py` |
+| Every public page states that live trading is off | same file |
+| Checkout answers about the product, not the deployment | same file |
 | Rule creation, validation, activation, versioning | `tests/test_platform_api.py`, `tests/test_platform_contracts.py` |
 | Preview SETUP / HOLD / REJECT, unknown never folded into not-met | `src/app/(app)/rules/[id]/page.test.tsx` |
 | Preview cannot place, close or amend — structural | same file, three assertions |

@@ -33,6 +33,21 @@ import Stripe from "stripe";
  * rather than stamping an unverified id that the webhook would then trust.
  */
 
+/**
+ * The one sentence this route says when nothing is for sale.
+ *
+ * It states three things a caller needs and cannot get from a 503 alone:
+ * that demo access is free, that nothing is being sold here, and that paying
+ * is not how an entitlement is granted even when it is. The webhook grants by
+ * reading a platform user id out of metadata a verified session wrote, and
+ * this route has no verified session — so there is no code path from a
+ * browser to an entitlement, in either configuration.
+ */
+export const CHECKOUT_DISABLED =
+  "Checkout is not enabled in this release. Demo accounts are free and " +
+  "require no payment. Licences are granted by a verified payment webhook " +
+  "only, never by this route.";
+
 const MISSING = (what: string) =>
   NextResponse.json(
     {
@@ -43,6 +58,23 @@ const MISSING = (what: string) =>
   );
 
 export async function POST(req: NextRequest) {
+  // FIRST, before anything about configuration.
+  //
+  // This used to run after the Stripe key and the price were checked, so a
+  // caller asking "can I buy this?" was told "STRIPE_SECRET_KEY is not
+  // configured" — an answer about our deployment, to a question about the
+  // product. The honest answer is that nothing is for sale, and it does not
+  // depend on what else happens to be set.
+  if (process.env.A4T_CHECKOUT_ENABLED !== "true") {
+    return NextResponse.json(
+      {
+        error: CHECKOUT_DISABLED,
+        checkoutEnabled: false,
+      },
+      { status: 503 },
+    );
+  }
+
   const key = process.env.STRIPE_SECRET_KEY;
   const priceMinor = process.env.A4T_PRICE_MINOR;
   const currency = process.env.A4T_CURRENCY;
@@ -56,20 +88,6 @@ export async function POST(req: NextRequest) {
   const amount = Number.parseInt(priceMinor, 10);
   if (!Number.isFinite(amount) || amount <= 0) {
     return MISSING("A4T_PRICE_MINOR (must be a positive integer in minor units)");
-  }
-
-  // Checkout is not open for business. The webhook grants by reading a
-  // platform user id out of metadata that a verified session wrote, and this
-  // route has no verified session. Answering 503 keeps the invariant simple:
-  // there is no code path from a browser to an entitlement.
-  if (process.env.A4T_CHECKOUT_ENABLED !== "true") {
-    return NextResponse.json(
-      {
-        error: "Checkout is not enabled in this release. Licences are granted " +
-          "by a verified payment webhook only.",
-      },
-      { status: 503 },
-    );
   }
 
   let email: unknown;

@@ -125,6 +125,19 @@ export type Licence = {
   plan: string | null;
 };
 /**
+ * What this release charges for, for pages with no session to ask.
+ *
+ * A signed-in client gets this from the server, in `me.execution.planNotice`
+ * — that is the copy of record. The landing and sign-up pages have no session
+ * and cannot ask, so they use this constant, and content.test.ts pins it to
+ * the Python that produces the other one. Two places is one more than ideal;
+ * a visitor not being told whether signing up costs money is worse.
+ */
+export const PLAN_NOTICE =
+  "Demo accounts are free. Real-money account access will be a paid plan, " +
+  "and live execution is not enabled in this release.";
+
+/**
  * What the SERVER says this client may do. Not derived here.
  *
  * Reading a licence state and an account mode and combining them into a

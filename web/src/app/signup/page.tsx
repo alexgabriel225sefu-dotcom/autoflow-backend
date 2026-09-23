@@ -1,6 +1,7 @@
 "use client";
 import { BrandLockup } from "@/components/brand/logo";
 import { useState } from "react";
+import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignUpPage() {
@@ -50,6 +51,9 @@ export default function SignUpPage() {
       <div className="auth-wrap">
         <h1>Create your account</h1>
         <p className="muted">Apex4Traders — rule-based automation on your own cTrader account.</p>
+        {/* Before the form, not after it. Somebody entering an email address
+            is entitled to know whether it will end in a payment screen. */}
+        <p className="muted" style={{ fontSize: ".82rem" }}>{PLAN_NOTICE}</p>
         <form onSubmit={onSubmit} className="card" style={{ marginTop: "1rem" }}>
           <label className="field">
             <span>Email</span>
