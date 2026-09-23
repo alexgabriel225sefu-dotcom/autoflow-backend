@@ -13,6 +13,8 @@
  *   a failed market read shows the read state, never a verdict — a HOLD
  *   rendered over a 503 reads as "no setup".
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Suspense } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -294,5 +296,91 @@ describe("Rule Detail — preview outcomes are first-class", () => {
     expect(screen.getByText("risk 1% per trade")).toBeDefined();
     expect(screen.getByText("stop 1.5× ATR")).toBeDefined();
     expect(screen.getByText("3 pips")).toBeDefined();
+  });
+});
+
+/**
+ * Preview is read-only, proven three ways.
+ *
+ * A screen that says "this is what would happen" is the one place where an
+ * "…and do it" button is most tempting to add. Asserting the current
+ * behaviour is not enough — the assertions below are structural, so they
+ * still hold after somebody rewrites the component.
+ */
+describe("Rule Detail — preview cannot trade", () => {
+  const SRC = readFileSync(join(__dirname, "page.tsx"), "utf8");
+
+  it("the page references no order, close or amend endpoint", () => {
+    for (const forbidden of ["force_trade", "place_order", "positions/close",
+                             "orders/close", "/amend", "authorize_order"]) {
+      expect(SRC, `the rule page references ${forbidden}`).not.toContain(forbidden);
+    }
+  });
+
+  it("previewing issues exactly one POST, to the preview endpoint", async () => {
+    routes["accounts/501/candles"] = { ok: true, data: {
+      connected: true, status: "ok", accountId: 501, mode: "demo",
+      candles: BARS, symbol: "EUR_USD", timeframe: "1h", count: 2, requested: 300,
+    } };
+    await renderPage();
+    await screen.findByRole("button", { name: /Fetch market data/ });
+    fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
+    await waitFor(() => expect(isDisabled(/^Preview$/)).toBe(false));
+
+    calls.length = 0;
+    fireEvent.click(screen.getByRole("button", { name: /^Preview$/ }));
+    await waitFor(() => expect(calls.some((c) => c.path.includes("/preview"))).toBe(true));
+
+    const writes = calls.filter((c) => c.init?.method && c.init.method !== "GET");
+    expect(writes.map((w) => w.path)).toEqual([`rules/r1/preview`]);
+  });
+
+  it("the verdict states that nothing was placed, whatever it decided", async () => {
+    routes["accounts/501/candles"] = { ok: true, data: {
+      connected: true, status: "ok", accountId: 501, mode: "demo",
+      candles: BARS, symbol: "EUR_USD", timeframe: "1h", count: 2, requested: 300,
+    } };
+    routes["rules/r1/preview"] = { ok: true, data: {
+      decision: { verdict: "BUY", reason: "met", conditions: [],
+                  executable: true, refusalCode: null, confidence: null },
+      executable: false, wouldTrade: true,
+    } };
+    await renderPage();
+    await screen.findByRole("button", { name: /Fetch market data/ });
+    fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
+    await waitFor(() => expect(isDisabled(/^Preview$/)).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: /^Preview$/ }));
+    await waitFor(() => expect(screen.getByText(/This preview placed nothing/)).toBeDefined());
+  });
+
+  it("draws the evaluated bars, and marks the bar the snapshot was stamped with", async () => {
+    routes["accounts/501/candles"] = { ok: true, data: {
+      connected: true, status: "ok", accountId: 501, mode: "demo",
+      candles: BARS, symbol: "EUR_USD", timeframe: "1h", count: 2, requested: 300,
+    } };
+    await renderPage();
+    await screen.findByRole("button", { name: /Fetch market data/ });
+    // No chart before the bars arrive — there is nothing to draw.
+    expect(container.querySelector("svg.candles")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
+    await waitFor(() => expect(container.querySelector("svg.candles")).not.toBeNull());
+    // And no marker until something has actually been evaluated.
+    expect(screen.queryAllByTestId("chart-marker")).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Preview$/ }));
+    await waitFor(() => expect(screen.getAllByTestId("chart-marker")).toHaveLength(1));
+  });
+
+  it("no chart is drawn over a read that failed", async () => {
+    routes["accounts/501/candles"] = { ok: true, data: {
+      connected: true, status: "unavailable", reason: "TimeoutError",
+    } };
+    await renderPage();
+    await screen.findByRole("button", { name: /Fetch market data/ });
+    fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
+    await waitFor(() => expect(screen.getByText(/TimeoutError/)).toBeDefined());
+    expect(container.querySelector("svg.candles")).toBeNull();
+    expect(verdictShown()).toBe(false);
   });
 });

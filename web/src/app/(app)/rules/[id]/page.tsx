@@ -11,6 +11,7 @@ import { ConfirmAction } from "@/components/app/shell";
 import { ErrorNotice, LicencePill, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
 import { RuleSentence, RuleTerms, humanise } from "@/components/app/rule-summary";
 import { TIMEFRAMES } from "@/components/app/rule-form";
+import { CandleChart, type ChartMarker } from "@/components/chart/candles";
 
 /**
  * What a preview decided, as a first-class outcome.
@@ -307,6 +308,31 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
               {barsErr ? <ErrorNotice error={barsErr} onRetry={loadBars} /> : null}
               {bars && bars.status !== "ok" ? (
                 <ReadPanel read={bars}><span /></ReadPanel>
+              ) : null}
+
+              {/* The chart draws EXACTLY the bars the preview will evaluate.
+                  Not a separate fetch — one read, shown and judged, so a
+                  verdict can never be about data the reader is not looking
+                  at. The marker sits on the bar the snapshot is stamped
+                  with. */}
+              {bars?.status === "ok" && bars.candles?.length ? (
+                <div style={{ marginTop: ".8rem" }}>
+                  <CandleChart
+                    candles={bars.candles}
+                    symbol={bars.symbol}
+                    timeframe={bars.timeframe}
+                    markers={
+                      preview && typeof bars.candles[bars.candles.length - 1]?.time === "number"
+                        ? [{
+                            time: bars.candles[bars.candles.length - 1].time as number,
+                            label: `Evaluated here — ${preview.decision.verdict}`,
+                            tone: preview.decision.verdict === "BUY" ? "long"
+                              : preview.decision.verdict === "SELL" ? "short" : "neutral",
+                          } satisfies ChartMarker]
+                        : []
+                    }
+                  />
+                </div>
               ) : null}
 
               {bars?.status === "ok" ? (
