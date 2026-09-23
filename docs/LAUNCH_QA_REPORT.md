@@ -1,6 +1,7 @@
 # Apex4Traders — release candidate QA report
 
 **Date:** 2026-09-23 · **Branch:** `claude/apex4traders-platform-v1`
+**Assessed at:** `fb064679f` (phases E–I)
 
 ## How this was run, and what that limits
 
@@ -27,10 +28,27 @@ were committed.
 
 | Suite | Result |
 |---|---|
-| `python3 apex-forex-bot/tests/run_all.py` | **155 / 155 files** |
-| `cd web && npm test` | **167 / 167 tests, 11 files** |
+| `python3 apex-forex-bot/tests/run_all.py` | **159 / 159 files** |
+| `cd web && npm test` | **175 / 175 tests, 11 files** |
 | `cd web && npm run build` | clean — 24 routes, TypeScript clean |
-| `cd web && npm run lint` | **0 errors** (was 13) |
+| `cd web && npm run lint` | **0 errors**, 8 warnings |
+
+### Secret checks, run by hand at `fb064679f`
+
+| Check | Result |
+|---|---|
+| Variables compiled into the browser bundle | `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — all three public by design |
+| Any secret carrying a `NEXT_PUBLIC_` prefix | none |
+| Fernet, `whsec_`, `sk_live_` or a service key in `web/.next/static` | none |
+| `.env` committed | none (`.env.example` only, pre-existing) |
+| Writers of the demo/live flag | one — `ctrader_link.select_account`, from the broker's own account list |
+| Readers of a live-trading flag | one — `health.py`, which refuses readiness if it is ever set |
+
+### Mutation testing
+
+Every material change in phases E–H was mutated to prove its test fails.
+**24 mutations applied, 24 killed** — one of them only after the test was
+strengthened, which is recorded below because it is the interesting one.
 
 ### Browser audit, 21 routes at 1440×900 and 7 at 390×844
 
@@ -84,7 +102,27 @@ reach the browser. Nothing under `/api/v1/` carries `access_token`,
 | No fake data, no old copy, no trackers, no iframes | `src/app/content.test.ts` |
 | No live trading path | `tests/test_live_path_invariants.py` |
 
-### Two bugs found by the tests during this work
+### Found during phases E–H
+
+1. **The redactor never masked Fernet tokens.** The runbook and this report
+   have both told operators to grep logs for `gAAAAA…` — the shape of every
+   broker token this platform stores — since before anything masked it. The
+   instruction existed *because* the output was not safe. Fixed, with tests
+   in both directions.
+2. **Three locks, and the tests could not tell them apart.** Removing the
+   entitlement check from `automation.start` left every test green, because
+   the connection-level check refused with the same code. The mutation
+   survived; each lock is now disabled in turn so the other has to answer.
+3. **Checkout answered about our deployment.** A caller asking to buy was
+   told `STRIPE_SECRET_KEY is not configured` rather than that nothing is for
+   sale. The disabled check now runs first.
+4. **An e2e test passing for the wrong reason.** "will not start automation
+   without a licence" got its 402 from the licence gate before the request
+   body was read, so it never exercised a rule at all.
+5. **Two allowlist exemptions with the reason "same"**, found by the audit
+   on its first run, in a file written minutes earlier.
+
+### Two bugs found by the tests during earlier work
 
 1. **Polling drained a control budget.** The first rate-limit classification
    put every `ctrader/*` route in one tight bucket. The shell and the accounts

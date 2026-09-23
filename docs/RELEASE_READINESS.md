@@ -1,6 +1,6 @@
 # Apex4Traders — release readiness
 
-**Assessed at:** `ce8496ac3` on `claude/apex4traders-platform-v1`
+**Assessed at:** `fb064679f` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-23
 
 | Gate | Status |
@@ -20,15 +20,18 @@ cTrader account is unverified, and that is one gate, not a detail.
 
 | # | Gate | Status | Evidence |
 |---|---|---|---|
-| 1 | Demo automation works | ⚠️ **unverified against a broker** | Start / pause / resume / stop are covered by `test_platform_http.py` and by dashboard tests. Never run against cTrader. |
+| 1 | Demo automation works | ⚠️ **unverified against a broker** | Start / pause / resume / stop are covered by `test_platform_http.py` and by dashboard tests. Never run against cTrader. `docs/CTRADER_DEMO_SMOKE_TEST.md` is the procedure that would close it. |
 | 2 | cTrader demo OAuth works | ⚠️ **unverified** | `test_platform_ctrader_link.py` covers the flow including the account-injection case. No real authorisation has been completed. |
-| 3 | Payment/licence tested **or** intentionally disabled | ✅ | Both. The webhook has 12 test groups; checkout is disabled behind `A4T_CHECKOUT_ENABLED`, which is off. |
+| 3 | Payment/licence tested **or** intentionally disabled | ✅ | Both. The webhook has 12 test groups; checkout is disabled behind `A4T_CHECKOUT_ENABLED`, which is off, and says so before it says anything about configuration. |
+| 3b | Access model implemented, not just decided | ✅ | `free_demo` / `paid_live`, server-derived, all four combinations tested. Demo access needs no manual grant. |
+| 3c | Health endpoints | ✅ | `/healthz`, `/readyz`, `/api/v1/system/status`. Tested, including the production refusals. **Never answered from a deployed instance.** |
+| 3d | Rate limiting is real across instances | ✅ | Shared `INCR` with a TTL; the per-process fallback fails readiness in production rather than being served quietly. |
 | 4 | Legal blockers documented | ✅ | `docs/LEGAL_LAUNCH_BLOCKERS.md`, nine items, each a `[TO BE CONFIRMED]` in the product. |
 | 5 | Production configuration documented | ✅ | `docs/PRODUCTION_RUNBOOK.md`, `docs/BETA_CONFIGURATION.md`, `docs/MANUAL_LICENCE_OPERATIONS.md`. |
 | 6 | No critical security issue | ✅ | No token under `/api/v1/`; rate limiting on every route; webhook verifies before parsing; ownership is the storage key. |
 | 7 | No live trading path | ✅ | `test_live_path_invariants.py`; `SUPPORTED_ORDER_TYPES = {MARKET}`; `automation.start` refuses a non-demo account. |
-| 8 | Frontend tests pass | ✅ | 167 / 167 |
-| 9 | Backend tests pass | ✅ | 155 / 155 files |
+| 8 | Frontend tests pass | ✅ | 175 / 175 |
+| 9 | Backend tests pass | ✅ | 159 / 159 files |
 | 10 | Build passes | ✅ | 24 routes, TypeScript clean, lint 0 errors |
 | 11 | Mobile navigation works | ✅ | 8 of 8 destinations at 390 px, 0 px overflow |
 | 12 | Chart handles real connected data | ⚠️ **unverified** | Every failure state is tested. The success state has never had real candles in it. |
@@ -37,6 +40,13 @@ cTrader account is unverified, and that is one gate, not a detail.
 **Verdict: NOT YET.** Gates 3–11 and 13 are met. Gates 1, 2 and 12 are all the
 same blocker — **X1, a real cTrader demo account** — and they are the three
 that matter most, because they are the product.
+
+Phases E–I changed the *shape* of that verdict without changing the verdict.
+Before them, closing X1 would still have left a beta that needed a manual
+licence grant per tester, had no health endpoint, rate-limited per process,
+and logged broker tokens in a shape the runbook told operators to grep for.
+Those are now done. What is left is the one thing that cannot be done from
+here.
 
 ### What closes it
 
@@ -144,8 +154,23 @@ testers (X9).
 | E | `319f58d0c` | Health endpoints, shared rate-limit counters, beta and licence runbooks |
 | F | `8fcefa39b` | free_demo / paid_live entitlement, server-derived execution capability |
 | G | `b95dff0e6` | cTrader demo smoke-test harness; Fernet tokens added to log redaction |
-| H | this commit | Repo-wide copy audit with a reasoned allowlist; checkout answers about the product |
+| H | `fb064679f` | Repo-wide copy audit with a reasoned allowlist; checkout answers about the product |
+| I | this commit | Final verification and release decisions |
 
-Tests went from 44 to 167 in the web client and from 153 to 155 files in the
+Tests went from 44 to 175 in the web client and from 153 to 159 files in the
 backend. Lint went from 13 errors to 0. Unreadable controls went from 15 to 0.
 Mobile destinations went from 1 of 8 to 8 of 8.
+
+---
+
+## The four release decisions, stated plainly
+
+| Decision | Answer | Who can change it |
+|---|---|---|
+| **Ship a private demo beta now?** | **No.** X1 is open: nothing has run against a real broker | Engineering, by running `docs/CTRADER_DEMO_SMOKE_TEST.md` once |
+| **Ship a public beta?** | **No.** Nine of twelve public-launch gates are open | Owner, for the decisions; engineering, for X2–X9 |
+| **Take money?** | **No.** Checkout is off, no price is approved, and the route refuses | Owner — D1, D2, D3, D5, D6 |
+| **Enable live trading?** | **No, and not by a flag.** It is not implemented. `LIVE_TRADING_ENABLED` has no execution path behind it and `/readyz` refuses to start if it is set | A separate milestone with its own review |
+
+None of these is blocked on code that is missing and unwritten. Three are
+blocked on the owner, and one on a cTrader demo account.
