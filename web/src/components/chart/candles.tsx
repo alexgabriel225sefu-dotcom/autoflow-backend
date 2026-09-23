@@ -147,7 +147,7 @@ export function CandleChart({
           const isUp = c.close >= c.open;
           const colour = isUp ? "var(--a4t-long)" : "var(--a4t-short)";
           const top = y(Math.max(c.open, c.close));
-          const bot = y(Math.min(c.open, c.close));
+          const bottom = y(Math.min(c.open, c.close));
           return (
             <g key={i} onMouseEnter={() => setHover(i)}>
               {/* A transparent column, so hovering works between candles too. */}
@@ -161,7 +161,7 @@ export function CandleChart({
                 y={top}
                 width={bodyW}
                 /* A doji has zero body height and would vanish. */
-                height={Math.max(1, bot - top)}
+                height={Math.max(1, bottom - top)}
                 fill={isUp ? "transparent" : colour}
                 stroke={colour}
                 strokeWidth="1.2"
