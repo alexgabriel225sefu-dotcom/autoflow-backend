@@ -578,9 +578,18 @@ try:
         })[1]["rule"]
         arid = active["ruleDocId"]
 
+        # Demo automation is free: an absent licence is the free tier. What
+        # stops this request is the rule still being a draft, which is the
+        # thing the client can actually act on.
         st, b = call("POST", "/api/v1/automation/start",
                      body={"ruleDocId": arid})
-        check("without a licence, nothing starts", st == 402, f"{st} {b}")
+        check("without a licence, the DRAFT is what refuses, not a paywall",
+              st == 409 and b["error"]["code"] == "RULE_NOT_ACTIVE", f"{st} {b}")
+        LC.revoke(ALICE)
+        st, b = call("POST", "/api/v1/automation/start",
+                     body={"ruleDocId": arid})
+        check("but a WITHDRAWN licence refuses before anything else",
+              st == 402, f"{st} {b}")
         LC.grant(ALICE, plan="pro")
         st, b = call("POST", "/api/v1/automation/start",
                      body={"ruleDocId": arid})

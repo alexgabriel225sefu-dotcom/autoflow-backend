@@ -161,10 +161,36 @@ try:
     st, b = call("POST", f"/api/v1/rules/{rid}/validate")
     check("validate reports the rule as complete", b["valid"] is True,
           str(b.get("problems")))
-    st, b = call("POST", f"/api/v1/rules/{rid}/activate")
-    check("without a licence, activation is 402", st == 402, str(st))
-    check("and names the licence state",
-          b["error"]["licenceState"] == L.NONE, str(b["error"]))
+    # Demo access is free, so an absent licence is the free tier and not a
+    # refusal. This used to be a 402; it changed with the entitlement model in
+    # apex/platform/entitlement.py, where a licence means `paid_live` and the
+    # only thing it still blocks is a WITHDRAWN one.
+    #
+    # Both assertions run on their own throwaway rules, so the version history
+    # of the rule this section is really about stays what the rest of it says.
+    def _throwaway(name):
+        _s, _b = call("POST", "/api/v1/rules", body={
+            "name": name, "symbols": ["EUR_USD"], "timeframe": "1h",
+            "sides": "BUY", "accountId": "ct-demo-1",
+            "entry": {"combine": "AND", "conditions": [
+                {"id": "rsi", "params": {"op": "below", "value": 30}}]},
+            "exit": {"combine": "OR", "conditions": [
+                {"id": "rsi", "params": {"op": "above", "value": 70}}]},
+        })
+        return _b["rule"]["ruleDocId"]
+
+    st, b = call("POST", f"/api/v1/rules/{_throwaway('free tier')}/activate")
+    check("without a licence, activation goes through — demo is free",
+          st == 200, f"{st} {str(b)[:120]}")
+
+    # The gate that remains, tested where the old one was.
+    rid_rev = _throwaway("withdrawal check")
+    L.revoke(ALICE)
+    st, b = call("POST", f"/api/v1/rules/{rid_rev}/activate")
+    check("a WITHDRAWN licence still refuses, and still as 402",
+          st == 402, f"{st} {str(b)[:120]}")
+    check("and names the state so support can explain it",
+          b["error"]["licenceState"] == L.REVOKED, str(b["error"]))
     L.grant(ALICE, plan="pro")
     _MODE["user"] = "unverified"          # same id, unconfirmed address
     I.forget_all()
@@ -200,10 +226,11 @@ try:
     # rather than "buy". Folding it into NONE would send a paying client who
     # lapsed to a sign-up page.
     L.grant(ALICE, plan="pro", expires_at=1.0)      # long past
-    st, b = call("POST", f"/api/v1/rules/{rid}/activate")
-    check("an expired licence does not activate anything", st == 402, str(st))
-    check("and is reported as expired, not as never having existed",
-          b["error"]["licenceState"] == L.EXPIRED, str(b["error"]))
+    st, b = call("GET", "/api/v1/me")
+    check("a lapsed licence is reported as expired, not as never having "
+          "existed", b["licence"]["state"] == L.EXPIRED, str(b["licence"]))
+    check("and the client drops to the free tier rather than being cut off",
+          b["execution"]["entitlement"] == "free_demo", str(b["execution"]))
     L.grant(ALICE, plan="pro")
 
     print("\n7. an invalid rule is refused with its problems, not a 500")

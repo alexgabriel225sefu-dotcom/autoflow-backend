@@ -13,21 +13,27 @@ licence the client holds.
 ## 1. Why this document exists
 
 `apex/platform/licence.py` is keyed by the Supabase user id and has exactly
-four states:
+four states. What a licence *means* changed with the entitlement model in
+`apex/platform/entitlement.py`: demo access is free, so a licence is the
+**paid** tier, and the only state that still blocks anything is a withdrawal.
 
-| State | Meaning | Can activate a rule or start automation |
-|---|---|---|
-| `none` | No record. **The default for every new sign-up** | No |
-| `active` | Granted, and not past `expiresAt` | Yes |
-| `expired` | Granted, and past `expiresAt` | No |
-| `revoked` | Withdrawn deliberately | No |
+| State | Meaning | Entitlement | Blocks demo automation |
+|---|---|---|---|
+| `none` | No record. The default for every new sign-up | `free_demo` | No |
+| `active` | Granted, and not past `expiresAt` | `paid_live` | No |
+| `expired` | Granted, and past `expiresAt` | `free_demo` | No |
+| `revoked` | Withdrawn deliberately | `free_demo` | **Yes** |
 
-The rule it enforces: *an unknown entitlement is not an entitlement.* A user
-with no record is `none`, never "active until told otherwise".
+`paid_live` does **not** unlock live trading in this release. There is no
+execution path behind it; `entitlement.capability()` refuses a live account
+under both entitlements, and the tests assert all four combinations.
+
+So during the beta there is nothing to grant. What this document is for is
+the case that remains: **withdrawing** a client's access, and putting it
+back.
 
 The only automated grant path is the payment webhook, and checkout is
-disabled. So during the beta every entitlement is granted by hand, and this
-is how.
+disabled — so any `active` licence in the store today was written by hand.
 
 ## 2. Finding the user id
 
@@ -43,6 +49,12 @@ licence to the wrong id gives a stranger automation and leaves the intended
 client refused, and neither party will be able to tell you why.
 
 ## 3. Granting
+
+You probably do not need to. A beta tester needs **no** licence: `free_demo`
+already allows building, activating and running a rule on a demo account.
+Grant one only to record that somebody is on the paid tier — and know that
+this release sells nothing and unlocks nothing extra, so the record is
+bookkeeping rather than access.
 
 Run on the backend host, in the deployment's environment (the same
 `PRODUCT`, `DATA_DIR` and Redis configuration — a licence written against the
@@ -82,6 +94,11 @@ value the UI renders, so it is the one worth trusting.
 from apex.platform import licence
 licence.revoke("<supabase-user-id>")
 ```
+
+This is the lever that still does something. A withdrawal outranks the free
+tier: `entitlement.capability()` refuses a revoked client on a demo account
+as well, which is the whole reason it is checked separately from the
+entitlement name.
 
 Takes effect on the client's **next authenticated request**. It does not stop
 automation that is already running — stop that explicitly:
@@ -132,9 +149,13 @@ nothing for a platform user, and the two must not be merged without an
 explicit migration, or one product's identifiers start silently entitling the
 other's clients.
 
-## 8. When this document stops being needed
+## 8. What is left for this document to do
 
-When entitlement is derived rather than granted: a connected **demo** account
-carries free demo access automatically, and a paid plan is what unlocks a
-live account once live execution exists. At that point manual grants become
-an exception path for support, not the normal way a client gets access.
+Entitlement is now derived rather than granted: a client with no record is
+`free_demo` and can use the product. What remains here is the support path —
+withdrawing access and restoring it — and the bookkeeping of who is on a paid
+tier once there is something to sell.
+
+The next change to this document is the one that comes with live execution
+actually existing, at which point `paid_live` starts unlocking something and
+granting it becomes a decision with money attached.

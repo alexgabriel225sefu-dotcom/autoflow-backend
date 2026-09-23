@@ -217,10 +217,31 @@ describe("the main flow against the real backend", () => {
     }
   });
 
-  it("will not start automation without a licence", async () => {
+  // Demo access is free, so what refuses here is the rule still being a
+  // draft — which is also the thing the client can act on next. This used to
+  // assert a 402 and passed before the body was even read; see
+  // apex/platform/entitlement.py for why the paywall is gone.
+  it("will not start automation on a rule that was never activated", async () => {
     const r = await api("automation/start", { method: "POST", body: { ruleDocId: ruleId } });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.status).toBe(402);
+    if (!r.ok) {
+      expect(r.status).toBe(409);
+      expect(r.code).toBe("RULE_NOT_ACTIVE");
+    }
+  });
+
+  it("tells the client what it may do, from the server", async () => {
+    const r = await api<{ execution: { entitlement: string; canAutomate: boolean;
+                                       liveExecutionEnabled: boolean; badge: string } }>("me");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      // Free tier, nothing connected, and live execution off — all decided
+      // server-side rather than assembled in the browser.
+      expect(r.data.execution.entitlement).toBe("free_demo");
+      expect(r.data.execution.canAutomate).toBe(false);
+      expect(r.data.execution.liveExecutionEnabled).toBe(false);
+      expect(r.data.execution.badge).toBe("NOT CONNECTED");
+    }
   });
 
   it("runs the whole demo flow once licence and a demo account exist", async () => {

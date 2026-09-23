@@ -31,6 +31,7 @@ from apex.platform import automation as _auto
 from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
+from apex.platform import entitlement as _ent
 from apex.platform import health as _health
 from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
@@ -163,6 +164,16 @@ def handle(method, path, headers=None, body=None, *, client_key=None):
         return _err(400, e.code, e.detail)
     except _lic.LicenceRequired as e:
         return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
+    except _ent.NotEntitled as e:
+        # A WITHDRAWN licence keeps the 402 the client already understands,
+        # so support can withdraw access without the UI needing a new branch.
+        # Everything else is a 409: the request was understood and the state
+        # of the account refuses it, which is not a payment problem and must
+        # not be rendered as one. Sending somebody to a checkout because their
+        # broker session expired would be the worst possible answer.
+        if e.code == "LICENCE_REVOKED":
+            return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
+        return _err(409, e.code, str(e))
     except _auto.AutomationRefused as e:
         return _err(409, e.code, e.detail)
     except _preview.PreviewRefused as e:
@@ -353,8 +364,14 @@ def _dispatch(method, route, headers, body, query=None):
 
     if route == "me" and method == "GET":
         p = _authenticate(headers)
+        # `execution` is the SERVER's verdict on what this client may do, so
+        # the browser renders a badge rather than inferring one by combining
+        # a licence state with an account mode. Those two have to be read
+        # together to mean anything, and a UI that combines them itself is a
+        # second implementation of this decision.
         return _ok({"user": p.as_dict(),
-                    "licence": _lic.status_for(p.user_id)})
+                    "licence": _lic.status_for(p.user_id),
+                    "execution": _ent.capability(p.user_id)})
 
     # The Rule Builder renders its form from this, so the UI can never offer a
     # condition the evaluator does not implement.
@@ -443,7 +460,9 @@ def _rule_action(action, rid, headers, body):
         # confirms the platform got as far as looking.
         _store.get(p.user_id, rid)
         _id.require_verified_email(p)
-        _lic.require(p.user_id)
+        # Activation records terms; it does not trade. It is free, and refuses
+        # only a withdrawn licence.
+        _ent.require_activation(p.user_id)
         return _ok({"rule": _store.activate(
             p.user_id, rid, known_condition_ids=_cond.available())})
 

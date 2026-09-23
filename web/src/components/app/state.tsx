@@ -11,7 +11,7 @@
  * carries the backend's own code and words.
  */
 import { CircleAlert, Plug, RefreshCw, TriangleAlert } from "lucide-react";
-import type { ApiError, ReadState } from "@/lib/api";
+import type { ApiError, Execution, ReadState } from "@/lib/api";
 
 export function StatusPill({ mode }: { mode?: "demo" | "live" | null }) {
   if (!mode) return <span className="pill pill-muted">No account selected</span>;
@@ -156,4 +156,42 @@ export function Stat({
     );
   }
   return <div className="stat" data-tone={tone}>{inner}</div>;
+}
+
+/**
+ * The server's verdict on what this client may do, rendered as it was given.
+ *
+ * The badge text and the sentence under it both come from `me.execution`.
+ * Nothing here re-derives them from a licence state and an account mode: that
+ * combination is a decision, it is made in apex/platform/entitlement.py, and
+ * a second implementation of it in the browser is one that can disagree with
+ * the server that actually refuses.
+ */
+export function ExecutionBadge({ execution }: { execution?: Execution | null }) {
+  if (!execution) return <span className="pill pill-muted">Checking access</span>;
+  const tone =
+    execution.badge === "DEMO" ? "pill pill-demo"
+      : execution.badge === "LIVE BLOCKED" ? "pill pill-live"
+        : "pill pill-muted";
+  return (
+    <span className={tone} title={execution.message}>
+      {execution.badge}
+    </span>
+  );
+}
+
+/**
+ * What this release charges for, in one sentence that comes from the server.
+ *
+ * Holding the wording in the backend is the point: a promise about pricing
+ * written in a component is a promise nobody reviewed, and this product has
+ * no approved price to promise.
+ */
+export function PlanNotice({ execution }: { execution?: Execution | null }) {
+  if (!execution?.planNotice) return null;
+  return (
+    <p className="muted" style={{ fontSize: ".8rem" }}>
+      {execution.planNotice}
+    </p>
+  );
 }

@@ -58,6 +58,10 @@ reach the browser. Nothing under `/api/v1/` carries `access_token`,
 | Ownership isolation | `tests/test_platform_identity_store.py`, `src/test/e2e.test.ts` |
 | cTrader OAuth, wrong callback user, token encryption, token redaction | `tests/test_platform_ctrader_link.py` |
 | Demo account selection; live account refused | `tests/test_platform_http.py`, dashboard tests |
+| Entitlement x account mode, all four combinations | `tests/test_platform_entitlement.py` |
+| A paid plan does NOT unlock a live account in this release | same file |
+| Each of the three live locks refuses on its own | same file |
+| The UI and the backend refuse live trading in the same words | `src/app/content.test.ts` |
 | Rule creation, validation, activation, versioning | `tests/test_platform_api.py`, `tests/test_platform_contracts.py` |
 | Preview SETUP / HOLD / REJECT, unknown never folded into not-met | `src/app/(app)/rules/[id]/page.test.tsx` |
 | Preview cannot place, close or amend — structural | same file, three assertions |

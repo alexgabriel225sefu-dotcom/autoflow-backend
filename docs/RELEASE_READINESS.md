@@ -79,7 +79,13 @@ infrastructure rather than code.
 Out of scope and deliberately not made easier. The properties that keep it
 false, all tested:
 
-- `automation.start` refuses any account that is not demo.
+- `automation.start` refuses any account that is not demo, and does so twice
+  over: the entitlement layer refuses from the stored link record, and the
+  resolved connection is checked again. Each is tested with the other
+  disabled, so neither can quietly disappear behind the other.
+- `entitlement.capability()` refuses a live account under **both**
+  entitlements. A paid plan unlocks nothing here, because there is nothing
+  behind it to unlock.
 - `ctrader_link.live_allowed()` requires production **and** an explicit flag.
 - `bridge.SUPPORTED_ORDER_TYPES` is `{MARKET}`;
   `bridge.SUPPORTED_CONSTRAINTS` is empty — an order the rule asked for and
@@ -133,7 +139,8 @@ testers (X9).
 | 7 | `82edd6044` | Product and legal copy |
 | 8 | `ce8496ac3` | Rate limiting, runbook |
 | 9–10 | `1925e49af` | QA report, release readiness |
-| E | this commit | Health endpoints, shared rate-limit counters, beta and licence runbooks |
+| E | `319f58d0c` | Health endpoints, shared rate-limit counters, beta and licence runbooks |
+| F | this commit | free_demo / paid_live entitlement, server-derived execution capability |
 
 Tests went from 44 to 167 in the web client and from 153 to 155 files in the
 backend. Lint went from 13 errors to 0. Unreadable controls went from 15 to 0.

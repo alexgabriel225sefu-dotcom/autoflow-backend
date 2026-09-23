@@ -20,6 +20,11 @@ because the flag would promise an execution path that does not exist.
 | **Price** | Demo access is free. Checkout is disabled |
 | **Paid plan** | Intended later, to unlock live-account automation. Not built, not priced, not sold |
 
+`GET /api/v1/me` carries an `execution` block with the server's own verdict:
+the account mode, the entitlement, whether this client may automate, and the
+badge to render. The UI renders it rather than recombining a licence state
+with an account mode, so there is one decision and not two.
+
 The product copy says the same thing in the same words: *demo accounts are
 free; real-money account access will be a paid plan, and live execution is not
 enabled in this release.* If the UI and this document ever disagree, one of
@@ -89,14 +94,10 @@ state the module can reach.
 ## 4. Onboarding a beta tester
 
 1. The tester signs up and confirms their e-mail through Supabase.
-2. **Grant them a licence manually.** See
-   `docs/MANUAL_LICENCE_OPERATIONS.md`. This step is currently required, and
-   it is the main rough edge of the beta: rule activation and
-   `automation/start` both call `licence.require()`, and a user with no
-   licence record is `none`, which refuses. "Demo is free" is a business
-   decision that the entitlement code does not yet implement — a free demo
-   entitlement derived from the connected account's mode is the subject of
-   the next phase of work.
+2. **Nothing else.** Demo access is free and automatic:
+   `apex/platform/entitlement.py` treats a client with no licence record as
+   `free_demo`, which is enough to build, activate and run a rule on a demo
+   account. No manual grant is needed to onboard a tester.
 3. The tester connects a cTrader **demo** account through OAuth.
 4. They select the demo account. A live account, if their cTrader login has
    one, is rendered disabled and labelled not available.
@@ -117,7 +118,7 @@ state the module can reach.
 
 | Limitation | Where it is recorded |
 |---|---|
-| Demo entitlement is not automatic; a licence is granted by hand | §4 above, and `docs/MANUAL_LICENCE_OPERATIONS.md` |
+| Paid access is defined but sells nothing; `paid_live` unlocks no live path in this release | `apex/platform/entitlement.py` |
 | The connected path has never been exercised against a real broker | blocker **X1** in `docs/RELEASE_READINESS.md` |
 | An active rule cannot be edited; editing must create a new version | `docs/LAUNCH_QA_REPORT.md` |
 | No volume and no indicator overlay on the chart | `docs/LAUNCH_QA_REPORT.md` |
@@ -128,6 +129,7 @@ state the module can reach.
 
 There is no destructive teardown to perform, and none should be invented.
 To stop serving a tester: revoke their licence
-(`docs/MANUAL_LICENCE_OPERATIONS.md`), which takes effect on their next
-authenticated request. Their rules, journal and encrypted broker link remain
+(`docs/MANUAL_LICENCE_OPERATIONS.md`). A withdrawal outranks the free tier —
+it is the one thing that still blocks demo automation — and it takes effect
+on their next authenticated request. Their rules, journal and encrypted broker link remain
 until they disconnect or the records are deliberately removed.

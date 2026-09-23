@@ -21,7 +21,7 @@ import { Activity, Plug, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
-import { ErrorNotice, Spinner, StatusPill } from "@/components/app/state";
+import { ErrorNotice, ExecutionBadge, PlanNotice, Spinner } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { MarketPanel } from "@/components/chart/market-panel";
@@ -61,6 +61,9 @@ export default function Dashboard() {
   const selected = account?.selected ?? null;
   const running = auto.result?.ok ? auto.result.data : null;
   const licence = me.result?.ok ? me.result.data.licence.state : undefined;
+  // The server's verdict, used as given. See ExecutionBadge for why this is
+  // not recombined from `licence` and `selected.mode` here.
+  const execution = me.result?.ok ? me.result.data.execution : null;
   const allRules = rules.result?.ok ? rules.result.data.rules : [];
   const activeRule = allRules.find((r) => r.ruleDocId === running?.ruleDocId)
     ?? allRules.find((r) => r.state === "active")
@@ -109,8 +112,8 @@ export default function Dashboard() {
             <div className="card-head">
               <h2>Automation</h2>
               <span className="btn-row">
-                <StatusPill mode={selected?.mode} />
-                {licence && licence !== "active" ? (
+                <ExecutionBadge execution={execution} />
+                {licence === "revoked" ? (
                   <Link className={tonePill(licPlain.tone)} href="/license">
                     Licence: {licPlain.label}
                   </Link>
@@ -119,6 +122,12 @@ export default function Dashboard() {
             </div>
 
             {ct.result && !ct.result.ok ? <ErrorNotice error={ct.result} onRetry={ct.reload} /> : null}
+
+            {/* What this release costs and what it cannot do, in the
+                server's words. It sits above the account picker because it
+                is the answer to the question somebody has before they
+                connect anything. */}
+            <PlanNotice execution={execution} />
 
             {account === null ? <Spinner label="Checking your broker link" />
               : !account.connected ? (
@@ -180,8 +189,13 @@ export default function Dashboard() {
                     </p>
                   ) : !isDemo ? (
                     <div className="notice notice-warn" role="alert">
-                      The selected account is not a demo account. Automation
-                      runs on demo accounts only.
+                      {/* The account picker's state is what opens this
+                          notice, and `me` is polled on a different clock, so
+                          the sentence is a constant rather than whatever
+                          verdict happens to be in hand. It is the same
+                          sentence the server refuses with — content.test.ts
+                          asserts that against the Python source. */}
+                      Live trading is not available in this release.
                     </div>
                   ) : (
                     <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>
@@ -189,10 +203,12 @@ export default function Dashboard() {
                         <ConfirmAction
                           label="Start"
                           question={activeRule ? `Start watching with "${activeRule.name || "this rule"}"?` : "Start?"}
-                          disabled={!activeRule || licence !== "active"}
+                          disabled={!activeRule || !execution?.canAutomate}
                           disabledReason={
                             !activeRule ? "Activate a rule first"
-                              : licence !== "active" ? "An active licence is required" : undefined
+                              : !execution?.canAutomate
+                                ? execution?.message ?? "Access is being checked"
+                                : undefined
                           }
                           onConfirm={() => control("start")}
                         />

@@ -53,11 +53,31 @@ const CONNECTED = {
   },
 };
 
+/**
+ * The server's verdict, as `me.execution` carries it.
+ *
+ * The dashboard renders this rather than recombining a licence state with an
+ * account mode, so a test that wants a refusal states the refusal — which is
+ * also what the backend would send.
+ */
+function execution(over: Record<string, unknown> = {}) {
+  return {
+    accountMode: "demo", entitlement: "paid_live", licenceState: "active",
+    liveExecutionEnabled: false,
+    planNotice: "Demo accounts are free. Real-money account access will be a paid plan, and live execution is not enabled in this release.",
+    canAutomate: true, reason: null,
+    message: "demo automation is available on this account",
+    badge: "DEMO",
+    ...over,
+  };
+}
+
 function base() {
   return {
     me: { ok: true, data: {
       user: { userId: "u1", email: "t@example.test", emailVerified: true },
       licence: { state: "active", expiresAt: null, plan: "demo" },
+      execution: execution(),
     } },
     "ctrader/status": CONNECTED,
     automation: { ok: true, data: { state: "stopped", ruleDocId: null, mode: null, startedAt: null } },
@@ -113,10 +133,45 @@ describe("dashboard — account state", () => {
       connected: true, accounts: [{ ctid: 902, mode: "live" }],
       selected: { ctid: 902, mode: "live" }, liveAllowed: true,
     } };
+    routes.me = { ok: true, data: {
+      user: { userId: "u1", email: "t@example.test", emailVerified: true },
+      licence: { state: "active", expiresAt: null, plan: "demo" },
+      execution: execution({
+        accountMode: "live", canAutomate: false, badge: "LIVE BLOCKED",
+        reason: "LIVE_NOT_AVAILABLE",
+        message: "live trading is not available in this release",
+      }),
+    } };
     await renderDash();
-    await waitFor(() => expect(screen.getByText(/runs on demo accounts only/)).toBeDefined());
+    // Said in more than one place on purpose: once in the automation card as
+    // the reason this account cannot run, once in the standing footer note.
+    await waitFor(() =>
+      expect(screen.getAllByText(/Live trading is not available in this release/).length)
+        .toBeGreaterThan(0));
+    expect(screen.getAllByText("LIVE BLOCKED").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /^Start$/ })).toBeNull();
     expect(calls.some((c) => c.path.startsWith("automation/"))).toBe(false);
+  });
+
+  it("shows the server's badge rather than deriving one", async () => {
+    routes.me = { ok: true, data: {
+      user: { userId: "u1", email: "t@example.test", emailVerified: true },
+      licence: { state: "none", expiresAt: null, plan: null },
+      execution: execution({
+        accountMode: "unknown", entitlement: "free_demo", licenceState: "none",
+        canAutomate: false, badge: "NOT CONNECTED", reason: "NOT_CONNECTED",
+        message: "connect a cTrader demo account and select it",
+      }),
+    } };
+    await renderDash();
+    await waitFor(() => expect(screen.getAllByText("NOT CONNECTED").length).toBeGreaterThan(0));
+  });
+
+  it("states what is free and what is not, in the server's words", async () => {
+    await renderDash();
+    await waitFor(() =>
+      expect(screen.getByText(/Demo accounts are free\./)).toBeDefined());
+    expect(screen.getByText(/live execution is not enabled in this release/)).toBeDefined();
   });
 });
 
@@ -143,10 +198,32 @@ describe("dashboard — automation state", () => {
     expect(screen.getAllByText(/Activate a rule first/).length).toBeGreaterThan(0);
   });
 
-  it("start is refused without an active licence, and says why", async () => {
+  // A lapsed licence no longer blocks anything: demo access is free, and the
+  // paid tier is what expired. The refusal that remains is a WITHDRAWN one,
+  // and the UI takes it from the server rather than inferring it.
+  it("a lapsed licence still offers demo automation", async () => {
     routes.me = { ok: true, data: {
       user: { userId: "u1", email: "t@example.test", emailVerified: true },
       licence: { state: "expired", expiresAt: 1, plan: "demo" },
+      execution: execution({ entitlement: "free_demo", licenceState: "expired" }),
+    } };
+    routes.rules = { ok: true, data: { rules: [
+      { ruleDocId: "r1", name: "R", state: "active", version: 1, symbols: ["EURUSD"], timeframe: "1h", updatedAt: 0 },
+    ] } };
+    await renderDash();
+    const start = await screen.findByRole("button", { name: /^Start$/ });
+    expect((start as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("start is refused when the server says it may not run, and says why", async () => {
+    routes.me = { ok: true, data: {
+      user: { userId: "u1", email: "t@example.test", emailVerified: true },
+      licence: { state: "revoked", expiresAt: null, plan: "demo" },
+      execution: execution({
+        entitlement: "free_demo", licenceState: "revoked", canAutomate: false,
+        reason: "LICENCE_REVOKED",
+        message: "this licence was withdrawn — contact support",
+      }),
     } };
     routes.rules = { ok: true, data: { rules: [
       { ruleDocId: "r1", name: "R", state: "active", version: 1, symbols: ["EURUSD"], timeframe: "1h", updatedAt: 0 },
@@ -154,7 +231,8 @@ describe("dashboard — automation state", () => {
     await renderDash();
     const start = await screen.findByRole("button", { name: /^Start$/ });
     expect((start as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/active licence is required/)).toBeDefined();
+    // The server's sentence, not a second version of it written in the UI.
+    expect(screen.getByText(/withdrawn — contact support/)).toBeDefined();
   });
 });
 

@@ -30,8 +30,8 @@ import uuid
 
 from apex import user_store
 from apex.platform import ctrader_link as _link
+from apex.platform import entitlement as _ent
 from apex.platform import journal_store as _jstore
-from apex.platform import licence as _lic
 from apex.platform import notifications as _notify
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
@@ -84,8 +84,18 @@ def status(user_id):
 
 
 def _preflight(user_id, rule_doc_id):
-    """(rule, connection) or raise. Every refusal names its own cause."""
-    _lic.require(user_id)                       # raises LicenceRequired
+    """(rule, connection) or raise. Every refusal names its own cause.
+
+    The order is deliberate. A client who has nothing connected and a draft
+    rule should be told about the draft, because that is the thing they can
+    act on first. Only the withdrawal check runs ahead of everything, since a
+    client whose access was withdrawn should not be walked through a checklist
+    at all.
+    """
+    # Demo automation is free. This checks only that access has not been
+    # WITHDRAWN — see apex/platform/entitlement.py for why an absent licence
+    # is the free tier rather than a refusal.
+    _ent.require_activation(user_id)            # raises NotEntitled
 
     rule = _store.get(user_id, rule_doc_id)     # raises NotFound — ownership
     if rule.get("state") != _rd.ACTIVE:
@@ -100,11 +110,14 @@ def _preflight(user_id, rule_doc_id):
         raise AutomationRefused(
             "NO_ACCOUNT",
             "connect a cTrader account and select one before starting")
+    # Two independent locks on the same door, on purpose. The entitlement
+    # module decides from the stored link record; this line decides from the
+    # connection actually resolved for this start. They agree today, and if a
+    # future change makes them disagree, the start is refused rather than
+    # taking whichever answer came first.
+    _ent.require_automation(user_id)            # raises NotEntitled
     if conn.get("mode") != DEMO:
-        raise AutomationRefused(
-            "LIVE_NOT_SUPPORTED",
-            "automation runs on demo accounts only — live trading is not "
-            "implemented")
+        raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
     return rule, conn
 
 

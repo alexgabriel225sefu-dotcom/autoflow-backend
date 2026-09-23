@@ -143,3 +143,53 @@ describe("unfinished legal values are visibly unfinished", () => {
     for (const id of ["L1", "L2", "L3", "L4"]) expect(doc).toContain(id);
   });
 });
+
+/**
+ * The UI and the server have to say the same thing about live trading.
+ *
+ * The dashboard renders a constant sentence rather than whatever verdict
+ * `me` last returned, because the account picker and `me` are polled on
+ * different clocks. A constant can drift from the server's refusal, so this
+ * reads the Python and pins the two together. If somebody softens one of
+ * them, this fails rather than letting the product and its API disagree
+ * about whether real money can move.
+ */
+describe("the UI and the backend refuse live trading in the same words", () => {
+  const py = readFileSync(
+    join(__dirname, "..", "..", "..", "apex-forex-bot", "apex", "platform",
+      "entitlement.py"), "utf8");
+
+  it("the backend's refusal is the sentence we think it is", () => {
+    expect(py).toContain('LIVE_REFUSAL = "live trading is not available in this release"');
+  });
+
+  it("the dashboard says it too, and capitalised as a sentence", () => {
+    const dash = readFileSync(
+      join(__dirname, "(app)", "dashboard", "page.tsx"), "utf8");
+    expect(dash).toContain("Live trading is not available in this release.");
+  });
+
+  it("the plan notice promises no price, date or outcome", () => {
+    const notice = /PLAN_NOTICE = \(([\s\S]*?)\)\n/.exec(py)?.[1] ?? "";
+    expect(notice).toContain("Demo accounts are free.");
+    expect(notice).toContain("live execution is not enabled in this release");
+    for (const word of ["soon", "guarantee", "profit", "$", "\u20ac"]) {
+      expect(notice.toLowerCase()).not.toContain(word.toLowerCase());
+    }
+  });
+
+  it("no component decides for itself whether live execution is on", () => {
+    // The server answers this. A component that hardcodes it would be a
+    // second source of truth, and the dangerous direction to be wrong in.
+    //
+    // The pattern is assembled at runtime so this file does not match itself
+    // — the first version of this test failed on its own source, which is
+    // funny once and useless afterwards.
+    const flag = ["live", "Execution", "Enabled"].join("");
+    const bad = new RegExp(`${flag}\\s*[:=]\\s*true`);
+    for (const f of FILES) {
+      expect(bad.test(f.body), `${f.path} sets the live-execution flag itself`)
+        .toBe(false);
+    }
+  });
+});

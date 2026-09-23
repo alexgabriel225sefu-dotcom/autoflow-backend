@@ -124,7 +124,38 @@ export type Licence = {
   expiresAt: number | null;
   plan: string | null;
 };
-export type Me = { user: { userId: string; email: string | null; emailVerified: boolean }; licence: Licence };
+/**
+ * What the SERVER says this client may do. Not derived here.
+ *
+ * Reading a licence state and an account mode and combining them into a
+ * verdict is a decision, and it is made once, in
+ * apex/platform/entitlement.py. A second copy of that decision in the browser
+ * would be a copy that can disagree — and the disagreement people notice is
+ * the one where the UI offers a control the server then refuses.
+ */
+export type Execution = {
+  accountMode: "demo" | "live" | "unknown";
+  entitlement: "free_demo" | "paid_live";
+  licenceState: Licence["state"];
+  /** False in this release, from the server, every time. */
+  liveExecutionEnabled: boolean;
+  planNotice: string;
+  canAutomate: boolean;
+  reason:
+    | null
+    | "NOT_CONNECTED"
+    | "REAUTH_REQUIRED"
+    | "LIVE_NOT_AVAILABLE"
+    | "LICENCE_REVOKED";
+  message: string;
+  badge: "DEMO" | "LIVE BLOCKED" | "NOT CONNECTED" | "REAUTH REQUIRED";
+};
+
+export type Me = {
+  user: { userId: string; email: string | null; emailVerified: boolean };
+  licence: Licence;
+  execution: Execution;
+};
 
 export type CtAccount = { ctid: number | string; mode: "demo" | "live"; label?: string };
 export type CtraderStatus = {
