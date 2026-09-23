@@ -1,209 +1,211 @@
-# Apex4Traders — ce este, ce face, și unde se opreşte
+# Apex4Traders — what it is, what it does, and where it stops
 
-Document de scop. Descrie produsul aşa cum este, nu aşa cum ar putea deveni.
+Scope document. It describes the platform as it is, not as it might become.
 
 ---
 
-## 1. Ce este Apex4Traders
+## 1. What Apex4Traders is
 
-**O platformă proprie de automatizare şi control al regulilor de tranzacţionare.**
-Clientul îşi construieşte regulile din condiţii cu nume şi formule publicate,
-vede exact ce ar decide fiecare regulă înainte s-o pornească, şi o poate opri
-în orice moment.
+**A platform for building and controlling trading automation rules.** A client
+builds rules from named conditions with published formulas, sees exactly what
+each rule would decide before starting it, and can stop it at any moment.
 
-### Ce NU este
+### What it is not
 
-| Nu este | De ce contează distincţia |
+| Not | Why the distinction matters |
 |---|---|
-| **Un bot de Telegram** | Telegram nu e login, nu e identitate, nu e interfaţă de control şi nu e necesar pentru nicio funcţie. Un client fără cont de Telegram foloseşte platforma integral. |
-| **Un broker** | Nu ţinem bani, nu deschidem conturi, nu suntem contraparte. Contul de tranzacţionare e al clientului, la brokerul lui, prin cTrader. |
-| **Un serviciu de semnale** | Nu trimitem recomandări. Platforma execută regulile pe care clientul le scrie; dacă regula tace, platforma tace. |
-| **Consultanţă de investiţii** | Nu evaluăm dacă o strategie e potrivită pentru cineva, nu promitem randamente şi nu publicăm statistici de performanţă. |
+| **A Telegram bot** | Telegram is not the login, not the identity, not the control surface, and not required for any function. A client without a Telegram account uses the platform in full. |
+| **A broker** | We hold no money, open no accounts, and are not a counterparty. The trading account belongs to the client, at their broker, through cTrader. |
+| **A signal service** | We send no recommendations. The platform executes the rules a client writes; if the rule is silent, the platform is silent. |
+| **Investment advice** | We do not assess whether a strategy suits anyone, promise no returns, and publish no performance statistics. |
 
-### cTrader este infrastructură, nu produs
+### cTrader is infrastructure, not the product
 
-cTrader e stratul prin care platforma se conectează la contul clientului, ia
-date de piaţă şi — când clientul porneşte automatizarea — trimite ordine.
-Clientul îl vede o singură dată, la conectare. Nu e brandul, nu e interfaţa, şi
-nu e ceva ce ascundem: ecranul de conectare spune explicit că execuţia se face
-printr-un cont cTrader pe care clientul îl conectează şi îl poate deconecta.
+cTrader is the layer through which the platform connects to the client's
+account, reads market data, and — once the client starts automation — sends
+orders. The client sees it once, at connection time. It is not the brand and
+not the interface, and it is not hidden either: the connection screen states
+plainly that execution happens through a cTrader account the client connects
+and can disconnect.
 
 ---
 
-## 2. Ce este implementat acum
+## 2. What is implemented today
 
-| Funcţie | Stare | Unde |
+| Capability | State | Notes |
 |---|---|---|
-| **Supabase Auth** | complet | email + parolă, confirmare, resetare. Identitatea platformei e `supabase_user_id`. |
-| **cTrader OAuth** | complet | flux în trei paşi, cu finalizare autentificată. Tokenurile se criptează la stocare şi nu ajung niciodată în frontend. |
-| **Accounts** | complet | listare conturi conectate, selecţie, deconectare, demo/live marcat explicit. |
-| **Positions** | citire | poziţii deschise, cu contul şi modul. |
-| **Orders** | citire | ordine în aşteptare. |
-| **Candles** | citire | date de piaţă pentru preview, prin acelaşi conector şi acelaşi cache ca motorul. |
-| **RuleDoc / Rule Builder** | complet | 12 condiţii, validare, activare care îngheaţă o versiune, versionare. |
-| **Preview pe date reale** | complet | evaluează regula pe lumânări luate din contul conectat. Nu plasează nimic, nu scrie nimic. |
-| **Journal** | complet | 12 statusuri distincte, filtrare după cont/simbol/perioadă/regulă/status, paginare. |
-| **Notifications** | complet | centru intern platformei. Fără Telegram. |
-| **Demo automation** | complet | start, pause, resume, stop — doar pe conturi demo. Idempotent şi jurnalizat. |
+| **Supabase Auth** | complete | Email and password, confirmation, reset. The platform identity is `supabase_user_id`. |
+| **cTrader OAuth** | complete | Three-step flow with an authenticated completion. Tokens are encrypted at rest and never reach the frontend. |
+| **Accounts** | complete | List connected accounts, select one, disconnect; demo and live marked explicitly. |
+| **Positions** | read-only | Open positions, with the account and its mode. |
+| **Orders** | read-only | Pending orders. |
+| **Candles** | read-only | Market data for preview, through the same connector and the same cache the execution engine uses. |
+| **RuleDoc / Rule Builder** | complete | 12 conditions, validation, activation that freezes a version, versioning. |
+| **Preview on real data** | complete | Evaluates a rule against candles fetched from the connected account. Places nothing, records nothing. |
+| **Journal** | complete | 12 distinct statuses; filter by account, instrument, period, rule and status; paged. |
+| **Notifications** | complete | An in-platform centre. No Telegram. |
+| **Demo automation** | complete | Start, pause, resume, stop — demo accounts only. Idempotent and journalled. |
 
-Interfaţa web are **18 pagini de platformă** — landing, sign up, login,
-confirmare email, resetare parolă, callback auth, dashboard, licenţă,
-conectare cTrader, conturi, reguli, rule builder, detaliu regulă, poziţii,
-ordine, jurnal, notificări, setări. Fiecare e legată de un endpoint real; nu
-există ecran cu date fabricate. (În proiect mai există `terms`, `privacy` şi un
-`configurator` preexistente, din afara platformei.)
+The web client has **18 platform pages**: landing, sign up, login, email
+confirmation, password reset, auth callback, dashboard, licence, connect
+cTrader, accounts, rules, rule builder, rule detail, positions, orders,
+journal, notifications, settings. Each is backed by a real endpoint; no screen
+shows fabricated data. (The project also carries pre-existing `terms`,
+`privacy` and `configurator` pages from outside the platform.)
 
 ---
 
-## 3. Ce NU este implementat
+## 3. What is not implemented
 
-| Lipseşte | Precizare |
+| Missing | Detail |
 |---|---|
-| **Live trading** | Nu "dezactivat" — **neimplementat**. Nu există ramură de cod care porneşte o buclă live. |
-| **Deploy public** | Platforma rulează local şi în staging. Nu e publicată. |
-| **Plăţi / licenţă comercială** | `licence.grant()` se apelează manual pe server. Nu există checkout, facturare sau reînnoire. |
-| **Execuţie reală pe cont live** | Vezi V2 şi V3 mai jos. |
-| **Ştergerea fizică a codului Telegram** | Codul legacy există şi funcţionează. Vezi mai jos de ce. |
+| **Live trading** | Not "disabled" — **not implemented**. No branch of code starts a live loop. |
+| **Public deployment** | The platform runs locally and in staging. It is not published. |
+| **Payments / commercial licensing** | `licence.grant()` is called manually on the server. There is no checkout, billing or renewal. |
+| **Real execution on a live account** | See V2 and V3 below. |
+| **Physical removal of the legacy Telegram code** | The legacy code exists and still works. See below. |
 
-### De ce codul Telegram nu a fost şters
+### Why the Telegram code was not deleted
 
-`apex/telegram.py` (6742 linii), `apex/ctrader_oauth.py` şi magaziile cheiate pe
-`chat_id` sunt intacte, fiindcă **clienţii onboardaţi prin Telegram au
-tokenurile stocate acolo** şi ştergerea i-ar lăsa fără cont.
+`apex/telegram.py` (6742 lines), `apex/ctrader_oauth.py` and the `chat_id`-keyed
+stores are intact, because **clients onboarded through Telegram have their
+tokens stored there** and deleting it would strand them.
 
-Ce s-a făcut în schimb:
+What was done instead:
 
-- `apex/ctrader_oauth.py` poartă un antet **DEPRECATED** care explică de ce nu
-  a putut fi refolosit: e cheiat pe `chat_id`, îşi semnează state-ul OAuth cu
-  tokenul de bot, şi finalizează legarea contului direct în callback.
-- Un test verifică, prin AST, că **niciun modul din `apex/platform/` nu importă
-  telegram** — pe tot pachetul, nu doar pe fişierul la care s-a uitat cineva.
-- Un deployment fără `TELEGRAM_BOT_TOKEN` rulează platforma integral.
+- `apex/ctrader_oauth.py` carries a **DEPRECATED** header explaining why it
+  could not be reused: it is keyed by `chat_id`, it signs the OAuth state with
+  the bot token, and it completes the account link inside the callback.
+- A test asserts through the AST that **no module in `apex/platform/` imports
+  telegram** — across the whole package, not only the file someone happened to
+  look at.
+- A deployment with no `TELEGRAM_BOT_TOKEN` runs the platform in full.
 
-Codul vechi e **legacy şi nu face parte din Apex4Traders v1.**
+The old code is **legacy and not part of Apex4Traders v1.**
 
 ---
 
-## 4. Ce poate face cTrader Open API
+## 4. What the cTrader Open API can do
 
-Distincţia care contează aici nu e "ce permite cTrader" — permite tot ce e mai
-jos. E **ce am cablat noi**, şi mai ales ce am cablat dar nu am expus.
+The distinction that matters here is not "what cTrader allows" — it allows
+everything below. It is **what we exposed**, and especially what we wired but
+deliberately did not expose.
 
-| Capabilitate cTrader | Conectorul nostru | Platforma v1 o expune |
+| cTrader capability | Our connector | Exposed by platform v1 |
 |---|---|---|
-| **OAuth** (authorize, token, refresh) | da | **da** — fluxul de conectare |
-| **Listare conturi** | da | **da** — `/accounts` |
-| **Market data** (trendbars, bid/ask) | da | **parţial** — lumânări da, cotaţii live nu |
-| **Positions** | da | **da**, doar citire |
-| **Orders** | da | **da**, doar citire |
-| **Place order** | da | **doar prin motor** — niciun endpoint al platformei nu plasează un ordin direct |
-| **Close position** | da | **nu** — niciun endpoint nu închide o poziţie |
-| **Amend SL/TP** | da | **nu** |
-| **History** (deal history) | da | **nu** — jurnalul platformei e separat şi acoperă doar deciziile ei |
-| **Balance / equity** | da | **parţial** — sold prin `/accounts/{id}`; equity live nu |
+| **OAuth** (authorize, token, refresh) | yes | **yes** — the connection flow |
+| **List accounts** | yes | **yes** — `/accounts` |
+| **Market data** (trendbars, bid/ask) | yes | **partly** — candles yes, live quotes no |
+| **Positions** | yes | **yes**, read-only |
+| **Orders** | yes | **yes**, read-only |
+| **Place order** | yes | **through the engine only** — no platform endpoint places an order directly |
+| **Close position** | yes | **no** — no endpoint closes a position |
+| **Amend SL/TP** | yes | **no** |
+| **History** (deal history) | yes | **no** — the platform journal is separate and covers its own decisions |
+| **Balance / equity** | yes | **partly** — balance via `/accounts/{id}`; live equity no |
 
-Coloana din mijloc e plină. Coloana din dreapta nu. Asta e deliberat: fiecare
-capabilitate expusă e o suprafaţă care trebuie păzită, iar cele care nu aduc
-nimic în v1 rămân necablate.
+The middle column is full. The right-hand one is not, and that is deliberate:
+every exposed capability is a surface that must be guarded, and the ones that
+add nothing to v1 stay unwired.
 
 ---
 
-## 5. Versiuni
+## 5. Versions
 
-### V1 — platformă demo / paper *(versiunea curentă)*
+### V1 — demo / paper platform *(current)*
 
-Clientul se înregistrează, conectează un cont cTrader demo, construieşte
-reguli, le previzualizează pe date reale, porneşte automatizarea pe demo şi
-vede totul în jurnal. Nimic nu atinge bani reali.
+A client signs up, connects a cTrader demo account, builds rules, previews them
+on real data, starts automation on demo, and sees everything in the journal.
+Nothing touches real money.
 
-### V2 — execuţie reală pe cont demo cTrader
+### V2 — real execution on a cTrader demo account
 
-Ordinele ajung efectiv la cTrader pe contul demo, prin motorul existent.
-Diferenţa faţă de V1 nu e o funcţie nouă, ci **încredere câştigată**: jurnalul
-trebuie să arate că fiecare ordin trimis a fost cel pe care regula l-a cerut, cu
-stopul pe care regula l-a cerut.
+Orders actually reach cTrader on the demo account, through the existing engine.
+The difference from V1 is not a new feature but **earned confidence**: the
+journal has to show that every order sent was the one the rule asked for, with
+the stop the rule asked for.
 
 ### V3 — live trading
 
-Doar după **audit** şi **clarificare legală**. Nu e o casetă de bifat: cere
-revizuire a fluxului de execuţie, a limitelor de risc, a termenilor de serviciu
-şi a obligaţiilor de reglementare din jurisdicţia în care se operează.
+Only after an **audit** and **legal review**. This is not a checkbox: it
+requires reviewing the execution path, the risk limits, the terms of service,
+and the regulatory obligations of the jurisdiction being operated in.
 
 ---
 
-## 6. Despre execuţie — spus fără ocolişuri
+## 6. About execution — stated plainly
 
-**Platforma poate, tehnic, să plaseze ordine prin cTrader.** Conectorul are
-`place_order`, `close_position` şi `amend_sltp`, iar motorul le foloseşte. A
-pretinde altceva ar fi neadevărat.
+**The platform can, technically, place orders through cTrader.** The connector
+has `place_order`, `close_position` and `amend_sltp`, and the engine uses them.
+Claiming otherwise would be untrue.
 
-**În versiunea curentă nu activăm live trading.** Trei refuzuri independente
-stau în cale, şi fiecare e verificat de teste:
+**In the current version live trading is not enabled.** Three independent
+refusals stand in the way, and each is covered by tests:
 
-1. `ctrader_link.live_allowed()` cere `APP_ENV=production` **şi**
-   `APEX_ALLOW_LIVE_ACCOUNTS=true`. Niciuna singură nu ajunge.
-2. Selectarea unui cont live e refuzată când asta e fals — şi la citire, nu
-   doar la tranzacţionare.
-3. `automation._preflight()` refuză orice cont al cărui mod nu e `demo`.
+1. `ctrader_link.live_allowed()` requires `APP_ENV=production` **and**
+   `APEX_ALLOW_LIVE_ACCOUNTS=true`. Neither alone is enough.
+2. Selecting a live account is refused when that is false — for reading too,
+   not only for trading.
+3. `automation._preflight()` refuses any account whose mode is not `demo`.
 
-**Orice execuţie trece prin acelaşi lanţ.** Fără excepţii şi fără scurtături:
+**Every execution goes through the same chain.** No exceptions, no shortcuts:
 
-- `ownership.may_trade` — instanţa care cere e cea care deţine contul;
-- `gates.authorize_order` — entitlement, mediu de broker, risc, limite;
-- `gates.audit` — decizia porţii e înregistrată;
-- `ledger.claim` / `record` — idempotenţă, luată **înainte** de apelul la broker;
-- abia apoi `broker.place_order`;
-- iar totul intră în jurnal, inclusiv refuzurile.
+- `ownership.may_trade` — the instance asking is the one that owns the account;
+- `gates.authorize_order` — entitlement, broker environment, risk, limits;
+- `gates.audit` — the gate's decision is recorded;
+- `ledger.claim` / `record` — idempotency, taken **before** the broker call;
+- only then `broker.place_order`;
+- and all of it lands in the journal, refusals included.
 
-**Nu există cale paralelă către broker.** Modulele platformei nu importă niciun
-broker, nicio poartă şi niciun ledger — predau lucrul controlerului care le
-are deja. Teste care parcurg AST-ul verifică asta pentru `broker_read.py`,
-`preview.py`, `bridge.py` şi `automation.py`: absenţa apelurilor e o proprietate
-a codului, nu o promisiune dintr-un comentariu.
+**There is no parallel path to the broker.** The platform modules import no
+broker, no gate and no ledger — they hand the work to the controller that
+already has them. Tests that walk the AST assert this for `broker_read.py`,
+`preview.py`, `bridge.py` and `automation.py`: the absence of those calls is a
+property of the code, not a promise in a comment.
 
 ---
 
-## 7. Diagramă
+## 7. Diagram
 
 ```
    ┌──────────┐
    │   User   │  browser, Apex4Traders
    └────┬─────┘
-        │  sesiune Supabase (Bearer)
+        │  Supabase session (Bearer)
         ▼
    ┌──────────────────┐
-   │  Apex Platform   │  /api/v1 — auth, ownership, licenţă
-   │                  │  RuleDoc, journal, notificări
+   │  Apex Platform   │  /api/v1 — auth, ownership, licence
+   │                  │  RuleDoc, journal, notifications
    └────┬─────────────┘
         │  RuleDoc + MarketSnapshot
         ▼
    ┌──────────────────┐
-   │   Rule Engine    │  evaluator pur — fără ceas, fără reţea
+   │   Rule Engine    │  pure evaluator — no clock, no network
    │                  │  Decision: BUY / SELL / CLOSE / HOLD / REJECT
    └────┬─────────────┘
-        │  ExecutionRequest   (doar BUY şi SELL ajung aici)
+        │  ExecutionRequest   (only BUY and SELL get this far)
         ▼
    ┌──────────────────┐
    │   Risk Gates     │  ownership · authorize_order · audit · ledger
-   │                  │  orice refuz opreşte aici şi se jurnalizează
+   │                  │  any refusal stops here and is journalled
    └────┬─────────────┘
         │
         ▼
    ┌──────────────────┐
-   │   cTrader API    │  conectare · date · execuţie
+   │   cTrader API    │  connection · data · execution
    └──────────────────┘
 ```
 
-HOLD, REJECT, o configuraţie invalidă sau o constrângere imposibil de respectat
-se opresc **înainte** de porţi. Nu devin niciodată ordin.
+HOLD, REJECT, an invalid configuration or a constraint that cannot be honoured
+all stop **before** the gates. They never become an order.
 
 ---
 
-## 8. Ce spunem clientului
+## 8. What we tell the client
 
-- Apex4Traders execută reguli pe care le configurezi tu.
-- Nu e consultanţă financiară şi nu administrăm bani.
-- Execuţia se face printr-un cont cTrader pe care îl conectezi şi îl poţi
-  deconecta oricând.
-- Tranzacţionarea implică risc, inclusiv pierderea capitalului.
-- Nu promitem randamente şi nu publicăm statistici de performanţă.
+- Apex4Traders executes rules you configure yourself.
+- It is not financial advice and we do not manage money.
+- Execution happens through a cTrader account you connect and can disconnect at
+  any time.
+- Trading carries risk, including the loss of your capital.
+- We promise no returns and publish no performance statistics.
