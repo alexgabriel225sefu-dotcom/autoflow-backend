@@ -30,8 +30,8 @@ cTrader account is unverified, and that is one gate, not a detail.
 | 5 | Production configuration documented | ✅ | `docs/PRODUCTION_RUNBOOK.md`, `docs/BETA_CONFIGURATION.md`, `docs/MANUAL_LICENCE_OPERATIONS.md`. |
 | 6 | No critical security issue | ✅ | No token under `/api/v1/`; rate limiting on every route; webhook verifies before parsing; ownership is the storage key. |
 | 7 | No live trading path | ✅ | `test_live_path_invariants.py`; `SUPPORTED_ORDER_TYPES = {MARKET}`; `automation.start` refuses a non-demo account. |
-| 8 | Frontend tests pass | ✅ | 175 / 175 |
-| 9 | Backend tests pass | ✅ | 159 / 159 files |
+| 8 | Frontend tests pass | ✅ | 215 / 215 |
+| 9 | Backend tests pass | ✅ | 160 / 160 files |
 | 10 | Build passes | ✅ | 24 routes, TypeScript clean, lint 0 errors |
 | 11 | Mobile navigation works | ✅ | 8 of 8 destinations at 390 px, 0 px overflow |
 | 12 | Chart handles real connected data | ⚠️ **unverified** | Every failure state is tested. The success state has never had real candles in it. |
@@ -79,7 +79,7 @@ thing.
 | 9 | Monitoring | ⚠️ X7 — `/healthz` and `/readyz` exist and are tested; nothing scrapes them yet |
 | 10 | Demo onboarding manually tested | ❌ X1 |
 | 11 | Five external testers complete the flow | ❌ X9 |
-| 12 | All critical issues closed | ✅ none open |
+| 12 | All critical issues closed | ⚠️ the broker connector pins a vulnerable TLS stack and cannot be raised without X1 — `docs/DEPLOYMENT_READINESS.md` §6 |
 
 **Verdict: NO.** Nine of twelve are open, and most are decisions or
 infrastructure rather than code.
@@ -155,7 +155,9 @@ testers (X9).
 | F | `8fcefa39b` | free_demo / paid_live entitlement, server-derived execution capability |
 | G | `b95dff0e6` | cTrader demo smoke-test harness; Fernet tokens added to log redaction |
 | H | `fb064679f` | Repo-wide copy audit with a reasoned allowlist; checkout answers about the product |
-| I | this commit | Final verification and release decisions |
+| I | `1e428f100` | Final verification and release decisions |
+| J | `e057ffb16` | Handoff |
+| A–E (25 Sep) | `d8f03196f`…this commit | Critical framework CVEs, per-rule copy exemptions, route audit, AST live invariants, live spec, dependency audits |
 
 Tests went from 44 to 175 in the web client and from 153 to 159 files in the
 backend. Lint went from 13 errors to 0. Unreadable controls went from 15 to 0.

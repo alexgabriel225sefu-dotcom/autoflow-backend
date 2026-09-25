@@ -50,7 +50,36 @@ Every material change in phases E–H was mutated to prove its test fails.
 **24 mutations applied, 24 killed** — one of them only after the test was
 strengthened, which is recorded below because it is the interesting one.
 
-### Browser audit, 21 routes at 1440×900 and 7 at 390×844
+### Browser audit re-run on 2026-09-25, after the framework bump
+
+Re-run because a framework minor was raised (next 16.2.7 → 16.3.6) and the auth
+middleware was changed. A suite that passes does not prove pages render.
+
+| Check | Result |
+|---|---|
+| Routes rendering | **21 / 21** |
+| Console errors, each page loaded directly | **0** |
+| Horizontal overflow at 390 px | **0 px** on all 7 checked |
+| Protected routes gated **signed out** | 4 / 4, `?next=` preserved |
+| Public routes open signed out | 5 / 5, including `/configurator?key=…` |
+| `/configurator` shows the old receipt reference | yes |
+| …and claims no licence state of its own | confirmed |
+
+The signed-in pass showed a dozen `ERR_ABORTED` / `ERR_FAILED` entries when the
+middleware redirects a signed-in visitor away from `/signup`: the previous
+page's polling reads and Next's RSC prefetches were in flight and the browser
+tore them down. That is ordinary navigation behaviour.
+
+It was checked rather than assumed, because the question it raises matters: a
+cancelled read rendering as a failure would flash "we could not reach your
+broker" at a client who did nothing but click a link. `useRead` already returns
+before setting any state when the signal aborted, so no false alarm is
+possible — and `src/lib/use-api.test.ts` now pins that, along with the opposite
+mistake, which is the easy way to "fix" abort noise: swallowing every error so a
+real broker outage renders as an empty list. Both directions are asserted, and
+four mutations against them were killed.
+
+### Earlier browser audit, 21 routes at 1440×900 and 7 at 390×844
 
 | Check | Result |
 |---|---|
