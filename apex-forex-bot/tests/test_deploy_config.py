@@ -244,6 +244,33 @@ finally:
     importlib.reload(_cfg)
 
 
+
+# ── dependency pins ─────────────────────────────────────────────────────────
+# The file's own header says exact pins are the point: Render runs
+# `pip install -r requirements.txt` on every build, so a floor alone means any
+# upstream release ships itself straight into a trading bot with no review.
+# Nothing was enforcing that, so a `>=` could drift in unnoticed.
+#
+# This does NOT audit for vulnerabilities — that needs the network and belongs
+# in release verification. `pip-audit -r requirements.txt` on 2026-09-25 found
+# advisories in cryptography, protobuf, pyOpenSSL and Twisted, all of which are
+# hard-pinned by `ctrader-open-api==0.9.2` and cannot be raised without
+# replacing or overriding the broker connector. See
+# docs/DEPLOYMENT_READINESS.md §6.
+print("\nDependency pins")
+_req = os.path.join(SERVICE_DIR, "requirements.txt")
+_lines = [l.split("#")[0].strip() for l in open(_req, encoding="utf-8")]
+_pins = [l for l in _lines if l]
+check("requirements.txt is not empty", bool(_pins))
+for line in _pins:
+    check(f"{line.split('==')[0]} is pinned exactly",
+          "==" in line and not any(op in line for op in (">=", "<=", "~=", ">", "<")),
+          line)
+check("cryptography is pinned, because it encrypts broker tokens at rest",
+      any(l.startswith("cryptography==") for l in _pins))
+check("the broker connector is pinned, because it pins the TLS stack below it",
+      any(l.startswith("ctrader-open-api==") for l in _pins))
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

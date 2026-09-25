@@ -203,14 +203,71 @@ clean, lint 0 errors.
 walk back under it, and names the advisories as the reason. `npm audit` itself
 needs the network and belongs in release verification, not a unit suite.
 
-### Python dependencies
+### Python dependencies — audited, and blocked by the broker connector
 
-`apex-forex-bot/requirements.txt` is exact-pinned with the reason written in
-the file. `pip-audit` is not installed here and installing a tool to audit a
-deployment's dependencies is itself a change to the environment, so the Python
-side is **unaudited in this session** — recorded as a gap rather than passed
-over. `cryptography==42.0.8` is the one worth checking first: it is the
-oldest pin and it is the library that encrypts broker tokens at rest.
+`pip-audit -r requirements.txt` on 2026-09-25 found advisories in four
+packages. **None can be raised**, and the reason is structural rather than
+neglect:
+
+```
+ctrader-open-api==0.9.2  hard-pins  pyOpenSSL==24.1.0
+                                    Twisted==24.3.0
+                                    protobuf==3.20.1
+pyOpenSSL==24.1.0        requires   cryptography<43,>=41.0.5
+```
+
+Those are `==` pins inside the connector's own metadata, not our choices. So
+`cryptography` cannot go past 42.x while `ctrader-open-api==0.9.2` is in the
+tree, and **0.9.2 is the newest release that exists** — 0.9.3 was published and
+then yanked by the maintainer, so there is no upgrade path through the registry.
+
+| Package | Installed | Advisories | Fix needs |
+|---|---|---|---|
+| `cryptography` | 42.0.8 | PYSEC-2026-35, -1284, -2141, -3553, -3554; GHSA-h4gh-qq45-vh27, GHSA-537c-gmf6-5ccf | 43.0.1 → 49.0.0 |
+| `protobuf` | 3.20.1 | PYSEC-2026-899, -1805, -1806 | 3.20.2 → 6.33.5 |
+| `pyOpenSSL` | 24.1.0 | PYSEC-2026-2268, -2269 | 26.0.0 |
+| `Twisted` | 24.3.0 | PYSEC-2024-75, PYSEC-2026-160, -1992 | 24.7.0 → 26.4.0 |
+
+#### What is and is not exposed
+
+This matters more than the count. `cryptography` is imported in exactly one
+place — `apex/user_store.py`, for `Fernet` — and nothing else in this codebase
+uses the library.
+
+- **Not applicable (3 of 7):** PYSEC-2026-35, -3553 and -3554 are X.509
+  certificate-chain and DNS-name-constraint verification flaws, and -2141 is
+  EC public-key loading. This codebase performs no certificate verification
+  with this library and loads no EC keys. Fernet is AES-CBC plus HMAC.
+- **Applicable to the broker connection (3 of 7):** PYSEC-2026-1284,
+  GHSA-h4gh-qq45-vh27 and GHSA-537c-gmf6-5ccf are vulnerabilities in the
+  OpenSSL statically linked into the wheel. Fernet's use of it involves no TLS
+  and no certificate parsing, so token encryption at rest is a small surface —
+  but **pyOpenSSL uses the same bundled OpenSSL for the TLS session to
+  cTrader**, and that does parse certificates. That is where the real exposure
+  is.
+
+#### Why nothing was bumped
+
+Overriding the connector's pins would change the TLS stack of a process that
+is currently trading a live demo account, and there is no cTrader credential in
+this environment to verify the handshake afterwards (blocker **X1**). A bump
+that breaks the broker connection is worse than the advisory it closes.
+
+`tests/test_deploy_config.py` now asserts every requirement stays exactly
+pinned, so a `>=` cannot drift in — the file's header already said exact pins
+were the point and nothing was enforcing it.
+
+#### The owner's options
+
+1. **Accept, with the analysis above recorded.** The applicable advisories
+   affect the broker TLS session, not token encryption.
+2. **Override the pins and verify against a real demo account.** Needs X1.
+   This is the path that actually closes them.
+3. **Replace the connector.** The cTrader Open API is reachable over protobuf
+   and TLS without this wrapper. That is a milestone, not a patch.
+
+Doing nothing is a decision too, and it should be a recorded one rather than a
+default.
 
 ## 7. Order of operations, when the owner decides to proceed
 

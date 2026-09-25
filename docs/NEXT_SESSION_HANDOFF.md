@@ -1,7 +1,7 @@
 # Apex4Traders — handoff
 
-**State at:** `1e428f100` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-23
+**State at:** `09b7660df` + this commit, on `claude/apex4traders-platform-v1`
+**Date:** 2026-09-25
 
 Read this first, then `docs/RELEASE_READINESS.md`. Everything else is detail.
 
@@ -16,11 +16,40 @@ and a private beta.
 
 | | |
 |---|---|
-| Tests | 159 backend files, 175 web tests, build clean, lint 0 errors |
+| Tests | 160 backend files, 207 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
 | Private demo beta | **NOT YET** — blocked on X1 |
 | Public beta | **NO** |
 | Taking money | **NO** — checkout off, no approved price |
 | Live trading | **NO**, and not implemented |
+
+## 1b. What phases A–E of 2026-09-25 changed
+
+Four audits were run that had never been run. Each found something real.
+
+| Audit | Finding |
+|---|---|
+| `npm audit` | **1 critical + 5 high.** Two unauthenticated RCEs in `next`, plus a middleware/proxy bypass — and this app enforces auth in middleware, so that one was an authentication bypass here. Fixed: next 16.2.7 → 16.3.6, now 0 vulnerabilities. |
+| Route audit | **`/configurator` was gated.** It is the previous checkout's return URL, kept so an old receipt does not 404, and it was redirecting those visitors to a login page for an account they do not have. Fixed. |
+| Copy-audit self-audit | **The allowlist was a hole 25 files wide.** Per-file exemptions meant `/terms` was exempt from the rule banning the old brand's support address. 14 of 25 entries needed no exemption at all. Restructured to per-rule. |
+| `pip-audit` | Advisories in `cryptography`, `protobuf`, `pyOpenSSL`, `Twisted` — **all hard-pinned by `ctrader-open-api==0.9.2`**, whose newest release is 0.9.2 (0.9.3 was yanked). Not bumped, and the reason is in `docs/DEPLOYMENT_READINESS.md` §6. |
+
+And the deployment picture was read from the live Render account for the first
+time. **There is no service for this platform.** See §1c.
+
+## 1c. Deployment: nothing on this branch is deployed
+
+Three Render services exist; all three deploy `claude/arcads-external-api-gExX7`
+and none has `web/` as its root directory. So no commit on this branch reaches
+any URL — including the Fernet-token masking in `apex/redact.py`, which
+protects the **legacy bot's** logs and is not live because it is on the wrong
+branch for the service that runs that bot.
+
+`docs/DEPLOYMENT_READINESS.md` has the full picture: what two services would be
+needed, every variable as a name and a placeholder, and the fact that the health
+check path is empty on all three existing services so Render has no signal to
+restart on.
+
+No service was created or changed. That is an owner decision with a cost.
 
 ## 2. The one thing to do next
 
@@ -98,6 +127,26 @@ unavailable read says which. `tests/test_product_copy.py` and
   `docs/CODEX_REVIEW_A_B_C.md`, which are agent-coordination and historical
   records. `tests/test_product_copy.py` has the full allowlist with reasons.
 
+## 5b. Live execution: the claim is now structural
+
+`docs/LIVE_EXECUTION_SPECIFICATION.md` is what a live milestone must contain
+before one real order is placed. Nothing in it is implemented and it authorises
+nothing.
+
+The central fact is stronger than "live trading is disabled":
+`apex/platform/bridge.py`, the only module that can ask a broker to place an
+order, **is imported by nothing in production** — its sole importer is its own
+test. `bridge.submit` is unreachable, not gated.
+
+`tests/test_platform_live_invariants.py` proves that on the AST, including the
+transitive import closure of `automation`, the API and `preview`. It also
+asserts `live_execution_enabled` returns a literal `False` with no name
+referenced and nothing called, so it cannot quietly become configurable.
+
+**When somebody wires the bridge up, that test fails. The failure is the review
+gate — do not resolve it by relaxing the test.** The specification says the
+file must be rewritten by that milestone, not deleted.
+
 ## 6. Known gaps, stated rather than hidden
 
 | Gap | Where |
@@ -108,6 +157,9 @@ unavailable read says which. `tests/test_product_copy.py` and
 | Several rule fields are recorded but not enforced by the engine | labelled at the input in the rule builder |
 | Webhook idempotency is weaker without Redis | `docs/PRODUCTION_RUNBOOK.md` §2 |
 | Checkout creation is a Next.js route with no verified session | `web/src/app/api/create-payment-intent/route.ts` — must move behind the platform API before it is ever enabled |
+| The broker connector pins a vulnerable TLS stack and cannot be raised | `docs/DEPLOYMENT_READINESS.md` §6 — needs X1 to verify any override |
+| A POST to an `/api/` route without a session gets a 307 to `/login`, not JSON | The middleware matcher covers `/api/*`. Harmless while checkout is off; wrong contract if it is ever enabled |
+| Nothing on this branch is deployed | §1c |
 
 ## 7. Hard limits
 
