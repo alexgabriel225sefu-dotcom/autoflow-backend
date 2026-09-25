@@ -1,6 +1,6 @@
 # Apex4Traders — handoff
 
-**State at:** `09b7660df` + this commit, on `claude/apex4traders-platform-v1`
+**State at:** `2f863458f` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-25
 
 Read this first, then `docs/RELEASE_READINESS.md`. Everything else is detail.
@@ -16,7 +16,7 @@ and a private beta.
 
 | | |
 |---|---|
-| Tests | 160 backend files, 207 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
+| Tests | 160 backend files, 215 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
 | Private demo beta | **NOT YET** — blocked on X1 |
 | Public beta | **NO** |
 | Taking money | **NO** — checkout off, no approved price |
@@ -50,6 +50,32 @@ check path is empty on all three existing services so Render has no signal to
 restart on.
 
 No service was created or changed. That is an owner decision with a cost.
+
+## 1d. How to re-run the browser pass
+
+The audit harness lives in the scratchpad, not the repository, and it survives
+between sessions in this container:
+
+```
+scratchpad/audit/serve.py    real apex.platform.api.handle() + a GoTrue stand-in, port 3001
+scratchpad/audit/shoot.js    21 routes at 1440x900, 7 at 390x844
+scratchpad/audit/verify.js   signed-OUT public/protected classification
+```
+
+```bash
+export AUDIT_DATA_DIR=<scratchpad>/audit/data
+cd <scratchpad>/audit && python3 serve.py &          # 3001
+cd web && NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:3001 \
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=audit-anon-key \
+  NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3001 \
+  npm run build && PORT=3000 npm run start &
+cd <scratchpad>/audit && node shoot.js && node verify.js
+```
+
+Chromium is at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Do **not**
+run `playwright install`. Run `verify.js` too, not only `shoot.js`: `shoot.js`
+signs in first, so it cannot see a public route that has been wrongly gated —
+which is exactly the bug that was found.
 
 ## 2. The one thing to do next
 
