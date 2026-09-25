@@ -73,7 +73,20 @@ Pentru Apex4Traders, în plus:
 Cei doi agenți lucrează pe **același branch**, dar **NU în același timp**.
 Unul singur e activ. Când unul se oprește, celălalt continuă de unde a rămas.
 
-Nu există predare automată — predarea se face prin git + `HANDOFF.md`.
+Nu există predare automată — predarea se face prin git + un fișier de handoff.
+
+**Care fișier depinde de firul de lucru:**
+
+| Fir | Branch | Handoff | Protocol |
+|---|---|---|---|
+| Apex4Traders (platforma) | `claude/apex4traders-platform-v1` | `docs/NEXT_SESSION_HANDOFF.md` | **`docs/CODEX_CLAUDE_PROTOCOL.md`** |
+| Apex Trade Bot (Telegram) + site | `claude/arcads-external-api-gexx7-6n4pr9` | `HANDOFF.md` (rădăcină) | — |
+
+Pentru platformă, `docs/CODEX_CLAUDE_PROTOCOL.md` e normativ: definește rolurile
+(Claude implementează și testează, Codex face arhitectură, securitate, release
+și review), ce se citește la începutul fiecărei sesiuni, contractul de handoff
+în zece câmpuri, regulile de onestitate și porțile de aprobare. Citește-l
+înainte să scrii cod pe branch-ul platformei.
 
 ## Când PORNEȘTI lucrul
 

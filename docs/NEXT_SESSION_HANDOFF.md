@@ -3,7 +3,9 @@
 **State at:** `2f863458f` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-25
 
-Read this first, then `docs/RELEASE_READINESS.md`. Everything else is detail.
+Read **`docs/CODEX_CLAUDE_PROTOCOL.md`** first — it is the normative working
+agreement and it defines the contract this document has to satisfy. Then this
+file, then `docs/RELEASE_READINESS.md`. Everything else is detail.
 
 ---
 
