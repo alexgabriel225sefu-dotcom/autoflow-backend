@@ -45,50 +45,79 @@ SURFACES = (
     os.path.join(REPO, "docs"),
 )
 
-# Deliberately NOT audited, each for a stated reason. A file is exempt
-# because of what it is, never because it happened to fail.
+# Deliberately NOT audited — but only for the SPECIFIC rule each file needs.
+#
+# WHY THIS IS PER-RULE AND NOT PER-FILE
+#
+# It used to be per-file: an entry here exempted a file from every ban. That
+# was a hole as wide as the list. `web/src/app/terms/page.tsx` was exempt
+# because it "records what the previous terms described" — and so the page most
+# likely to carry a support address was exempt from the rule forbidding the old
+# brand's support address. A mutation putting that address back into /terms
+# survived the audit.
+#
+# Recomputing what each file ACTUALLY trips found that 14 of the 25 entries
+# needed no exemption at all. They had a plausible reason and no cause. Those
+# are gone; what is left grants exactly the rule the file needs, and the test
+# below fails if an exemption is ever wider than its cause.
 ALLOWED = {
-    # Historical records. These say what a previous session decided, in the
-    # language it decided in. Editing one to pass an audit would falsify a
-    # record.
-    "docs/CODEX_REVIEW_A_B_C.md": "Codex↔Claude handoff, kept verbatim",
-    "docs/CHANGE_A_B_C.md": "a record of changes A, B and C as proposed",
-    "docs/ARCHITECTURE_V2.md": "describes the architecture it replaced",
-    "docs/APEX_ENGINE_AUDIT.md": "an audit of the legacy engine, by name",
-    "docs/APEX_ENGINE_REPORT.md": "a report on the legacy engine, by name",
-    "docs/UI_AUDIT_V1.md": "records the legacy remnants it found, by quoting them",
-    # Documents whose subject IS the previous product or the migration.
-    "docs/APEX4TRADERS_PLATFORM_SCOPE.md": "defines the split from the old product",
-    "docs/APEX4TRADERS_PROGRESS.md": "a progress log that names what was removed",
-    "docs/PLATFORM_V1_PLAN.md": "names the old product as the thing being left",
-    "docs/PLATFORM_V1_RELEASE_CHECKLIST.md": "checks off the removal of the old product's surfaces",
-    "docs/CTRADER_CAPABILITIES.md": "records what the legacy bot proved possible",
-    "docs/PAYMENT_AND_LICENCE_DECISIONS.md": "names the old price and SKU as what must NOT be defaulted to",
-    "docs/LAUNCH_QA_REPORT.md": "records the legacy findings it closed",
-    "docs/LEGAL_LAUNCH_BLOCKERS.md": "names the old brand's contact address as removed",
-    "docs/FOUNDATIONS_IMPLEMENTATION_PLAN.md": "plans the removal, so it names the thing",
-    "docs/MANUAL_LICENCE_OPERATIONS.md": "names the legacy Telegram entitlement store",
-    "docs/RELEASE_READINESS.md": "records what was removed",
-    "docs/BETA_CONFIGURATION.md": "names what the beta is not",
-    # Code whose subject is the boundary between the two products.
-    "apex-forex-bot/apex/platform/billing.py": "names the old price and SKU as the defaults it refuses to substitute",
-    "web/src/app/api/create-payment-intent/route.ts": "documents the old price and SKU as the fallback that was removed",
-    "web/src/app/configurator/page.tsx": "records the old copy it replaced",
-    "web/src/app/layout.tsx": "records the old title a client read in their browser tab",
-    "web/src/app/terms/page.tsx": "records what the previous terms described",
-    "web/src/app/content.test.ts": "the test that bans these phrases has to name them",
-    "web/src/app/(app)/rules/[id]/page.test.tsx": "asserts absence by naming",
+    "apex-forex-bot/apex/platform/billing.py": (
+        "names the old price and SKU as the defaults it refuses to substitute",
+        frozenset({"the previous price", "the previous SKU"})),
+    "web/src/app/api/create-payment-intent/route.ts": (
+        "documents the old price and SKU as the fallback that was removed",
+        frozenset({"the previous price", "the previous SKU"})),
+    "docs/PAYMENT_AND_LICENCE_DECISIONS.md": (
+        "names the old price and SKU as what must NOT be defaulted to",
+        frozenset({"the previous price", "the previous SKU"})),
+    "web/src/app/configurator/page.tsx": (
+        "records the old copy it replaced",
+        frozenset({"the previous product's name"})),
+    "web/src/app/layout.tsx": (
+        "records the old title a client read in their browser tab",
+        frozenset({"the previous product's name"})),
+    "web/src/app/content.test.ts": (
+        "the test that bans these phrases has to name them",
+        frozenset({"the previous product's name", "the previous SKU",
+                   "a profit promise",
+                   "the other brand named in the product"})),
+    "docs/LEGAL_LAUNCH_BLOCKERS.md": (
+        "records the old brand's contact address as the thing that was removed",
+        frozenset({"the previous product's name",
+                   "another brand's domain or contact address"})),
+    "docs/UI_AUDIT_V1.md": (
+        "records the legacy remnants it found, by quoting them",
+        frozenset({"the previous product's name", "the previous price",
+                   "the previous SKU",
+                   "another brand's domain or contact address"})),
+    "docs/FOUNDATIONS_IMPLEMENTATION_PLAN.md": (
+        "plans the removal, so it names every thing being removed",
+        frozenset({"the previous product's name", "the previous price",
+                   "the previous SKU",
+                   "another brand's domain or contact address"})),
 }
 
 BANNED = (
     ("the previous product's name", re.compile(r"Apex\s*Trade\s*Bot", re.I)),
     ("the previous price", re.compile(r"\$\s*297\b|\b29700\b")),
     ("the previous SKU", re.compile(r"apex-bot", re.I)),
-    ("another brand's domain", re.compile(r"aicashsystem", re.I)),
+    ("another brand's domain or contact address",
+     re.compile(r"aicashsystem\s*\.\s*\w|@\s*aicashsystem|https?://\S*aicashsystem",
+                re.I)),
     ("a profit promise", re.compile(
         r"\b(guaranteed|guarantee)\b[^.\n]{0,40}\b(profit|return|win)", re.I)),
     ("a claim that live trading is available", re.compile(
         r"live trading is (available|enabled|supported|on)\b", re.I)),
+)
+
+# Banned on the PRODUCT surfaces only — code a client runs and copy a client
+# reads. An infrastructure document has to be able to name a hosting service
+# that exists; rewording it to pass an audit would make it useless to the
+# operator reading the same name in their dashboard.
+PRODUCT_SURFACES = ("web/src/", "apex-forex-bot/apex/platform/")
+BARE_BRAND = "the other brand named in the product"
+SURFACE_ONLY = (
+    (BARE_BRAND, re.compile(r"aicashsystem", re.I)),
 )
 
 
@@ -108,18 +137,35 @@ def files():
 
 
 ALL = list(files())
-AUDITED = [(rel, full) for rel, full in ALL if rel not in ALLOWED]
+
+
+def _exempt(rel):
+    """The labels this file is allowed to trip, and only those."""
+    entry = ALLOWED.get(rel)
+    return entry[1] if entry else frozenset()
+
+
+# Every file is audited. What changes per file is WHICH rules apply to it, so
+# a file can never fall out of the audit entirely.
+AUDITED = ALL
 
 # ── 1. the allowlist is honest ──────────────────────────────────────────────
-print("\n[1] the allowlist is a list of reasons, not a list of failures")
+print("\n[1] every exemption is exactly as wide as its cause")
 present = {rel for rel, _ in ALL}
 stale = sorted(set(ALLOWED) - present)
 check("every allowlisted file still exists", not stale,
       f"stale exemptions: {stale}")
 check("every exemption has a reason written down",
-      all(len(v) > 10 for v in ALLOWED.values()))
-check("the audit still covers most of the surface",
-      len(AUDITED) > len(ALLOWED) * 3, f"{len(AUDITED)} audited, {len(ALLOWED)} exempt")
+      all(len(reason) > 10 for reason, _ in ALLOWED.values()))
+check("every exemption names at least one rule",
+      all(labels for _, labels in ALLOWED.values()),
+      "a blanket exemption is a hole, not an exemption")
+_labels = {label for label, _ in BANNED} | {label for label, _ in SURFACE_ONLY}
+check("no exemption names a rule that does not exist",
+      all(labels <= _labels for _, labels in ALLOWED.values()),
+      str({r: sorted(l - _labels) for r, (_, l) in ALLOWED.items() if l - _labels}))
+check("no file is audited by exclusion — every file is audited",
+      len(AUDITED) == len(ALL))
 check("it covers the web client", any(r.startswith("web/src/") for r, _ in AUDITED))
 check("it covers the platform backend",
       any(r.startswith("apex-forex-bot/apex/platform/") for r, _ in AUDITED))
@@ -133,8 +179,44 @@ for rel, full in AUDITED:
         bodies[rel] = fh.read()
 
 for label, pattern in BANNED:
-    hits = sorted(r for r, b in bodies.items() if pattern.search(b))
+    hits = sorted(r for r, b in bodies.items()
+                  if pattern.search(b) and label not in _exempt(r))
     check(f"no {label}", not hits, f"found in {hits}")
+
+# ── 2a. an exemption that is not needed is a hole ───────────────────────────
+# This is the check that would have caught the old per-file allowlist: an
+# entry granting a rule the file never trips is an exemption waiting to be
+# used by something that does trip it.
+print("\n[2a] no exemption is wider than what the file actually trips")
+for rel, (reason, labels) in sorted(ALLOWED.items()):
+    body = bodies.get(rel)
+    if body is None:
+        continue
+    _all_rules = dict(BANNED) | dict(SURFACE_ONLY)
+    unnecessary = sorted(
+        label for label in labels
+        if not _all_rules[label].search(body))
+    check(f"{rel} needs every rule it is exempt from", not unnecessary,
+          f"exempt from {unnecessary} without tripping it")
+
+# ── 2b. the other brand is not NAMED on a product surface ───────────────────
+# Infrastructure documents may name a service. Code a client runs, and copy a
+# client reads, may not name the brand at all.
+print("\n[2b] the other brand is not named in code or client-facing copy")
+hits = sorted(r for r, b in bodies.items()
+              if r.startswith(PRODUCT_SURFACES)
+              and dict(SURFACE_ONLY)[BARE_BRAND].search(b)
+              and BARE_BRAND not in _exempt(r))
+check("no mention of the other brand in the product itself", not hits,
+      f"found in {hits}")
+# And prove the domain form is still caught everywhere, so tightening the rule
+# above did not quietly switch the protection off.
+_domain_rule = dict(BANNED)["another brand's domain or contact address"]
+for form in ("aicashsystem.space", "support@aicashsystem.space",
+             "https://aicashsystem.space/contact", "AiCashSystem.Space"):
+    check(f"{form!r} is still refused", bool(_domain_rule.search(form)), form)
+check("but a bare service name is allowed in an infrastructure document",
+      not _domain_rule.search("the aicashsystem service is suspended"))
 
 # ── 3. no public page claims live trading ───────────────────────────────────
 # The pages a visitor reads without signing in. Each must state the limit,
@@ -205,4 +287,4 @@ if _fails:
         print("  -", f)
     sys.exit(1)
 print(f"All product-copy checks passed ({len(AUDITED)} files audited, "
-      f"{len(ALLOWED)} exempt with reasons).")
+      f"{len(ALLOWED)} carrying a per-rule exemption).")
