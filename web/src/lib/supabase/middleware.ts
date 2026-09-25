@@ -1,10 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Paths a signed-out visitor may see. Everything else needs a session. */
+/**
+ * Paths a signed-out visitor may see. Everything else needs a session.
+ *
+ * Deny by default: a route added under `(app)/` is protected because it is
+ * absent from this list, not because anything was remembered.
+ *
+ * `/configurator` is here because it is the return URL the PREVIOUS checkout
+ * used. Somebody following an old link from an old receipt has no session on
+ * this platform and never will, so gating it sends them to a login wall for an
+ * account they do not have — which is the exact 404-equivalent the page was
+ * kept to avoid. It is static, makes no authenticated call, and states no
+ * licence state of its own.
+ */
 export const PUBLIC_PATHS = [
   "/", "/login", "/signup", "/auth/confirm", "/auth/reset",
-  "/auth/callback", "/terms", "/privacy",
+  "/auth/callback", "/terms", "/privacy", "/configurator",
 ];
 
 export function isPublic(pathname: string) {
