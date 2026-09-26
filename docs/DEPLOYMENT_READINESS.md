@@ -659,7 +659,70 @@ message through (3 checks, with the leak visible in the output).
 **Every pinned package is advisory-free.** The one remaining `pip-audit`
 finding is `setuptools` (PYSEC-2026-3447), which is build-environment only and
 not in `requirements.txt`. `pip check` reports no broken requirements, and
-164/164 backend test files pass in that venv.
+164/164 backend test files passed in that venv at the time.
+
+#### `ctrader_accounts` encrypted at rest — DONE 2026-09-26
+
+The observation recorded above, now acted on. **The decision was not the obvious
+one**, and the reason matters more than the outcome.
+
+**Adding the field to `_SENSITIVE_FIELDS` does nothing.** `_encrypt_sensitive`
+only touches `isinstance(val, str)`, and `ctrader_accounts` holds a *list* of
+`{"ctid": <int>, "live": <bool>}`. The name would have sat in a set called
+"sensitive fields" while the data stayed in the clear — a change that reads as a
+fix and is not one, which is worse than the honest status quo. Measured before
+writing anything: adding the name left the value byte-for-byte unchanged.
+
+So there is a second set, `_SENSITIVE_JSON_FIELDS`, encrypted as a JSON payload:
+`json.dumps` → Fernet → `enc:<token>` on write, and the inverse on read, so the
+four modules that read the field keep receiving the list they always did.
+
+**Backwards compatibility.** A record written before this change holds a real
+list, which is by definition "not a string starting with `enc:`", so it passes
+through untouched — and the next save of that record encrypts it. That is the
+common case until every record has been rewritten once, and it is asserted
+directly: a hand-written legacy file, bypassing `save()`, loads correctly, is
+accepted by the real reader (`ui_state._accounts`), gives the right count, and is
+encrypted on the following save.
+
+**An unopenable value reads as absent, never as itself.** Callers do
+`for a in (u.get("ctrader_accounts") or [])`, so handing back the ciphertext
+string would walk its characters and "find" accounts that do not exist. A
+corrupted token, a truncated one, a non-token and a payload that decrypts but is
+not JSON all become `None`, which `or []` turns into no accounts, with a log line
+naming the field and not echoing the ciphertext.
+
+**An empty list is deliberately not encrypted**, so "this client has no accounts"
+stays distinguishable from "the list could not be read".
+
+**The compare-and-set path is unaffected.** `ctrader_accounts` is in
+`CRITICAL_FIELDS`, and Fernet ciphertext is non-deterministic, so a per-field
+value comparison would see a change on every write. It does not do that: the CAS
+compares a record version counter, not field values.
+
+**WHAT IS DELIBERATELY NOT ENCRYPTED, AND SO WHAT THIS DOES NOT BUY.**
+`ctrader_account_id` — the currently selected account — holds the same identifier
+and stays in plaintext. It is a *selector*: compared against this list to render
+the account switcher, displayed in roughly fourteen places, stored as an int.
+That is exactly the "used as a key or index" case that must not be encrypted
+without auditing every caller. So the protection is **partial**: the full set of
+a client's accounts and which of them trade real money stop being readable at
+rest; the one they have selected does not. The reason is written next to the set
+in `user_store.py`, and a test asserts that it is written there — a silent
+omission and a considered decision look identical in a diff otherwise.
+
+Pinned by `tests/test_accounts_at_rest.py`. Mutations, each restored and re-run
+green:
+
+| Mutation | Result |
+|---|---|
+| the no-op "fix": move the field to `_SENSITIVE_FIELDS` | **fails 13 checks** |
+| decrypt returns the ciphertext instead of `None` | fails 13 |
+| skip the JSON decode, returning the decrypted string | fails 5 |
+| encrypt the empty list too | fails 1 |
+| legacy plaintext clobbered instead of passing through | fails 6 |
+
+Verified: 165/165 backend test files pass, in the container and in a clean venv.
 
 #### Decision, and it is recorded rather than defaulted
 

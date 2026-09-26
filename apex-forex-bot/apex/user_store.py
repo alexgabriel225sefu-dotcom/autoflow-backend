@@ -41,6 +41,32 @@ _SENSITIVE_FIELDS = {
     # on the next save.
     "anthropic_key", "groq_key", "gemini_key",
 }
+# Sensitive fields whose value is NOT a string. `_encrypt_sensitive` only
+# touches `isinstance(val, str)`, so naming one of these in _SENSITIVE_FIELDS
+# above would do NOTHING while reading as though it were protected — the worst
+# of the available outcomes. They are encrypted as a JSON payload instead:
+# json.dumps -> Fernet -> "enc:<token>" on write, and the inverse on read, so
+# callers keep receiving the list or dict they always did.
+#
+# ctrader_accounts is the broker's own answer to "which accounts does this token
+# hold, and is each one real money": a list of {"ctid": <account id>,
+# "live": <bool>}. It is not a credential — it cannot reach the account without
+# the access token, which is encrypted — but it identifies every broker account
+# the client holds and which of them are real money, and it sat in plaintext
+# beside the encrypted tokens.
+#
+# NOTE ON WHAT THIS DOES NOT COVER. `ctrader_account_id` — the currently
+# selected account — holds the same identifier and stays in plaintext
+# deliberately. It is a selector, compared against this list to render the
+# account switcher, displayed in roughly fourteen places, and stored as an int.
+# That is exactly the "used as a key or index" case that must not be encrypted
+# without auditing every caller. So the protection here is PARTIAL: the full set
+# of a client's accounts and their live/demo flags stop being readable at rest;
+# the one they have selected does not.
+_SENSITIVE_JSON_FIELDS = {
+    "ctrader_accounts",
+}
+
 _ENC_PREFIX = "enc:"
 
 class EncryptionNotConfigured(RuntimeError):
@@ -112,6 +138,28 @@ def _encrypt_sensitive(data: dict) -> dict:
         val = out.get(field)
         if isinstance(val, str) and val and not val.startswith(_ENC_PREFIX):
             out[field] = _ENC_PREFIX + _fernet.encrypt(val.encode()).decode()
+    for field in _SENSITIVE_JSON_FIELDS:
+        if field not in out:
+            continue
+        val = out[field]
+        # Already encrypted (a re-save of a record read back), or empty: leave
+        # it. An empty list carries nothing worth encrypting and encrypting it
+        # would make "no accounts" indistinguishable from "cannot be read".
+        if isinstance(val, str) and val.startswith(_ENC_PREFIX):
+            continue
+        if val in (None, [], {}, ""):
+            continue
+        try:
+            payload = json.dumps(val, separators=(",", ":"), sort_keys=True)
+        except (TypeError, ValueError) as e:
+            # Storing it in the clear because it would not serialise is the one
+            # outcome this must not choose silently.
+            print(f"[Store] ⛔ {field} could not be serialised for encryption "
+                  f"({type(e).__name__}) — storing nothing rather than "
+                  f"plaintext")
+            out[field] = None
+            continue
+        out[field] = _ENC_PREFIX + _fernet.encrypt(payload.encode()).decode()
     return out
 
 
@@ -180,6 +228,39 @@ def _decrypt_sensitive(data: dict) -> dict:
                       f"absent. If TOKEN_ENCRYPTION_KEY was rotated, restore "
                       f"the previous key.")
                 data[field] = ""
+
+    for field in _SENSITIVE_JSON_FIELDS:
+        val = data.get(field)
+        # A legacy plaintext value — a real list or dict, written before this
+        # field was encrypted — is exactly what "not a str starting with enc:"
+        # means, and it passes through untouched. That is the backwards
+        # compatibility requirement, and it is the common case until every
+        # record has been rewritten once.
+        if not (isinstance(val, str) and val.startswith(_ENC_PREFIX)):
+            continue
+        if not _fernet:
+            print(f"[Store] ⛔ {field} is ENCRYPTED but TOKEN_ENCRYPTION_KEY is "
+                  f"not set — cannot decrypt. Restore the key that was used to "
+                  f"write it.")
+            data[field] = None
+            continue
+        try:
+            opened = _fernet.decrypt(val[len(_ENC_PREFIX):].encode()).decode()
+        except Exception as e:
+            print(f"[Store] ⛔ failed to decrypt {field} ({e}) — treating as "
+                  f"absent. If TOKEN_ENCRYPTION_KEY was rotated, restore the "
+                  f"previous key.")
+            data[field] = None
+            continue
+        try:
+            data[field] = json.loads(opened)
+        except ValueError as e:
+            # Decrypted, but not the shape it went in as. Returning the string
+            # would hand callers that do `for a in accounts` a walk over its
+            # characters, so this reads as absent too.
+            print(f"[Store] ⛔ {field} decrypted but is not valid JSON "
+                  f"({type(e).__name__}) — treating as absent")
+            data[field] = None
     return data
 
 # ─── Backend selection ───────────────────────────────────
