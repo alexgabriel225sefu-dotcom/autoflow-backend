@@ -1,13 +1,18 @@
 # Apex4Traders — release readiness
 
-**Assessed at:** `6f35dcd7f` on `claude/apex4traders-platform-v1`
+**Assessed at:** `495fed056` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-26
+> **What "assessed at" means here.** The commit named is the one the tree was in
+> when these numbers were produced. The commit that updates this line changes
+> only documentation, so the numbers still hold at it — that is the convention,
+> and it is the reason the SHA is a commit rather than "latest".
+
 
 ### Verification at this commit
 
 | | |
 |---|---|
-| Backend | **160 / 160** test files |
+| Backend | **162 / 162** test files |
 | Frontend | **215 / 215** tests |
 | Build | **clean**, 24 routes |
 | Lint | **0 errors**, 8 warnings |
@@ -42,7 +47,7 @@ cTrader account is unverified, and that is one gate, not a detail.
 | 6 | No critical security issue | ✅ | No token under `/api/v1/`; rate limiting on every route; webhook verifies before parsing; ownership is the storage key. |
 | 7 | No live trading path | ✅ | `test_live_path_invariants.py`; `SUPPORTED_ORDER_TYPES = {MARKET}`; `automation.start` refuses a non-demo account. |
 | 8 | Frontend tests pass | ✅ | 215 / 215 |
-| 9 | Backend tests pass | ✅ | 160 / 160 files |
+| 9 | Backend tests pass | ✅ | 162 / 162 files |
 | 10 | Build passes | ✅ | 24 routes, TypeScript clean |
 | 11 | Mobile navigation works | ✅ | 8 of 8 destinations at 390 px, 0 px overflow |
 | 12 | Chart handles real connected data | ⚠️ **unverified** | Every failure state is tested. The success state has never had real candles in it. |

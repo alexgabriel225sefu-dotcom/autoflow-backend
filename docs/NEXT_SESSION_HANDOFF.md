@@ -1,7 +1,12 @@
 # Apex4Traders — handoff
 
-**State at:** `c95e5d7df` on `claude/apex4traders-platform-v1`
+**State at:** `495fed056` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-26
+> **What "assessed at" means here.** The commit named is the one the tree was in
+> when these numbers were produced. The commit that updates this line changes
+> only documentation, so the numbers still hold at it — that is the convention,
+> and it is the reason the SHA is a commit rather than "latest".
+
 
 Read **`docs/CODEX_CLAUDE_PROTOCOL.md`** first — it is the normative working
 agreement and it defines the contract this document has to satisfy. Then this
@@ -130,6 +135,34 @@ variable is the right fix and a separate change.
 screenshots (15 MB). Untracked and gitignored in `f566c6629`; the previous
 commit's history still holds them. The platform branch already gitignored
 `ui-audit/`, which is why it never happened here.
+
+## 1f. Codex review decisions — settled, do not re-open
+
+Review of handoff #2, 2026-09-26. These are decided; a next session that
+re-litigates them is wasting the review.
+
+| Question | Decision |
+|---|---|
+| `protobuf` 3.20.1 → 3.20.2 | **Apply**, as its own reviewed commit, not bundled with deployment work. Done. |
+| pyOpenSSL / cryptography | **Do not raise now.** Off our execution path; the 26 + newest-cryptography pairing is broken. |
+| Render topology | **Two separate services** for the platform. Do **not** merge the platform into the Telegram bot's service. |
+| Git history rewrite for the scrubbed identifiers | **Not now.** |
+| `nova/config/nova.json5` `allowFrom` → env var | **Later**, as a separate change on the bot's branch. |
+| Empty health check path on the three existing services | **Fixed separately** on the legacy deployment, not from here. |
+
+Two required fixes came with it and are done:
+
+1. **`tests/test_broker_tls_posture.py` missed three spellings** of reaching the
+   SDK's `Client` — the submodule import, `from … import client` then
+   `client.Client`, and `import … as c` then `c.Client`. All three were
+   confirmed by mutation before the fix. It now resolves aliases rather than
+   matching names, catches nine variants including `getattr`, and is itself
+   tested against five legitimate constructs so it cannot be deleted for crying
+   wolf. Commit `495fed056`.
+2. **Stale release docs** — this file said `c95e5d7df` and
+   `RELEASE_READINESS.md` said `6f35dcd7f` with `160 / 160`. Both now name
+   `495fed056` with the current counts, and both state what "assessed at" means
+   so the next reader can tell a deliberate SHA from a forgotten one.
 
 ## 2. The one thing to do next
 
