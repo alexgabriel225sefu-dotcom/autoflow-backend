@@ -28,9 +28,23 @@ services:
     env: python
     rootDir: apex-forex-bot
     buildCommand: pip install -r requirements.txt
+    # platform_server.py, NOT main.py. This was wrong in the first version of
+    # this file and it was the worst kind of wrong: `main.py` starts
+    # apex.bot.main(), which starts Telegram polling, the per-user trading loops
+    # and the operator dashboard. Deploying it under a second name would have
+    # created a SECOND live Telegram trading bot alongside the one already
+    # running. It looked right because the platform's /healthz, /readyz and
+    # /api/v1/* routes are mounted on that bot's HTTP handler, so the health
+    # check path below was real — the service behind it would not have been.
+    #
+    # platform_server.py serves the platform surface and nothing else: no
+    # Telegram poller, no trading loop, no ownership lease, no dashboard. It
+    # never imports apex.bot, which tests/test_platform_server.py asserts on the
+    # transitive import closure, and that test also asserts this line.
+    #
     # -u so startup logs reach the log tab unbuffered. Without it, "it will not
     # start" is undebuggable.
-    startCommand: python -u main.py
+    startCommand: python -u platform_server.py
     plan: starter
     # The platform's own branch. NOT the legacy bot's deploy branch — a commit
     # here must never restart the live trading loop.
@@ -59,6 +73,21 @@ services:
       # limiter, which /readyz then refuses in production.
       - key: RATE_LIMIT_STORE
         value: auto
+      # The web client's origin. REQUIRED, not optional: the browser calls
+      # /api/v1/* cross-origin with an Authorization header, which triggers a
+      # CORS preflight, and without a matching reply the deployed dashboard
+      # shows nothing but network errors. Set it to the web service's own URL,
+      # scheme and host, no trailing path — e.g.
+      # https://apex4traders-web.onrender.com — and add a custom domain to the
+      # same value, comma-separated, if one is attached later.
+      #
+      # `sync: false` rather than a literal because the web service's URL is not
+      # known until Render has created it, and it must never be guessed: the
+      # allowlist is compared exactly and is never reflected back from the
+      # request, since reflecting Origin would let any site on the internet make
+      # authenticated calls with a visitor's bearer token.
+      - key: A4T_ALLOWED_ORIGIN
+        sync: false
 
       # ── secrets: set in the dashboard, never here ────────────────────────
       # Fernet key for broker tokens at rest. Startup is refused without it.
@@ -82,7 +111,10 @@ services:
         sync: false
       # Shared backend. Without one, ownership, entitlement and order
       # idempotency become per-container and /readyz fails in production.
-      # Provide REDIS_URL, or the two Upstash variables instead.
+      #
+      # SET EITHER REDIS_URL ALONE, OR BOTH UPSTASH VARIABLES. Not all three,
+      # and not one Upstash variable on its own. All three keys are listed so
+      # the dashboard shows them; leave the ones you are not using empty.
       - key: REDIS_URL
         sync: false
       - key: UPSTASH_REDIS_REST_URL

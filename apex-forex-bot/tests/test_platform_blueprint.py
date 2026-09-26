@@ -75,7 +75,10 @@ for name in ("apex4traders-api", "apex4traders-web"):
 # from the repository root, where the file does not exist.
 print("\n[2] every rootDir exists and every command resolves inside it")
 EXPECT = {
-    "apex4traders-api": ("apex-forex-bot", ["requirements.txt", "main.py"]),
+    # platform_server.py, not main.py: see the startCommand check below for why
+    # the difference is a second live trading bot rather than a detail.
+    "apex4traders-api": ("apex-forex-bot", ["requirements.txt",
+                                            "platform_server.py"]),
     "apex4traders-web": ("web", ["package.json", "package-lock.json"]),
 }
 for name, (root, needed) in EXPECT.items():
@@ -91,9 +94,27 @@ for name, (root, needed) in EXPECT.items():
 api, web = SVCS.get("apex4traders-api", {}), SVCS.get("apex4traders-web", {})
 check("the API installs from requirements.txt",
       "requirements.txt" in api.get("buildCommand", ""), api.get("buildCommand"))
-check("the API starts main.py unbuffered",
-      "main.py" in api.get("startCommand", "") and "-u" in api.get("startCommand", ""),
-      api.get("startCommand"))
+# THIS CHECK USED TO ASSERT `main.py`, AND IT WAS GREEN THE WHOLE TIME THE
+# BLUEPRINT WAS WRONG. `main.py` starts apex.bot.main() — Telegram polling, the
+# per-user trading loops, the operator dashboard — so applying that blueprint
+# would have deployed a SECOND live Telegram trading bot under the name of the
+# platform API. The test agreed with the blueprint instead of with the product,
+# which is the failure mode of writing a test from the artifact rather than from
+# what the artifact has to do.
+_start = api.get("startCommand", "")
+check("the API starts the PLATFORM server, not the trading bot",
+      "platform_server.py" in _start,
+      f"{_start!r} — main.py starts Telegram polling and the trading loops")
+check("and it must not start main.py under any flag",
+      "main.py" not in _start, _start)
+check("unbuffered, or a failure to start is undebuggable",
+      "-u" in _start, _start)
+# The API service is useless to the web client without this: the browser calls
+# it cross-origin with an Authorization header, so a CORS preflight has to be
+# answered, and the allowed origin is configured rather than reflected.
+check("A4T_ALLOWED_ORIGIN is declared for the API service",
+      "A4T_ALLOWED_ORIGIN" in RAW,
+      "without it the deployed dashboard shows only network errors")
 # `npm ci` and not `npm install`: the lockfile is the reviewed dependency set,
 # and the framework pin exists because a range would let a deploy install a
 # version nobody read.
