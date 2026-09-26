@@ -37,6 +37,38 @@ The cTrader application is created once, at <https://openapi.ctrader.com/apps>.
 Its redirect URI depends on a URL Render has not issued yet, so §3 comes back to
 it.
 
+### Supabase URL configuration — the step that is easy to miss
+
+A new Supabase project ships with **Site URL set to `http://localhost:3000`**,
+and that single default breaks sign-up on a deployed site in a way that looks
+like the application is broken.
+
+What happens: the app asks for a confirmation redirect to
+`${window.location.origin}/auth/callback`. Supabase only honours a redirect that
+is on its allowlist; anything else silently falls back to the Site URL. So the
+e-mail arrives, the visitor clicks "Confirm email address", and Safari says it
+cannot connect to the server — because it has been sent to localhost on their
+phone. This happened on the very first real sign-up.
+
+Worth understanding before panicking: the confirmation itself SUCCEEDS. The link
+goes to Supabase's own verify endpoint, which confirms the address server-side
+and only then redirects. So the account is usable and the person can sign in
+directly; it is the landing page that fails, not the confirmation.
+
+In **Authentication → URL Configuration** (project settings):
+
+| Field | Value |
+|---|---|
+| Site URL | the web service's URL, e.g. `https://apex4traders-web.onrender.com` |
+| Redirect URLs | the same host with a wildcard: `https://apex4traders-web.onrender.com/**` |
+
+The wildcard covers `/auth/callback` and the `?mode=recovery` variant that
+password reset uses. Add a custom domain here too if one is attached later, or
+reset e-mails will start landing on the old host.
+
+There is no API for this in the Supabase MCP tooling — it is a dashboard
+setting.
+
 ## 1. The API service
 
 Create it first: the web service needs its URL, and the cTrader redirect URI
