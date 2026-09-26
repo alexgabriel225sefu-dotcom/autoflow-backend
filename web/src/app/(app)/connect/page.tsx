@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type CtraderStatus } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
@@ -11,11 +11,72 @@ import { ErrorNotice, Spinner } from "@/components/app/state";
  * completes the link with an authenticated call. That is what stops somebody
  * starting a flow for THEIR account and getting a victim to approve it.
  */
+/**
+ * Where the pending nonce is kept between step 1 and step 2.
+ *
+ * It used to be React state and nothing else, with the reasoning that a stale
+ * nonce in storage "would invite a completion attempt against an attempt that
+ * is long gone". That reasoning is right and the conclusion was wrong, because
+ * it treated losing the tab's memory as the exception. On a phone it is the
+ * normal case: step 1 opens cTrader in a NEW tab, iOS discards the JS state of
+ * the backgrounded tab under memory pressure, and returning reloads it. The
+ * page then showed "Step 1" again, the visitor pressed Connect again, and the
+ * only visible outcome was RATE_LIMITED from the oauth bucket. The flow was
+ * unfinishable on mobile. Found on the first real connection attempt.
+ *
+ * sessionStorage, not localStorage: it is scoped to this tab and survives the
+ * reload, which is exactly the lifetime the nonce should have. And the stale
+ * case the original comment worried about is handled directly rather than by
+ * refusing to persist — the value is stored with the time it was issued and
+ * ignored once it is older than the server's own PENDING_TTL_S, so the page
+ * cannot offer to finish something the server has already forgotten.
+ */
+const NONCE_KEY = "a4t.ctrader.pending";
+const NONCE_TTL_MS = 900_000;   // PENDING_TTL_S on the server, in milliseconds
+
+function loadNonce(): string | null {
+  try {
+    const raw = sessionStorage.getItem(NONCE_KEY);
+    if (!raw) return null;
+    const { nonce, at } = JSON.parse(raw) as { nonce?: string; at?: number };
+    if (!nonce || !at || Date.now() - at > NONCE_TTL_MS) {
+      sessionStorage.removeItem(NONCE_KEY);
+      return null;
+    }
+    return nonce;
+  } catch {
+    // A private window, disabled site data, or a value somebody else wrote.
+    // None of those should break the page; they just mean no resume.
+    return null;
+  }
+}
+
+function saveNonce(nonce: string | null) {
+  try {
+    if (nonce === null) sessionStorage.removeItem(NONCE_KEY);
+    else sessionStorage.setItem(NONCE_KEY,
+      JSON.stringify({ nonce, at: Date.now() }));
+  } catch { /* storage unavailable — the in-memory path still works */ }
+}
+
+/** Errors that mean this attempt is finished, whatever the page thinks. */
+const TERMINAL = new Set([
+  "STATE_UNKNOWN", "STATE_EXPIRED", "STATE_REPLAYED", "NO_CODE",
+]);
+
 export default function ConnectPage() {
   const status = useRead<CtraderStatus>("ctrader/status");
   const [pending, setPending] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Resume after the tab was reloaded while the visitor was away at cTrader.
+  useEffect(() => { setPending(loadNonce()); }, []);
+
+  function remember(nonce: string | null) {
+    setPending(nonce);
+    saveNonce(nonce);
+  }
 
   async function begin() {
     setBusy(true); setErr(null);
@@ -23,10 +84,7 @@ export default function ConnectPage() {
       "ctrader/connect", { method: "POST" });
     setBusy(false);
     if (!r.ok) return setErr(`${r.code}: ${r.message}`);
-    // The nonce is kept in memory for this tab only. It is not a credential,
-    // and it is not written to localStorage — a stale one in storage would
-    // invite a completion attempt against an attempt that is long gone.
-    setPending(r.data.nonce);
+    remember(r.data.nonce);
     window.open(r.data.authorizeUrl, "_blank", "noopener");
   }
 
@@ -36,8 +94,13 @@ export default function ConnectPage() {
     const r = await api<{ ctrader: CtraderStatus }>(
       "ctrader/complete", { method: "POST", body: { nonce: pending } });
     setBusy(false);
-    if (!r.ok) return setErr(`${r.code}: ${r.message}`);
-    setPending(null);
+    if (!r.ok) {
+      // A terminal refusal must clear the stored nonce, or the page offers
+      // "finish here" for ever against an attempt that can never succeed.
+      if (TERMINAL.has(r.code)) remember(null);
+      return setErr(`${r.code}: ${r.message}`);
+    }
+    remember(null);
     void status.reload();
   }
 
