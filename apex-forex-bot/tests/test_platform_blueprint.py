@@ -118,6 +118,20 @@ check("A4T_ALLOWED_ORIGIN is declared for the API service",
 # `npm ci` and not `npm install`: the lockfile is the reviewed dependency set,
 # and the framework pin exists because a range would let a deploy install a
 # version nobody read.
+# The web build needs devDependencies, and NODE_ENV=production takes them away.
+# This failed on the first real deploy: Render applies NODE_ENV during the build,
+# `npm ci` then omits devDependencies, and `next build` died on
+# "Cannot find module '@tailwindcss/postcss'" — which lives in devDependencies
+# along with tailwindcss and typescript. Measured against a real install, not
+# inferred: `npm ci` under NODE_ENV=production leaves both out of node_modules.
+_web_build = web.get("buildCommand", "")
+if "NODE_ENV" in RAW and "production" in RAW:
+    check("the web build installs devDependencies, which NODE_ENV=production "
+          "would otherwise omit",
+          "--include=dev" in _web_build,
+          f"{_web_build!r} — the build needs @tailwindcss/postcss, tailwindcss "
+          f"and typescript, all devDependencies")
+
 check("the web service uses `npm ci`, not `npm install`",
       "npm ci" in web.get("buildCommand", "")
       and "npm install" not in web.get("buildCommand", ""),

@@ -128,13 +128,20 @@ New → Web Service → the same repository.
 | Language / runtime | Node |
 | Branch | `claude/apex4traders-platform-v1` |
 | Root Directory | `web` |
-| Build Command | `npm ci && npm run build` |
+| Build Command | `npm ci --include=dev && npm run build` |
 | Start Command | `npm run start` |
 | Health Check Path | `/` |
 | Auto-Deploy | **Off** |
 
 `npm ci` and not `npm install`: the lockfile is the dependency set that was
 reviewed and audited, and `install` may resolve something else.
+
+`--include=dev` is required, and leaving it out is how the first attempt at this
+service failed. `NODE_ENV=production` is set below, Render applies it during the
+build as well as at runtime, and `npm ci` then skips devDependencies — but the
+build needs `@tailwindcss/postcss`, `tailwindcss` and `typescript`, all of which
+live there. Without the flag the build ends with
+`Cannot find module '@tailwindcss/postcss'`.
 
 ### Environment variables — web service
 
