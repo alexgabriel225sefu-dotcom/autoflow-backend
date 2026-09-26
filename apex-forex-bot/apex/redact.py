@@ -78,6 +78,24 @@ _SHAPES = (
     # A private key block, however it is embedded.
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
                 re.S), MASK),
+    # Credentials carried in a QUERY STRING. cTrader's /apps/token reads its
+    # params from the query string rather than a body, so a URL for that
+    # endpoint contains the application's client_secret — the credential behind
+    # every client's broker connection, not one client's — alongside the
+    # authorization code or the client's refresh token.
+    #
+    # This is defence in depth, not the fix. requests puts the full URL into the
+    # message of the HTTPError that raise_for_status() raises, and that message
+    # used to reach the logs verbatim; apex/brokers/ctrader.py no longer lets it
+    # escape. This catches the next place somebody prints a URL.
+    #
+    # The parameter name is kept and only the value masked, because "which
+    # credential was in the line" is the one thing an operator reading a log
+    # actually needs.
+    (re.compile(r"(?i)\b(client_secret|client_id|refresh_token|access_token"
+                r"|code|id_token|api_key|apikey|token|password|passwd|secret)"
+                r"=([^&\s\"'\]<>]{4,})"),
+     r"\1=" + MASK),
 )
 
 

@@ -118,11 +118,49 @@ def authorize_url(redirect_uri: str, state: str, scope: str = None) -> str:
 def _token_request(params: dict) -> dict:
     """cTrader's /apps/token reads QUERY-STRING params (not a form body) and
     returns JSON with an in-band errorCode even on HTTP 200. Send params in the
-    query string and surface errorCode as an exception."""
-    r = requests.get(_OAUTH_TOKEN, params=params,
-                     headers={"Accept": "application/json"}, timeout=15)
-    r.raise_for_status()
-    data = r.json()
+    query string and surface errorCode as an exception.
+
+    NO EXCEPTION RAISED HERE MAY CARRY THE URL. Because the params travel in the
+    query string, that URL contains `client_secret` — the application's own
+    credential, behind every client's broker connection, not one client's — plus
+    either the authorization code or the client's refresh token.
+
+    `requests` puts the full URL in the message of the HTTPError that
+    `raise_for_status()` produces, and in its ConnectionError and Timeout
+    messages too. This function used to let those escape, and a failed token
+    refresh is exactly the kind of event that gets logged. So the status is
+    checked by hand and every requests exception is replaced with one that
+    names the class of failure and nothing else.
+
+    tests/test_ctrader_oauth_http.py pins this against a real HTTP server.
+    """
+    try:
+        r = requests.get(_OAUTH_TOKEN, params=params,
+                         headers={"Accept": "application/json"}, timeout=15)
+    except requests.exceptions.Timeout:
+        raise RuntimeError("cTrader token request timed out after 15s") from None
+    except requests.exceptions.RequestException as e:
+        # `from None` as well as a rewritten message: the original is chained
+        # onto the traceback otherwise, and the traceback is what gets logged.
+        raise RuntimeError(
+            f"cTrader token request failed to reach the endpoint "
+            f"({type(e).__name__})") from None
+
+    if r.status_code != 200:
+        # No URL, no body. A body from a token endpoint can echo what was sent.
+        raise RuntimeError(
+            f"cTrader token endpoint returned HTTP {r.status_code}")
+
+    try:
+        data = r.json()
+    except ValueError:
+        raise RuntimeError(
+            "cTrader token endpoint returned a body that is not JSON") from None
+
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"cTrader token endpoint returned {type(data).__name__}, not an object")
+
     if data.get("errorCode"):
         raise RuntimeError(f"cTrader token error: {data.get('errorCode')} — {data.get('description', '')}")
     return data
