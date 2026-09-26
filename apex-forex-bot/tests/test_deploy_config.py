@@ -266,6 +266,30 @@ for line in _pins:
     check(f"{line.split('==')[0]} is pinned exactly",
           "==" in line and not any(op in line for op in (">=", "<=", "~=", ">", "<")),
           line)
+# The check that would have caught a bump that cannot be installed. A pin can be
+# perfectly valid on its own and unresolvable in combination: `protobuf==3.20.2`
+# closes PYSEC-2026-899 and conflicts with `ctrader-open-api==0.9.2`, which pins
+# `protobuf==3.20.1` in its own metadata. pip answers ResolutionImpossible and
+# the build fails — on a service that runs a trading loop.
+#
+# This does not resolve anything (that needs the network). It asserts the
+# specific collision is absent, by name, with the reason attached.
+_names = {l.split("==")[0].strip().lower() for l in _pins if "==" in l}
+_versions = {l.split("==")[0].strip().lower(): l.split("==")[1].strip()
+             for l in _pins if "==" in l}
+if "ctrader-open-api" in _names and "protobuf" in _names:
+    check("protobuf is not pinned against the connector's own protobuf pin",
+          _versions.get("protobuf") == "3.20.1",
+          f"ctrader-open-api==0.9.2 requires protobuf==3.20.1; this file says "
+          f"{_versions.get('protobuf')}, which makes `pip install -r "
+          f"requirements.txt` fail with ResolutionImpossible. Closing the "
+          f"protobuf advisory needs the connector replaced or its generated "
+          f"_pb2 stubs vendored — see docs/DEPLOYMENT_READINESS.md §6.")
+else:
+    check("protobuf is not pinned directly, so no collision is possible",
+          "protobuf" not in _names,
+          "if protobuf is pinned here, it must match the connector's pin")
+
 check("cryptography is pinned, because it encrypts broker tokens at rest",
       any(l.startswith("cryptography==") for l in _pins))
 check("the broker connector is pinned, because it pins the TLS stack below it",

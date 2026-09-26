@@ -143,7 +143,7 @@ re-litigates them is wasting the review.
 
 | Question | Decision |
 |---|---|
-| `protobuf` 3.20.1 → 3.20.2 | **Apply**, as its own reviewed commit, not bundled with deployment work. Done. |
+| `protobuf` 3.20.1 → 3.20.2 | Decided **apply**, and it turned out **not implementable** — `ctrader-open-api==0.9.2` pins `protobuf==3.20.1`, so the bump makes `pip install -r requirements.txt` fail with ResolutionImpossible. Reverted, guarded by a test, and the only real route (vendor the `_pb2` stubs) is written up in `docs/DEPLOYMENT_READINESS.md` §6. **Back to Codex.** |
 | pyOpenSSL / cryptography | **Do not raise now.** Off our execution path; the 26 + newest-cryptography pairing is broken. |
 | Render topology | **Two separate services** for the platform. Do **not** merge the platform into the Telegram bot's service. |
 | Git history rewrite for the scrubbed identifiers | **Not now.** |

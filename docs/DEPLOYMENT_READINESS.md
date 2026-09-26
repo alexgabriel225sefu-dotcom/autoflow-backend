@@ -317,11 +317,69 @@ import error — in the TLS stack of a process that is trading.
 `pip check` reports only the connector's `==` pins being violated. Nothing else
 breaks.
 
+#### The protobuf bump is NOT IMPLEMENTABLE — tested 2026-09-26
+
+Codex reviewed handoff #2 and decided: apply `protobuf` 3.20.1 → 3.20.2 as its
+own commit. **It cannot be done inside `requirements.txt`, and I should have
+known that before recommending it.**
+
+```
+$ pip install --dry-run -r requirements.txt
+ERROR: Cannot install -r requirements.txt (line 34), ctrader-open-api==0.9.2
+       and protobuf==3.20.2 because these package versions have conflicting
+       dependencies.
+ERROR: ResolutionImpossible
+```
+
+`ctrader-open-api==0.9.2` pins `protobuf==3.20.1` — an exact pin in its own
+metadata — and the fix for PYSEC-2026-899 is `>=3.20.2`. **No version satisfies
+both.** Adding the bump makes `pip install -r requirements.txt` fail, on the
+service that runs a trading loop.
+
+It also breaks `pip-audit -r requirements.txt`, which cannot resolve the file any
+more — so the change would close one advisory and disable the tool that finds the
+next one.
+
+**Why I recommended it anyway.** The isolated venv used `pip install --no-deps`,
+which installs a version without consulting the resolver. That proved the code
+*works* at 3.20.2, which is a real and useful result, and it says nothing about
+whether the combination can be *installed*. I tested the wrong half and reported
+the conclusion as if I had tested both.
+
+`tests/test_deploy_config.py` now asserts this collision is absent by name, with
+the reason attached, so the same recommendation cannot be made again without
+failing a test. Mutation: adding `protobuf==3.20.2` back kills it.
+
+**The change is reverted.** `requirements.txt` is unmodified.
+
+#### So PYSEC-2026-899 stays open, and here is the only way to close it
+
+Not by bumping. The connector's `==` pin has to stop being in the way:
+
+1. **Vendor the generated `_pb2` stubs.** They are machine-generated protobuf
+   files; copying them into `apex/brokers/` and dropping `ctrader-open-api`
+   removes the pin, and with it Twisted and pyOpenSSL and all five of their
+   advisories. This is the recommended route and it is a small, well-defined
+   piece of work.
+2. **Change the build command** to install the connector with `--no-deps` and
+   protobuf separately. Cheaper, but it is a deployment change, it silently
+   skips whatever else the connector's metadata asks for, and it puts the
+   dependency graph in a build script where nobody reads it.
+3. **Accept it.** protobuf's advisories are denial-of-service via crafted
+   messages, and we parse protobuf from cTrader over a connection whose
+   certificate and hostname we verify — so the "untrusted input" premise
+   requires an attacker who is the broker or who has broken verified TLS.
+
+Route 1 is the one that actually ends the problem. Until somebody does it, the
+honest status is: **open, understood, and not closeable by a version bump.**
+
 #### Decision, and it is recorded rather than defaulted
 
-**Recommended minimal change: `protobuf==3.20.1` → `3.20.2`.** One patch
-version, tested above, and it closes the only advisory on a code path this
-product executes.
+~~**Recommended minimal change: `protobuf==3.20.1` → `3.20.2`.**~~
+**Withdrawn.** See the section above: it makes `pip install -r
+requirements.txt` fail with ResolutionImpossible. The recommendation was made
+from a `--no-deps` install, which proves the code works at that version and
+proves nothing about whether it can be installed.
 
 **Not applied here.** `requirements.txt` is the live Telegram bot's dependency
 file, and changing it alters that bot's next build. This branch is not deployed,
