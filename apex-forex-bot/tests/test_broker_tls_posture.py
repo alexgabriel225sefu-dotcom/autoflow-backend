@@ -93,39 +93,146 @@ for bad in ("CERT_NONE", "_create_unverified_context", "check_hostname=False",
             "check_hostname = False"):
     check(f"nothing in the module uses {bad!r}", bad not in SRC)
 
-# ── 3. the SDK's unverified client is never instantiated ────────────────────
+# ── 3. the SDK's unverified client is never reached, by any spelling ────────
 # This is the regression that matters. The SDK ships a Client; we hand-roll a
 # socket. Switching to theirs looks like a simplification and silently turns
 # certificate verification off.
-print("\n[3] the SDK's VERIFY_NONE client is not used anywhere")
+#
+# The first version of this check matched two spellings and missed three, which
+# Codex found in review:
+#
+#   from ctrader_open_api.client import Client        # submodule, not package
+#   from ctrader_open_api import client               # then client.Client
+#   import ctrader_open_api.client as c               # then c.Client
+#
+# Matching names does not work, because the name a module is reached under is
+# whatever the author chose. So this resolves ALIASES: every local name bound to
+# anything under `ctrader_open_api`, and every local name bound directly to the
+# Client class, then flags any reference through either.
+print("\n[3] the SDK's VERIFY_NONE client is not reachable under any name")
+SDK_ROOT = "ctrader_open_api"
+
+
+def _dotted(node):
+    """`a.b.c` -> ("a", ["b", "c"]); anything else -> (None, [])."""
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        return node.id, list(reversed(parts))
+    return None, []
+
+
+def sdk_client_references(tree):
+    """Every way this module could reach the SDK's Client. [] means none."""
+    hits = []
+    # Local names that resolve to the SDK package or one of its submodules.
+    module_aliases = set()
+    # Local names bound directly to the Client class itself.
+    client_aliases = set()
+
+    for node in ast.walk(tree):
+        # `import ctrader_open_api[.sub][ as alias]`
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name == SDK_ROOT or a.name.startswith(SDK_ROOT + "."):
+                    # Without `as`, `import x.y` binds `x`; with `as`, it binds
+                    # the alias to x.y itself.
+                    module_aliases.add(a.asname or a.name.split(".")[0])
+        # `from ctrader_open_api[.sub] import name[ as alias]`
+        elif isinstance(node, ast.ImportFrom):
+            mod = node.module or ""
+            if mod != SDK_ROOT and not mod.startswith(SDK_ROOT + "."):
+                continue
+            for a in node.names:
+                local = a.asname or a.name
+                if a.name == "Client":
+                    client_aliases.add(local)
+                    hits.append(f"from {mod} import "
+                                f"{a.name}{f' as {a.asname}' if a.asname else ''}")
+                else:
+                    # A submodule or anything else imported from the SDK becomes
+                    # a name that could carry `.Client`.
+                    module_aliases.add(local)
+
+    for node in ast.walk(tree):
+        # `<alias>[.…].Client`
+        if isinstance(node, ast.Attribute) and node.attr == "Client":
+            root, parts = _dotted(node)
+            if root in module_aliases:
+                hits.append(".".join([root] + parts))
+        # `getattr(<alias>, "Client")` — an attribute check cannot see this.
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                and node.func.id == "getattr" and len(node.args) >= 2:
+            target, attr = node.args[0], node.args[1]
+            root, _ = _dotted(target) if isinstance(target, ast.Attribute) else (
+                target.id if isinstance(target, ast.Name) else None, [])
+            if root in module_aliases and isinstance(attr, ast.Constant) \
+                    and attr.value == "Client":
+                hits.append(f'getattr({root}, "Client")')
+        # A bare call to a name bound directly to the class.
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                and node.func.id in client_aliases:
+            hits.append(f"{node.func.id}(...)  [bound to the SDK Client]")
+
+    return hits
+
+
 SEARCH = [os.path.join(ROOT, "apex"), os.path.join(ROOT, "scripts")]
 offenders = []
+scanned = 0
 for base in SEARCH:
     for dirpath, dirnames, names in os.walk(base):
         dirnames[:] = [d for d in dirnames if d != "__pycache__"]
-        for n in names:
+        for n in sorted(names):
             if not n.endswith(".py"):
                 continue
             full = os.path.join(dirpath, n)
+            rel = os.path.relpath(full, ROOT)
             with open(full, encoding="utf-8", errors="replace") as fh:
                 body = fh.read()
-            rel = os.path.relpath(full, ROOT)
-            tree = ast.parse(body, filename=n)
-            for node in ast.walk(tree):
-                # `from ctrader_open_api import Client` / `... import Client as X`
-                if isinstance(node, ast.ImportFrom) \
-                        and (node.module or "") == "ctrader_open_api" \
-                        and any(a.name == "Client" for a in node.names):
-                    offenders.append(f"{rel}: from ctrader_open_api import Client")
-                # `ctrader_open_api.Client(...)`
-                if isinstance(node, ast.Attribute) and node.attr == "Client" \
-                        and isinstance(node.value, ast.Name) \
-                        and node.value.id == "ctrader_open_api":
-                    offenders.append(f"{rel}: ctrader_open_api.Client")
-check("no module imports or references the SDK's Client", not offenders,
-      str(offenders))
+            scanned += 1
+            for hit in sdk_client_references(ast.parse(body, filename=n)):
+                offenders.append(f"{rel}: {hit}")
+
+check(f"no production module reaches the SDK's Client ({scanned} files scanned)",
+      not offenders, str(offenders))
 check("and nothing builds a Twisted SSL endpoint string",
       "clientFromString" not in SRC and 'f"ssl:' not in SRC)
+
+# The resolver is itself tested, because a checker that cannot catch the
+# spellings it claims to catch is worse than no checker: it reports safety.
+# Each of these is a real evasion; the first three are the ones review found.
+print("\n[3b] the resolver catches every spelling, including three it missed")
+EVASIONS = (
+    "from ctrader_open_api import Client\nClient(1,2,3)\n",
+    "from ctrader_open_api.client import Client\nClient(1,2,3)\n",
+    "from ctrader_open_api import client\nclient.Client(1,2,3)\n",
+    "import ctrader_open_api.client as c\nc.Client(1,2,3)\n",
+    "import ctrader_open_api\nctrader_open_api.client.Client(1,2,3)\n",
+    "import ctrader_open_api\nctrader_open_api.Client(1,2,3)\n",
+    "from ctrader_open_api import Client as Sock\nSock(1,2,3)\n",
+    "from ctrader_open_api import client as k\nk.Client(1,2,3)\n",
+    'from ctrader_open_api import client\ngetattr(client, "Client")\n',
+)
+for src in EVASIONS:
+    first = src.split("\n")[0]
+    check(f"caught: {first}", bool(sdk_client_references(ast.parse(src))), "NOT CAUGHT")
+
+# And it does not cry wolf on what we actually do, or this check gets deleted.
+LEGITIMATE = (
+    "from ctrader_open_api.messages.OpenApiMessages_pb2 import ProtoOAApplicationAuthReq\n",
+    "from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import ProtoMessage\n"
+    "ProtoMessage()\n",
+    "import ssl\nclient = ssl.create_default_context()\nclient.check_hostname\n",
+    "class Client:\n    pass\nClient()\n",          # our own unrelated class
+    'x = {"Client": 1}\n',                           # the word as data
+)
+for src in LEGITIMATE:
+    check(f"no false positive: {src.splitlines()[0][:52]}",
+          not sdk_client_references(ast.parse(src)),
+          str(sdk_client_references(ast.parse(src))))
 
 # ── 4. only the protobuf definitions are taken from the SDK ─────────────────
 # The reason the SDK is a dependency at all. If that widens, the TLS posture
