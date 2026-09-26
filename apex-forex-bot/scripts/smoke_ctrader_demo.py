@@ -49,18 +49,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from apex import redact                                     # noqa: E402
-
-# Before anything can print. Installing this after the first output would
-# leave exactly the line that carried the token.
-redact.install()
-
-from apex.platform import broker_read as _read              # noqa: E402
-from apex.platform import ctrader_link as _link             # noqa: E402
-from apex.platform import entitlement as _ent               # noqa: E402
-from apex.platform import preview as _preview               # noqa: E402
-from apex.platform import store as _store                   # noqa: E402
-
 CONFIRM_VAR = "SMOKE_CONFIRM_DEMO_ONLY"
 DEMO = "demo"
 
@@ -69,21 +57,16 @@ class Refused(RuntimeError):
     """The script will not start. Distinct from a step that failed."""
 
 
-def mask_ctid(ctid):
-    """An account number is not a credential, and it does identify a person.
+def guard_env(env=None):
+    """The refusals that need nothing imported yet. Returns the user id.
 
-    Enough of it survives to match against a broker statement; not enough to
-    be pasted into an issue and identify the client.
-    """
-    s = str(ctid or "")
-    return s if len(s) <= 3 else "…" + s[-3:]
-
-
-def guard(env=None):
-    """Raise Refused unless it is safe and sensible to start.
-
-    Every refusal names the variable to set. A script that exits 2 without
-    saying which of five conditions failed gets run again with a guess.
+    Separated from `guard` and run BEFORE importing `apex`, because
+    `apex.platform.store` refuses at import time when TOKEN_ENCRYPTION_KEY is
+    absent — by design, it fails closed rather than storing credentials in
+    plaintext. That refusal used to be the first thing an operator saw when they
+    had simply forgotten SMOKE_CONFIRM_DEMO_ONLY: a true statement about a
+    different problem than the one they had, naming the wrong variable to set.
+    Both orders refuse, so nothing was ever unsafe; only the message was wrong.
     """
     env = os.environ if env is None else env
 
@@ -102,6 +85,49 @@ def guard(env=None):
         raise Refused("TOKEN_ENCRYPTION_KEY is not set, so the stored broker "
                       "token cannot be decrypted. Run this where the "
                       "deployment's environment is")
+
+    return user_id
+
+
+# Run as a script: refuse before importing anything, so the message names the
+# variable the operator actually needs to set.
+if __name__ == "__main__":
+    try:
+        guard_env()
+    except Refused as _e:
+        print(f"REFUSED: {_e}")
+        sys.exit(2)
+
+from apex import redact                                     # noqa: E402
+
+# Before anything can print. Installing this after the first output would
+# leave exactly the line that carried the token.
+redact.install()
+
+from apex.platform import broker_read as _read              # noqa: E402
+from apex.platform import ctrader_link as _link             # noqa: E402
+from apex.platform import entitlement as _ent               # noqa: E402
+from apex.platform import preview as _preview               # noqa: E402
+from apex.platform import store as _store                   # noqa: E402
+
+
+def mask_ctid(ctid):
+    """An account number is not a credential, and it does identify a person.
+
+    Enough of it survives to match against a broker statement; not enough to
+    be pasted into an issue and identify the client.
+    """
+    s = str(ctid or "")
+    return s if len(s) <= 3 else "…" + s[-3:]
+
+
+def guard(env=None):
+    """Raise Refused unless it is safe and sensible to start.
+
+    Every refusal names the variable to set. A script that exits 2 without
+    saying which of five conditions failed gets run again with a guess.
+    """
+    user_id = guard_env(env)
 
     # If this is ever True, the release has changed underneath this script and
     # "read-only by construction" is no longer a claim it can make.

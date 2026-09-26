@@ -18,6 +18,7 @@ Run: python3 tests/test_smoke_harness.py
 import io
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -212,8 +213,58 @@ for module in ("bridge", "execution", "gates", "automation"):
           f"import {module}" not in src and f"platform import {module}" not in src)
 check("it does not import the broker directly either",
       "from apex.brokers" not in src)
+# `str.index` raises when the needle is gone, which aborts the whole file and
+# skips every check below it — a crash is not a test result. This reports a
+# clean failure instead, and says which half was missing.
+def _before(first, second):
+    """True when `first` appears, `second` appears, and first comes first."""
+    a, b = src.find(first), src.find(second)
+    if a < 0 or b < 0:
+        missing = first if a < 0 else second
+        check(f"the file still contains {missing!r}, which an ordering "
+              f"check needs", False, "it was removed or renamed")
+        return False
+    return a < b
+
+
 check("redaction is installed before any platform import",
-      src.index("redact.install()") < src.index("from apex.platform"))
+      _before("redact.install()", "from apex.platform"))
+
+# ── the refusal must name the variable the operator actually needs ───────────
+# apex.platform.store refuses at import time without TOKEN_ENCRYPTION_KEY — it
+# fails closed by design. So when the guards ran only inside main(), an operator
+# who had merely forgotten SMOKE_CONFIRM_DEMO_ONLY got told about
+# TOKEN_ENCRYPTION_KEY instead: safe, but it names the wrong variable, and a
+# script that misdirects gets run again with a guess. The env-only guards
+# therefore run before the imports, and that order is asserted here rather than
+# left to whoever next tidies the import block.
+check("the env-only guard is defined before apex is imported",
+      _before("def guard_env(", "from apex import redact"))
+check("and it runs before apex is imported, when run as a script",
+      _before("guard_env()", "from apex import redact"))
+check("guard() still delegates to it, so both paths refuse identically",
+      "guard_env(env)" in src)
+
+# Run as a real subprocess with a stripped environment: importing the module
+# cannot show this, because the test preamble has already set the variables.
+_ORDER = (
+    ({}, "SMOKE_CONFIRM_DEMO_ONLY"),
+    ({"SMOKE_CONFIRM_DEMO_ONLY": "yes"}, "SMOKE_USER_ID"),
+    ({"SMOKE_CONFIRM_DEMO_ONLY": "yes", "SMOKE_USER_ID": "1000000001"},
+     "TOKEN_ENCRYPTION_KEY"),
+)
+for _extra, _expected in _ORDER:
+    _env = {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")}
+    _env.update(_extra)
+    _p = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "scripts", "smoke_ctrader_demo.py")],
+        capture_output=True, text=True, env=_env, timeout=120)
+    _first = (_p.stdout or _p.stderr).strip().splitlines()
+    _first = _first[0] if _first else ""
+    check(f"with {sorted(_extra) or 'nothing'} set, it names {_expected}",
+          _expected in _first and "REFUSED" in _first, _first[:100])
+    check(f"and exits 2 (refused), not 1 (a step failed): {_expected}",
+          _p.returncode == 2, f"exit {_p.returncode}")
 
 shutil.rmtree(_TMP, ignore_errors=True)
 
