@@ -228,43 +228,132 @@ then yanked by the maintainer, so there is no upgrade path through the registry.
 | `pyOpenSSL` | 24.1.0 | PYSEC-2026-2268, -2269 | 26.0.0 |
 | `Twisted` | 24.3.0 | PYSEC-2024-75, PYSEC-2026-160, -1992 | 24.7.0 → 26.4.0 |
 
-#### What is and is not exposed
+#### CORRECTION to the 2026-09-25 assessment
 
-This matters more than the count. `cryptography` is imported in exactly one
-place — `apex/user_store.py`, for `Fernet` — and nothing else in this codebase
-uses the library.
+That assessment said the real exposure was "the TLS session to cTrader" via
+pyOpenSSL. **That was wrong**, and the conclusion changes with it.
 
-- **Not applicable (3 of 7):** PYSEC-2026-35, -3553 and -3554 are X.509
-  certificate-chain and DNS-name-constraint verification flaws, and -2141 is
-  EC public-key loading. This codebase performs no certificate verification
-  with this library and loads no EC keys. Fernet is AES-CBC plus HMAC.
-- **Applicable to the broker connection (3 of 7):** PYSEC-2026-1284,
-  GHSA-h4gh-qq45-vh27 and GHSA-537c-gmf6-5ccf are vulnerabilities in the
-  OpenSSL statically linked into the wheel. Fernet's use of it involves no TLS
-  and no certificate parsing, so token encryption at rest is a small surface —
-  but **pyOpenSSL uses the same bundled OpenSSL for the TLS session to
-  cTrader**, and that does parse certificates. That is where the real exposure
-  is.
+`apex/brokers/ctrader.py` does not use the SDK's client. It opens its own
+socket:
 
-#### Why nothing was bumped
+```python
+ctx = ssl.create_default_context()      # CERT_REQUIRED, check_hostname=True
+raw = socket.create_connection((_HOST[self.env], _PORT), timeout=15)
+self._sock = ctx.wrap_socket(raw, server_hostname=_HOST[self.env])
+```
 
-Overriding the connector's pins would change the TLS stack of a process that
-is currently trading a live demo account, and there is no cTrader credential in
-this environment to verify the handshake afterwards (blocker **X1**). A bump
-that breaks the broker connection is worse than the advisory it closes.
+That is the **standard library's** TLS against the **system** OpenSSL (3.0.13
+here), not the copy bundled in the `cryptography` wheel, and it verifies the
+certificate and the hostname. The module docstring says it reuses "only the
+protobuf message definitions" from the SDK — load-bearing, not stylistic.
 
-`tests/test_deploy_config.py` now asserts every requirement stays exactly
-pinned, so a `>=` cannot drift in — the file's header already said exact pins
-were the point and nothing was enforcing it.
+So pyOpenSSL and Twisted are **not on our TLS path at all**. They are pulled in
+because `ctrader_open_api/__init__.py` eagerly does `from .client import
+Client`, so importing any submodule — even a generated `_pb2` one — drags in
+Twisted. Verified by removing both packages: every protobuf import then fails
+on `ModuleNotFoundError: twisted`.
 
-#### The owner's options
+#### What each advisory actually reaches
 
-1. **Accept, with the analysis above recorded.** The applicable advisories
-   affect the broker TLS session, not token encryption.
-2. **Override the pins and verify against a real demo account.** Needs X1.
-   This is the path that actually closes them.
-3. **Replace the connector.** The cTrader Open API is reachable over protobuf
-   and TLS without this wrapper. That is a milestone, not a patch.
+| Package | On a path we execute? | Why |
+|---|---|---|
+| `cryptography` | Fernet only | One import, `user_store.py`. AES-CBC + HMAC. No TLS, no certificate parsing. |
+| `protobuf` | **yes** | We parse broker messages with it. |
+| `pyOpenSSL` | **no** | Only the SDK's unused `Client` uses it. |
+| `Twisted` | **no** | Same. |
+
+Of cryptography's seven advisories, four are X.509 chain / DNS-constraint
+verification and EC public-key loading — code this repository never calls. Three
+are bugs in the wheel's bundled OpenSSL, which Fernet does use, for symmetric
+encryption with no certificate handling.
+
+protobuf's three are denial-of-service via crafted messages. We parse protobuf
+from cTrader over a verified TLS connection, so the "untrusted input" premise is
+weak — an attacker would have to be the broker or break verified TLS. It is
+still the only category on a path we execute.
+
+#### A separate finding: the SDK's own client does not verify anything
+
+Measured on the installed version. `ctrader_open_api.Client` connects with
+`clientFromString(reactor, f"ssl:{host}:{port}")`, and Twisted's bare `ssl:`
+string with no trust root produces:
+
+```
+trustRoot           = None
+verify              = False
+OpenSSL verify mode = VERIFY_NONE
+```
+
+A client that does not verify its peer accepts any certificate, and this
+connection carries a broker access token. **We do not use that class**, which is
+why this is a finding about the library rather than an incident. Nothing was
+enforcing that we keep not using it, so
+`apex-forex-bot/tests/test_broker_tls_posture.py` now does: it asserts our
+connector builds a verifying context and passes `server_hostname`, that nothing
+weakens verification anywhere in the module, that no module imports or
+references the SDK's `Client`, and that every SDK import is a `_pb2` module.
+Four mutations against it were killed, including "somebody switches to the
+SDK's client".
+
+#### Isolated compatibility test — what can actually be raised
+
+Run in a throwaway venv, exercising exactly what the connector depends on: the
+protobuf message classes, a round-trip through `ProtoMessage` framing with the
+same length prefix, a trendbars request, a heartbeat, the stdlib TLS context and
+a Fernet round-trip.
+
+| Combination | Result |
+|---|---|
+| Baseline: protobuf 3.20.1, pyOpenSSL 24.1.0, cryptography 42.0.8 | all pass |
+| **protobuf 3.20.2** (patch; closes PYSEC-2026-899) | **all pass** |
+| + pyOpenSSL 26.0.0 + cryptography 50.0.1 | **BROKEN** — `AttributeError: module 'lib' has no attribute 'GEN_EMAIL'`; pyOpenSSL 26 requires `cryptography<47` |
+| + pyOpenSSL 26.0.0 + **cryptography 46.0.7** | all pass, Fernet round-trips, key format unchanged |
+| pyOpenSSL and Twisted removed entirely | **BROKEN** — the SDK's `__init__` needs Twisted |
+
+The third row is the reason this was tested rather than applied. A bump to the
+newest cryptography, which is what "fix the advisory" reads like, produces an
+import error — in the TLS stack of a process that is trading.
+
+`pip check` reports only the connector's `==` pins being violated. Nothing else
+breaks.
+
+#### Decision, and it is recorded rather than defaulted
+
+**Recommended minimal change: `protobuf==3.20.1` → `3.20.2`.** One patch
+version, tested above, and it closes the only advisory on a code path this
+product executes.
+
+**Not applied here.** `requirements.txt` is the live Telegram bot's dependency
+file, and changing it alters that bot's next build. This branch is not deployed,
+so committing it would be latent rather than immediate — which is worse, not
+better, because it would take effect whenever the branches converge, without
+anybody deciding to. That is an owner and Codex call.
+
+**Not recommended:** raising pyOpenSSL and cryptography. They are not on a path
+we execute, the benefit is hygiene, and the change touches the TLS stack of a
+running trading process to fix advisories in code it never reaches.
+
+**The real fix, for later:** the dependency on Twisted and pyOpenSSL exists only
+because the SDK's `__init__.py` imports its client eagerly. Vendoring the
+generated `_pb2` modules — they are machine-generated protobuf stubs — removes
+Twisted, pyOpenSSL and their advisories entirely, and is a small, well-defined
+piece of work rather than "replace the connector".
+
+#### Real handshake: NOT verified, and why
+
+`scripts/check_ctrader_tls.py` performs it with no credential: DNS, TCP 5035,
+then a handshake with `CERT_REQUIRED` and `check_hostname`, printing the issuer
+and the SANs, and closing before any application message.
+
+It **cannot run in the development container.** cTrader's Open API is raw TLS
+carrying protobuf on TCP 5035, and this environment permits only HTTPS through
+an inspecting proxy. The proxy accepts `CONNECT demo.ctraderapi.com:5035` and
+then resets the TLS layer, because it cannot speak a protocol that is not HTTP.
+Measured: `ConnectionResetError` during `wrap_socket`, and a plain
+`TimeoutError` without the proxy.
+
+DNS resolves, so the host is real. Exit code 2 is reserved for exactly this, so
+a network answer is never reported as a TLS one. Run it on the deployment host.
 
 Doing nothing is a decision too, and it should be a recorded one rather than a
 default.

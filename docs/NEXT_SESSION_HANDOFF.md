@@ -1,7 +1,7 @@
 # Apex4Traders — handoff
 
-**State at:** `2f863458f` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-25
+**State at:** `6f35dcd7f` on `claude/apex4traders-platform-v1`
+**Date:** 2026-09-26
 
 Read **`docs/CODEX_CLAUDE_PROTOCOL.md`** first — it is the normative working
 agreement and it defines the contract this document has to satisfy. Then this

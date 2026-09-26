@@ -1,0 +1,146 @@
+# Apex4Traders — Render blueprint for the two platform services.
+#
+# NOT APPLIED. This file is deliberately NOT `render.yaml` at the repository
+# root, because Render reads that one and would try to create these services on
+# the next blueprint sync. Creating a service costs money and puts a URL on the
+# internet, which is an owner decision — so this is prepared and left for
+# somebody to apply.
+#
+# It also does not touch the two blueprints that already exist:
+#   render.yaml                  the legacy Express sales site
+#   apex-forex-bot/render.yaml   the legacy Telegram forex bot
+# Neither is modified, and neither service is redeployed by anything here.
+#
+# TO APPLY: either paste these two service definitions into the root
+# render.yaml, or create the services by hand in the dashboard using the
+# commands and paths below. Then set every `sync: false` variable in the
+# dashboard — none has a value in this repository and none ever will.
+#
+# WHY TWO SERVICES: the halves have different runtimes and different secrets.
+# The API holds the broker tokens and the encryption key; the web client holds
+# nothing secret at all, and must not, because everything prefixed
+# NEXT_PUBLIC_ is compiled into the browser bundle.
+
+services:
+  # ── platform API ───────────────────────────────────────────────────────────
+  - type: web
+    name: apex4traders-api
+    env: python
+    rootDir: apex-forex-bot
+    buildCommand: pip install -r requirements.txt
+    # -u so startup logs reach the log tab unbuffered. Without it, "it will not
+    # start" is undebuggable.
+    startCommand: python -u main.py
+    plan: starter
+    # The platform's own branch. NOT the legacy bot's deploy branch — a commit
+    # here must never restart the live trading loop.
+    branch: claude/apex4traders-platform-v1
+    autoDeploy: false
+    # /healthz and NOT /readyz. Readiness touches dependencies, so pointing a
+    # restart probe at it turns one backend degradation into every container
+    # restarting at once — a degradation becomes an outage. /healthz answers
+    # from process state alone. See docs/PRODUCTION_RUNBOOK.md §4.
+    healthCheckPath: /healthz
+    # Paths are relative to the REPOSITORY ROOT, not to rootDir. Scoped so a
+    # commit to web/ or to the sales site does not restart this service.
+    buildFilter:
+      paths:
+        - apex-forex-bot/**
+    envVars:
+      # Namespaces every stored key. config.py refuses to start on any other
+      # value, because a wrong one would read another deployment's state.
+      - key: PRODUCT
+        value: forex
+      - key: APP_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Counters shared across instances. `memory` forces the per-process
+      # limiter, which /readyz then refuses in production.
+      - key: RATE_LIMIT_STORE
+        value: auto
+
+      # ── secrets: set in the dashboard, never here ────────────────────────
+      # Fernet key for broker tokens at rest. Startup is refused without it.
+      #   python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      # Identity. The ANON key, never the service key — the service key
+      # bypasses row-level security.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      # cTrader Open API application. The redirect URI must match the one
+      # registered in the portal byte for byte; a trailing slash is a different
+      # URI.
+      - key: CTRADER_CLIENT_ID
+        sync: false
+      - key: CTRADER_CLIENT_SECRET
+        sync: false
+      - key: CTRADER_REDIRECT_URI
+        sync: false
+      # Shared backend. Without one, ownership, entitlement and order
+      # idempotency become per-container and /readyz fails in production.
+      # Provide REDIS_URL, or the two Upstash variables instead.
+      - key: REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+
+      # ── deliberately absent ─────────────────────────────────────────────
+      # LIVE_TRADING_ENABLED        no execution path exists behind it, and
+      #                             /readyz fails if it is set
+      # APEX_ALLOW_LIVE_ACCOUNTS    would let a live account be selected
+      # A4T_CHECKOUT_ENABLED        no approved price, SKU or legal entity
+      # A4T_STRIPE_WEBHOOK_SECRET   checkout is off; the webhook answers 503
+      # ALLOW_LOCAL_BACKEND_DEV     makes a per-container store acceptable
+      # ALLOW_PLAINTEXT_DEV_STORAGE stores broker tokens unencrypted
+      #
+      # The last two are development opt-ins. /readyz fails in production if
+      # either is set, and entitlement.live_execution_enabled() returns a
+      # literal False, so the first cannot enable anything even if somebody
+      # sets it.
+
+  # ── web client ─────────────────────────────────────────────────────────────
+  - type: web
+    name: apex4traders-web
+    env: node
+    rootDir: web
+    # `npm ci` and not `npm install`: the lockfile is the dependency set that
+    # was reviewed and audited. `install` may resolve something else, and the
+    # framework pin exists because a caret would let a deploy install a version
+    # nobody read — see web/src/lib/deps.test.ts.
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    plan: starter
+    branch: claude/apex4traders-platform-v1
+    autoDeploy: false
+    healthCheckPath: /
+    buildFilter:
+      paths:
+        - web/**
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Public by design — both are compiled into the browser bundle and are
+      # meant to be. The anon key is public; the service key is not and must
+      # never appear on this service in any form.
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      # The API service's URL. Empty means same origin, which is wrong here
+      # because the API is a separate service.
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false
+
+      # ── never on this service ───────────────────────────────────────────
+      # STRIPE_SECRET_KEY, SUPABASE_SERVICE_KEY, TOKEN_ENCRYPTION_KEY,
+      # CTRADER_CLIENT_SECRET, UPSTASH_REDIS_REST_TOKEN
+      #
+      # The web client has no code path that needs any of them. Anything
+      # prefixed NEXT_PUBLIC_ reaches the browser, and a secret on this service
+      # is one prefix away from being published.
