@@ -373,6 +373,97 @@ Not by bumping. The connector's `==` pin has to stop being in the way:
 Route 1 is the one that actually ends the problem. Until somebody does it, the
 honest status is: **open, understood, and not closeable by a version bump.**
 
+#### Route 1 taken — CLOSED 2026-09-26
+
+Codex chose vendoring. The four generated modules now live under
+`apex-forex-bot/apex/ctrader_proto/` with the upstream MIT licence beside them,
+`ctrader-open-api` is out of `requirements.txt`, and `protobuf` is pinned
+directly. `apex/ctrader_proto/__init__.py` records the source package and
+version and the exact commands to refresh the stubs.
+
+Four files, not the three the connector imports:
+`OpenApiCommonMessages_pb2` imports `OpenApiCommonModelMessages_pb2`, and
+`OpenApiMessages_pb2` imports `OpenApiModelMessages_pb2`. One line changed in
+each of two of them — the sibling import was `from ctrader_open_api.messages
+import X` and is now `from . import X`, which cannot break under a future
+relocation. Everything else, including the serialized descriptors, is
+byte-identical to upstream.
+
+**Which protobuf version, and why not 3.20.2.** Codex's instruction was the
+safest installable version compatible with the vendored stubs, preferring 3.20.2
+if it passed. 3.20.2 passes, and it is not the safest — with the SDK's `==` pin
+gone, nothing holds protobuf in the 3.x range at all. Measured with `pip-audit`,
+one version at a time, in a clean venv:
+
+| protobuf | Stubs | Advisories still open |
+|---|---|---|
+| 3.20.2 | pass | PYSEC-2026-1805, PYSEC-2026-1806 |
+| 3.20.3 | pass | PYSEC-2026-1805, PYSEC-2026-1806 |
+| 4.25.8 | pass | PYSEC-2026-1805 |
+| 5.29.5 | pass | PYSEC-2026-1805 |
+| **6.33.5** | **pass** | **none** |
+
+So 6.33.5. Stopping at 3.20.2 would have closed one advisory of three and left
+the reason for vendoring unresolved. It needs Python >= 3.9; `matplotlib==3.11.1`
+in the same file already requires >= 3.11 and installs in production today, so
+this raises no floor.
+
+**What the dependency tree looks like now.** `pip install -r requirements.txt`
+in a clean venv resolves normally — no `ResolutionImpossible` — and installs
+neither `ctrader-open-api`, `pyOpenSSL` nor `Twisted`. All 162 backend test files
+pass in that venv with the SDK absent, which is the check that matters: the code
+no longer depends on a package the deployment will not have.
+
+`pip-audit` on the resulting tree:
+
+| Package | Before | After |
+|---|---|---|
+| `protobuf` | 3 advisories | **none** |
+| `pyOpenSSL` | 2 advisories | **not installed** |
+| `Twisted` | 3 advisories | **not installed** |
+| `cryptography` | 7 advisories | 7 advisories — unchanged, see below |
+| `requests` | PYSEC-2026-1872, -2275 | unchanged, pre-existing |
+
+**A consequence worth acting on separately: the cryptography ceiling is gone.**
+`cryptography` was held below 43 by `pyOpenSSL==24.1.0`, which required
+`cryptography<43,>=41.0.5`. pyOpenSSL is no longer in the tree, and nothing
+installed now constrains `cryptography` at all — the only remaining mentions are
+optional extras that are not installed (`redis[ocsp]`, `curl_cffi[dev]`,
+`curl_cffi[test]`). The seven advisories need 43.0.1 through 49.0.0, which was
+previously impossible and is now merely untested. **Not done here**, because
+Codex's instruction for this commit was explicitly not to raise
+pyOpenSSL/cryptography. It is the obvious next dependency task, and it is now
+unblocked.
+
+**What enforces this.** `tests/test_broker_tls_posture.py` no longer asks
+whether the SDK's client is reached; it asserts that no module under `apex/` or
+`scripts/` imports `ctrader_open_api` **at all**, in any spelling — a `_pb2`
+import is as much a defect as a `Client` import now, because the package will not
+be installed. Both are asserted separately, because one crashes the bot and the
+other leaks broker tokens, and a red suite should say which. The vendored files
+are themselves checked for SDK references, and the provenance and licence are
+asserted to exist. `tests/test_deploy_config.py` now requires `protobuf` to be
+pinned directly at major >= 6 and requires `pyOpenSSL`/`Twisted` to be absent,
+while keeping the old collision guard for the case where the connector ever
+returns.
+
+Mutations, each restored afterwards and the suite re-run green:
+
+| Mutation | Result |
+|---|---|
+| `from ctrader_open_api import Client` in the connector | **FAILS** both checks — import and client-reach |
+| one `_pb2` import pointed back at the SDK | **FAILS** the import check only, as designed |
+| `protobuf==3.20.2` | **FAILS** — "at a version with no open advisory against it" |
+| `protobuf` pin deleted | **FAILS** two checks — unpinned, and no version |
+| vendored `LICENSE` removed | **FAILS** — provenance check |
+| one of the four `_pb2` modules deleted | **FAILS** — completeness check |
+
+**Not fixed here, found while verifying:** `tests/test_hardening_final.py`
+imports `yaml`, and `PyYAML` is in no requirements file — it was already
+undeclared before this change. It passes in the developer container, where the
+package happens to be installed, and fails in a clean venv. Test-only, no
+production path, reported rather than folded into a mechanical commit.
+
 #### Decision, and it is recorded rather than defaulted
 
 ~~**Recommended minimal change: `protobuf==3.20.1` → `3.20.2`.**~~

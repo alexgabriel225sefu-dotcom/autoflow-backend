@@ -253,10 +253,11 @@ finally:
 #
 # This does NOT audit for vulnerabilities — that needs the network and belongs
 # in release verification. `pip-audit -r requirements.txt` on 2026-09-25 found
-# advisories in cryptography, protobuf, pyOpenSSL and Twisted, all of which are
-# hard-pinned by `ctrader-open-api==0.9.2` and cannot be raised without
-# replacing or overriding the broker connector. See
-# docs/DEPLOYMENT_READINESS.md §6.
+# advisories in cryptography, protobuf, pyOpenSSL and Twisted, all four
+# hard-pinned by `ctrader-open-api==0.9.2`. That connector has since been
+# removed: its generated `_pb2` modules are vendored under apex/ctrader_proto/,
+# which dropped pyOpenSSL and Twisted from the tree entirely and freed protobuf
+# to be pinned on its own. See docs/DEPLOYMENT_READINESS.md §6.
 print("\nDependency pins")
 _req = os.path.join(SERVICE_DIR, "requirements.txt")
 _lines = [l.split("#")[0].strip() for l in open(_req, encoding="utf-8")]
@@ -266,34 +267,56 @@ for line in _pins:
     check(f"{line.split('==')[0]} is pinned exactly",
           "==" in line and not any(op in line for op in (">=", "<=", "~=", ">", "<")),
           line)
-# The check that would have caught a bump that cannot be installed. A pin can be
-# perfectly valid on its own and unresolvable in combination: `protobuf==3.20.2`
-# closes PYSEC-2026-899 and conflicts with `ctrader-open-api==0.9.2`, which pins
-# `protobuf==3.20.1` in its own metadata. pip answers ResolutionImpossible and
-# the build fails — on a service that runs a trading loop.
+# The collision this guards against, kept because it cost a wrong report once. A
+# pin can be perfectly valid alone and unresolvable in combination:
+# `ctrader-open-api==0.9.2` pins `protobuf==3.20.1` with `==` in its own
+# metadata, so any other protobuf pin alongside it makes `pip install -r
+# requirements.txt` answer ResolutionImpossible — the build fails, on a service
+# that runs a trading loop. It was originally missed because the compatibility
+# test used `pip install --no-deps`, which bypasses the resolver: that proves
+# code runs, never that a tree installs.
 #
-# This does not resolve anything (that needs the network). It asserts the
-# specific collision is absent, by name, with the reason attached.
+# So the rule is conditional on which of the two is present, and BOTH branches
+# assert something. If the connector ever comes back, protobuf must match its
+# pin; while it is gone, protobuf must be pinned here directly, because the
+# vendored `_pb2` modules import `google.protobuf` and nothing else would pull
+# it in. An unpinned transitive dependency of nobody is how a build breaks.
+#
+# This does not resolve anything — that needs the network and is part of release
+# verification.
 _names = {l.split("==")[0].strip().lower() for l in _pins if "==" in l}
 _versions = {l.split("==")[0].strip().lower(): l.split("==")[1].strip()
              for l in _pins if "==" in l}
-if "ctrader-open-api" in _names and "protobuf" in _names:
+if "ctrader-open-api" in _names:
     check("protobuf is not pinned against the connector's own protobuf pin",
           _versions.get("protobuf") == "3.20.1",
           f"ctrader-open-api==0.9.2 requires protobuf==3.20.1; this file says "
           f"{_versions.get('protobuf')}, which makes `pip install -r "
-          f"requirements.txt` fail with ResolutionImpossible. Closing the "
-          f"protobuf advisory needs the connector replaced or its generated "
-          f"_pb2 stubs vendored — see docs/DEPLOYMENT_READINESS.md §6.")
+          f"requirements.txt` fail with ResolutionImpossible.")
 else:
-    check("protobuf is not pinned directly, so no collision is possible",
-          "protobuf" not in _names,
-          "if protobuf is pinned here, it must match the connector's pin")
+    check("protobuf is pinned directly, since the vendored stubs need it",
+          "protobuf" in _names,
+          "apex/ctrader_proto/*_pb2.py import google.protobuf and nothing else "
+          "in requirements.txt depends on it, so removing this pin leaves the "
+          "runtime dependency uninstalled")
+    # 3.20.2 closes PYSEC-2026-899 only. -1806 needs 4.25.8 and -1805 needs
+    # 6.33.5, and the vendored stubs were exercised against every step up to
+    # 6.33.5. Dropping back into the 3.x/4.x/5.x range silently reopens one or
+    # both, which is the whole reason the vendoring was done.
+    _pb = _versions.get("protobuf", "")
+    _major = int(_pb.split(".")[0]) if _pb.split(".")[0].isdigit() else 0
+    check("and at a version with no open advisory against it",
+          _major >= 6,
+          f"protobuf=={_pb}: 3.20.2 leaves PYSEC-2026-1805 and -1806 open, "
+          f"4.25.8 and 5.29.5 still leave -1805. 6.33.5 closes all three and "
+          f"the vendored stubs pass on it.")
+    check("and the connector's own pins are gone with it",
+          not any(n in _names for n in ("pyopenssl", "twisted")),
+          "pyOpenSSL and Twisted were only ever pulled in by the SDK's eager "
+          "__init__; nothing in this repository executes them")
 
 check("cryptography is pinned, because it encrypts broker tokens at rest",
       any(l.startswith("cryptography==") for l in _pins))
-check("the broker connector is pinned, because it pins the TLS stack below it",
-      any(l.startswith("ctrader-open-api==") for l in _pins))
 
 print("\n" + "=" * 50)
 if failures:

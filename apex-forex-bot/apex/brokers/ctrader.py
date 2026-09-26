@@ -9,6 +9,9 @@ over a persistent TLS socket on port 5035. The official Python SDK uses Twisted
 (async), which does not fit this bot's synchronous per-user-thread model, so this
 module implements a small SYNCHRONOUS request/response client over a raw TLS
 socket, reusing only the protobuf message definitions from `ctrader-open-api`.
+Those definitions are vendored under `apex/ctrader_proto/`, so the SDK itself is
+not a dependency: it hard-pinned protobuf, pyOpenSSL and Twisted with `==`, and
+its own client connects without verifying the certificate.
 
 Auth is two-stage:
     1. Application auth   — ProtoOAApplicationAuthReq(clientId, clientSecret)
@@ -39,13 +42,15 @@ import requests
 from apex import config as cfg
 from apex import candle_cache
 
-# Protobuf message definitions come from the official package. We use ONLY the
-# generated message classes — not the Twisted-based Client.
+# Protobuf message definitions, vendored from `ctrader-open-api==0.9.2` — see
+# apex/ctrader_proto/__init__.py for provenance and how to refresh them. We use
+# ONLY the generated message classes, never the SDK's Twisted-based Client,
+# which connects with VERIFY_NONE.
 try:
-    from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import (
+    from apex.ctrader_proto.OpenApiCommonMessages_pb2 import (
         ProtoMessage, ProtoHeartbeatEvent, ProtoErrorRes,
     )
-    from ctrader_open_api.messages.OpenApiMessages_pb2 import (
+    from apex.ctrader_proto.OpenApiMessages_pb2 import (
         ProtoOAApplicationAuthReq, ProtoOAApplicationAuthRes,
         ProtoOAAccountAuthReq, ProtoOAAccountAuthRes,
         ProtoOAGetAccountListByAccessTokenReq, ProtoOAGetAccountListByAccessTokenRes,
@@ -61,7 +66,7 @@ try:
         ProtoOAGetDynamicLeverageByIDReq, ProtoOAGetDynamicLeverageByIDRes,
         ProtoOAGetPositionUnrealizedPnLReq, ProtoOAGetPositionUnrealizedPnLRes,
     )
-    from ctrader_open_api.messages.OpenApiModelMessages_pb2 import (
+    from apex.ctrader_proto.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
         ProtoOAExecutionType, ProtoOAOrderStatus,
     )
@@ -372,7 +377,8 @@ class _Conn:
     # -- lifecycle ------------------------------------------------------------
     def connect(self):
         if not _SDK_OK:
-            raise RuntimeError(f"ctrader-open-api not installed: {_SDK_ERR}")
+            raise RuntimeError(
+                f"cTrader protobuf definitions unavailable: {_SDK_ERR}")
         ctx = ssl.create_default_context()
         raw = socket.create_connection((_HOST[self.env], _PORT), timeout=15)
         self._sock = ctx.wrap_socket(raw, server_hostname=_HOST[self.env])
@@ -1477,7 +1483,8 @@ def list_accounts(access_token: str) -> list:
     """Trading accounts authorized by this token — used after OAuth to let the
     client pick which account to trade. Opens a short-lived demo connection."""
     if not _SDK_OK:
-        raise RuntimeError(f"ctrader-open-api not installed: {_SDK_ERR}")
+        raise RuntimeError(
+            f"cTrader protobuf definitions unavailable: {_SDK_ERR}")
     ctx = ssl.create_default_context()
     raw = socket.create_connection((_HOST["demo"], _PORT), timeout=15)
     sock = ctx.wrap_socket(raw, server_hostname=_HOST["demo"])

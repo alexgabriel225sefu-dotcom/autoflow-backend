@@ -29,6 +29,23 @@ reasonable-looking simplification, since the SDK ships a client and we hand-roll
 one — broker tokens start crossing an unverified connection and no test would
 notice. This file notices.
 
+THE INVARIANT IS NOW STRICTER THAN "DO NOT USE THEIR CLIENT"
+
+The generated message modules have been vendored under `apex/ctrader_proto/`, so
+`ctrader-open-api` is no longer a dependency at all — it is not in
+requirements.txt and will not be installed on the deployment. That makes the
+weaker invariant untestable in the honest direction: an import of the SDK would
+now fail at runtime with `ModuleNotFoundError` in production while passing here,
+where the package still happens to be installed in the developer container. So
+the rule this file enforces is the one that matches the dependency list:
+
+    NO module under apex/ or scripts/ imports `ctrader_open_api` in any way.
+
+Not "does not import their Client" — does not import the package, under any
+name, for any reason, including a `_pb2` module. Section [3] proves that, and
+section [4] proves the connector gets its message classes from the vendored
+package instead.
+
 Run: python3 tests/test_broker_tls_posture.py
 """
 import ast
@@ -93,10 +110,16 @@ for bad in ("CERT_NONE", "_create_unverified_context", "check_hostname=False",
             "check_hostname = False"):
     check(f"nothing in the module uses {bad!r}", bad not in SRC)
 
-# ── 3. the SDK's unverified client is never reached, by any spelling ────────
-# This is the regression that matters. The SDK ships a Client; we hand-roll a
-# socket. Switching to theirs looks like a simplification and silently turns
-# certificate verification off.
+# ── 3. the SDK is not imported at all, by any spelling ──────────────────────
+# The package is no longer a dependency, so ANY import of it is a defect: it
+# would raise ModuleNotFoundError on the deployment. Two distinct failures are
+# caught here, and the second is the severe one:
+#
+#   * a `_pb2` import — breaks the bot outright, loudly, on the next deploy;
+#   * a `Client` import — the SDK's client connects with VERIFY_NONE, so if the
+#     package is ever reinstalled and used, broker access tokens start crossing
+#     an unverified connection. Switching to it looks like a simplification,
+#     since the SDK ships a client and we hand-roll a socket.
 #
 # The first version of this check matched two spellings and missed three, which
 # Codex found in review:
@@ -108,8 +131,10 @@ for bad in ("CERT_NONE", "_create_unverified_context", "check_hostname=False",
 # Matching names does not work, because the name a module is reached under is
 # whatever the author chose. So this resolves ALIASES: every local name bound to
 # anything under `ctrader_open_api`, and every local name bound directly to the
-# Client class, then flags any reference through either.
-print("\n[3] the SDK's VERIFY_NONE client is not reachable under any name")
+# Client class. `sdk_references` reports every import of the package;
+# `sdk_client_references` narrows that to the ones that reach the Client, which
+# is what the severity in the failure message comes from.
+print("\n[3] the SDK is not imported anywhere, under any name")
 SDK_ROOT = "ctrader_open_api"
 
 
@@ -122,6 +147,34 @@ def _dotted(node):
     if isinstance(node, ast.Name):
         return node.id, list(reversed(parts))
     return None, []
+
+
+def sdk_references(tree):
+    """Every import of the SDK package, whatever is taken from it.
+
+    The dependency is gone, so this is the primary rule: no import, full stop.
+    A `_pb2` import is as much a defect as a `Client` import now — it would
+    raise ModuleNotFoundError on the deployment. [] means none.
+    """
+    hits = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name == SDK_ROOT or a.name.startswith(SDK_ROOT + "."):
+                    hits.append(
+                        f"import {a.name}"
+                        + (f" as {a.asname}" if a.asname else ""))
+        elif isinstance(node, ast.ImportFrom):
+            mod = node.module or ""
+            # `level` guards against a relative import that merely looks alike:
+            # `from .ctrader_open_api import x` is a local package, not the SDK.
+            if node.level == 0 and (mod == SDK_ROOT
+                                    or mod.startswith(SDK_ROOT + ".")):
+                for a in node.names:
+                    hits.append(
+                        f"from {mod} import {a.name}"
+                        + (f" as {a.asname}" if a.asname else ""))
+    return hits
 
 
 def sdk_client_references(tree):
@@ -180,7 +233,8 @@ def sdk_client_references(tree):
 
 
 SEARCH = [os.path.join(ROOT, "apex"), os.path.join(ROOT, "scripts")]
-offenders = []
+importers = []       # any import of the package — the dependency is gone
+client_reach = []    # the subset that reaches the VERIFY_NONE client
 scanned = 0
 for base in SEARCH:
     for dirpath, dirnames, names in os.walk(base):
@@ -193,11 +247,23 @@ for base in SEARCH:
             with open(full, encoding="utf-8", errors="replace") as fh:
                 body = fh.read()
             scanned += 1
-            for hit in sdk_client_references(ast.parse(body, filename=n)):
-                offenders.append(f"{rel}: {hit}")
+            tree = ast.parse(body, filename=n)
+            for hit in sdk_references(tree):
+                importers.append(f"{rel}: {hit}")
+            for hit in sdk_client_references(tree):
+                client_reach.append(f"{rel}: {hit}")
 
-check(f"no production module reaches the SDK's Client ({scanned} files scanned)",
-      not offenders, str(offenders))
+check(f"no production module imports ctrader_open_api at all "
+      f"({scanned} files scanned)",
+      not importers,
+      "the package is not in requirements.txt, so these would raise "
+      f"ModuleNotFoundError on the deployment: {importers}")
+# Kept as its own assertion rather than folded into the one above: this is the
+# failure that leaks tokens instead of merely crashing, and a reader of a red
+# suite should be able to tell those two apart without reading the resolver.
+check("and none reaches the SDK's VERIFY_NONE client",
+      not client_reach,
+      f"broker tokens would cross an unverified connection: {client_reach}")
 check("and nothing builds a Twisted SSL endpoint string",
       "clientFromString" not in SRC and 'f"ssl:' not in SRC)
 
@@ -218,36 +284,104 @@ EVASIONS = (
 )
 for src in EVASIONS:
     first = src.split("\n")[0]
-    check(f"caught: {first}", bool(sdk_client_references(ast.parse(src))), "NOT CAUGHT")
+    # Every one of these imports the package, so BOTH detectors must fire: the
+    # narrow one because it reaches the Client, the broad one because the
+    # dependency no longer exists.
+    check(f"caught as a client reach: {first}",
+          bool(sdk_client_references(ast.parse(src))), "NOT CAUGHT")
+    check(f"caught as an SDK import:  {first}",
+          bool(sdk_references(ast.parse(src))), "NOT CAUGHT")
 
-# And it does not cry wolf on what we actually do, or this check gets deleted.
-LEGITIMATE = (
+# A `_pb2` import is now a defect too, but a different one — it crashes rather
+# than leaking. These prove the two detectors disagree in exactly that way; if
+# they ever agree here, the severity split in the failure messages is a lie.
+PB2_ONLY = (
     "from ctrader_open_api.messages.OpenApiMessages_pb2 import ProtoOAApplicationAuthReq\n",
     "from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import ProtoMessage\n"
     "ProtoMessage()\n",
-    "import ssl\nclient = ssl.create_default_context()\nclient.check_hostname\n",
-    "class Client:\n    pass\nClient()\n",          # our own unrelated class
-    'x = {"Client": 1}\n',                           # the word as data
+    "import ctrader_open_api.messages.OpenApiModelMessages_pb2 as m\nm.ProtoOAOrderType\n",
 )
-for src in LEGITIMATE:
-    check(f"no false positive: {src.splitlines()[0][:52]}",
+for src in PB2_ONLY:
+    label = src.splitlines()[0][:58]
+    check(f"flagged as an SDK import: {label}",
+          bool(sdk_references(ast.parse(src))), "NOT CAUGHT")
+    check(f"but not as a client reach: {label}",
           not sdk_client_references(ast.parse(src)),
           str(sdk_client_references(ast.parse(src))))
 
-# ── 4. only the protobuf definitions are taken from the SDK ─────────────────
-# The reason the SDK is a dependency at all. If that widens, the TLS posture
-# above stops being ours to guarantee.
-print("\n[4] the SDK is used for message definitions and nothing else")
-sdk_imports = set()
+# And neither detector cries wolf on what we actually do, or they get deleted.
+NOT_THE_SDK = (
+    # What the connector does now: the vendored package, not the SDK.
+    "from apex.ctrader_proto.OpenApiMessages_pb2 import ProtoOAApplicationAuthReq\n",
+    "from apex.ctrader_proto.OpenApiCommonMessages_pb2 import ProtoMessage\n"
+    "ProtoMessage()\n",
+    # What the vendored modules do internally, after the relocation edit.
+    "from . import OpenApiModelMessages_pb2 as OpenApiModelMessages__pb2\n",
+    # A relative import that merely reads like the SDK.
+    "from .ctrader_open_api import thing\n",
+    "import ssl\nclient = ssl.create_default_context()\nclient.check_hostname\n",
+    "class Client:\n    pass\nClient()\n",          # our own unrelated class
+    'x = {"Client": 1}\n',                           # the word as data
+    "sdk = 'ctrader_open_api'\n",                    # the name as a string
+)
+for src in NOT_THE_SDK:
+    label = src.splitlines()[0][:58]
+    check(f"no false positive (import): {label}",
+          not sdk_references(ast.parse(src)),
+          str(sdk_references(ast.parse(src))))
+    check(f"no false positive (client): {label}",
+          not sdk_client_references(ast.parse(src)),
+          str(sdk_client_references(ast.parse(src))))
+
+# ── 4. the message definitions come from the vendored package ────────────────
+# The connector needs generated protobuf classes from somewhere. Section [3]
+# says it must not be the SDK; this says where it IS, so a future reader cannot
+# satisfy [3] by deleting the import and breaking the bot.
+print("\n[4] message definitions come from apex/ctrader_proto, and only those")
+VENDORED = "apex.ctrader_proto"
+vendored_imports = set()
 for node in ast.walk(TREE):
     if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
-            "ctrader_open_api"):
-        sdk_imports.add(node.module)
-check("every SDK import is a protobuf message module",
-      sdk_imports and all("_pb2" in m for m in sdk_imports),
-      str(sorted(sdk_imports)))
+            VENDORED):
+        vendored_imports.add(node.module)
+check("the connector imports from the vendored package",
+      bool(vendored_imports), str(sorted(vendored_imports)))
+check("and every one of those imports is a protobuf message module",
+      vendored_imports and all("_pb2" in m for m in vendored_imports),
+      str(sorted(vendored_imports)))
 check("the docstring says so, so the next reader knows it is deliberate",
       "protobuf message definitions" in SRC)
+
+# The vendored package must itself be free of the SDK, or removing the
+# dependency was cosmetic: the connector would import a module that imports the
+# thing we just deleted from requirements.txt.
+VENDOR_DIR = os.path.join(ROOT, "apex", "ctrader_proto")
+check("the vendored package directory exists", os.path.isdir(VENDOR_DIR))
+vendor_files = sorted(f for f in os.listdir(VENDOR_DIR) if f.endswith("_pb2.py")) \
+    if os.path.isdir(VENDOR_DIR) else []
+check("it holds the four generated modules the connector's three need",
+      len(vendor_files) == 4, str(vendor_files))
+for f in vendor_files:
+    with open(os.path.join(VENDOR_DIR, f), encoding="utf-8") as fh:
+        vsrc = fh.read()
+    check(f"{f} reaches no SDK module",
+          not sdk_references(ast.parse(vsrc, filename=f)),
+          str(sdk_references(ast.parse(vsrc, filename=f))))
+    # Belt and braces: the AST check above cannot see a name inside a string,
+    # and these files carry a large serialized descriptor blob.
+    check(f"{f} does not mention the SDK package anywhere, even in a string",
+          "ctrader_open_api" not in vsrc)
+
+# Provenance, because a vendored file with no recorded source is a file nobody
+# can safely refresh.
+with open(os.path.join(VENDOR_DIR, "__init__.py"), encoding="utf-8") as fh:
+    VENDOR_DOC = fh.read()
+check("the vendored package records the upstream package and version",
+      "ctrader-open-api" in VENDOR_DOC and "0.9.2" in VENDOR_DOC)
+check("and how to refresh the stubs",
+      "HOW TO REFRESH" in VENDOR_DOC)
+check("and the upstream licence is kept alongside them",
+      os.path.isfile(os.path.join(VENDOR_DIR, "LICENSE")))
 
 # ── 5. the port and hosts are the broker's, not something configurable ──────
 # A host read from a request body would make verification pointless: an
