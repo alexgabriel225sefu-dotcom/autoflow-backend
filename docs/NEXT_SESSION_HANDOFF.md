@@ -189,6 +189,42 @@ file must be rewritten by that milestone, not deleted.
 | A POST to an `/api/` route without a session gets a 307 to `/login`, not JSON | The middleware matcher covers `/api/*`. Harmless while checkout is off; wrong contract if it is ever enabled |
 | Nothing on this branch is deployed | §1c |
 
+## 6b. Security concern with no fix yet: identifiers in the legacy bot
+
+A tree-wide scan on 2026-09-26 found the owner's own cTrader account number
+(`47765456`) and Telegram chat ids in tracked files. Protocol §9 forbids
+committing account numbers, so this is recorded rather than passed over.
+
+| File | What |
+|---|---|
+| `apex-forex-bot/apex/account_mode.py` | account number in a doc comment |
+| `apex-forex-bot/apex/user_loop.py` | same |
+| `apex-forex-bot/apex/copilot.py` | chat id in a doc comment |
+| `apex-forex-bot/scripts/backfill_trades.py` | chat id in a usage example |
+| `apex-forex-bot/scripts/mark_journal_artefacts.py` | chat id in a docstring |
+| `apex-forex-bot/tests/test_access_gates_loop.py` | both ids as test fixtures |
+| `HANDOFF.md` (root) | chat id in prose |
+
+**Scope:** all of these are in the **legacy Telegram bot**, added between
+2026-08-15 and 2026-09-03. The platform is clean — zero occurrences in
+`apex-forex-bot/apex/platform/` or `web/src/`, asserted by scan.
+
+**Not acted on, deliberately.** They are the owner's own identifiers rather
+than a third party's; several are load-bearing test fixtures for the other
+product; and purging them from history is a destructive rewrite that needs
+approval. Changing another work stream's tests from this branch would also
+conflict with whoever is working on it.
+
+**For Codex to rule on:** whether these are acceptable (the owner's own ids, in
+a private repository) or whether the bot's files should be scrubbed on its own
+branch. If scrubbed, the test fixtures need synthetic ids and the history
+question is separate from the working-tree question.
+
+The secret scan itself was clean: the four pattern matches were documentation
+showing regexes (`AKIA[0-9A-Z]{16}`, a Kubernetes `-----BEGIN PRIVATE KEY-----`
+example, a PGP regex in an agent definition), none of them a real credential,
+and none in the product.
+
 ## 7. Hard limits
 
 - **Do not merge to `main`.** It is old and divergent.
