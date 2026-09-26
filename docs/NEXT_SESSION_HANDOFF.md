@@ -1,6 +1,6 @@
 # Apex4Traders — handoff
 
-**State at:** `6f35dcd7f` on `claude/apex4traders-platform-v1`
+**State at:** `c95e5d7df` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-26
 
 Read **`docs/CODEX_CLAUDE_PROTOCOL.md`** first — it is the normative working
@@ -18,7 +18,7 @@ and a private beta.
 
 | | |
 |---|---|
-| Tests | 160 backend files, 215 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
+| Tests | 162 backend files, 215 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
 | Private demo beta | **NOT YET** — blocked on X1 |
 | Public beta | **NO** |
 | Taking money | **NO** — checkout off, no approved price |
@@ -78,6 +78,58 @@ Chromium is at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Do **not**
 run `playwright install`. Run `verify.js` too, not only `shoot.js`: `shoot.js`
 signs in first, so it cannot see a public route that has been wrongly gated —
 which is exactly the bug that was found.
+
+## 1e. Session of 2026-09-26 — deployment prepared, TLS answered, scrub done
+
+### The TLS question is settled, and it corrected me
+
+Yesterday's assessment said the pinned-dependency exposure was "the TLS session
+to cTrader". **Wrong.** `apex/brokers/ctrader.py` opens its own socket with
+`ssl.create_default_context()` — CERT_REQUIRED, check_hostname, `server_hostname`
+passed — against the SYSTEM OpenSSL, not the wheel's. pyOpenSSL and Twisted are
+not on any path this product executes; they are dragged in because the SDK's
+`__init__.py` imports its client eagerly.
+
+Separate finding: **the SDK's own `Client` is `VERIFY_NONE`** (measured —
+`trustRoot=None`, `verify=False`). We do not use it.
+`tests/test_broker_tls_posture.py` now keeps it that way, because switching to
+the SDK's client looks like a simplification and silently turns certificate
+verification off. Four mutations killed.
+
+Tested combinations are in `docs/DEPLOYMENT_READINESS.md` §6. The one that
+matters: **pyOpenSSL 26 + newest cryptography is BROKEN** (`AttributeError:
+GEN_EMAIL`), which is what "fix the advisory" would have produced if applied
+blind. Recommended minimal change is `protobuf==3.20.2`, tested, **not applied**
+because requirements.txt is the live bot's and this branch is not deployed, so
+it would take effect whenever the branches converge without anybody deciding.
+
+### Deployment prepared, not applied
+
+`docs/deploy/render-apex4traders.yaml` — `apex4traders-api` (root
+`apex-forex-bot`, `/healthz`) and `apex4traders-web` (root `web`, `npm ci`).
+Deliberately not the root `render.yaml`, which Render reads and would act on.
+Both name the platform branch with `autoDeploy: false`, so nothing here can
+restart the legacy trading loop. `tests/test_platform_blueprint.py` validates it
+against the repository — the bot's own blueprint already failed exactly this way
+by omitting `rootDir`.
+
+### The legacy identifiers are scrubbed, on the bot's own branch
+
+`claude/arcads-external-api-gexx7-6n4pr9`, commits `fd1acb491` and `f566c6629`.
+28 files, synthetic same-shape values, 142/142 bot tests still pass. That branch
+is **not** the one Render deploys (`…-gExX7` is), checked before switching.
+
+One file deliberately untouched: `nova/config/nova.json5` — `allowFrom:
+["7585109158"]` is live configuration deciding who may use the tool. Scrubbing
+it would revoke access, not scrub an identifier. Moving it to an environment
+variable is the right fix and a separate change.
+
+**History not rewritten.** Purging needs a force push over shared history.
+
+**My error, recorded:** `git add -A` on that branch swept in 113 `ui-audit/`
+screenshots (15 MB). Untracked and gitignored in `f566c6629`; the previous
+commit's history still holds them. The platform branch already gitignored
+`ui-audit/`, which is why it never happened here.
 
 ## 2. The one thing to do next
 
@@ -179,6 +231,8 @@ file must be rewritten by that milestone, not deleted.
 
 | Gap | Where |
 |---|---|
+| **The real cTrader demo smoke test has NOT been run** — no broker credential exists here. Nothing in this platform has ever spoken to cTrader | blocker **X1**, `docs/CTRADER_DEMO_SMOKE_TEST.md` |
+| **The real TLS handshake has NOT been verified** — TCP 5035 is unreachable from this container; the inspecting proxy resets raw TLS on a non-HTTP port | `scripts/check_ctrader_tls.py`, run it on the deployment host |
 | `/readyz` has never answered from a deployed instance | `docs/LAUNCH_QA_REPORT.md` |
 | An active rule cannot be edited; editing must create a version | same |
 | No volume and no indicator overlay on the chart, both for stated reasons | same, and `docs/CHART_DEPENDENCY_DECISION.md` |
