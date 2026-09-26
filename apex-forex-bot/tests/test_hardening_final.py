@@ -184,14 +184,154 @@ check("the root railway.json that deployed the legacy API is gone",
 check("the source-download route is gone", "app.get('/bot-access'" not in SERVER,
       "it streamed trading-bot source to any valid key holder")
 wf = os.path.join(REPO, ".github", "workflows")
-# Parse the workflow rather than regex it — `- name:` also matches every step.
+
+
+# The workflow has to be read structurally, not with a regex: `- name:` also
+# matches every step, so a whole-file match would report step names as images
+# and this invariant would pass while CI built a second bot.
+#
+# PyYAML would do it, and is not used, for the reason already written down in
+# tests/test_platform_blueprint.py: it is in no requirements file, so a test
+# that depends on it passes in a developer container and fails in a clean venv —
+# which is exactly what happened here. A test that needs a dependency the
+# deployment does not have is a test that silently stops running.
+#
+# So: an indentation-scoped walk into jobs -> <job> -> strategy -> matrix ->
+# include. It reads one nesting path and refuses everything it does not
+# understand, because a parser that returns [] on an input it misread turns a
+# broken check into a green one.
+def _indent(line):
+    return len(line) - len(line.lstrip(" "))
+
+
+def _is_content(line):
+    s = line.strip()
+    return bool(s) and not s.startswith("#")
+
+
+def _child_block(lines, key):
+    """Lines nested under `key:`, plus whatever sat on the key's own line.
+
+    A mapping key only — `- name: x` strips to `- name: x`, never to `name:`,
+    which is what keeps step and matrix entries from being mistaken for keys.
+    Raises KeyError if the key is not there, rather than returning empty.
+    """
+    for i, line in enumerate(lines):
+        if not _is_content(line):
+            continue
+        s = line.strip()
+        if s != f"{key}:" and not s.startswith(f"{key}: "):
+            continue
+        ind = _indent(line)
+        block = []
+        for nxt in lines[i + 1:]:
+            if _is_content(nxt) and _indent(nxt) <= ind:
+                break
+            block.append(nxt)
+        return block, s[len(key) + 1:].strip()
+    raise KeyError(key)
+
+
+def matrix_names(text, job="build"):
+    """The `name:` of every matrix include entry of one job, in file order."""
+    lines = text.splitlines()
+    block = lines
+    for key in ("jobs", job, "strategy", "matrix"):
+        block, _ = _child_block(block, key)
+    block, inline = _child_block(block, "include")
+    if inline:
+        raise ValueError(f"include is written in flow style, which this parser "
+                         f"does not read: {inline!r}")
+    names = []
+    for line in block:
+        if not _is_content(line):
+            continue
+        s = line.strip()
+        if s.startswith("- name:"):
+            names.append(s.split(":", 1)[1].strip())
+        elif s.startswith("- "):
+            # An entry whose first key is not `name` would be skipped, and a
+            # skipped entry is an unbuilt image this check would not see.
+            raise ValueError(f"matrix entry does not lead with name: {s!r}")
+    if not names:
+        raise ValueError("the include block has no entries")
+    return names
+
+
+# The parser is tested before it is trusted, because it replaced a library.
+# Case 3 is the one that matters: it is the mistake a regex would make.
+_SELF = (
+    ("one entry",
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n"
+     "          - name: apex-forex\n            context: apex-forex-bot\n",
+     ["apex-forex"]),
+    ("two entries are both seen",
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n"
+     "          - name: a\n          - name: b\n",
+     ["a", "b"]),
+    ("a step named like an image is not a matrix entry",
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n"
+     "          - name: apex-forex\n    steps:\n      - name: apex-crypto\n"
+     "      - name: Build and push\n",
+     ["apex-forex"]),
+    ("a comment inside the block is ignored",
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n"
+     "          # only one image\n          - name: apex-forex\n",
+     ["apex-forex"]),
+    ("another job's matrix is not mixed in",
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n"
+     "          - name: apex-forex\n  other:\n    strategy:\n      matrix:\n"
+     "        include:\n          - name: apex-crypto\n",
+     ["apex-forex"]),
+)
+for _label, _doc, _want in _SELF:
+    try:
+        _got = matrix_names(_doc)
+    except Exception as _e:                  # noqa: BLE001
+        _got = f"raised {_e}"
+    check(f"workflow parser: {_label}", _got == _want, f"got {_got}")
+
+# And it refuses, loudly, everything it cannot read. Each of these would
+# otherwise return [] or a short list and make this section pass on a lie.
+#
+# The EXPECTED EXCEPTION TYPE is asserted, not merely that something was raised.
+# A first version of this only checked "did it raise", and a mutation that made
+# _child_block return ([], "") instead of raising KeyError SURVIVED: every
+# missing-key case still ended up raising ValueError from the final "no entries"
+# guard, so the guard was doing all the work and the KeyError path was never
+# exercised. Pinning the type is what tells the two apart.
+_REFUSE = (
+    ("a document with no jobs at all", KeyError, "on: push\n"),
+    ("a job that is not there", KeyError,
+     "jobs:\n  release:\n    strategy:\n      matrix:\n        include:\n"
+     "          - name: x\n"),
+    ("a missing strategy block", KeyError, "jobs:\n  build:\n    steps: []\n"),
+    ("a strategy with no matrix", KeyError,
+     "jobs:\n  build:\n    strategy:\n      fail-fast: false\n"),
+    ("a matrix with no include", KeyError,
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        os: [linux]\n"),
+    ("flow-style include", ValueError,
+     "jobs:\n  build:\n    strategy:\n      matrix:\n"
+     "        include: [{name: apex-forex}]\n"),
+    ("an entry that does not lead with name", ValueError,
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n"
+     "          - context: x\n            name: apex-crypto\n"),
+    ("an empty include block", ValueError,
+     "jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n"
+     "    steps: []\n"),
+)
+for _label, _want_exc, _doc in _REFUSE:
+    try:
+        _outcome = f"returned {matrix_names(_doc)}"
+    except Exception as _e:                  # noqa: BLE001
+        _outcome = type(_e)
+    check(f"workflow parser refuses {_label} with {_want_exc.__name__}",
+          _outcome is _want_exc, f"got {_outcome}")
+
 try:
-    import yaml
-    _pub = yaml.safe_load(read(wf, "docker-publish.yml"))
-    _matrix = [e.get("name") for e in
-               _pub["jobs"]["build"]["strategy"]["matrix"]["include"]]
+    _matrix = matrix_names(read(wf, "docker-publish.yml"))
 except Exception as _e:                      # noqa: BLE001
-    _matrix = [f"unparseable: {_e}"]
+    _matrix = [f"could not read the matrix: {_e}"]
 check("CI publishes exactly one bot image", _matrix == ["apex-forex"],
       f"matrix builds {_matrix}")
 check("no workflow deploys a legacy bot",
