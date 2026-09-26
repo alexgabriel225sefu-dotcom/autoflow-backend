@@ -318,6 +318,32 @@ else:
 check("cryptography is pinned, because it encrypts broker tokens at rest",
       any(l.startswith("cryptography==") for l in _pins))
 
+# Floors for the two packages whose pins were raised to close advisories. Each
+# carries the advisory that set it, because a version number with no reason
+# beside it is a number somebody tidies up later — and tidying either of these
+# downward silently reopens a known hole rather than risking an unknown one.
+def _ver(name):
+    raw = _versions.get(name, "")
+    parts = raw.split(".")
+    return tuple(int(x) if x.isdigit() else 0 for x in parts[:3]), raw
+
+
+_cv, _craw = _ver("cryptography")
+check("cryptography is at or above the version with no open advisory",
+      _cv >= (50, 0, 0),
+      f"cryptography=={_craw}: 49.0.0 still leaves PYSEC-2026-3552, which "
+      f"50.0.0 fixed. This encrypts broker tokens at rest.")
+
+_rv, _rraw = _ver("requests")
+check("requests is pinned", bool(_rraw), "it is the HTTP client for OAuth, "
+      "Telegram, the licence check and every market feed")
+check("requests is at or above the version with no open advisory",
+      _rv >= (2, 33, 0),
+      f"requests=={_rraw}: 2.32.4 fixed PYSEC-2026-1872 (.netrc credential "
+      f"leak via malicious URLs) and 2.33.0 fixed PYSEC-2026-2275 "
+      f"(extract_zipped_paths predictable temp path). Below 2.33.0 one of "
+      f"the two is open.")
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed")

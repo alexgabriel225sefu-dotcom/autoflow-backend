@@ -12,7 +12,21 @@
 # actual import graph. The `groq` SDK used to be here and was never imported:
 # the Groq calls go out over plain `requests`.
 
-requests==2.32.3
+# The HTTP client for everything that is not the broker socket: the cTrader
+# OAuth token exchange, Telegram, the licence check, market and news feeds.
+# Every call site uses the plain module-level API — no Session, no
+# HTTPAdapter, no verify=, no proxies=, no custom auth — which is the most
+# stable part of the surface.
+#
+# 2.33.0 is the floor that clears both findings against 2.32.3:
+#   PYSEC-2026-1872  .netrc credential leak via malicious URLs   (2.32.4)
+#   PYSEC-2026-2275  extract_zipped_paths predictable temp path  (2.33.0)
+# 2.34.2 is the current release, clears the same set, and its changes over
+# 2.33 are inline typing plus two runtime fixes (non-greedy no_proxy
+# matching, duplicate leading slashes in paths — the latter complete only
+# with urllib3 >= 2.7.0, and 2.8.0 is what installs). Needs Python >= 3.10;
+# matplotlib below already requires >= 3.11, so this raises no floor.
+requests==2.34.2
 redis==8.1.0
 python-dotenv==1.2.2
 # Field-level encryption of broker tokens at rest (Fernet, in

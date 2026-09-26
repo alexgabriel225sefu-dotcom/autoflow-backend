@@ -562,6 +562,105 @@ instead of `""` on failure fails four.
 beside it are encrypted. Not touched in a dependency commit; recorded for a
 decision.
 
+#### requests 2.32.3 → 2.34.2 — CLOSED 2026-09-26
+
+Also unblocked by the vendoring, which was not noticed at the time:
+`ctrader-open-api==0.9.2` pinned `requests==2.32.3` **exactly**, alongside
+protobuf, pyOpenSSL and Twisted. So this bump was equally impossible before, and
+the vendoring freed three pins, not two.
+
+| requests | Call shapes | `pip check` | Advisories still open |
+|---|---|---|---|
+| 2.32.3 (old pin) | pass | clean | PYSEC-2026-1872, PYSEC-2026-2275 |
+| 2.32.4 | pass | clean | PYSEC-2026-2275 |
+| **2.33.0** | **pass** | **clean** | **none** |
+| 2.33.1 | pass | clean | none |
+| **2.34.2** | **pass** | **clean** | **none** |
+
+- `PYSEC-2026-1872` — `.netrc` credential leak via malicious URLs. Fixed 2.32.4.
+- `PYSEC-2026-2275` / CVE-2026-25645 — `requests.utils.extract_zipped_paths`
+  uses a predictable temp filename. Fixed 2.33.0. This repository never calls
+  `requests.utils`, so it did not affect us in practice.
+
+2.33.0 is the floor that clears both; **2.34.2** was taken as the current
+release. Its changes over 2.33 are inline typing (replacing typeshed — no
+runtime effect here) plus two runtime *fixes*: non-greedy `no_proxy` matching,
+and no longer stripping duplicate leading slashes in paths, the latter complete
+only with `urllib3 >= 2.7.0`, and 2.8.0 is what installs. Needs Python >= 3.10;
+`matplotlib==3.11.1` already requires >= 3.11.
+
+**How the call paths were exercised.** Every one of the 15 modules that imports
+`requests` uses the plain module-level API — no `Session`, no `HTTPAdapter`, no
+`verify=`, no `cert=`, no `proxies=`, no custom auth, no streaming — which is
+the most stable part of the surface. A probe drove each shape actually used
+against a local HTTP server on every candidate version: `get(params=)`,
+`get(headers=)`, `post(json=)`, `post(data=)`, `post(data=, files=)`, the
+response attributes the code reads (`status_code`, `ok`, `text`, `headers`,
+`.json()`), a 503 returning rather than raising, `raise_for_status` raising when
+asked, a timeout raising `Timeout`, a refused connection raising
+`ConnectionError`, both being `OSError` subclasses as the broker code assumes,
+and `Session.verify` defaulting to `True`. Identical on all five versions.
+
+The 18 existing tests around those paths pass, and
+`tests/test_ctrader_oauth_http.py` is new — the OAuth token helpers had no
+coverage at all, and writing it is what surfaced the credential leak below.
+
+`tests/test_deploy_config.py` now asserts floors for both raised pins, each with
+its advisory attached. Mutations: `requests==2.32.3`, `requests==2.32.4` and
+`cryptography==49.0.0` each fail one check.
+
+#### A credential leak found while doing it — FIXED 2026-09-26
+
+Not a test artifact, and it is the **application-wide** secret, not one
+client's. cTrader's `/apps/token` reads its parameters from the **query
+string**, so the URL of every token request contains `client_secret` —  the
+credential behind every client's broker connection — plus either the
+authorization code or that client's refresh token. `requests` puts the full URL
+into the message of the `HTTPError` that `raise_for_status()` produces, and into
+its `ConnectionError` and `Timeout` messages. `_token_request` let those escape,
+and a failed token refresh is exactly the kind of event that gets logged.
+Measured on a 401 before the fix:
+
+```
+401 Client Error: Unauthorized for url: .../apps/token?grant_type=
+authorization_code&code=<code>&redirect_uri=...&client_id=...&
+client_secret=<the application secret>
+```
+
+`apex/brokers/ctrader.py` now checks the status by hand, and replaces every
+`requests` exception with one naming the class of failure and nothing else — no
+URL, and no response body either, since a token endpoint can echo what was
+sent. Each raise uses `from None`, because a rewritten message is worth nothing
+while the original chains onto the traceback, and the traceback is what a log
+captures. `apex/redact.py` masks credential-bearing query parameters as defence
+in depth for the next place somebody prints a URL.
+
+Pinned by `tests/test_ctrader_oauth_http.py`, which asserts the absence of the
+secret, the code and the refresh token from the message **and the full formatted
+traceback**, on HTTP errors and on a refused connection. Six mutations kill it,
+including restoring `raise_for_status` (11 checks) and passing requests' own
+message through (3 checks, with the leak visible in the output).
+
+#### Dependency state after all four commits
+
+`pip-audit` against `requirements.txt`, in a clean venv:
+
+| Package | Pin | Advisories |
+|---|---|---|
+| `requests` | 2.34.2 | none |
+| `cryptography` | 50.0.1 | none |
+| `protobuf` | 6.33.5 | none |
+| `redis` | 8.1.0 | none |
+| `python-dotenv` | 1.2.2 | none |
+| `yfinance` | 1.6.0 | none |
+| `matplotlib` | 3.11.1 | none |
+| `ctrader-open-api`, `pyOpenSSL`, `Twisted`, `PyYAML` | — | not installed |
+
+**Every pinned package is advisory-free.** The one remaining `pip-audit`
+finding is `setuptools` (PYSEC-2026-3447), which is build-environment only and
+not in `requirements.txt`. `pip check` reports no broken requirements, and
+164/164 backend test files pass in that venv.
+
 #### Decision, and it is recorded rather than defaulted
 
 ~~**Recommended minimal change: `protobuf==3.20.1` → `3.20.2`.**~~
