@@ -464,6 +464,104 @@ undeclared before this change. It passes in the developer container, where the
 package happens to be installed, and fails in a clean venv. Test-only, no
 production path, reported rather than folded into a mechanical commit.
 
+#### The PyYAML clean-venv failure — CLOSED 2026-09-26
+
+Fixed by removing the dependency, not declaring it. `tests/test_hardening_final.py`
+now reads the CI matrix with an indentation-scoped walk into
+`jobs -> <job> -> strategy -> matrix -> include`, following the precedent in
+`tests/test_platform_blueprint.py`. A regex is not an option: `- name:` also
+matches every step, so a whole-file match would report step names as published
+images and the invariant would pass while CI built a second bot.
+
+The parser is tested before it is trusted — five inputs it must read (including
+a step named like an image, and a second job with its own matrix) and eight it
+must refuse, each asserting the exception TYPE. That last part came from a
+surviving mutation: checking only "did it raise" let a change that returned
+`([], "")` instead of raising `KeyError` pass, because every missing-key case
+still tripped the final "no entries" guard. The guard was doing all the work.
+
+#### cryptography 42.0.8 → 50.0.1 — CLOSED 2026-09-26
+
+**This is token encryption at rest, not the broker TLS path.** `cryptography` is
+used in exactly one place, `apex/user_store.py`, for Fernet. The cTrader
+connection uses stdlib `ssl` against the system OpenSSL and is unaffected by
+this pin in either direction.
+
+Unblocked by the vendoring commit: the ceiling was `pyOpenSSL==24.1.0` requiring
+`cryptography<43,>=41.0.5`, and pyOpenSSL left the tree with the SDK.
+
+**Which version.** Measured one version at a time in a clean venv, with the
+production requirements installed first so the resolver saw the real tree:
+
+| cryptography | Fernet vectors | `pip check` | Advisories still open |
+|---|---|---|---|
+| 42.0.8 (old pin) | pass | clean | 7 |
+| 43.0.1 | pass | clean | 6 |
+| 44.0.1 | pass | clean | 6 |
+| 46.0.6 | pass | clean | 5 |
+| 48.0.1 | pass | clean | 3 |
+| 49.0.0 | pass | clean | 1 — PYSEC-2026-3552, fixed in 50.0.0 |
+| **50.0.0** | **pass** | **clean** | **none** |
+| **50.0.1** | **pass** | **clean** | **none** |
+
+50.0.0 is the floor that clears the last finding; **50.0.1** is the current patch
+on that line and was taken, since it clears the same set and 50.0.0 offers
+nothing over it. Nothing installed constrains `cryptography` any more — the only
+remaining mentions are extras that are not installed (`redis[ocsp]`,
+`curl_cffi[dev]`, `curl_cffi[test]`).
+
+Note this supersedes one row of the earlier compatibility matrix. "pyOpenSSL 26 +
+cryptography 50 → BROKEN (`AttributeError: module 'lib' has no attribute
+'GEN_EMAIL'`)" was a *pyOpenSSL* incompatibility. pyOpenSSL is gone, so
+cryptography 50 is testable on its own, and it passes.
+
+**Fernet backwards compatibility, which is the risk that matters.** Broker
+ciphertexts live in Redis and are not re-encrypted on deploy. A bump where the
+new version encrypts and decrypts perfectly while stored tokens stop opening
+would show up as every connected client losing their broker connection at once,
+with `decrypt_value` correctly returning `""` rather than handing out
+ciphertext — so the logs would say a secret was "treated as absent" and nothing
+would say why. Round-tripping on the installed version cannot detect that.
+
+So `tests/test_fernet_compat.py` freezes four ciphertexts **minted under
+42.0.8** into the repository and opens them on whatever version is installed:
+through raw Fernet, through `user_store.decrypt_value` with the `enc:` prefix,
+and through `_decrypt_sensitive` on a whole record. It also asserts a tampered
+token is still rejected (a version that decrypted everything would pass every
+other check), that `user_store` turns that rejection into absence rather than
+returning ciphertext, and that a pre-existing `TOKEN_ENCRYPTION_KEY` still
+loads. The vectors are synthetic — a key generated for that file, plaintexts
+ending in `SAMPLEONLY`, the synthetic account id `1000000001` — and the file says
+so at the top, because they look exactly like the thing nobody should commit.
+
+Run across versions, same frozen vectors: 42.0.8 → 4/4 decrypt, 49.0.0 → 4/4,
+50.0.1 → 4/4. Only the advisory-floor assertion distinguishes them, which is what
+it is there for.
+
+**Verification.** `pip install -r requirements.txt` in a clean venv, `pip check`
+clean, **163/163 backend test files pass in that venv** with neither
+ctrader-open-api, pyOpenSSL, Twisted nor PyYAML installed. Mutations: corrupting
+one frozen vector fails three checks; making `decrypt_value` return ciphertext
+instead of `""` on failure fails four.
+
+**pip-audit on the requirements set is now clean except `requests`:**
+
+| Package | State |
+|---|---|
+| `cryptography` | **no advisory** (was 7) |
+| `protobuf` | **no advisory** (was 3) |
+| `pyOpenSSL`, `Twisted` | **not installed** (were 5 between them) |
+| `requests` 2.32.3 | PYSEC-2026-1872 (needs 2.32.4), PYSEC-2026-2275 (needs 2.33.0) |
+| `setuptools` | build environment only, not in requirements.txt |
+
+`requests` is the next dependency candidate and is out of scope here.
+
+**Observation, not a change:** `ctrader_accounts` is not in
+`user_store._SENSITIVE_FIELDS`, so the account list — which contains
+`ctidTraderAccountId` values — is stored at rest in plaintext while the tokens
+beside it are encrypted. Not touched in a dependency commit; recorded for a
+decision.
+
 #### Decision, and it is recorded rather than defaulted
 
 ~~**Recommended minimal change: `protobuf==3.20.1` → `3.20.2`.**~~

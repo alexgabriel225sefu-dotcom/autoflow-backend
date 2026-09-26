@@ -15,7 +15,19 @@
 requests==2.32.3
 redis==8.1.0
 python-dotenv==1.2.2
-cryptography==42.0.8      # field-level encryption of broker tokens at rest
+# Field-level encryption of broker tokens at rest (Fernet, in
+# apex/user_store.py — the only thing in this repository that uses this
+# package). NOT the broker TLS path: that is stdlib `ssl` against the system
+# OpenSSL, so this pin has no bearing on the cTrader connection.
+#
+# Held at 42.0.8 until 2026-09-26 by `pyOpenSSL==24.1.0`, which required
+# `cryptography<43,>=41.0.5` and arrived transitively with
+# `ctrader-open-api`. Vendoring the protobuf stubs removed both, so this
+# became raisable. 50.0.0 is the floor that clears the last finding
+# (PYSEC-2026-3552); 50.0.1 is the current patch on that line and clears
+# every advisory. Fernet backwards compatibility is pinned by
+# tests/test_fernet_compat.py, which decrypts a token minted under 42.0.8.
+cryptography==50.0.1
 yfinance==1.6.0
 # cTrader's protobuf message definitions are vendored under
 # apex/ctrader_proto/ instead of coming from `ctrader-open-api`, which
