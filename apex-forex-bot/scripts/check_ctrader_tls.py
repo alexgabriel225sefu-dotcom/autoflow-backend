@@ -51,6 +51,55 @@ def step(name, ok, detail=""):
     return ok
 
 
+def probe(env="demo", timeout=8.0):
+    """One credential-free reachability verdict, as data rather than output.
+
+    Returns {"stage": ..., "ok": bool, "detail": str}, where stage is the
+    furthest point reached: "dns", "tcp" or "tls".
+
+    Extracted from main() so the deployment can answer the same question about
+    ITSELF at boot. "Can this host reach the broker" is not something a config
+    check can determine — /readyz verifies that CTRADER_* variables are set,
+    which is a different claim entirely — and it is the question that decides
+    whether the product can work from a given network at all.
+
+    Never raises. A diagnostic that can take the process down is worse than no
+    diagnostic. Closes before any application message, exactly as main() does.
+    """
+    host = HOSTS.get(env, HOSTS["demo"])
+    try:
+        socket.getaddrinfo(host, PORT, proto=socket.IPPROTO_TCP)
+    except OSError as e:
+        return {"stage": "dns", "ok": False,
+                "detail": f"{host} does not resolve ({type(e).__name__})"}
+    try:
+        raw = socket.create_connection((host, PORT), timeout=timeout)
+    except OSError as e:
+        return {"stage": "tcp", "ok": False,
+                "detail": f"TCP {PORT} unreachable ({type(e).__name__}) — a "
+                          f"network result, not a TLS one"}
+    try:
+        ctx = ssl.create_default_context()
+        with ctx.wrap_socket(raw, server_hostname=host) as tls:
+            return {"stage": "tls", "ok": True,
+                    "detail": f"{tls.version()} to {host}:{PORT}, certificate "
+                              f"verified"}
+    except ssl.SSLCertVerificationError as e:
+        why = e.verify_message or type(e).__name__
+        return {"stage": "tls", "ok": False,
+                "detail": f"certificate verification FAILED ({why}) — "
+                          f"do not work around this"}
+    except (ssl.SSLError, OSError) as e:
+        return {"stage": "tls", "ok": False,
+                "detail": f"handshake failed ({type(e).__name__}) — an "
+                          f"inspecting proxy resets non-HTTP ports like this"}
+    finally:
+        try:
+            raw.close()
+        except Exception:
+            pass
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--env", choices=sorted(HOSTS), default="demo",

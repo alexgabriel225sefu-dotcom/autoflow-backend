@@ -264,6 +264,53 @@ def build_server(port=None):
                                Handler)
 
 
+def _start_broker_probe():
+    """Log, once at boot, whether THIS host can reach the broker at all.
+
+    /readyz cannot answer this. Its cTrader check verifies that CTRADER_*
+    variables are set, which is a different claim: a service can be perfectly
+    configured and sit on a network that does not permit outbound TCP 5035, and
+    the first sign would be a client whose account will not connect. cTrader
+    Open API is protobuf over TLS on 5035, not HTTPS, and plenty of networks
+    allow 443 and nothing else.
+
+    IN A THREAD, because the probe can take seconds and the platform must bind
+    $PORT promptly — a start-up that stalls fails the health check and the
+    container is replaced. NEVER blocks and never raises: a diagnostic that can
+    take the process down is worse than no diagnostic.
+
+    Credential-free, one connection, closed before any application message.
+    Set A4T_SKIP_BROKER_PROBE=1 to turn it off.
+    """
+    if (os.getenv("A4T_SKIP_BROKER_PROBE") or "").strip().lower() in (
+            "1", "true", "yes", "on"):
+        print("[API] broker reachability probe skipped "
+              "(A4T_SKIP_BROKER_PROBE)")
+        return
+
+    def run():
+        try:
+            sys.path.insert(0, os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "scripts"))
+            import check_ctrader_tls as chk
+            r = chk.probe(env="demo", timeout=8.0)
+        except Exception as e:                               # noqa: BLE001
+            print(f"[API] broker reachability probe could not run "
+                  f"({type(e).__name__}) — this is the probe failing, not the "
+                  f"broker")
+            return
+        if r["ok"]:
+            print(f"[API] broker reachable: {r['detail']}")
+        else:
+            print(f"[API] BROKER NOT REACHABLE at the {r['stage']} stage: "
+                  f"{r['detail']}")
+            print("[API] clients will not be able to connect a cTrader "
+                  "account from this host. This is infrastructure, not "
+                  "configuration — /readyz cannot see it.")
+
+    threading.Thread(target=run, name="broker-probe", daemon=True).start()
+
+
 def main():
     origins = allowed_origins()
     print(f"[API] Apex4Traders platform API starting on :{PORT}")
@@ -277,6 +324,8 @@ def main():
     # operator should never have to read code to answer.
     from apex.platform import entitlement as _ent
     print(f"[API] live execution enabled: {_ent.live_execution_enabled()}")
+
+    _start_broker_probe()
 
     server = build_server()
 
