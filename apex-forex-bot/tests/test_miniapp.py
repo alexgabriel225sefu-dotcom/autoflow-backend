@@ -372,7 +372,7 @@ import time as _time                                        # noqa: E402
 
 
 def _signed(auth_date=None, omit_date=False):
-    pairs = {"user": json.dumps({"id": 7585109158, "first_name": "A"}),
+    pairs = {"user": json.dumps({"id": 1000000001, "first_name": "A"}),
              "query_id": "AAH"}
     if not omit_date:
         pairs["auth_date"] = str(auth_date if auth_date is not None
@@ -385,7 +385,7 @@ def _signed(auth_date=None, omit_date=False):
 
 _now = int(_time.time())
 check("a fresh signature is accepted",
-      (webapp.validate(_signed(), BOT_TOKEN) or {}).get("id") == 7585109158)
+      (webapp.validate(_signed(), BOT_TOKEN) or {}).get("id") == 1000000001)
 # The window was 24 hours, and this asserted that a day-old signature still
 # worked — "a session open all day must not be logged out". initData IS the
 # credential: whoever holds a fresh one can read this client's balance, open
@@ -398,10 +398,10 @@ check("the production window is an hour, not a day",
       _WINDOW <= 3600, f"window is {_WINDOW}s")
 check("a signature from inside the window still works",
       (webapp.validate(_signed(_now - int(_WINDOW * 0.5)), BOT_TOKEN) or {}).get("id")
-      == 7585109158, "a live terminal session must not be logged out mid-use")
+      == 1000000001, "a live terminal session must not be logged out mid-use")
 check("one just inside the edge works",
       (webapp.validate(_signed(_now - (_WINDOW - 60)), BOT_TOKEN) or {}).get("id")
-      == 7585109158)
+      == 1000000001)
 check("a stale one is refused",
       webapp.validate(_signed(_now - (_WINDOW + 60)), BOT_TOKEN) is None)
 check("a day-old signature is now refused",

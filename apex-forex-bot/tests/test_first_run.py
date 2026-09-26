@@ -163,7 +163,7 @@ print("\n══ 4. they connect a broker, then look around ══")
 STATE["record"] = {
     "active": True, "paper": False, "symbol": "EURUSD", "strategy": "momentum",
     "risk": 0.01, "sl_pips": 35.0, "tp_pips": 70.0, "timeframe": "15m",
-    "broker": "ctrader", "ctrader_account_id": 47765456, "ctrader_env": "demo",
+    "broker": "ctrader", "ctrader_account_id": 90000001, "ctrader_env": "demo",
     "paper_balance": 3000.0, "max_trades_day": 15, "maxpos": 1,
     "_connected_ctrader": True, "verbose_alerts": False,
 }

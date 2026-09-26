@@ -63,7 +63,7 @@ def reset(**over):
     store.update({
         "risk_accepted": "2026-07-17T05:57:35",
         "ctrader_env": "live",
-        "ctrader_account_id": 47765456,
+        "ctrader_account_id": 90000001,
         "risk": 0.02, "paper": True,
         "sl_pips": 35.0, "tp_pips": 70.0,
         "max_trades_day": 15, "max_daily_loss_pct": 6, "max_dd_pct": 25,
@@ -80,7 +80,7 @@ check("a confirmation was demanded", any("REAL MONEY" in s for s in sent), str(s
 
 print("\n── the summary shows what will actually trade ──")
 msg = sent[-1]
-check("the account id", "47765456" in msg)
+check("the account id", "90000001" in msg)
 check("the balance", "5000" in msg)
 check("the stop and target", "35" in msg and "70" in msg)
 check("the daily loss cap", "6" in msg)
@@ -139,7 +139,7 @@ check("an audit record was written", len(audits) == 1, str(audits))
 rec = audits[0] if audits else {}
 check("it names the action", rec.get("action") == "live_trading_activated", str(rec))
 check("it records the actor", rec.get("actor") == "111", str(rec))
-check("it records the account", "47765456" in str(rec.get("account")), str(rec))
+check("it records the account", "90000001" in str(rec.get("account")), str(rec))
 check("it records the risk it started at",
       rec.get("risk_per_trade") == tg._LIVE_INITIAL_RISK_CAP, str(rec))
 check("no token leaks into the audit", "token" not in str(rec).lower(), str(rec))

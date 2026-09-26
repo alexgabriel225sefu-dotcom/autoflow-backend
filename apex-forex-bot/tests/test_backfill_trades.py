@@ -35,7 +35,7 @@ def check(name, cond, detail=""):
 
 import backfill_trades as bf
 
-# ── Real journal rows (live account 47765456, before the fix) ────────────
+# ── Real journal rows (live account 90000001, before the fix) ────────────
 ROWS = [
     # Has netPnl and time; no exit, no side, no positionId.
     {"time": "2026-08-28 14:04:58", "symbol": "USDCHF", "entry": 0.8045,

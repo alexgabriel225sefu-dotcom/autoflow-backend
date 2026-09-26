@@ -62,7 +62,7 @@ DASH = {"symbol": "EURUSD", "currentPrice": 1.1042, "balance": 3240.49,
         "positions": [{"symbol": "EURUSD", "side": "BUY", "entryPrice": 1.10,
                        "stopLoss": 1.0975, "pnlUsd": 12.5}]}
 
-CTX = tools.ToolContext("7585109158", environment="DEMO", dash=DASH)
+CTX = tools.ToolContext("1000000001", environment="DEMO", dash=DASH)
 
 print("\n1. The tool context cannot be widened")
 try:

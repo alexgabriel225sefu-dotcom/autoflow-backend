@@ -427,7 +427,7 @@ def _mode_of(user_id):
 
     This used to be `"demo" if paper else "live"`, which read the WRONG AXIS.
     `paper` distinguishes simulated fills from broker-executed ones; it says
-    nothing about whether the broker account is real money. Account 47765456
+    nothing about whether the broker account is real money. Account 90000001
     runs paper=false against a cTrader DEMO account, so every trade it closed
     was journalled "live" — and the history screen prints this field verbatim,
     which would show a client demo trades labelled LIVE.

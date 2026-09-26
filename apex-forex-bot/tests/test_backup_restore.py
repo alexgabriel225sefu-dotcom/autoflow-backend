@@ -51,7 +51,7 @@ WORK = tempfile.mkdtemp(prefix="apex-backup-")
 user_store._DIR = WORK
 
 TOKEN = "ctrader-secret-token-value"
-UID = "7585109158"
+UID = "1000000001"
 
 try:
     print("1. State goes in")
@@ -59,7 +59,7 @@ try:
         "active": True, "paper": False, "ctrader_env": "demo",
         "license_key": "FORX-AAAA-BBBB-CCCC",
         "ctrader_access_token": TOKEN,
-        "ctrader_account_id": "47765456",
+        "ctrader_account_id": "90000001",
         "risk": 0.005, "maxpos": 2, "automation": "approval", "copilot": True,
     })
     user_store.append_trade(UID, {"time": "2026-08-15 10:00:00", "symbol": "EURUSD",
@@ -118,7 +118,7 @@ try:
     check("risk settings survived", back.get("risk") == 0.005 and back.get("maxpos") == 2)
     check("the automation level survived", back.get("automation") == "approval")
     check("live/paper state survived", back.get("paper") is False)
-    check("the broker account survived", back.get("ctrader_account_id") == "47765456")
+    check("the broker account survived", back.get("ctrader_account_id") == "90000001")
     rows = user_store.load_trades(UID)
     check("the journal survived intact", len(rows) == 2 and rows[0]["netPnl"] == 12.5,
           rows)

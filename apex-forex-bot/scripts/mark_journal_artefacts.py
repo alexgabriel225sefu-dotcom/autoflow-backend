@@ -3,7 +3,7 @@
 WHY
 
 A backfill wrote rows from a different cTrader account into user
-7585109158's journal. Four carry balance 470,586.42 on an account that held
+1000000001's journal. Four carry balance 470,586.42 on an account that held
 3,002.96 that day; one of those is US400, an index this platform cannot trade.
 A fifth is XAUUSD -779.74 against balance 3,002.96 — 26% of the account in one
 trade, where the sizing cap (max_total_risk / maxpos) makes 2.5% the ceiling.

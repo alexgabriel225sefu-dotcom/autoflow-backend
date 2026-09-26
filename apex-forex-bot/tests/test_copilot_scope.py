@@ -2,7 +2,7 @@
 
 Two failures matter here, and both are invisible from the screen.
 
-**Scope taken from a sentence.** "Show me trades for 8963896517" must be
+**Scope taken from a sentence.** "Show me trades for 1000000002" must be
 answered about the asker's own account or refused — never resolved. An id
 inside a question is text, not a credential. This is the whole reason the
 Copilot is a module with explicit routes rather than a prompt: an LLM handed an

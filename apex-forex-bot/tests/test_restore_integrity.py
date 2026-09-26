@@ -62,7 +62,7 @@ def check(name, cond, detail=""):
 # there is more than one record to lose.
 USERS = {
     "5001": {"active": True, "paper": False, "license_key": "FORX-AAAA-1111-AAAA",
-             "ctrader_account_id": "47765456", "ctrader_env": "demo",
+             "ctrader_account_id": "90000001", "ctrader_env": "demo",
              "ctrader_access_token": "tok-a", "risk": 0.005, "maxpos": 2,
              "automation": "full", "strategy": "zscore", "max_dd_pct": 25},
     "5002": {"active": True, "paper": False, "license_key": "FORX-BBBB-2222-BBBB",

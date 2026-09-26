@@ -35,13 +35,13 @@ blank rather than guessed. See CtraderBroker.get_deal_history.
 USAGE
 
     # see what would change, for one client
-    python scripts/backfill_trades.py --user 7585109158
+    python scripts/backfill_trades.py --user 1000000001
 
     # ...and for everyone
     python scripts/backfill_trades.py --all
 
     # write it
-    python scripts/backfill_trades.py --user 7585109158 --apply
+    python scripts/backfill_trades.py --user 1000000001 --apply
 
     # how far back to read (default 120 days)
     python scripts/backfill_trades.py --all --days 365 --apply

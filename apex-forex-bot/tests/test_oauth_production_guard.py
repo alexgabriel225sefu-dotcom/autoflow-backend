@@ -118,8 +118,8 @@ with env(production=True, stateless=False):
 oauth._pending.clear()
 
 print("\n4. A signed state is redeemable exactly once")
-state = oauth.make_state("7585109158")
-check("it round-trips to its owner", oauth.parse_state(state) == "7585109158")
+state = oauth.make_state("1000000001")
+check("it round-trips to its owner", oauth.parse_state(state) == "1000000001")
 check("first use is accepted", oauth._consume_state(state) is True)
 check("second use is refused", oauth._consume_state(state) is False,
       "a replayed state must never link an account twice")

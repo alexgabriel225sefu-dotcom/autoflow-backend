@@ -100,7 +100,7 @@ import apex.user_loop as _ul  # noqa: E402
 _orig_make = _ul._make_broker
 _orig_refresh = _ul._refresh_ctrader_token
 
-LIVE = {"ctrader_account_id": 47765456, "ctrader_env": "demo", "paper": False}
+LIVE = {"ctrader_account_id": 90000001, "ctrader_env": "demo", "paper": False}
 
 _ul._make_broker = lambda user: (_Broker(2999.45), object())
 ok, detail = sw._reconnect("u1", LIVE)
@@ -156,7 +156,7 @@ _orig_drop = _ct._drop_conn
 _ct._drop_conn = lambda env, ctid: dropped.append((env, ctid))
 check("a linked account is dropped", sw._disconnect(LIVE) is True)
 check("...with that account's env and id",
-      dropped == [("demo", 47765456)], str(dropped))
+      dropped == [("demo", 90000001)], str(dropped))
 check("an unlinked account reports nothing to drop",
       sw._disconnect({"paper": True}) is False)
 _ct._drop_conn = _orig_drop

@@ -79,8 +79,8 @@ def url_for(parts):
 
 
 print("\n── existing keys must not change ──")
-u = url_for(["GET", "forex:user:7585109158"])
-check("colons stay literal", u.endswith("/GET/forex:user:7585109158"), u)
+u = url_for(["GET", "forex:user:1000000001"])
+check("colons stay literal", u.endswith("/GET/forex:user:1000000001"), u)
 check("no percent-escapes appear at all", "%" not in u, u)
 u = url_for(["SMEMBERS", "forex:active_users"])
 check("underscores are untouched", u.endswith("/SMEMBERS/forex:active_users"), u)

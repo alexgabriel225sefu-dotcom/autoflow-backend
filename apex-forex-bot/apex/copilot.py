@@ -5,7 +5,7 @@ implementation gets it wrong.
 
 **Scope is taken, never given.** Every query runs against the chat id the
 Telegram signature proved. A question is text; it is never allowed to select
-whose data is loaded. "Show me trades for 8963896517" is answered about the
+whose data is loaded. "Show me trades for 1000000002" is answered about the
 asker's own account or refused — never resolved. This is the whole reason the
 Copilot is a module rather than a prompt: an LLM that receives an account id in
 its context will eventually use it.

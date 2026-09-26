@@ -205,7 +205,7 @@ try:
     os.environ["ADMIN_CHAT_IDS"] = "111,222"
     check("a configured admin is authorized", access.is_admin("111"))
     check("the old hardcoded id is NOT an admin any more",
-          not access.is_admin("7585109158"))
+          not access.is_admin("1000000001"))
     check("an unconfigured id is denied", not access.is_admin("333"))
     check("admins_configured() sees them", access.admins_configured() is True)
     os.environ.pop("ADMIN_CHAT_IDS")

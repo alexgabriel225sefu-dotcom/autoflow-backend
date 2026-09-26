@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("APP_ENV", "test")
 # The owner is CONFIGURED now, not hardcoded in access.py — that was
 # finding 3. This is the configuration the fix requires.
-os.environ.setdefault("ADMIN_CHAT_IDS", "7585109158")
+os.environ.setdefault("ADMIN_CHAT_IDS", "1000000001")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
@@ -45,8 +45,8 @@ def check(name, cond, detail=""):
         failures.append(name)
 
 
-CLIENT = "8963896517"       # the chat from the screenshot
-OWNER = "7585109158"        # admin via ADMIN_CHAT_IDS, set above
+CLIENT = "1000000002"       # the chat from the screenshot
+OWNER = "1000000001"        # admin via ADMIN_CHAT_IDS, set above
 STRANGER = "1111111111"
 
 # Keep the real store out of this; drive access through a stub we control.

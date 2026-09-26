@@ -133,7 +133,7 @@ for literal in ("apextrade-super-secret-key-change-in-prod",):
 
 # ── 4. operator identity ──────────────────────────────────────────────────
 print("\n4. No hardcoded operator identity")
-check("no hardcoded Telegram operator id", "7585109158" not in SERVER)
+check("no hardcoded Telegram operator id", "1000000001" not in SERVER)
 check("no hardcoded operator email", "alexgabriel225sefu@gmail" not in SERVER)
 check("an undeliverable alert is loud",
       "Admin alert UNDELIVERABLE" in SERVER,

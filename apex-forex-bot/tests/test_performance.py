@@ -161,7 +161,7 @@ _MODE_FN = LOOP[LOOP.index("def _mode_of"):LOOP.index("def _already_journaled")]
 check("it comes from THIS user's record, not the process-global config",
       "user_store.load(user_id)" in _MODE_FN and "cfg.PAPER_TRADING" not in _MODE_FN)
 # It used to be `"demo" if paper else "live"`. `paper` means simulated-vs-broker
-# fills, NOT real-vs-demo money: account 47765456 runs paper=false against a
+# fills, NOT real-vs-demo money: account 90000001 runs paper=false against a
 # cTrader DEMO account, so every close was journalled "live" and the history
 # screen would show a client demo trades labelled LIVE.
 check("the mode is NOT derived from the paper flag",

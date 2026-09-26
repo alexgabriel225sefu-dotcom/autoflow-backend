@@ -58,7 +58,7 @@ def check(name, cond, detail=""):
 _real_entitlement = gates.live_entitlement
 gates.live_entitlement = lambda uid, u=None: ("allowed", "test: entitled")
 
-BROKERED = {"paper": False, "ctrader_account_id": 47765456,
+BROKERED = {"paper": False, "ctrader_account_id": 90000001,
             "ctrader_access_token": "test-token"}
 GUARD = {"riskGuard": {"halted": False}}
 _n = [0]

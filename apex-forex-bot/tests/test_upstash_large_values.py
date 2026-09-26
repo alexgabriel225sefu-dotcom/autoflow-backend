@@ -9,7 +9,7 @@ value never gets smaller on its own:
 
   2026-09-03T00:22:27 [Redis] command failed SET: 431 Client Error: Request
   Header Fields Too Large for url:
-  https://...upstash.io/SET/evt:user:7585109158/%5B%7B%22event_id%22...
+  https://...upstash.io/SET/evt:user:1000000001/%5B%7B%22event_id%22...
 
 Retried at :27, :29, :32, :35 and abandoned. Every retry sends the same
 oversized URL, so retrying cannot help.
@@ -92,18 +92,18 @@ print(f"\nA 73-trade journal is {len(JOURNAL):,} chars raw "
       f"(~{len(JOURNAL) * 2:,} percent-encoded).")
 
 print("\n1. A large SET does not put the value in the URL")
-ok = run(user_store._redis_set, "forex:trades:7585109158", JOURNAL)
+ok = run(user_store._redis_set, "forex:trades:1000000001", JOURNAL)
 check("the write reports success", ok is True)
 check("nothing was sent as a GET", not gets, str(gets)[:120])
 check("it went out as a POST", len(posts) == 1)
 check("the value is in the BODY, not the URL",
-      posts and posts[0][1][:3] == ["SET", "forex:trades:7585109158", JOURNAL])
+      posts and posts[0][1][:3] == ["SET", "forex:trades:1000000001", JOURNAL])
 check("the URL carries no journal content",
       posts and "event" not in posts[0][0] and len(posts[0][0]) < 120,
       posts[0][0][:100] if posts else "")
 
 print("\n2. The event journal that actually failed live")
-run(user_store._redis_set, "evt:user:7585109158", JOURNAL)
+run(user_store._redis_set, "evt:user:1000000001", JOURNAL)
 check("also a POST", len(posts) == 1 and not gets)
 
 print("\n3. Small values take the same safe path — no size threshold to tune")
@@ -120,9 +120,9 @@ check("EX and the ttl survive as arguments",
       str(posts[0][1][:2] + posts[0][1][3:]) if posts else "")
 
 print("\n5. Reads still use the GET form, so the encoding rules still hold")
-run(user_store._redis_get, "forex:user:7585109158")
+run(user_store._redis_get, "forex:user:1000000001")
 check("GET is unchanged", len(gets) == 1 and not posts)
-check("colons stay literal", gets and gets[0].endswith("/GET/forex:user:7585109158"),
+check("colons stay literal", gets and gets[0].endswith("/GET/forex:user:1000000001"),
       gets[0] if gets else "")
 
 print("\n6. A refused write is still reported as a failure")

@@ -2,7 +2,7 @@
 
 WHAT WENT WRONG
 
-A backfill wrote five rows into user 7585109158's journal that did not come
+A backfill wrote five rows into user 1000000001's journal that did not come
 from this account. Four carry balance 470,586.42 on an account that held
 3,002.96 that day, one of them on US400 — an index this platform cannot trade
 at all. The fifth is XAUUSD -779.74 against a balance of 3,002.96, 26% of the
@@ -56,7 +56,7 @@ def check(name, cond, detail=""):
         failures.append(name)
 
 
-UID = "7585109158"
+UID = "1000000001"
 REAL = [
     {"time": "2026-08-18 06:07", "symbol": "NZDUSD", "netPnl": -2.10,
      "balance": 2938.71, "confidence": 71},
@@ -135,7 +135,7 @@ check("an empty or null mark is not an artefact",
 
 # ── The classifier, against the real journal it was written for ──────────
 # Section 7 runs the migration's rules over the actual 76 rows from user
-# 7585109158 (time, symbol, netPnl, balance — the fields the rules read). If a
+# 1000000001 (time, symbol, netPnl, balance — the fields the rules read). If a
 # rule ever widens enough to catch a genuine trade, this fails.
 import importlib.util  # noqa: E402
 import statistics  # noqa: E402

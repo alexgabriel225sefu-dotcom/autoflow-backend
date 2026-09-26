@@ -63,8 +63,8 @@ for name, value in SECRETS.items():
     check(f"{name} is masked in every shape tried", leaked_in is None, str(leaked_in))
 
 print("\n2. ...and the surrounding text survives, so output stays readable")
-out = redact.scrub(f"[BOT] connect failed for account 47765456 using {SECRETS['DASHBOARD_TOKEN']} - retrying")
-check("the message is still legible", "connect failed for account 47765456" in out, out)
+out = redact.scrub(f"[BOT] connect failed for account 90000001 using {SECRETS['DASHBOARD_TOKEN']} - retrying")
+check("the message is still legible", "connect failed for account 90000001" in out, out)
 check("the secret is gone", SECRETS["DASHBOARD_TOKEN"] not in out, out)
 check("and something marks the removal", redact.MASK in out, out)
 
@@ -100,7 +100,7 @@ print("\n4. Ordinary output is NOT mangled")
 for benign in ("[BOT] EURUSD BUY 0.10 @ 1.08452 sl=1.08102 tp=1.09152",
                "position 12345678 closed, netPnl -12.40",
                "risk_per_trade=0.01 confidence=62 regime=trending",
-               "cTrader connected (demo) account 47765456",
+               "cTrader connected (demo) account 90000001",
                "XAUUSD spread 0.28 - inside cap"):
     check(f"unchanged: {benign[:38]}", redact.scrub(benign) == benign, redact.scrub(benign))
 

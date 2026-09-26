@@ -61,7 +61,7 @@ istorice/secundă per conexiune indiferent de câți clienți.
 Fixul C3 schimbă comportamentul **contului tău**, nu doar al clienților viitori.
 
 `automation.mode()` întorcea `"full"` când nu era setat niciun câmp. Contul
-proprietarului (7585109158) **nu are nici `automation`, nici `copilot`** — deci
+proprietarului (1000000001) **nu are nici `automation`, nici `copilot`** — deci
 rula pe `full` prin exact acest fallback. După deploy va rula pe `approval`:
 botul va cere aprobare pentru fiecare intrare în loc să deschidă singur.
 

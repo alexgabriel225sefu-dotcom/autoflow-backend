@@ -18,7 +18,7 @@ the first scan onward `_skip` is a set for the life of the loop, and every
 later `_skip(reason)` raises `'set' object is not callable`.
 
 Observed live on 2026-09-04, four times:
-    [UserLoop:7585109158] regime gate error: 'set' object is not callable
+    [UserLoop:1000000001] regime gate error: 'set' object is not callable
 
 WHAT IT DID AND DID NOT BREAK
 

@@ -49,7 +49,7 @@ UID = "900001"
 # the order gate now declines new live orders on those. This fixture is about
 # ownership during a restart, so it has to get past that gate to test anything.
 user_store.save(UID, {"active": True, "paper": False, "symbol": "GBPUSD",
-                      "ctrader_account_id": 47765456,
+                      "ctrader_account_id": 90000001,
                       "ctrader_access_token": "test-only-broker-token",
                       "ctrader_env": "live",
                       "open_position_snapshot": dict(LIVE_POS),
@@ -102,7 +102,7 @@ try:
     # ACCOUNT_MODE_UNVERIFIED and the ownership check never runs. Seeding the
     # resolver's cache is what "the broker just answered LIVE" looks like.
     from apex import account_mode as _am
-    _am._store("47765456", _am.LIVE)
+    _am._store("90000001", _am.LIVE)
     owned(False, "another instance holds the lease")
     d, _ = gates.authorize_order(UID, symbol="GBPUSD", side="BUY", units=5000.0,
                                  sl=1.35777, tp=1.36681, origin="signal",

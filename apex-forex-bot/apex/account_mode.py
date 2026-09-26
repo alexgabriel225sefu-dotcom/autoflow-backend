@@ -5,7 +5,7 @@ different axes, and they disagreed:
 
   * `user_loop._mode_of()` returned "live" whenever `paper` was false. But
     `paper` means "simulated fills vs broker-executed" — NOT "real money".
-    Account 47765456 runs paper=false against a cTrader DEMO account, so every
+    Account 90000001 runs paper=false against a cTrader DEMO account, so every
     trade it closed was journalled `mode: "live"`. The history screen prints
     that field verbatim, so demo trades would be shown to a client as LIVE.
   * the loop's dash label read `ctrader_env`, a string stored at OAuth time.
