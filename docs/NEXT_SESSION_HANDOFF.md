@@ -1,7 +1,7 @@
 # Apex4Traders — handoff
 
-**State at:** `495fed056` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-26
+**State at:** `4d02720d7` on `claude/apex4traders-platform-v1`
+**Date:** 2026-09-27
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
 > only documentation, so the numbers still hold at it — that is the convention,
@@ -17,14 +17,21 @@ file, then `docs/RELEASE_READINESS.md`. Everything else is detail.
 ## 1. Where this actually is
 
 A rule-driven trading automation platform, connected to cTrader, that runs on
-**demo accounts only**. The software is in good shape. **Nothing has ever run
-against a real broker**, and that single fact is the difference between this
-and a private beta.
+**demo accounts only**.
+
+**As of 2026-09-27 this platform has spoken to the real cTrader.** A real
+broker demo account (`47765456`) was authorised, its authorization code
+exchanged, its account list read, and the connection written — repeatedly,
+from a phone and a PC, against the deployed services. The sentence that stood
+here for two days, "nothing has ever run against a real broker", is no longer
+true and has been removed rather than softened.
+
+What that closes and what it does not is in §1g.
 
 | | |
 |---|---|
-| Tests | 162 backend files, 215 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
-| Private demo beta | **NOT YET** — blocked on X1 |
+| Tests | 168 backend files, 255 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
+| Private demo beta | **NOT YET** — X1 is now partly closed; see §1g |
 | Public beta | **NO** |
 | Taking money | **NO** — checkout off, no approved price |
 | Live trading | **NO**, and not implemented |
@@ -38,18 +45,31 @@ Four audits were run that had never been run. Each found something real.
 | `npm audit` | **1 critical + 5 high.** Two unauthenticated RCEs in `next`, plus a middleware/proxy bypass — and this app enforces auth in middleware, so that one was an authentication bypass here. Fixed: next 16.2.7 → 16.3.6, now 0 vulnerabilities. |
 | Route audit | **`/configurator` was gated.** It is the previous checkout's return URL, kept so an old receipt does not 404, and it was redirecting those visitors to a login page for an account they do not have. Fixed. |
 | Copy-audit self-audit | **The allowlist was a hole 25 files wide.** Per-file exemptions meant `/terms` was exempt from the rule banning the old brand's support address. 14 of 25 entries needed no exemption at all. Restructured to per-rule. |
-| `pip-audit` | Advisories in `cryptography`, `protobuf`, `pyOpenSSL`, `Twisted` — **all hard-pinned by `ctrader-open-api==0.9.2`**, whose newest release is 0.9.2 (0.9.3 was yanked). Not bumped, and the reason is in `docs/DEPLOYMENT_READINESS.md` §6. |
+| `pip-audit` | Advisories in `cryptography`, `protobuf`, `pyOpenSSL`, `Twisted` — **all hard-pinned by `ctrader-open-api==0.9.2`**, whose newest release is 0.9.2 (0.9.3 was yanked). **Resolved since:** the generated `_pb2` stubs were vendored (`apex/ctrader_proto/`, MIT, provenance recorded) and the SDK dependency dropped, which freed four pins, not two. `protobuf==6.33.5` clears all three advisories; measured with pip-audit rather than assumed. |
 
 And the deployment picture was read from the live Render account for the first
-time. **There is no service for this platform.** See §1c.
+time. There was no service for this platform. **There is now** — see §1c.
 
-## 1c. Deployment: nothing on this branch is deployed
+## 1c. Deployment: this branch IS deployed, as of 2026-09-26
 
-Three Render services exist; all three deploy `claude/arcads-external-api-gExX7`
-and none has `web/` as its root directory. So no commit on this branch reaches
-any URL — including the Fernet-token masking in `apex/redact.py`, which
-protects the **legacy bot's** logs and is not live because it is on the wrong
-branch for the service that runs that bot.
+Two services were created for the platform and deploy this branch:
+
+| Service | ID | URL |
+|---|---|---|
+| `apex4traders-api` | `srv-das11onlk1mc73dtj1fg` | <https://apex4traders-api.onrender.com> |
+| `apex4traders-web` | `srv-das11tfavr4c738irjv0` | <https://apex4traders-web.onrender.com> |
+
+Plus a Key Value store, `apex4traders-store` (`red-das1cb59fdbs73bf68g0`,
+noeviction). `autoDeploy` is **off** on both: every deploy is triggered
+deliberately, and a push is therefore not a release.
+
+`/readyz` reports all checks `ok`, shared store Redis (not the memory
+fallback), live trading off.
+
+**The legacy Telegram bot service is untouched and must stay that way.** It
+deploys a different branch. The Fernet-token masking in `apex/redact.py`
+protects that bot's logs and is still not live, because it is on the wrong
+branch for the service that runs it — that has not changed.
 
 `docs/DEPLOYMENT_READINESS.md` has the full picture: what two services would be
 needed, every variable as a name and a placeholder, and the fact that the health
@@ -164,20 +184,84 @@ Two required fixes came with it and are done:
    `495fed056` with the current counts, and both state what "assessed at" means
    so the next reader can tell a deliberate SHA from a forgotten one.
 
+## 1g. Session of 2026-09-27 — the OAuth flow met the real cTrader
+
+Deployed to `apex4traders-api` and `apex4traders-web` throughout. Five defects,
+each found in production, each with the evidence that found it.
+
+| # | Defect | How it was found |
+|---|---|---|
+| 1 | **cTrader's authorization code expires in ONE MINUTE.** The flow parked it at the callback and exchanged it on a second, human-timed click. Rate-limited on that button, the owner waited for the window to roll and came back to a dead code — answered `ACCESS_DENIED`, which names credentials and means nothing of the kind. A day went into suspecting a correct client secret. | cTrader's own docs, after the guess-and-check had been exhausted. The deprecated Telegram module exchanges in its callback, which is why the legacy bot works on the same application and the same credentials. |
+| 2 | `RATE_LIMITED` reported the WINDOW LENGTH (a flat 60) whichever second of the minute it was, and the message said only "wait a moment". | Reading the limiter after the owner hit it twice. |
+| 3 | **The nonce was lost at login.** The middleware put only the pathname in `next=`, and cTrader opens in a new tab whose `sessionStorage` is empty — so `?n=` was the only record of the attempt. A lapsed session during the round trip lost it. Fixing it exposed a pre-existing **open redirect**: `next` went straight into `router.push`. | Reading the middleware while implementing observability. |
+| 4 | A finished connection still showed **"Step 1 — authorise"**, because the heading was chosen from `pending`, which is cleared on success. The owner pressed Connect again five seconds after succeeding. | **The server log.** First defect in this flow found without a photograph of a phone. |
+| 5 | Finishing an **already-finished** attempt answered `NOT_READY` — "this connection has not come back from cTrader yet" — about one that had come back, been exchanged and been written. | The server log, by the diagnostic id the owner read off the screen. |
+
+**The instrument that made 4 and 5 possible:** `apex/platform/linklog.py`.
+Every step of the link now says what happened, keyed by an attempt id —
+`HMAC(nonce)[:8]`, surfaced to the client as `diagnosticId` — so a failure is
+reported by reading eight characters aloud instead of sending a screenshot of
+a page with a live session on it. `tests/test_platform_linklog.py` drives the
+real flow with sentinel credentials and greps everything the process printed;
+five deliberate leaks were planted and all five failed it.
+
+**Also shipped:** `docs/MT5_CLOUD_CONNECTOR_SPIKE.md` and
+`apex/platform/brokers/` — a platform-neutral provider contract and a
+read-only MT5 skeleton behind two env flags, wired to nothing. See §1h.
+
+**A pre-existing hole closed:** `test_platform_live_invariants.py` enumerated
+modules with `os.listdir`, so anything in a subpackage escaped every check in
+it. It now walks.
+
+### What is still open on the flow
+
+The owner reports pressing "I have approved — finish" with **no request
+reaching the server** — `ctrader/status` polls from the same page keep
+arriving, so the page is alive and authenticated. `complete()` opened with a
+bare `if (!nonce) return;`, the only path through that function that produces
+neither a request nor a message; it now reports `NO_PENDING`. Whether that was
+the cause is **not yet confirmed by evidence**, and must not be written up as
+if it were.
+
+Independently, the connect page now offers an escape route that does not go
+through that button: when an account is already connected, the step-2 card
+says so, names it, and links to `/accounts`.
+
+## 1h. MT5: the finding that decides the approach
+
+MetaTrader 5 has no first-party machine interface for third parties. The only
+approach meeting "no install, works from a phone" is a cloud vendor running
+the terminals.
+
+MetaApi's provisioning documents the password field as: *"The password can be
+either investor password for read-only access or master password to enable
+trading features."* An investor password **cannot place, modify or close an
+order** — the broker refuses. So a read-only MT5 connector is read-only
+because the credential cannot trade, not because our code says so. That
+survives a bug here, a mistake in the gates, and a compromise of the vendor.
+
+The privacy cost is real and is written down rather than managed away: the
+client hands a broker credential to a third party, it cannot be revoked per
+integration, and it is **worse than cTrader's OAuth** on exactly the axis
+clients care about.
+
 ## 2. The one thing to do next
 
-**Run `docs/CTRADER_DEMO_SMOKE_TEST.md` against a real cTrader demo
-account.** Eleven steps, plus a script that automates the read side of four
-of them and refuses to run against anything that is not a demo account.
+**Select the connected account, then run the data half of
+`docs/CTRADER_DEMO_SMOKE_TEST.md`.**
 
-It closes gates 1, 2 and 12 in `docs/RELEASE_READINESS.md` — the three that
-matter most, because they are the product. It also needs a Supabase project
-(X3) and a registered OAuth redirect URI (X4), which are configuration rather
-than work.
+The connect half of that document is now PROVEN — repeatedly, against the real
+cTrader, from two devices. What has never run is everything after it:
+`ctrader/select` has **never been called once** in the entire production log,
+so no account has been selected, and therefore candles, positions, orders and
+preview have never been exercised against a real broker.
 
-Nothing in the code is known to be missing for those gates. They are
-**unproven**, which is a different thing from broken, and must not be
-reported as the same thing.
+That is the remaining substance of X1, and it is one click followed by four
+reads.
+
+Nothing in the code is known to be missing. Those reads are **unproven**,
+which is a different thing from broken, and must not be reported as the same
+thing.
 
 ## 3. What is blocked on the owner, not on engineering
 
@@ -264,7 +348,7 @@ file must be rewritten by that milestone, not deleted.
 
 | Gap | Where |
 |---|---|
-| **The real cTrader demo smoke test has NOT been run** — no broker credential exists here. Nothing in this platform has ever spoken to cTrader | blocker **X1**, `docs/CTRADER_DEMO_SMOKE_TEST.md` |
+| **The DATA half of the cTrader smoke test has not been run.** The connect half is proven against the real broker (2026-09-27); `ctrader/select` has never been called once in production, so candles, positions, orders and preview have never met a real account | blocker **X1**, now partial — `docs/CTRADER_DEMO_SMOKE_TEST.md`, §1g |
 | **The real TLS handshake has NOT been verified** — TCP 5035 is unreachable from this container; the inspecting proxy resets raw TLS on a non-HTTP port | `scripts/check_ctrader_tls.py`, run it on the deployment host |
 | `/readyz` has never answered from a deployed instance | `docs/LAUNCH_QA_REPORT.md` |
 | An active rule cannot be edited; editing must create a version | same |

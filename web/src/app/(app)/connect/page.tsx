@@ -95,6 +95,12 @@ export default function ConnectPage() {
   // which must never invite step 1 at somebody who has finished step 2.
   const isConnected = Boolean(
     status.result?.ok && status.result.data.connected);
+  // The first connected account, so the page can answer "which account am I
+  // on" without anybody having to ask the server.
+  const connectedCtid =
+    status.result?.ok && status.result.data.accounts?.length
+      ? status.result.data.accounts[0].ctid
+      : null;
 
   // Resume after the visitor comes back from cTrader. Two ways in, because on
   // a phone only the second one is reliable:
@@ -129,7 +135,15 @@ export default function ConnectPage() {
       }
       return;
     }
-    setPending(loadNonce());
+    const stored = loadNonce();
+    // set-state-in-effect is disabled here deliberately, not worked around.
+    // The obvious alternative — a lazy useState initialiser — would read
+    // sessionStorage during render, which does not exist on the server: the
+    // server would render "no pending attempt", the client would render one,
+    // and the hydration mismatch is a worse bug than an extra render. An
+    // effect is where a browser-only value is allowed to arrive.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stored) setPending(stored);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -153,7 +167,15 @@ export default function ConnectPage() {
     // that discovered the nonce, before React has re-rendered with it in
     // state. Reading `pending` there would read null and do nothing.
     const nonce = nonceOverride ?? pending;
-    if (!nonce) return;
+    if (!nonce) {
+      // Never silent. A button that can do nothing without saying so cannot
+      // be diagnosed from outside the browser, and this flow has already cost
+      // several rounds of "I press it and nothing happens" with no request
+      // reaching the server and no message on screen.
+      setErr("NO_PENDING: there is no connection attempt to finish. "
+             + "Start again, or open Accounts if you are already connected.");
+      return;
+    }
     setBusy(true); setErr(null); setDiagnosticId(null);
     const r = await api<{ ctrader: CtraderStatus }>(
       "ctrader/complete", { method: "POST", body: { nonce } });
@@ -256,6 +278,21 @@ export default function ConnectPage() {
               This last step runs as you — which is how we know the account
               being linked is being linked by its owner.
             </p>
+            {/* An escape route that does not go through the button above.
+                Somebody whose account is already linked must be able to move
+                on whatever state this card is in — that is the position the
+                owner was stuck in, pressing finish against a connection that
+                had already succeeded twice. */}
+            {isConnected ? (
+              <p className="notice" style={{ marginTop: ".6rem" }}>
+                Already connected
+                {connectedCtid ? (
+                  <> to <span className="mono">#{connectedCtid}</span></>
+                ) : null}
+                . Finishing here would add another account —{" "}
+                <a href="/accounts">choose an account instead</a>.
+              </p>
+            ) : null}
             <div className="btn-row">
               {/* Wrapped, not passed directly: complete() now takes an
                   optional nonce, and a bare handler would hand it the click

@@ -167,11 +167,12 @@ describe("the page and this test do not drift apart", () => {
     expect(src).not.toMatch(/\blocalStorage\s*\.\s*(get|set|remove)Item/);
   });
 
-  it("clears the nonce on a terminal refusal, not just on success", () => {
+  it("clears the nonce on a terminal refusal, not just on success", async () => {
     // Without this the page offers "finish here" for ever against an attempt
     // the server has already rejected.
-    const src = require("node:fs").readFileSync(
-      require("node:path").join(__dirname, "page.tsx"), "utf8");
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
     for (const code of ["STATE_UNKNOWN", "STATE_EXPIRED", "STATE_REPLAYED"]) {
       expect(src).toContain(code);
     }
@@ -310,5 +311,62 @@ describe("a finished connection does not still invite step 1", () => {
     // Demoted to a ghost button rather than removed: a client with two
     // broker accounts must still be able to add the second.
     expect(src).toMatch(/btn-ghost[^>]*onClick=\{begin\}|onClick=\{begin\}[^>]*btn-ghost/);
+  });
+});
+
+/**
+ * The finish button must never be a button that does nothing.
+ *
+ * WHY THIS EXISTS — from production:
+ *
+ *   18:08:13  complete.already_done attempt="1d4479f4"  -> 200
+ *   18:10:56  ctrader/status -> 200
+ *   18:13:49  ctrader/status -> 200
+ *
+ * After 18:08:13 the owner pressed "I have approved — finish" and reported
+ * that nothing happened. The status polls from that same page kept arriving,
+ * so the page was alive and authenticated — and NO ctrader/complete request
+ * reached the server at all. The press produced nothing, and the page said
+ * nothing about it.
+ *
+ * `complete()` opens with `if (!nonce) return;`. That is a silent no-op: if
+ * the card is ever on screen while `pending` is null, the button is dead and
+ * mute. Whether or not that is the cause here, a control that can do nothing
+ * without saying so is not diagnosable from the outside — and this flow has
+ * now cost several rounds of exactly that.
+ *
+ * The second half matters more than the first: a person whose account is
+ * ALREADY connected must have a way forward that does not go through this
+ * button at all.
+ */
+describe("a press that cannot work says so", () => {
+  it("the no-nonce branch reports instead of returning silently", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    // The bare `if (!nonce) return;` must be gone.
+    expect(src).not.toMatch(/if\s*\(!nonce\)\s*return;/);
+    expect(src).toContain("NO_PENDING");
+  });
+});
+
+describe("being already connected is always an escape route", () => {
+  it("the step-2 card names the connected account when there is one", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    // Whatever state the button is in, somebody already connected can leave
+    // for /accounts without pressing it.
+    expect(src).toMatch(/Already connected/);
+    expect(src).toContain("/accounts");
+  });
+
+  it("and shows which account, so the page can answer 'where am I'", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    // The ctid is rendered. The owner had to ask the server which account he
+    // was on; the page holds that answer already.
+    expect(src).toMatch(/accounts\[0\]|\.ctid/);
   });
 });
