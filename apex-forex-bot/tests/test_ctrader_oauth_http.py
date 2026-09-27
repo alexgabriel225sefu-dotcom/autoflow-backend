@@ -319,3 +319,61 @@ if _fails:
     sys.exit(1)
 print("cTrader OAuth over real HTTP: query-string grant, in-band errorCode "
       "handled, no credential in any message.")
+
+# ── 9. a reloaded callback page is not an attack ───────────────────────────
+# The first real connection died here. The visitor landed on the callback,
+# saw raw JSON, refreshed — the only thing the page invited — and the identical
+# code and state came back as STATE_REPLAYED with no way forward.
+#
+# Replay protection still has to hold for the case that matters: a DIFFERENT
+# code presented against the same state, which would swap which broker account
+# gets linked. So the two are separated here rather than treated alike.
+print("\n[9] the same code replayed is idempotent; a different one is refused")
+import tempfile as _tf                                            # noqa: E402
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
+os.environ["DATA_DIR"] = _tf.mkdtemp(prefix="apex-replay-")
+
+from apex.platform import ctrader_link as _link                   # noqa: E402
+from apex.platform import store as _pstore                        # noqa: E402
+
+_UID = "27d43c19-0000-0000-0000-000000000000"
+
+
+def _fresh_attempt():
+    """A pending attempt that has already come back from cTrader."""
+    began = _link.begin(_UID, redirect_uri="https://example.test/cb",
+                        authorize_url_fn=lambda uri, state: f"https://x/?s={state}")
+    state = began["authorizeUrl"].split("s=", 1)[1]
+    return state
+
+
+_state = _fresh_attempt()
+_first = _link.handle_callback({"code": "THE-CODE", "state": _state})
+check("the first callback parks the code", bool(_first.get("nonce")), str(_first))
+
+_second = None
+_raised = None
+try:
+    _second = _link.handle_callback({"code": "THE-CODE", "state": _state})
+except Exception as e:                                            # noqa: BLE001
+    _raised = e
+check("the SAME code replayed returns the same nonce instead of failing",
+      _raised is None and _second and _second.get("nonce") == _first["nonce"],
+      f"raised {_raised}" if _raised else str(_second))
+
+_state2 = _fresh_attempt()
+_link.handle_callback({"code": "FIRST-CODE", "state": _state2})
+try:
+    _link.handle_callback({"code": "ATTACKER-CODE", "state": _state2})
+    check("a DIFFERENT code against the same state is refused", False,
+          "it was accepted — this is the swap the guard exists to stop")
+except Exception as e:                                            # noqa: BLE001
+    check("a DIFFERENT code against the same state is refused",
+          getattr(e, "code", "") == "STATE_REPLAYED", f"{type(e).__name__}: {e}")
+
+# And the parked code is still the first one, not the attacker's.
+_rec = _pstore._read(_link._k_pending(_link.parse_state(_state2)[0]))
+from apex import user_store as _us                                # noqa: E402
+check("the parked code is unchanged by the refused attempt",
+      _us.decrypt_value(_rec.get("code") or "") == "FIRST-CODE",
+      repr(_us.decrypt_value(_rec.get("code") or ""))[:40])

@@ -54,6 +54,7 @@ import os
 import signal
 import sys
 import threading
+from urllib.parse import quote
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -123,6 +124,99 @@ def cors_headers(origin):
     }
 
 
+def web_url():
+    """Where the web client lives, for the "go back and finish" link.
+
+    Falls back to the first allowed origin, which is the same value in every
+    deployment that works at all: A4T_ALLOWED_ORIGIN has to be the web app or
+    the browser blocks every call it makes.
+    """
+    explicit = (os.getenv("A4T_WEB_URL") or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    allowed = allowed_origins()
+    return allowed[0] if allowed else ""
+
+
+def _esc(s):
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def callback_page(status, payload):
+    """The OAuth callback, rendered for a human instead of a machine.
+
+    WHY THIS EXISTS
+
+    cTrader redirects a person's BROWSER here. It used to answer with the same
+    JSON an API client gets, so the first real connection ended with somebody
+    staring at {"ok": true, "nonce": "...", "pendingOnly": true} on a phone,
+    with no idea that the flow continues in another tab. They refreshed — the
+    only thing the page invited — which re-ran the callback and produced
+    STATE_REPLAYED, and the connection was unrecoverable.
+
+    So: on success, say plainly that authorisation worked, that it is not
+    finished, and give one button that goes back to the app carrying the nonce.
+    On failure, say which failure in words, and offer the way to start again.
+
+    The nonce travels in the URL and that is safe by the same reasoning the
+    flow already rests on: it is not a credential, and `complete` refuses
+    unless the SESSION calling it is the user the attempt was opened for. That
+    check is what stops an account-injection attack, not the secrecy of the
+    nonce.
+    """
+    base = web_url()
+    ok = bool(payload.get("ok"))
+    nonce = (payload.get("nonce") or "") if ok else ""
+    err = payload.get("error") or {}
+    # Two contexts, two encodings, applied once each. The nonce goes into a
+    # URL, so it is percent-encoded; the finished URL goes into an href, so it
+    # is HTML-escaped below. Escaping for HTML first and then again for the
+    # attribute produced "&amp;lt;" — safe, but wrong, and the test caught it.
+    link = f"{base}/connect" + (f"?n={quote(nonce, safe='')}" if nonce else "")
+
+    if ok:
+        title, tone = "Authorised", "ok"
+        body = ("<p>cTrader has approved access. <strong>This is not the last "
+                "step.</strong></p><p>Go back to Apex4Traders to choose the "
+                "account and finish connecting.</p>")
+        action = "Finish connecting"
+    else:
+        title, tone = "Not connected", "bad"
+        body = (f"<p>{_esc(err.get('message') or 'The connection did not complete.')}"
+                f"</p><p class=\"code\">{_esc(err.get('code') or 'ERROR')}</p>"
+                f"<p>Nothing has been linked. You can start again.</p>")
+        action = "Back to Apex4Traders"
+
+    button = (f'<a class="btn" href="{_esc(link)}">{action}</a>' if base
+              else '<p>Return to the Apex4Traders tab in your browser.</p>')
+
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title} — Apex4Traders</title>
+<style>
+ :root{{color-scheme:dark}}
+ body{{margin:0;min-height:100vh;display:flex;align-items:center;
+   justify-content:center;background:#0b0f19;color:#e6e9f0;
+   font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+   padding:24px}}
+ .card{{max-width:26rem;width:100%;background:#141a28;border:1px solid #232c40;
+   border-radius:14px;padding:28px}}
+ h1{{font-size:1.4rem;margin:0 0 14px}}
+ h1::before{{content:"";display:inline-block;width:10px;height:10px;
+   border-radius:50%;margin-right:10px;vertical-align:middle}}
+ .ok h1::before{{background:#34d399}} .bad h1::before{{background:#f87171}}
+ p{{margin:0 0 12px;color:#aeb6c7}} strong{{color:#e6e9f0}}
+ .code{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;
+   color:#f87171}}
+ .btn{{display:block;margin-top:20px;padding:14px 18px;border-radius:10px;
+   background:#2dd4bf;color:#06221e;text-decoration:none;font-weight:600;
+   text-align:center}}
+</style></head>
+<body><div class="card {tone}"><h1>{title}</h1>{body}{button}</div></body></html>"""
+
+
 class Handler(BaseHTTPRequestHandler):
     # Identifies the service in logs without naming a version, which would be a
     # free hint about which advisories apply.
@@ -145,6 +239,34 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _wants_html(self):
+        """True when this looks like a browser navigation rather than fetch().
+
+        `Accept: text/html` is sent by a navigation and not by the client's
+        fetch() calls, which ask for JSON. A missing Accept is treated as a
+        machine, because an API client that forgets the header should still get
+        JSON rather than a page.
+        """
+        try:
+            return "text/html" in (self.headers.get("Accept") or "").lower()
+        except Exception:
+            return False
+
+    def _send_html(self, status, html):
+        body = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        # This page renders a nonce and an error message and loads nothing.
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy",
+                         "default-src 'none'; style-src 'unsafe-inline'")
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
@@ -202,6 +324,18 @@ class Handler(BaseHTTPRequestHandler):
                 cors_headers(self._origin()))
             return True
         status, payload = out
+
+        # The OAuth callback is the one route a PERSON'S BROWSER is redirected
+        # to by a third party, so it is the one route that answers in HTML when
+        # a browser asks. Everything else here is called by our own client with
+        # fetch(), which wants JSON. Content negotiation is a transport
+        # decision, and the page is built from the API's own answer — no rule
+        # is enforced here that api.py does not already enforce.
+        if self._wants_html() and self.path.split("?", 1)[0].rstrip("/").endswith(
+                "/ctrader/callback"):
+            self._send_html(status, callback_page(status, payload))
+            return True
+
         self._send(status, payload, cors_headers(self._origin()))
         return True
 

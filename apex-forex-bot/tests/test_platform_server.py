@@ -27,6 +27,7 @@ Run: python3 tests/test_platform_server.py
 import ast
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -275,6 +276,66 @@ status, hdrs, _ = req("/api/v1/me", method="OPTIONS",
 check("a preflight from another origin is refused", status == 403, str(status))
 check("and carries no allow header",
       "Access-Control-Allow-Origin" not in hdrs, str(hdrs))
+
+# ── 4b. the OAuth callback answers a PERSON, not only a machine ────────────
+# The route a third party redirects a browser to. It used to return the same
+# JSON an API client gets, so the first real connection ended with somebody
+# looking at {"ok": true, "nonce": ...} on a phone, refreshing — the only thing
+# the page invited — and killing the attempt with STATE_REPLAYED.
+print("\n[4b] the callback renders a page for a browser and JSON for a client")
+
+CB = "/api/v1/ctrader/callback?code=x&state=bogus"
+status, hdrs, body = req(CB, headers={"Accept": "text/html"})
+html = body.decode("utf-8", "replace")
+check("a browser gets HTML", "text/html" in (hdrs.get("Content-Type") or ""),
+      str(hdrs.get("Content-Type")))
+check("with the real status, not a cheerful 200", status == 400, str(status))
+check("it says in words what went wrong", "Not connected" in html, html[:90])
+check("it names the code for someone reporting it", "STATE_MALFORMED" in html)
+check("it says nothing was linked, so nobody wonders",
+      "Nothing has been linked" in html)
+check("and it offers the way back rather than a dead end",
+      "/connect" in html and "Back to Apex4Traders" in html)
+check("the page loads nothing external — no script, no image, no font",
+      "<script" not in html.lower() and "<img" not in html.lower()
+      and "http://" not in html.replace("http://127.0.0.1", ""))
+
+status, hdrs, body = req(CB)
+check("a client with no Accept still gets JSON",
+      "application/json" in (hdrs.get("Content-Type") or ""),
+      str(hdrs.get("Content-Type")))
+check("with the same code, so the two representations agree",
+      json.loads(body)["error"]["code"] == "STATE_MALFORMED")
+
+# The success page is what the person actually sees, so it is built directly
+# rather than inferred from the failure one.
+ok_html = ps.callback_page(200, {"ok": True, "nonce": "ABC123",
+                                 "pendingOnly": True})
+check("the success page says authorisation worked", "Authorised" in ok_html)
+check("and says plainly that it is NOT the last step",
+      "not the last step" in ok_html.lower(), ok_html[:120])
+check("and carries the nonce back to the app, so a dead tab is survivable",
+      "?n=ABC123" in ok_html, ok_html[-200:])
+# A nonce is generated server-side, but the page renders whatever arrives, so
+# it is treated as hostile input. Percent-encoded for the URL, HTML-escaped for
+# the attribute — once each, which is what the first version got wrong.
+_hostile = ps.callback_page(200, {"ok": True, "nonce": '"><script>alert(1)</script>'})
+# Asserted on the ATTRIBUTE VALUE, not on the whole document: a first version
+# looked for '"><' anywhere in the page and matched `<html lang="en"><head>`,
+# its own template. A check that fires on legitimate markup teaches you to
+# ignore it.
+_href = re.search(r'<a class="btn" href="([^"]*)"', _hostile)
+check("the link renders as a single well-formed href", bool(_href),
+      _hostile[_hostile.find("<a "):][:120])
+if _href:
+    check("nothing in the nonce escapes the attribute",
+          "<" not in _href.group(1) and ">" not in _href.group(1)
+          and '"' not in _href.group(1), _href.group(1))
+check("it is percent-encoded for the URL it sits in",
+      "%3Cscript%3E" in _hostile or "%3cscript%3e" in _hostile.lower(),
+      _hostile[_hostile.find("<a "):][:120])
+check("and not double-encoded, which would render as gibberish",
+      "&amp;lt;" not in _hostile)
 
 status, _, body = req("/nope")
 check("an unknown path is 404 JSON, not an HTML error page", status == 404)

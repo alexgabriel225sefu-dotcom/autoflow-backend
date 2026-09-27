@@ -219,18 +219,37 @@ def handle_callback(query, *, now=None):
     nonce, _ts = parse_state(query.get("state"), now=now)
 
     claimed = _consume_once(nonce)
-    if claimed is False:
-        raise LinkError("STATE_REPLAYED",
-                        "this connection link has already been used")
 
     rec = _store._read(_k_pending(nonce))
     if not rec:
         raise LinkError("STATE_UNKNOWN",
                         "this connection attempt is not one this platform "
                         "started, or it has already been cleaned up")
-    if claimed is None and rec.get("status") != "awaiting_callback":
-        # No shared backend to claim with; the record's own flag is the only
-        # guard left. Single-process only — see _consume_once.
+
+    # Two ways to learn this nonce has been through here before: the shared
+    # claim said so (False), or there is no shared backend and the record's own
+    # flag says so (None, plus a status that has moved on). Same conclusion, so
+    # the same handling — the first version of this fix covered only the first
+    # and left the second raising, which a test caught immediately.
+    replayed = (claimed is False
+                or (claimed is None
+                    and rec.get("status") != "awaiting_callback"))
+
+    if replayed:
+        # A replay is NOT automatically an attack. Somebody who lands on this
+        # page and reloads it re-sends the identical code and state, and the
+        # first real connection attempt died exactly there: the visitor saw raw
+        # JSON, had no idea what to do, refreshed, and got STATE_REPLAYED with
+        # no way forward.
+        #
+        # The replay that matters is a DIFFERENT code presented against this
+        # state, which would swap which broker account gets linked. So the same
+        # code parked in the same state is idempotent, and anything else is
+        # refused exactly as before.
+        already = user_store.decrypt_value(rec.get("code") or "")
+        if (rec.get("status") == "awaiting_confirmation"
+                and code and already and already == code):
+            return {"nonce": nonce}
         raise LinkError("STATE_REPLAYED",
                         "this connection link has already been used")
     if not code:

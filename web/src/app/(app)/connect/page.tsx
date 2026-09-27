@@ -70,8 +70,30 @@ export default function ConnectPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Resume after the tab was reloaded while the visitor was away at cTrader.
-  useEffect(() => { setPending(loadNonce()); }, []);
+  // Resume after the visitor comes back from cTrader. Two ways in, because on
+  // a phone only the second one is reliable:
+  //   ?n=<nonce>   the callback page sends them back here carrying it, which
+  //                works even when the original tab is gone entirely
+  //   sessionStorage  the same tab, reloaded
+  // The URL wins: it is the fresher of the two, and it is the one that exists
+  // when iOS has discarded the tab the flow started in.
+  useEffect(() => {
+    let fromUrl: string | null = null;
+    try {
+      fromUrl = new URLSearchParams(window.location.search).get("n");
+    } catch { /* no URL access is not a reason to fail */ }
+    if (fromUrl) {
+      remember(fromUrl);
+      // Take it out of the address bar: it has served its purpose, and a nonce
+      // left in the URL ends up in history and in anything the visitor shares.
+      try {
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch { /* not fatal */ }
+      return;
+    }
+    setPending(loadNonce());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function remember(nonce: string | null) {
     setPending(nonce);
