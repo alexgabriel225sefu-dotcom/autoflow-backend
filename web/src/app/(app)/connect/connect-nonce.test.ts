@@ -265,3 +265,50 @@ describe("which refusals end an attempt, and which do not", () => {
     expect(src).toContain("Reference:");
   });
 });
+
+/**
+ * What the page says once the connection has actually worked.
+ *
+ * WHY THIS EXISTS — read the production log, not the code:
+ *
+ *   16:39:32  complete.connected attempt="d964e360" count=1 selected=False
+ *   16:39:32  api.response route="ctrader/complete" status=200
+ *   16:39:37  begin attempt="f380e622"        <- five seconds later
+ *
+ * The connection succeeded and the owner pressed "Connect cTrader" again
+ * five seconds afterwards, because the card below the status still read
+ * "Step 1 — authorise" and offered to start over. He reported the whole
+ * feature as broken. It was not: the page was.
+ *
+ * So the invitation to start a connection must not be the thing on screen
+ * when a connection already exists.
+ */
+describe("a finished connection does not still invite step 1", () => {
+  it("the page never renders the step-1 heading while connected", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    // The heading is chosen from the connection state, not from `pending`
+    // alone — which is what made it say "Step 1" to somebody who had just
+    // finished step 2.
+    expect(src).toMatch(/connected\s*&&\s*!pending|isConnected/);
+    expect(src).toContain("Account connected");
+  });
+
+  it("points at choosing an account, which is the real next step", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    expect(src).toContain("/accounts");
+    expect(src).toMatch(/Choose|choose/);
+  });
+
+  it("still allows connecting another account, but not as the main action", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    // Demoted to a ghost button rather than removed: a client with two
+    // broker accounts must still be able to add the second.
+    expect(src).toMatch(/btn-ghost[^>]*onClick=\{begin\}|onClick=\{begin\}[^>]*btn-ghost/);
+  });
+});

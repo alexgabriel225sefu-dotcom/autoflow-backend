@@ -91,6 +91,10 @@ export default function ConnectPage() {
   // Guards the automatic finish. Survives re-renders; never reset, because
   // one arrival with ?n= is one attempt.
   const autoRan = useRef(false);
+  // Whether a broker account is already linked. Drives the heading below,
+  // which must never invite step 1 at somebody who has finished step 2.
+  const isConnected = Boolean(
+    status.result?.ok && status.result.data.connected);
 
   // Resume after the visitor comes back from cTrader. Two ways in, because on
   // a phone only the second one is reliable:
@@ -201,8 +205,38 @@ export default function ConnectPage() {
       </section>
 
       <section className="card">
-        <div className="card-head"><h2>{pending ? "Step 2 — finish here" : "Step 1 — authorise"}</h2><span className="pill pill-accent">{pending ? "2 of 2" : "1 of 2"}</span></div>
-        {!pending ? (
+        {/* WHAT THIS BRANCH IS FOR
+            A finished connection used to leave "Step 1 — authorise" on
+            screen with a Connect button under it, because the heading was
+            chosen from `pending` alone and `pending` is cleared on success.
+            The owner connected successfully and pressed Connect again five
+            seconds later — the server log shows both — and reported the
+            feature as broken. It was not; the page was telling him he had
+            not started. */}
+        <div className="card-head">
+          <h2>{pending ? "Step 2 — finish here"
+               : isConnected ? "Account connected"
+               : "Step 1 — authorise"}</h2>
+          <span className="pill pill-accent">
+            {pending ? "2 of 2" : isConnected ? "Done" : "1 of 2"}
+          </span>
+        </div>
+        {!pending && isConnected ? (
+          <>
+            <p>
+              cTrader is linked. Nothing is being traded yet — choose which
+              account Apex4Traders should use.
+            </p>
+            <div className="btn-row">
+              <a className="btn" href="/accounts">Choose an account</a>
+              {/* Demoted, not removed: somebody with a second broker account
+                  still needs a way to add it. */}
+              <button className="btn btn-ghost" onClick={begin} disabled={busy}>
+                {busy ? "Preparing…" : "Connect another account"}
+              </button>
+            </div>
+          </>
+        ) : !pending ? (
           <>
             <p className="muted">
               We will open cTrader in a new tab. Sign in there and approve
