@@ -2,6 +2,7 @@
 import { BrandLockup } from "@/components/brand/logo";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeNext } from "@/lib/supabase/middleware";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginPageInner() {
@@ -23,7 +24,10 @@ function LoginPageInner() {
     // person reading them, and collapsing both into "Sign-in failed" hides
     // which one it was.
     if (error) return setError(error.message);
-    router.push(params.get("next") || "/dashboard");
+    // Validated, never used raw: this value comes from the address bar and
+    // this line navigates to it, which is an open redirect waiting to be
+    // pointed at a phishing page.
+    router.push(safeNext(params.get("next")));
     router.refresh();
   }
 

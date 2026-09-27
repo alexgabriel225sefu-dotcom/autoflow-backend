@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type CtraderStatus } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
@@ -59,16 +59,38 @@ function saveNonce(nonce: string | null) {
   } catch { /* storage unavailable — the in-memory path still works */ }
 }
 
-/** Errors that mean this attempt is finished, whatever the page thinks. */
+/** Errors that mean this attempt is finished, whatever the page thinks.
+ *
+ * This list grew when the authorization code started being spent at the
+ * callback. Before that, EXCHANGE_FAILED and NO_TOKEN could not happen at
+ * this step at all; now they can, and they are as final as the rest — the
+ * code behind them is spent either way, so offering "finish" again can only
+ * fail. Leaving them out is how a page ends up inviting a click that is
+ * guaranteed to do nothing, which is exactly what the owner sat through.
+ */
 const TERMINAL = new Set([
   "STATE_UNKNOWN", "STATE_EXPIRED", "STATE_REPLAYED", "NO_CODE",
+  "PROVIDER_REFUSED", "EXCHANGE_FAILED", "NO_TOKEN",
 ]);
+
+/** Deliberately NOT terminal.
+ *
+ * The token is already parked by the time accounts are listed, so a failure
+ * here is the broker being briefly unreachable, not the attempt being dead.
+ * Clearing the nonce would throw away a good token and send the visitor
+ * through cTrader again for nothing.
+ */
+const RETRYABLE = new Set(["ACCOUNTS_FAILED", "RATE_LIMITED"]);
 
 export default function ConnectPage() {
   const status = useRead<CtraderStatus>("ctrader/status");
   const [pending, setPending] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [diagnosticId, setDiagnosticId] = useState<string | null>(null);
+  // Guards the automatic finish. Survives re-renders; never reset, because
+  // one arrival with ?n= is one attempt.
+  const autoRan = useRef(false);
 
   // Resume after the visitor comes back from cTrader. Two ways in, because on
   // a phone only the second one is reliable:
@@ -89,6 +111,18 @@ export default function ConnectPage() {
       try {
         window.history.replaceState({}, "", window.location.pathname);
       } catch { /* not fatal */ }
+      // Arriving with ?n= means cTrader has just approved and the callback
+      // has already spent the code. Making the visitor press one more button
+      // adds nothing: this step runs as them either way, which is what the
+      // session cookie on this request proves. So finish it.
+      //
+      // ONCE. A ref, not state: an effect that re-runs on render would spend
+      // the oauth budget in seconds, and the owner has already spent an
+      // afternoon looking at RATE_LIMITED.
+      if (!autoRan.current) {
+        autoRan.current = true;
+        void complete(fromUrl);
+      }
       return;
     }
     setPending(loadNonce());
@@ -110,16 +144,23 @@ export default function ConnectPage() {
     window.open(r.data.authorizeUrl, "_blank", "noopener");
   }
 
-  async function complete() {
-    if (!pending) return;
-    setBusy(true); setErr(null);
+  async function complete(nonceOverride?: string) {
+    // The override exists because the automatic finish runs from the effect
+    // that discovered the nonce, before React has re-rendered with it in
+    // state. Reading `pending` there would read null and do nothing.
+    const nonce = nonceOverride ?? pending;
+    if (!nonce) return;
+    setBusy(true); setErr(null); setDiagnosticId(null);
     const r = await api<{ ctrader: CtraderStatus }>(
-      "ctrader/complete", { method: "POST", body: { nonce: pending } });
+      "ctrader/complete", { method: "POST", body: { nonce } });
     setBusy(false);
     if (!r.ok) {
       // A terminal refusal must clear the stored nonce, or the page offers
       // "finish here" for ever against an attempt that can never succeed.
-      if (TERMINAL.has(r.code)) remember(null);
+      // A retryable one must NOT: the token may already be parked.
+      if (TERMINAL.has(r.code) && !RETRYABLE.has(r.code)) remember(null);
+      setDiagnosticId(
+        typeof r.diagnosticId === "string" ? r.diagnosticId : null);
       return setErr(`${r.code}: ${r.message}`);
     }
     remember(null);
@@ -182,7 +223,11 @@ export default function ConnectPage() {
               being linked is being linked by its owner.
             </p>
             <div className="btn-row">
-              <button className="btn" onClick={complete} disabled={busy}>
+              {/* Wrapped, not passed directly: complete() now takes an
+                  optional nonce, and a bare handler would hand it the click
+                  event as one. The typechecker caught that. */}
+              <button className="btn" onClick={() => void complete()}
+                      disabled={busy}>
                 {busy ? "Finishing…" : "I have approved — finish"}
               </button>
               <button className="btn btn-ghost" onClick={() => setPending(null)} disabled={busy}>
@@ -191,7 +236,20 @@ export default function ConnectPage() {
             </div>
           </>
         )}
-        {err ? <div className="notice notice-error" role="alert">{err}</div> : null}
+        {err ? (
+          <div className="notice notice-error" role="alert">
+            {err}
+            {/* Shown so a failure can be reported by reading eight characters
+                aloud instead of sending a screenshot of a page that has a
+                live session on it. */}
+            {diagnosticId ? (
+              <div style={{ marginTop: ".5rem", fontFamily: "ui-monospace, monospace",
+                            fontSize: ".85em", opacity: .75, userSelect: "all" }}>
+                Reference: {diagnosticId}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
     </main>
   );

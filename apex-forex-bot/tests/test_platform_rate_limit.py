@@ -125,6 +125,12 @@ check("and how long to wait", out["error"]["retryAfterSec"] > 0, json.dumps(out)
 # times the only thing the page could tell him was "wait a moment". A number
 # that is wrong by up to a minute is worse than no number, because a countdown
 # is exactly what a person acts on.
+#
+# check() is exercised DIRECTLY rather than through A.handle(). The reported
+# wait is computed there, and driving the whole API to reach it meant a few
+# hundred authenticated requests against a stubbed Supabase — which made this
+# file the slowest in the suite for no extra coverage. One end-to-end case at
+# the bottom keeps the wiring honest.
 print("\n[3b] the reported wait tracks the clock, not the window length")
 import time as _time                                              # noqa: E402
 _real_time = _time.time
@@ -136,6 +142,23 @@ def _at(second_of_minute):
     return float(base - (base % 60)) + float(second_of_minute)
 
 
+def _wait_at(offset, key):
+    """The seconds check() reports once `key` has spent its budget."""
+    RL.time.time = lambda: _at(offset)
+    try:
+        limit = RL.LIMITERS["candles"].limit
+        hdr = f"Bearer {key}"
+        for _ in range(limit + 2):
+            RL.check("GET", "accounts/501/candles",
+                     client_key="9.9.9.9", auth_header=hdr)
+        allowed, _bucket, retry = RL.check(
+            "GET", "accounts/501/candles", client_key="9.9.9.9",
+            auth_header=hdr)
+        return allowed, retry
+    finally:
+        RL.time.time = _real_time
+
+
 # The fractional offsets are the ones that matter: at a whole second, rounding
 # up and rounding down agree, so integer cases alone cannot tell a correct
 # implementation from one that under-reports and sends the client back a beat
@@ -143,53 +166,35 @@ def _at(second_of_minute):
 for _offset, _expected in ((0, 60), (5, 55), (30, 30), (59, 1),
                            (30.4, 30), (0.1, 60), (58.6, 2), (59.5, 1)):
     RL.reset_all()
-    RL.time.time = (lambda o=_offset: float(_at(o)))
-    try:
-        hdr3b = {"Authorization": f"Bearer clock-client-{_offset}"}
-        for _ in range(RL.LIMITERS["candles"].limit + 2):
-            A.handle("GET", "/api/v1/accounts/501/candles?symbol=EURUSD",
-                     hdr3b, None, client_key="9.9.9.9")
-        _st, _o = A.handle("GET", "/api/v1/accounts/501/candles",
-                           hdr3b, None, client_key="9.9.9.9")
-        _got = _o["error"]["retryAfterSec"]
-        check(f"{_offset}s into the window it reports {_expected}s, not 60",
-              _got == _expected, f"reported {_got}")
-    finally:
-        RL.time.time = _real_time
-RL.reset_all()
+    _allowed, _got = _wait_at(_offset, f"clock-{_offset}")
+    check(f"{_offset}s into the window it reports {_expected}s, not 60",
+          _allowed is False and _got == _expected,
+          f"allowed={_allowed} reported={_got}")
 
 # Never zero: a wait of zero invites an instant retry that fails again, which
 # is how a client ends up hammering a limiter it is already behind.
 RL.reset_all()
-RL.time.time = lambda: float(_at(59)) + 0.99
-try:
-    hdr3c = {"Authorization": "Bearer edge-client"}
-    for _ in range(RL.LIMITERS["candles"].limit + 2):
-        A.handle("GET", "/api/v1/accounts/501/candles?symbol=EURUSD",
-                 hdr3c, None, client_key="9.9.9.8")
-    _st, _o = A.handle("GET", "/api/v1/accounts/501/candles",
-                       hdr3c, None, client_key="9.9.9.8")
-    check("at the very end of the window it still asks for at least a second",
-          _o["error"]["retryAfterSec"] >= 1, str(_o["error"]["retryAfterSec"]))
-    check("and never more than the window itself",
-          _o["error"]["retryAfterSec"] <= 60, str(_o["error"]["retryAfterSec"]))
-finally:
-    RL.time.time = _real_time
-RL.reset_all()
+_allowed, _edge = _wait_at(59.99, "edge")
+check("at the very end of the window it still asks for at least a second",
+      _edge >= 1, str(_edge))
+check("and never more than the window itself", _edge <= 60, str(_edge))
 
-# And the message a person reads carries the number, because the page shows
-# the message.
+# And the number reaches the client, in the message a person actually reads.
 RL.reset_all()
-RL.time.time = lambda: float(_at(30))
+RL.time.time = lambda: _at(30)
 try:
-    hdr3d = {"Authorization": "Bearer message-client"}
+    _hdr3d = {"Authorization": "Bearer message-client"}
     for _ in range(RL.LIMITERS["candles"].limit + 2):
         A.handle("GET", "/api/v1/accounts/501/candles?symbol=EURUSD",
-                 hdr3d, None, client_key="9.9.9.7")
+                 _hdr3d, None, client_key="9.9.9.7")
     _st, _o = A.handle("GET", "/api/v1/accounts/501/candles",
-                       hdr3d, None, client_key="9.9.9.7")
+                       _hdr3d, None, client_key="9.9.9.7")
+    check("the refusal really does travel through the API",
+          _o["error"]["code"] == "RATE_LIMITED", json.dumps(_o))
     check("the human-readable message names the seconds",
           "30" in _o["error"]["message"], _o["error"]["message"])
+    check("and so does the field a client can branch on",
+          _o["error"]["retryAfterSec"] == 30, str(_o["error"]))
 finally:
     RL.time.time = _real_time
 RL.reset_all()

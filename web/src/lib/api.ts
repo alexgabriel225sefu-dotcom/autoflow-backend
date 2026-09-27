@@ -30,6 +30,14 @@ export type ApiError = {
   capability?: string;
   /** Present on RATE_LIMITED, so a retry can wait rather than hammer. */
   retryAfterSec?: number;
+  /**
+   * A keyed reference to one broker-link attempt, safe to display and to
+   * quote. It identifies the attempt in the server logs and reveals neither
+   * the nonce it derives from nor who made it — which is the point: the
+   * alternative was asking people to photograph a screen that has their
+   * session on it.
+   */
+  diagnosticId?: string;
 };
 
 export type ApiResult<T> = { ok: true; data: T } | ApiError;
@@ -111,6 +119,7 @@ export async function api<T>(
         licenceState: err.licenceState as string | undefined,
         capability: err.capability as string | undefined,
         retryAfterSec: typeof err.retryAfterSec === "number" ? err.retryAfterSec : undefined,
+        diagnosticId: typeof err.diagnosticId === "string" ? err.diagnosticId : undefined,
       },
     );
   }

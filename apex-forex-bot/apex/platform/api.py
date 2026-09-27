@@ -37,6 +37,7 @@ from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
 from apex.platform import preview as _preview
+from apex.platform import linklog as _log
 from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
 from apex.platform import ruledoc as _rd
@@ -54,8 +55,11 @@ _NOT_YET = {}
 
 
 def _err(status, code, message, **extra):
+    # A key whose value is None is worse than an absent key: the UI would
+    # render "diagnosticId: null" and a person would read it out.
     body = {"ok": False, "error": dict({"code": code, "message": message},
-                                       **extra)}
+                                       **{k: v for k, v in extra.items()
+                                          if v is not None})}
     return status, body
 
 
@@ -120,6 +124,40 @@ def _query(path):
 
 
 def handle(method, path, headers=None, body=None, *, client_key=None):
+    """Every request, with the broker-link ones written down.
+
+    WHY THE LOGGING IS HERE AND NOT INSIDE
+
+    `_handle` refuses from about twenty places — the rate limiter before
+    dispatch, a dozen exception handlers after it — and a log line added to
+    each is a log line that the next branch forgets. Wrapping the single exit
+    means a refusal cannot escape unrecorded, which is the property that
+    matters: the interesting failures are exactly the ones nobody thought to
+    instrument.
+
+    Only the cTrader routes are logged. This is a diagnostic for one flow, not
+    an access log for the platform, and logging every route would bury the
+    handful of lines that answer "what happened to this connection attempt".
+    """
+    result = _handle(method, path, headers=headers, body=body,
+                     client_key=client_key)
+    try:
+        route = (path or "")[len(PREFIX):].split("?", 1)[0].strip("/") \
+            if (path or "").startswith(PREFIX) else ""
+        if route.startswith("ctrader/") and result:
+            status, body_out = result
+            err = (body_out or {}).get("error") or {}
+            _log.event("api.response", method=(method or "GET").upper(),
+                       route=route, status=status,
+                       code=err.get("code"),
+                       attempt=err.get("diagnosticId"),
+                       retryAfterSec=err.get("retryAfterSec"))
+    except Exception:  # noqa: BLE001
+        pass
+    return result
+
+
+def _handle(method, path, headers=None, body=None, *, client_key=None):
     """(status, payload), or None when the path is not ours.
 
     `client_key` is the caller's network identity, supplied by the transport
@@ -159,9 +197,14 @@ def handle(method, path, headers=None, body=None, *, client_key=None):
     except _link.LinkConfigError as e:
         # The platform is misconfigured, which is not the client's fault and
         # must not read as one. 503, like every other "we cannot", never 400.
-        return _err(503, e.code, e.detail)
+        return _err(503, e.code, e.detail,
+                    diagnosticId=getattr(e, "attempt", None))
     except _link.LinkError as e:
-        return _err(400, e.code, e.detail)
+        # diagnosticId is a keyed reference to the attempt, safe to show and
+        # safe to quote: it identifies the attempt in the logs and reveals
+        # neither the nonce it derives from nor who made it.
+        return _err(400, e.code, e.detail,
+                    diagnosticId=getattr(e, "attempt", None))
     except _lic.LicenceRequired as e:
         return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
     except _ent.NotEntitled as e:

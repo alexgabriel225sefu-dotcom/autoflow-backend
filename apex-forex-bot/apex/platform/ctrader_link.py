@@ -51,6 +51,7 @@ import secrets
 import time
 
 from apex import user_store
+from apex.platform import linklog as _log
 from apex.platform import store as _store
 
 STATE_TTL_S = 600          # 10 minutes to log into cTrader and approve
@@ -64,8 +65,12 @@ LIVE = "live"
 class LinkError(RuntimeError):
     """Base for every refusal here. Carries a code the UI can branch on."""
 
-    def __init__(self, code, detail):
+    def __init__(self, code, detail, attempt=None):
         self.code, self.detail = code, detail
+        # The id the client may be shown and may quote back. It is a keyed
+        # reference to the attempt, not the nonce, so putting it on an error
+        # page gives support something to search for and an onlooker nothing.
+        self.attempt = attempt
         super().__init__(f"{code}: {detail}")
 
 
@@ -198,6 +203,9 @@ def begin(user_id, *, now=None, redirect_uri=None, authorize_url_fn=None):
     if authorize_url_fn is None:
         from apex.brokers import ctrader as _ct
         authorize_url_fn = _ct.authorize_url
+    _log.event("begin", attempt=_log.attempt_id(nonce),
+               user=_log.user_ref(user_id), redirect=_log.host_of(uri),
+               expiresAt=ts + STATE_TTL_S)
     return {"authorizeUrl": authorize_url_fn(uri, make_state(nonce, ts)),
             "nonce": nonce, "expiresAt": ts + STATE_TTL_S}
 
@@ -216,6 +224,23 @@ def _code_digest(code: str) -> str:
 
 
 def handle_callback(query, *, now=None, exchanger=None):
+    """Spend the code, and make sure every refusal can be traced.
+
+    The stamping happens here rather than at each raise: a refusal that
+    escaped without an id would be the one the client is looking at, and a
+    diagnostic id that is present only most of the time is not one support can
+    rely on.
+    """
+    ctx = {}
+    try:
+        return _handle_callback(query, now=now, exchanger=exchanger, ctx=ctx)
+    except LinkError as e:
+        if getattr(e, "attempt", None) is None:
+            e.attempt = ctx.get("attempt")
+        raise
+
+
+def _handle_callback(query, *, now=None, exchanger=None, ctx=None):
     """What cTrader redirects to. Spends the code; binds it to nobody.
 
     Returns {"nonce": ...} on success. The authorization code is NEVER put in
@@ -241,16 +266,32 @@ def handle_callback(query, *, now=None, exchanger=None):
     """
     now = time.time() if now is None else now
     query = query or {}
+    _log.event("callback.received", hasCode=bool(query.get("code")),
+               hasError=bool(query.get("error")),
+               hasState=bool(query.get("state")))
     if query.get("error"):
+        _log.event("callback.provider_refused")
         raise LinkError("PROVIDER_REFUSED",
                         f"cTrader refused the authorization "
                         f"({query.get('error')})")
     code = (query.get("code") or "").strip()
-    nonce, _ts = parse_state(query.get("state"), now=now)
+    try:
+        nonce, _ts = parse_state(query.get("state"), now=now)
+    except LinkError as e:
+        _log.event("callback.state", ok=False, code=e.code)
+        raise
+    attempt = _log.attempt_id(nonce)
+    if ctx is not None:
+        ctx["attempt"] = attempt
+    _log.event("callback.state", ok=True, attempt=attempt)
 
     claimed = _consume_once(nonce)
+    _log.event("callback.claim", attempt=attempt,
+               claimed=("none" if claimed is None else bool(claimed)))
 
     rec = _store._read(_k_pending(nonce))
+    _log.event("callback.pending", attempt=attempt, found=bool(rec),
+               status=(rec or {}).get("status"))
     if not rec:
         raise LinkError("STATE_UNKNOWN",
                         "this connection attempt is not one this platform "
@@ -280,20 +321,26 @@ def handle_callback(query, *, now=None, exchanger=None):
         same_code = bool(code and already
                          and already == _code_digest(code))
         if rec.get("status") == "awaiting_confirmation" and same_code:
+            _log.event("callback.replay", attempt=attempt, outcome="idempotent")
             return {"nonce": nonce}
         # A reload after the exchange itself failed must show what failed, not
         # a refusal about replays. Replacing a real diagnosis with a wrong one
         # is the exact shape of the bug that sent this flow hunting
         # credentials for a day.
         if same_code and rec.get("failureCode"):
+            _log.event("callback.replay", attempt=attempt,
+                       outcome="repeat_failure", code=rec["failureCode"])
             raise LinkError(rec["failureCode"],
                             rec.get("failureMessage")
                             or "this connection attempt failed")
+        _log.event("callback.replay", attempt=attempt, outcome="refused",
+                   sameCode=same_code)
         raise LinkError("STATE_REPLAYED",
                         "this connection link has already been used")
     if not code:
         rec["status"] = "failed"
         _store._write(_k_pending(nonce), rec)
+        _log.event("callback.no_code", attempt=attempt)
         raise LinkError("NO_CODE", "cTrader sent no authorization code")
 
     def _failure(err_code, message):
@@ -303,6 +350,8 @@ def handle_callback(query, *, now=None, exchanger=None):
         rec["failureCode"] = err_code
         rec["failureMessage"] = message
         _store._write(_k_pending(nonce), rec)
+        _log.event("exchange.result", attempt=attempt, ok=False,
+                   code=err_code)
         # Returns the error rather than raising it, so the caller's `raise`
         # keeps the traceback at the point of failure.
         return LinkError(err_code, message)
@@ -310,6 +359,8 @@ def handle_callback(query, *, now=None, exchanger=None):
     if exchanger is None:
         from apex.brokers import ctrader as _ct
         exchanger = _ct.exchange_code
+    _log.event("exchange.attempt", attempt=attempt,
+               redirect=_log.host_of(rec.get("redirectUri")))
     try:
         tok = exchanger(code, rec.get("redirectUri"))
     except Exception as e:  # noqa: BLE001
@@ -334,10 +385,25 @@ def handle_callback(query, *, now=None, exchanger=None):
     rec["status"] = "awaiting_confirmation"
     rec["callbackAt"] = int(now)
     _store._write(_k_pending(nonce), rec)
+    _log.event("exchange.result", attempt=attempt, ok=True,
+               hasRefresh=bool(refresh), expiresIn=expires_in)
+    _log.event("callback.pending_write", attempt=attempt,
+               status="awaiting_confirmation")
     return {"nonce": nonce}
 
 
 def complete(user_id, nonce, *, now=None, lister=None):
+    """Finish the link, stamping every refusal with the attempt it concerns."""
+    ctx = {}
+    try:
+        return _complete(user_id, nonce, now=now, lister=lister, ctx=ctx)
+    except LinkError as e:
+        if getattr(e, "attempt", None) is None:
+            e.attempt = ctx.get("attempt")
+        raise
+
+
+def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
     """Finish the link, as the signed-in user who started it.
 
     This is where the account-injection attack in the module docstring dies:
@@ -351,15 +417,25 @@ def complete(user_id, nonce, *, now=None, lister=None):
     """
     now = time.time() if now is None else now
     user_id = str(user_id)
+    attempt = _log.attempt_id(nonce)
+    if ctx is not None:
+        ctx["attempt"] = attempt
     rec = _store._read(_k_pending(str(nonce or "")))
+    _log.event("complete.called", attempt=attempt,
+               user=_log.user_ref(user_id), found=bool(rec),
+               status=(rec or {}).get("status"))
     if not rec:
         raise LinkError("STATE_UNKNOWN", "no such connection attempt")
     if str(rec.get("userId")) != user_id:
+        # Logged as a mismatch only. Naming the other party here would put one
+        # client's identity in a line reachable by another's support request.
+        _log.event("complete.user_match", attempt=attempt, match=False)
         # Deliberately the same message a stranger's nonce would get: telling
         # the caller that the attempt exists but belongs to someone else would
         # confirm a guess. Checked BEFORE the status, which would otherwise
         # confirm the same guess by answering NOT_READY.
         raise LinkError("STATE_UNKNOWN", "no such connection attempt")
+    _log.event("complete.user_match", attempt=attempt, match=True)
     if rec.get("status") == "failed" and rec.get("failureCode"):
         # Say what actually went wrong at the callback instead of the
         # uninformative "not back from cTrader yet" below.
@@ -387,6 +463,7 @@ def complete(user_id, nonce, *, now=None, lister=None):
     try:
         accounts = lister(access) or []
     except Exception as e:  # noqa: BLE001
+        _log.event("accounts.result", attempt=attempt, ok=False)
         raise LinkError("ACCOUNTS_FAILED",
                         f"connected, but the account list could not be read "
                         f"({e})")
@@ -403,7 +480,14 @@ def complete(user_id, nonce, *, now=None, lister=None):
                      for a in accounts],
         "selectedCtid": None, "selectedMode": None,
     }
+    _log.event("accounts.result", attempt=attempt, ok=True,
+               count=len(conn["accounts"]),
+               demo=sum(1 for a in conn["accounts"] if a["mode"] == DEMO),
+               live=sum(1 for a in conn["accounts"] if a["mode"] == LIVE))
     _store._write(_k_conn(user_id), conn)
+    _log.event("complete.connected", attempt=attempt,
+               user=_log.user_ref(user_id), count=len(conn["accounts"]),
+               selected=False)
     # The pending record is finished with. The code inside it is single-use on
     # cTrader's side anyway, but leaving it lying around encrypted serves
     # nothing and could be replayed against a future bug.

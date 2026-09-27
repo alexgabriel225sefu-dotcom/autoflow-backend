@@ -19,6 +19,43 @@ export const PUBLIC_PATHS = [
   "/auth/callback", "/terms", "/privacy", "/configurator",
 ];
 
+/**
+ * The only place a post-login redirect target is decided.
+ *
+ * Two jobs, and they pull against each other. It must keep the QUERY STRING:
+ * the cTrader callback returns people to /connect?n=<nonce> in a fresh tab
+ * whose sessionStorage is empty, so that parameter is the only record of
+ * which attempt they just approved — drop it and they come back to a page
+ * offering to start over.
+ *
+ * And it must refuse to leave this origin. The value reaches here from the
+ * address bar, and the login page navigates to whatever it is handed, so
+ * anything that is not a same-origin path is a redirect somebody else chose.
+ * "Starts with a slash" is not that check: "//evil.example" satisfies it and
+ * is a protocol-relative URL to another site.
+ */
+export function safeNext(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw.startsWith("/")) return "/dashboard";
+  // Protocol-relative ("//host") and the backslash spelling browsers also
+  // accept ("/\\host").
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/dashboard";
+  return raw;
+}
+
+/**
+ * The exact string that goes into `next=`.
+ *
+ * Pulled out of the middleware so it can be tested without standing up a
+ * NextRequest and a Supabase client. That is not tidiness: the version that
+ * dropped the query string passed every test of safeNext(), because the
+ * dropping happened at the call site rather than inside it. A mutation put
+ * the bug back and nothing failed.
+ */
+export function nextTarget(pathname: string, search: string | undefined): string {
+  return safeNext(`${pathname}${search ?? ""}`);
+}
+
 export function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
@@ -56,9 +93,10 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublic(pathname)) {
     const to = request.nextUrl.clone();
     to.pathname = "/login";
-    // Where they were headed, so signing in does not dump them on a
-    // dashboard when they clicked a link to their journal.
-    to.searchParams.set("next", pathname);
+    // Where they were headed, INCLUDING the query: a broker-link nonce lives
+    // there and nowhere else once the flow has moved to a new tab.
+    to.search = "";
+    to.searchParams.set("next", nextTarget(pathname, request.nextUrl.search));
     return NextResponse.redirect(to);
   }
   if (user && (pathname === "/login" || pathname === "/signup")) {

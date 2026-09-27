@@ -64,6 +64,16 @@ def _fake_get(url, **kw):
         if who not in USERS:
             return _R(401, {})
         return _R(200, USERS[who])
+    if "openapi.ctrader.com" in str(url):
+        # Nothing in this suite may reach cTrader's real token endpoint. It
+        # would fail — these are not real credentials — but the failure would
+        # be a confusing network error, and the request itself would carry the
+        # configured client_secret out of the box. A test suite that talks to
+        # a live credential endpoint is a test suite that leaks; one already
+        # did, and this is where that stops.
+        raise AssertionError(
+            "a test reached cTrader's live token endpoint — stub the "
+            "exchanger instead")
     return _real_get(url, **kw)
 
 
@@ -127,11 +137,13 @@ def seed(what):
         user_store.save(ALICE, {"paper": True, "paper_balance": 5000})
         st = link.begin(ALICE)
         state = st["authorizeUrl"].split("state=")[1].split("&")[0]
-        link.handle_callback({"code": "c", "state": state})
+        # The exchange happens at the CALLBACK now: cTrader's authorization
+        # code lives one minute, so it cannot wait for a second request.
+        link.handle_callback({"code": "c", "state": state},
+                             exchanger=lambda c, u: {"accessToken": "CT-SECRET",
+                                                     "refreshToken": "R",
+                                                     "expiresIn": 2592000})
         link.complete(ALICE, st["nonce"],
-                      exchanger=lambda c, u: {"accessToken": "CT-SECRET",
-                                              "refreshToken": "R",
-                                              "expiresIn": 2592000},
                       lister=lambda a: [{"ctid": 501, "live": False},
                                         {"ctid": 502, "live": True}])
         link.select_account(ALICE, 501)

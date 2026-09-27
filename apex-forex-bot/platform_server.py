@@ -169,6 +169,7 @@ def callback_page(status, payload):
     ok = bool(payload.get("ok"))
     nonce = (payload.get("nonce") or "") if ok else ""
     err = payload.get("error") or {}
+    diag = str(err.get("diagnosticId") or "")
     # Two contexts, two encodings, applied once each. The nonce goes into a
     # URL, so it is percent-encoded; the finished URL goes into an href, so it
     # is HTML-escaped below. Escaping for HTML first and then again for the
@@ -183,9 +184,15 @@ def callback_page(status, payload):
         action = "Finish connecting"
     else:
         title, tone = "Not connected", "bad"
+        # The reference id is shown because the alternative is a screenshot.
+        # Asking somebody to photograph a failure means asking them to send
+        # whatever else is on the screen, which on this page is a session.
+        # Eight characters, safe to read aloud, and they find every line of
+        # this attempt in the logs.
         body = (f"<p>{_esc(err.get('message') or 'The connection did not complete.')}"
                 f"</p><p class=\"code\">{_esc(err.get('code') or 'ERROR')}</p>"
-                f"<p>Nothing has been linked. You can start again.</p>")
+                + (f"<p class=\"ref\">Reference: {_esc(diag)}</p>" if diag else "")
+                + "<p>Nothing has been linked. You can start again.</p>")
         action = "Back to Apex4Traders"
 
     button = (f'<a class="btn" href="{_esc(link)}">{action}</a>' if base
@@ -210,6 +217,8 @@ def callback_page(status, payload):
  p{{margin:0 0 12px;color:#aeb6c7}} strong{{color:#e6e9f0}}
  .code{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;
    color:#f87171}}
+ .ref{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;
+   color:#8b93a7;user-select:all}}
  .btn{{display:block;margin-top:20px;padding:14px 18px;border-radius:10px;
    background:#2dd4bf;color:#06221e;text-decoration:none;font-weight:600;
    text-align:center}}

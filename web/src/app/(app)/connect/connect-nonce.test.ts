@@ -178,3 +178,90 @@ describe("the page and this test do not drift apart", () => {
     expect(src).toMatch(/TERMINAL\.has\(r\.code\)/);
   });
 });
+
+/**
+ * The automatic finish, and what must stay final.
+ *
+ * Arriving back with ?n= means cTrader has approved and the callback has
+ * already spent the authorization code. Making the visitor press one more
+ * button adds no security — the finish runs as them either way — and the
+ * owner spent an afternoon on the page that asked for that press and then
+ * answered RATE_LIMITED.
+ *
+ * The danger in automating it is the opposite failure: an effect that fires
+ * on every render spends a ten-per-minute budget in seconds. So the guard is
+ * asserted here, not assumed.
+ */
+describe("the automatic finish fires once, and only once", () => {
+  it("a ref guard admits exactly one run across many renders", () => {
+    // The component's guard, in the shape the component uses it.
+    const autoRan = { current: false };
+    let runs = 0;
+    const onMountWithNonce = () => {
+      if (!autoRan.current) { autoRan.current = true; runs += 1; }
+    };
+    for (let i = 0; i < 25; i++) onMountWithNonce();
+    expect(runs).toBe(1);
+  });
+
+  it("useState would NOT have been enough, which is why it is a ref", () => {
+    // State is captured per render: a handler closing over `false` keeps
+    // seeing `false` until React re-renders, so two renders in the same tick
+    // both pass the guard. This is the bug the ref exists to prevent, shown
+    // rather than described.
+    let runs = 0;
+    const captured = false;            // what a stale closure would see
+    for (let i = 0; i < 5; i++) if (!captured) runs += 1;
+    expect(runs).toBe(5);              // the broken version
+  });
+});
+
+describe("which refusals end an attempt, and which do not", () => {
+  const TERMINAL = new Set([
+    "STATE_UNKNOWN", "STATE_EXPIRED", "STATE_REPLAYED", "NO_CODE",
+    "PROVIDER_REFUSED", "EXCHANGE_FAILED", "NO_TOKEN",
+  ]);
+  const RETRYABLE = new Set(["ACCOUNTS_FAILED", "RATE_LIMITED"]);
+
+  it("covers the refusals the callback can now produce", () => {
+    // EXCHANGE_FAILED and NO_TOKEN could not reach this step until the code
+    // started being spent at the callback. They are as final as the rest: the
+    // code is gone either way, so offering "finish" again can only fail.
+    for (const code of ["EXCHANGE_FAILED", "NO_TOKEN", "PROVIDER_REFUSED"]) {
+      expect(TERMINAL.has(code)).toBe(true);
+    }
+  });
+
+  it("does NOT end the attempt when only the account listing failed", () => {
+    // The token is already parked. Clearing the nonce here throws away a good
+    // token and sends the visitor back through cTrader for nothing.
+    expect(TERMINAL.has("ACCOUNTS_FAILED")).toBe(false);
+    expect(RETRYABLE.has("ACCOUNTS_FAILED")).toBe(true);
+  });
+
+  it("nor when the client was merely going too fast", () => {
+    expect(TERMINAL.has("RATE_LIMITED")).toBe(false);
+    expect(RETRYABLE.has("RATE_LIMITED")).toBe(true);
+  });
+
+  it("matches the component, which is the copy that actually runs", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    for (const code of TERMINAL) expect(src).toContain(code);
+    for (const code of RETRYABLE) expect(src).toContain(code);
+    // The retryable set must be consulted, not merely declared.
+    expect(src).toMatch(/RETRYABLE\.has\(r\.code\)/);
+    // And the automatic finish must be guarded by a ref, not by state.
+    expect(src).toMatch(/autoRan\.current/);
+    expect(src).toMatch(/useRef\(false\)/);
+  });
+
+  it("shows a reference id when the server sends one", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    expect(src).toContain("diagnosticId");
+    expect(src).toContain("Reference:");
+  });
+});
