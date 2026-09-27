@@ -49,14 +49,27 @@ def check(name, cond, detail=""):
 
 
 # ── parse everything once ───────────────────────────────────────────────────
+# Walked, not listed. os.listdir() sees only the top level, so any module
+# placed in a subpackage — say apex/platform/brokers/ — escaped every check in
+# this file silently. That is the wrong way round: a new broker integration is
+# exactly the kind of code these invariants exist for, and it is exactly the
+# kind of code somebody puts in a subdirectory.
+#
+# Top-level modules keep their bare name as the key, so the checks below go on
+# reading `func("entitlement", ...)`. Nested ones are keyed by their path,
+# `brokers/mt5_cloud`, which is what appears in a failure message.
 MODULES = {}
-for fn in sorted(os.listdir(PLATFORM)):
-    if not fn.endswith(".py"):
-        continue
-    name = fn[:-3]
-    with open(os.path.join(PLATFORM, fn), encoding="utf-8") as fh:
-        src = fh.read()
-    MODULES[name] = {"src": src, "tree": ast.parse(src, filename=fn)}
+for _dir, _subdirs, _files in os.walk(PLATFORM):
+    _subdirs[:] = [d for d in sorted(_subdirs)
+                   if d != "__pycache__" and not d.startswith(".")]
+    for fn in sorted(_files):
+        if not fn.endswith(".py"):
+            continue
+        full = os.path.join(_dir, fn)
+        rel = os.path.relpath(full, PLATFORM)[:-3].replace(os.sep, "/")
+        with open(full, encoding="utf-8") as fh:
+            src = fh.read()
+        MODULES[rel] = {"src": src, "tree": ast.parse(src, filename=rel)}
 
 
 def imports_of(name):
