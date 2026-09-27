@@ -490,6 +490,67 @@ try:
     check("and handle_callback() is what takes one",
           "exchanger" in _inspect.signature(L.handle_callback).parameters)
 
+
+    print("\n12. finishing an attempt that is already finished")
+    # WHY THIS SECTION EXISTS
+    #
+    # From production, attempt 67ee4a20:
+    #
+    #   17:58:19  complete.connected count=1 ctids="47765456"
+    #   17:59:21  complete.called status="completed"  -> NOT_READY
+    #   17:59:48  complete.called status="completed"  -> NOT_READY
+    #
+    # The connection had succeeded. Pressing finish again answered "this
+    # connection has not come back from cTrader yet" — about an attempt that
+    # had come back, been exchanged, and been written. The message was simply
+    # untrue, and the owner read it as the feature being broken.
+    #
+    # It happens because cTrader opens in a NEW TAB. The connection finishes
+    # there; the ORIGINAL tab keeps its own sessionStorage, its own stale
+    # status, and a button offering to finish something already done. Two tabs
+    # is the normal case for this flow, not an edge case.
+    #
+    # So a completed attempt, pressed again BY ITS OWNER, answers with the
+    # real state. The stale tab then heals itself instead of accusing the
+    # platform.
+    s12 = L.begin(ALICE, now=T0)
+    st12 = s12["authorizeUrl"].split("state=")[1].split("&")[0]
+    L.handle_callback({"code": "code-12", "state": st12}, now=T0,
+                      exchanger=exchanger)
+    first = L.complete(ALICE, s12["nonce"], now=T0, lister=lister)
+    check("the first finish connects the account", first["connected"] is True)
+
+    again = L.complete(ALICE, s12["nonce"], now=T0 + 90, lister=lister)
+    check("finishing again does not refuse", again["connected"] is True)
+    check("and reports the same accounts, so a stale tab catches up",
+          {a["ctid"] for a in again["accounts"]}
+          == {a["ctid"] for a in first["accounts"]})
+    check("it is NOT_READY that must never be the answer here",
+          True)  # asserted by the two checks above not raising
+
+    # The idempotent path must not be a hole. It is reachable only by the user
+    # the attempt belongs to — the same check that stops account injection.
+    # Checked with a user who has never connected, so "not connected" is a
+    # fact about this check rather than a leftover from an earlier section.
+    # (BOB was connected in section 11; asserting against him passed for the
+    # wrong reason, then failed for the right one.)
+    CAROL = "cccccccc-3333-4333-8333-cccccccccccc"
+    check("a stranger cannot ride the idempotent path",
+          refuses("STATE_UNKNOWN",
+                  lambda: L.complete(CAROL, s12["nonce"], now=T0 + 90,
+                                     lister=lister)))
+    check("and gains no connection from trying",
+          L.public_status(CAROL)["connected"] is False)
+    check("while Alice's own connection is untouched by the attempt",
+          L.public_status(ALICE)["connected"] is True)
+
+    # And the real NOT_READY still exists, for an attempt that genuinely has
+    # not come back.
+    s13 = L.begin(ALICE, now=T0)
+    check("an attempt still waiting on cTrader is refused as NOT_READY",
+          refuses("NOT_READY", lambda: L.complete(ALICE, s13["nonce"],
+                                                  now=T0, lister=lister)))
+
 finally:
     shutil.rmtree(_TMP, ignore_errors=True)
 

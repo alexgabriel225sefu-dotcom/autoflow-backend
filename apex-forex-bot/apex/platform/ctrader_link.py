@@ -436,6 +436,24 @@ def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
         # confirm the same guess by answering NOT_READY.
         raise LinkError("STATE_UNKNOWN", "no such connection attempt")
     _log.event("complete.user_match", attempt=attempt, match=True)
+    if rec.get("status") == "completed":
+        # Already done, by this same user. Answer with the real state rather
+        # than an error about it.
+        #
+        # cTrader opens in a NEW TAB, so this flow routinely ends with two
+        # tabs open: the connection finishes in one, and the other keeps its
+        # own sessionStorage, its own stale status, and a button offering to
+        # finish something already finished. Pressing it used to answer
+        # NOT_READY — "this connection has not come back from cTrader yet" —
+        # about an attempt that had come back, been exchanged and been
+        # written. Untrue, and read by the owner as the feature being broken.
+        #
+        # Safe because it is reached only after the userId check above, which
+        # is the same gate that stops account injection. A stranger with a
+        # guessed nonce gets STATE_UNKNOWN and never arrives here.
+        _log.event("complete.already_done", attempt=attempt,
+                   user=_log.user_ref(user_id))
+        return public_status(user_id)
     if rec.get("status") == "failed" and rec.get("failureCode"):
         # Say what actually went wrong at the callback instead of the
         # uninformative "not back from cTrader yet" below.
