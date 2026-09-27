@@ -202,12 +202,42 @@ def begin(user_id, *, now=None, redirect_uri=None, authorize_url_fn=None):
             "nonce": nonce, "expiresAt": ts + STATE_TTL_S}
 
 
-def handle_callback(query, *, now=None):
-    """What cTrader redirects to. Parks the code; finishes nothing.
+def _code_digest(code: str) -> str:
+    """A comparison handle for an authorization code, not the code itself.
+
+    Reloading the callback page re-sends the identical code and must get the
+    same answer rather than a refusal, so the code has to be recognisable
+    later. Keeping the code to do that stopped being acceptable once it is
+    spent at the callback, so what is kept is a digest keyed with the same
+    secret the state signature uses — useless anywhere but here.
+    """
+    return hmac.new(_secret(), (code or "").encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+def handle_callback(query, *, now=None, exchanger=None):
+    """What cTrader redirects to. Spends the code; binds it to nobody.
 
     Returns {"nonce": ...} on success. The authorization code is NEVER put in
     the response or in a redirect URL — it stays server-side, so it cannot
     reach a browser history, a referrer header or an access log.
+
+    WHY THE EXCHANGE HAPPENS HERE
+
+    cTrader's authorization code expires ONE MINUTE after it is issued. This
+    function used to park the code and leave the exchange to `complete`, which
+    runs on a second, human-timed click. That is not a race anyone wins: a
+    visitor who reads the page, or who gets rate-limited on the finish button
+    and waits for the window to move, comes back to a dead code — and cTrader
+    answers ACCESS_DENIED, which names credentials and means nothing of the
+    kind. It cost a whole session of chasing a credential that was correct all
+    along.
+
+    So the code is spent here, milliseconds after cTrader issues it, and what
+    `complete` inherits is the ACCESS TOKEN, which lives about thirty days.
+    Nothing about WHOSE account this becomes moves here: the tokens are parked
+    in the pending record, and `complete` is still the only thing that may
+    attach them to a user, still only for the user who began the attempt.
     """
     now = time.time() if now is None else now
     query = query or {}
@@ -246,10 +276,19 @@ def handle_callback(query, *, now=None):
         # state, which would swap which broker account gets linked. So the same
         # code parked in the same state is idempotent, and anything else is
         # refused exactly as before.
-        already = user_store.decrypt_value(rec.get("code") or "")
-        if (rec.get("status") == "awaiting_confirmation"
-                and code and already and already == code):
+        already = rec.get("codeDigest") or ""
+        same_code = bool(code and already
+                         and already == _code_digest(code))
+        if rec.get("status") == "awaiting_confirmation" and same_code:
             return {"nonce": nonce}
+        # A reload after the exchange itself failed must show what failed, not
+        # a refusal about replays. Replacing a real diagnosis with a wrong one
+        # is the exact shape of the bug that sent this flow hunting
+        # credentials for a day.
+        if same_code and rec.get("failureCode"):
+            raise LinkError(rec["failureCode"],
+                            rec.get("failureMessage")
+                            or "this connection attempt failed")
         raise LinkError("STATE_REPLAYED",
                         "this connection link has already been used")
     if not code:
@@ -257,55 +296,94 @@ def handle_callback(query, *, now=None):
         _store._write(_k_pending(nonce), rec)
         raise LinkError("NO_CODE", "cTrader sent no authorization code")
 
-    rec["code"] = user_store.encrypt_value(code)
+    def _failure(err_code, message):
+        rec["code"] = None
+        rec["codeDigest"] = _code_digest(code)
+        rec["status"] = "failed"
+        rec["failureCode"] = err_code
+        rec["failureMessage"] = message
+        _store._write(_k_pending(nonce), rec)
+        # Returns the error rather than raising it, so the caller's `raise`
+        # keeps the traceback at the point of failure.
+        return LinkError(err_code, message)
+
+    if exchanger is None:
+        from apex.brokers import ctrader as _ct
+        exchanger = _ct.exchange_code
+    try:
+        tok = exchanger(code, rec.get("redirectUri"))
+    except Exception as e:  # noqa: BLE001
+        raise _failure("EXCHANGE_FAILED",
+                    f"cTrader would not exchange the code ({e})") from None
+    access = (tok or {}).get("accessToken") or (tok or {}).get("access_token")
+    if not access:
+        raise _failure("NO_TOKEN",
+                    "cTrader returned no access token, so nothing was "
+                    "connected")
+    refresh = tok.get("refreshToken") or tok.get("refresh_token")
+    expires_in = tok.get("expiresIn") or tok.get("expires_in")
+
+    # The code is spent and is not kept. `expiresAt` is measured from HERE,
+    # when the token was actually issued, rather than from whenever the
+    # visitor gets round to confirming.
+    rec["code"] = None
+    rec["codeDigest"] = _code_digest(code)
+    rec["accessToken"] = user_store.encrypt_value(access)
+    rec["refreshToken"] = user_store.encrypt_value(refresh or "")
+    rec["expiresAt"] = (float(now) + float(expires_in)) if expires_in else None
     rec["status"] = "awaiting_confirmation"
     rec["callbackAt"] = int(now)
     _store._write(_k_pending(nonce), rec)
     return {"nonce": nonce}
 
 
-def complete(user_id, nonce, *, now=None, exchanger=None, lister=None):
+def complete(user_id, nonce, *, now=None, lister=None):
     """Finish the link, as the signed-in user who started it.
 
     This is where the account-injection attack in the module docstring dies:
     the session calling this must match the user id recorded by begin().
+
+    The authorization code is already spent — `handle_callback` did that,
+    because the code only lives a minute. What this works with is the access
+    token, good for about thirty days, so a visitor who takes their time here
+    is not punished for it. There is deliberately no `exchanger` parameter any
+    more: nothing after the callback may exchange a code.
     """
     now = time.time() if now is None else now
     user_id = str(user_id)
     rec = _store._read(_k_pending(str(nonce or "")))
     if not rec:
         raise LinkError("STATE_UNKNOWN", "no such connection attempt")
-    if rec.get("status") != "awaiting_confirmation":
-        raise LinkError("NOT_READY",
-                        "this connection has not come back from cTrader yet")
     if str(rec.get("userId")) != user_id:
         # Deliberately the same message a stranger's nonce would get: telling
         # the caller that the attempt exists but belongs to someone else would
-        # confirm a guess.
+        # confirm a guess. Checked BEFORE the status, which would otherwise
+        # confirm the same guess by answering NOT_READY.
         raise LinkError("STATE_UNKNOWN", "no such connection attempt")
+    if rec.get("status") == "failed" and rec.get("failureCode"):
+        # Say what actually went wrong at the callback instead of the
+        # uninformative "not back from cTrader yet" below.
+        raise LinkError(rec["failureCode"],
+                        rec.get("failureMessage")
+                        or "this connection attempt failed")
+    if rec.get("status") != "awaiting_confirmation":
+        raise LinkError("NOT_READY",
+                        "this connection has not come back from cTrader yet")
     if now - float(rec.get("createdAt") or 0) > PENDING_TTL_S:
         raise LinkError("STATE_EXPIRED",
                         "this connection attempt has expired — start again")
 
-    code = user_store.decrypt_value(rec.get("code") or "")
-    if not code:
-        raise LinkError("NO_CODE", "the authorization code is missing")
-
-    if exchanger is None or lister is None:
-        from apex.brokers import ctrader as _ct
-        exchanger = exchanger or _ct.exchange_code
-        lister = lister or _ct.list_accounts
-    try:
-        tok = exchanger(code, rec.get("redirectUri"))
-    except Exception as e:  # noqa: BLE001
-        raise LinkError("EXCHANGE_FAILED",
-                        f"cTrader would not exchange the code ({e})")
-    access = tok.get("accessToken") or tok.get("access_token")
-    refresh = tok.get("refreshToken") or tok.get("refresh_token")
+    # Already encrypted by the callback, and moved across without a decrypt
+    # and re-encrypt round trip.
+    access_enc = rec.get("accessToken") or ""
+    access = user_store.decrypt_value(access_enc)
     if not access:
         raise LinkError("NO_TOKEN",
-                        "cTrader returned no access token, so nothing was "
-                        "connected")
+                        "the access token from the callback is missing")
+
+    if lister is None:
+        from apex.brokers import ctrader as _ct
+        lister = _ct.list_accounts
     try:
         accounts = lister(access) or []
     except Exception as e:  # noqa: BLE001
@@ -313,12 +391,11 @@ def complete(user_id, nonce, *, now=None, exchanger=None, lister=None):
                         f"connected, but the account list could not be read "
                         f"({e})")
 
-    expires_in = tok.get("expiresIn") or tok.get("expires_in")
     conn = {
         "userId": user_id,
-        "accessToken": user_store.encrypt_value(access),
-        "refreshToken": user_store.encrypt_value(refresh or ""),
-        "expiresAt": (float(now) + float(expires_in)) if expires_in else None,
+        "accessToken": access_enc,
+        "refreshToken": rec.get("refreshToken") or user_store.encrypt_value(""),
+        "expiresAt": rec.get("expiresAt"),
         "connectedAt": float(now),
         "accounts": [{"ctid": a.get("ctid"),
                       "mode": LIVE if a.get("live") else DEMO,
@@ -331,7 +408,9 @@ def complete(user_id, nonce, *, now=None, exchanger=None, lister=None):
     # cTrader's side anyway, but leaving it lying around encrypted serves
     # nothing and could be replayed against a future bug.
     _store._write(_k_pending(nonce), {"nonce": nonce, "userId": user_id,
-                                      "status": "completed", "code": None})
+                                      "status": "completed", "code": None,
+                                      "accessToken": None,
+                                      "refreshToken": None})
     return public_status(user_id)
 
 

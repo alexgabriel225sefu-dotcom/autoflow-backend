@@ -64,13 +64,14 @@ def connect(accounts, *, expires_in=2592000):
     """
     begun = CL.begin(USER)
     state = begun["authorizeUrl"].split("state=")[1].split("&")[0]
-    CL.handle_callback({"code": "c", "state": state})
-    return CL.complete(
-        USER, begun["nonce"],
-        exchanger=lambda c, u: {"accessToken": "TOKEN-SECRET-VALUE",
-                                "refreshToken": "REFRESH-SECRET",
-                                "expiresIn": expires_in},
-        lister=lambda a: accounts)
+    # The exchange belongs to the callback: cTrader's authorization code lives
+    # one minute, so it cannot survive until a second, human-timed request.
+    CL.handle_callback({"code": "c", "state": state},
+                       exchanger=lambda c, u: {
+                           "accessToken": "TOKEN-SECRET-VALUE",
+                           "refreshToken": "REFRESH-SECRET",
+                           "expiresIn": expires_in})
+    return CL.complete(USER, begun["nonce"], lister=lambda a: accounts)
 
 
 def select(ctid, *, allow_live=False):

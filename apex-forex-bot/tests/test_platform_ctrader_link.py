@@ -81,6 +81,11 @@ def exchanger(code, redirect_uri, *, token=None):
                      "expiresIn": 2592000}
 
 
+def never_exchanges(code, redirect_uri):
+    """For paths that must refuse before any code is exchanged."""
+    raise AssertionError("the exchange must not be reached on this path")
+
+
 def lister(access, *, accounts=None):
     return accounts if accounts is not None else [DEMO_ACC, LIVE_ACC]
 
@@ -89,10 +94,10 @@ def connect(user_id, *, accounts=None, token=None, now=None):
     """The whole flow, end to end, with no network and no Telegram."""
     started = L.begin(user_id, now=now)
     state = started["authorizeUrl"].split("state=")[1].split("&")[0]
-    L.handle_callback({"code": "auth-code-xyz", "state": state}, now=now)
+    L.handle_callback({"code": "auth-code-xyz", "state": state}, now=now,
+                      exchanger=lambda c, u: exchanger(c, u, token=token))
     return started, L.complete(
         user_id, started["nonce"], now=now,
-        exchanger=lambda c, u: exchanger(c, u, token=token),
         lister=lambda a: lister(a, accounts=accounts))
 
 
@@ -138,43 +143,50 @@ try:
     # Alice's account, and Alice must not be able to finish Bob's attempt.
     bob_started = L.begin(BOB)
     bob_state = bob_started["authorizeUrl"].split("state=")[1].split("&")[0]
-    L.handle_callback({"code": "alices-code", "state": bob_state})
+    L.handle_callback({"code": "alices-code", "state": bob_state},
+                      exchanger=exchanger)
     check("a different signed-in user cannot complete somebody else's attempt",
           refuses("STATE_UNKNOWN", lambda: L.complete(
-              ALICE, bob_started["nonce"], exchanger=exchanger, lister=lister)))
+              ALICE, bob_started["nonce"], lister=lister)))
     check("and the refusal is the same one a made-up nonce gets, so it "
           "confirms nothing",
           refuses("STATE_UNKNOWN", lambda: L.complete(
-              ALICE, "not-a-real-nonce", exchanger=exchanger, lister=lister)))
+              ALICE, "not-a-real-nonce", lister=lister)))
     check("Alice's own connection is untouched",
           L.access_token_for(ALICE) == ACCESS)
 
     print("\n5. state is required, signed, single-use and time-limited")
     check("a callback with no state is refused",
-          refuses("STATE_MISSING", lambda: L.handle_callback({"code": "x"})))
+          refuses("STATE_MISSING", lambda: L.handle_callback(
+              {"code": "x"}, exchanger=never_exchanges)))
     check("a callback with an empty state is refused",
           refuses("STATE_MISSING",
-                  lambda: L.handle_callback({"code": "x", "state": ""})))
+                  lambda: L.handle_callback({"code": "x", "state": ""},
+                                            exchanger=never_exchanges)))
     check("a made-up state is refused",
           refuses("STATE_MALFORMED",
-                  lambda: L.handle_callback({"code": "x", "state": "garbage"})))
+                  lambda: L.handle_callback({"code": "x", "state": "garbage"},
+                                            exchanger=never_exchanges)))
     s2 = L.begin(ALICE)
     st2 = s2["authorizeUrl"].split("state=")[1].split("&")[0]
     tampered = st2[:-2] + ("AA" if not st2.endswith("AA") else "BB")
     check("a tampered signature is refused",
           refuses("STATE_BAD_SIGNATURE",
-                  lambda: L.handle_callback({"code": "x", "state": tampered})))
+                  lambda: L.handle_callback({"code": "x", "state": tampered},
+                                            exchanger=never_exchanges)))
     s3 = L.begin(ALICE, now=1000.0)
     st3 = s3["authorizeUrl"].split("state=")[1].split("&")[0]
     check("a state older than its window is refused",
           refuses("STATE_EXPIRED", lambda: L.handle_callback(
-              {"code": "x", "state": st3}, now=1000.0 + L.STATE_TTL_S + 1)))
+              {"code": "x", "state": st3}, now=1000.0 + L.STATE_TTL_S + 1,
+              exchanger=never_exchanges)))
     s4 = L.begin(ALICE)
     st4 = s4["authorizeUrl"].split("state=")[1].split("&")[0]
-    L.handle_callback({"code": "c1", "state": st4})
+    L.handle_callback({"code": "c1", "state": st4}, exchanger=exchanger)
     check("the same state cannot be used twice",
           refuses("STATE_REPLAYED",
-                  lambda: L.handle_callback({"code": "c2", "state": st4})))
+                  lambda: L.handle_callback({"code": "c2", "state": st4},
+                                            exchanger=never_exchanges)))
     # The check above exercises the development fallback: with no shared
     # backend user_store.claim returns None ("could not ask") and the record's
     # own status does the refusing. In production the atomic SET NX is what
@@ -186,11 +198,13 @@ try:
         user_store.claim = lambda key, ttl_s=120: False   # somebody has it
         check("with a shared backend, a second use loses the atomic claim",
               refuses("STATE_REPLAYED",
-                      lambda: L.handle_callback({"code": "c", "state": st4b})))
+                      lambda: L.handle_callback({"code": "c", "state": st4b},
+                                                exchanger=never_exchanges)))
         user_store.claim = lambda key, ttl_s=120: True    # first through
         s4c = L.begin(ALICE)
         st4c = s4c["authorizeUrl"].split("state=")[1].split("&")[0]
-        out = L.handle_callback({"code": "c", "state": st4c})
+        out = L.handle_callback({"code": "c", "state": st4c},
+                                exchanger=exchanger)
         check("and the winner of the claim is let through",
               out["nonce"] == s4c["nonce"])
     finally:
@@ -201,33 +215,40 @@ try:
     st5 = s5["authorizeUrl"].split("state=")[1].split("&")[0]
     check("a callback carrying no code is refused",
           refuses("NO_CODE",
-                  lambda: L.handle_callback({"state": st5, "code": ""})))
+                  lambda: L.handle_callback({"state": st5, "code": ""},
+                                            exchanger=never_exchanges)))
     s6 = L.begin(ALICE)
     st6 = s6["authorizeUrl"].split("state=")[1].split("&")[0]
     check("a provider-side error is surfaced, not swallowed",
           refuses("PROVIDER_REFUSED", lambda: L.handle_callback(
-              {"state": st6, "error": "access_denied"})))
+              {"state": st6, "error": "access_denied"},
+              exchanger=never_exchanges)))
     s7 = L.begin(ALICE)
     st7 = s7["authorizeUrl"].split("state=")[1].split("&")[0]
-    L.handle_callback({"code": "expired-code", "state": st7})
 
     def _expired(code, uri):
         raise RuntimeError("cTrader token error: INVALID_REQUEST — code expired")
+    # Surfaced BY THE CALLBACK now, because that is where the exchange is.
     check("an expired authorization code refuses the connection",
-          refuses("EXCHANGE_FAILED", lambda: L.complete(
-              ALICE, s7["nonce"], exchanger=_expired, lister=lister)))
+          refuses("EXCHANGE_FAILED", lambda: L.handle_callback(
+              {"code": "expired-code", "state": st7}, exchanger=_expired)))
+    check("and pressing finish afterwards repeats that, not a vaguer refusal",
+          refuses("EXCHANGE_FAILED",
+                  lambda: L.complete(ALICE, s7["nonce"], lister=lister)))
+    check("nor is it replaced by one about replays when the page is reloaded",
+          refuses("EXCHANGE_FAILED", lambda: L.handle_callback(
+              {"code": "expired-code", "state": st7}, exchanger=_expired)))
     s8 = L.begin(BOB)
     st8 = s8["authorizeUrl"].split("state=")[1].split("&")[0]
-    L.handle_callback({"code": "c", "state": st8})
     check("a token response with no access token connects nothing",
-          refuses("NO_TOKEN", lambda: L.complete(
-              BOB, s8["nonce"], lister=lister,
+          refuses("NO_TOKEN", lambda: L.handle_callback(
+              {"code": "c", "state": st8},
               exchanger=lambda c, u: {"refreshToken": "r", "expiresIn": 10})))
     check("and Bob is still not connected afterwards",
           L.public_status(BOB)["connected"] is False)
     check("completing before cTrader has come back is refused",
           refuses("NOT_READY", lambda: L.complete(
-              BOB, L.begin(BOB)["nonce"], exchanger=exchanger, lister=lister)))
+              BOB, L.begin(BOB)["nonce"], lister=lister)))
 
     print("\n7. demo and live are separated, and live is blocked here")
     check("this environment does not allow live accounts",
@@ -378,6 +399,97 @@ try:
               L.parse_state(signed_before, now=1000)[0] == "n2")
     finally:
         os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+
+    print("\n11. the authorization code is spent before it can expire")
+    # WHY THIS SECTION EXISTS
+    #
+    # cTrader's authorization code lives ONE MINUTE — "its expiration period is
+    # one minute", help.ctrader.com/open-api/account-authentication. This flow
+    # parked the code at the callback and exchanged it when the visitor pressed
+    # a second button, so the exchange happened whenever a human got round to
+    # clicking.
+    #
+    # The first real connection attempt died on precisely that. The visitor
+    # approved at cTrader, was rate-limited on the finish button, waited for
+    # the window to move — about a minute — pressed again, and got
+    # ACCESS_DENIED. A day went into suspecting the client secret, which was
+    # correct the whole time. The one test that would have caught it is the one
+    # that makes the stub behave like the real endpoint: refuse a code
+    # presented late.
+    exchanges = []
+    T0 = 10_000_000.0
+    clock = {"t": T0}
+
+    def ttl_exchanger(code, redirect_uri):
+        """cTrader, as documented: this code is dead after sixty seconds."""
+        exchanges.append({"code": code, "uri": redirect_uri, "at": clock["t"]})
+        if clock["t"] - T0 > 60:
+            raise RuntimeError("cTrader token error: ACCESS_DENIED — Access "
+                               "denied. Make sure the credentials are valid.")
+        return {"accessToken": ACCESS, "refreshToken": REFRESH,
+                "expiresIn": 2592000}
+
+    s11 = L.begin(BOB, now=T0)
+    st11 = s11["authorizeUrl"].split("state=")[1].split("&")[0]
+    clock["t"] = T0 + 2                      # cTrader redirects back at once
+    L.handle_callback({"code": "code-11", "state": st11}, now=clock["t"],
+                      exchanger=ttl_exchanger)
+    check("the callback exchanges the code itself", len(exchanges) == 1)
+    check("within the minute the code is alive for",
+          exchanges and exchanges[0]["at"] - T0 <= 60)
+    check("and sends the redirect URI begin() registered, which cTrader "
+          "checks again at the exchange",
+          exchanges and exchanges[0]["uri"] == os.environ["CTRADER_REDIRECT_URI"])
+
+    # The parked record between the two steps: tokens, no code, encrypted.
+    mid = L._store._read(L._k_pending(s11["nonce"]))
+    check("the spent code is not kept", not mid.get("code"))
+    check("but the attempt stays recognisable, so a reload is still idempotent",
+          bool(mid.get("codeDigest")))
+    check("and the digest is not the code in disguise",
+          "code-11" not in _json.dumps(mid))
+    check("the parked access token is encrypted, not plain",
+          ACCESS not in _json.dumps(mid) and bool(mid.get("accessToken")))
+    check("as is the refresh token",
+          REFRESH not in _json.dumps(mid) and bool(mid.get("refreshToken")))
+
+    # A reload of the callback page re-sends the identical code. The code is
+    # single-use at cTrader, so a second exchange would fail AND could replace
+    # tokens that are already good.
+    before = len(exchanges)
+    again = L.handle_callback({"code": "code-11", "state": st11},
+                              now=clock["t"], exchanger=ttl_exchanger)
+    check("a reloaded callback page does not exchange the code twice",
+          len(exchanges) == before)
+    check("and still answers with the same nonce",
+          again.get("nonce") == s11["nonce"])
+
+    # THE REGRESSION. Five minutes later — long past the code's life, well
+    # inside PENDING_TTL_S — the visitor finally presses finish.
+    clock["t"] = T0 + 300
+    late = L.complete(BOB, s11["nonce"], now=clock["t"],
+                      lister=lambda a: lister(a))
+    check("confirming five minutes later still connects the account",
+          late["connected"] is True)
+    check("because nothing after the callback exchanges a code",
+          len(exchanges) == 1)
+    check("and the token that came back at the callback is the one stored",
+          L.access_token_for(BOB, now=clock["t"]) == ACCESS)
+    # Measured from when cTrader issued the token, not from the click.
+    check("the expiry is dated from the exchange, not from the confirmation",
+          abs((L._read_conn(BOB).get("expiresAt") or 0)
+              - (T0 + 2 + 2592000)) < 1.0,
+          str(L._read_conn(BOB).get("expiresAt")))
+
+    # `complete` must not merely avoid exchanging by accident — the parameter
+    # that let it is gone, so a caller cannot reintroduce the old timing.
+    import inspect as _inspect
+    check("complete() no longer takes an exchanger at all",
+          "exchanger" not in _inspect.signature(L.complete).parameters,
+          str(_inspect.signature(L.complete)))
+    check("and handle_callback() is what takes one",
+          "exchanger" in _inspect.signature(L.handle_callback).parameters)
+
 finally:
     shutil.rmtree(_TMP, ignore_errors=True)
 

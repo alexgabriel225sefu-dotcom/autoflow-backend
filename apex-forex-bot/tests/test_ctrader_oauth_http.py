@@ -339,6 +339,13 @@ from apex.platform import store as _pstore                        # noqa: E402
 _UID = "27d43c19-0000-0000-0000-000000000000"
 
 
+def _stub_exchange(code, redirect_uri):
+    """Stands in for cTrader. The callback exchanges the code on the spot now,
+    because the real code expires one minute after it is issued."""
+    return {"accessToken": f"ACCESS-FOR-{code}", "refreshToken": "R",
+            "expiresIn": 2592000}
+
+
 def _fresh_attempt():
     """A pending attempt that has already come back from cTrader."""
     began = _link.begin(_UID, redirect_uri="https://example.test/cb",
@@ -348,13 +355,15 @@ def _fresh_attempt():
 
 
 _state = _fresh_attempt()
-_first = _link.handle_callback({"code": "THE-CODE", "state": _state})
-check("the first callback parks the code", bool(_first.get("nonce")), str(_first))
+_first = _link.handle_callback({"code": "THE-CODE", "state": _state},
+                               exchanger=_stub_exchange)
+check("the first callback spends the code", bool(_first.get("nonce")), str(_first))
 
 _second = None
 _raised = None
 try:
-    _second = _link.handle_callback({"code": "THE-CODE", "state": _state})
+    _second = _link.handle_callback({"code": "THE-CODE", "state": _state},
+                                    exchanger=_stub_exchange)
 except Exception as e:                                            # noqa: BLE001
     _raised = e
 check("the SAME code replayed returns the same nonce instead of failing",
@@ -362,21 +371,32 @@ check("the SAME code replayed returns the same nonce instead of failing",
       f"raised {_raised}" if _raised else str(_second))
 
 _state2 = _fresh_attempt()
-_link.handle_callback({"code": "FIRST-CODE", "state": _state2})
+_link.handle_callback({"code": "FIRST-CODE", "state": _state2},
+                      exchanger=_stub_exchange)
 try:
-    _link.handle_callback({"code": "ATTACKER-CODE", "state": _state2})
+    _link.handle_callback({"code": "ATTACKER-CODE", "state": _state2},
+                          exchanger=_stub_exchange)
     check("a DIFFERENT code against the same state is refused", False,
           "it was accepted — this is the swap the guard exists to stop")
 except Exception as e:                                            # noqa: BLE001
     check("a DIFFERENT code against the same state is refused",
           getattr(e, "code", "") == "STATE_REPLAYED", f"{type(e).__name__}: {e}")
 
-# And the parked code is still the first one, not the attacker's.
+# And the attempt still belongs to the FIRST code, not the attacker's. The
+# spent code itself is not kept any more, so what is checked is the pair that
+# replaced it: the digest that recognises a reload, and the token the first
+# code actually bought.
 _rec = _pstore._read(_link._k_pending(_link.parse_state(_state2)[0]))
 from apex import user_store as _us                                # noqa: E402
-check("the parked code is unchanged by the refused attempt",
-      _us.decrypt_value(_rec.get("code") or "") == "FIRST-CODE",
-      repr(_us.decrypt_value(_rec.get("code") or ""))[:40])
+check("the attempt still recognises the first code, not the attacker's",
+      _rec.get("codeDigest") == _link._code_digest("FIRST-CODE")
+      and _rec.get("codeDigest") != _link._code_digest("ATTACKER-CODE"))
+check("and the parked token is the one the first code bought",
+      _us.decrypt_value(_rec.get("accessToken") or "") == "ACCESS-FOR-FIRST-CODE",
+      repr(_us.decrypt_value(_rec.get("accessToken") or ""))[:40])
+check("with no authorization code left in the record at all",
+      not _rec.get("code") and "FIRST-CODE" not in json.dumps(_rec),
+      str(list(_rec.keys())))
 
 
 # ── 10. a credential pasted with whitespace ────────────────────────────────

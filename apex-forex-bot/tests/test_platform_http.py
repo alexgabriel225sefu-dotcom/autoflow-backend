@@ -80,6 +80,18 @@ requests.get = _fake_get
 from apex import bot  # noqa: E402
 from apex.platform import identity as I  # noqa: E402
 
+# The HTTP callback exchanges the authorization code itself — cTrader's code
+# lives one minute and cannot wait for a second request — so every test that
+# drives the real endpoint would otherwise reach cTrader. Stubbed here, before
+# the server starts, rather than beside the first section that happens to need
+# it: installing it later left an earlier callback test talking to the live
+# token endpoint, which is how this comment came to be written. The token a
+# section expects is set just before its own callback.
+from apex.brokers import ctrader as _ct_broker  # noqa: E402
+_NEXT_TOKEN = {"accessToken": "UNSET-TOKEN", "refreshToken": "UNSET",
+               "expiresIn": 2592000}
+_ct_broker.exchange_code = lambda code, uri: dict(_NEXT_TOKEN)
+
 failures = []
 
 
@@ -246,11 +258,10 @@ try:
     user_store.save(ALICE, {"paper": True, "paper_balance": 5000})
     started = call("POST", "/api/v1/ctrader/connect")[1]
     state = started["authorizeUrl"].split("state=")[1].split("&")[0]
+    _NEXT_TOKEN.update({"accessToken": "ALICE-TOKEN-SECRET",
+                        "refreshToken": "ALICE-REFRESH"})
     call("GET", f"/api/v1/ctrader/callback?code=c&state={state}", auth=None)
     CL.complete(ALICE, started["nonce"],
-                exchanger=lambda c, u: {"accessToken": "ALICE-TOKEN-SECRET",
-                                        "refreshToken": "ALICE-REFRESH",
-                                        "expiresIn": 2592000},
                 lister=lambda a: [{"ctid": 501, "live": False, "label": "D"},
                                   {"ctid": 502, "live": True, "label": "L"}])
     st, b = call("POST", "/api/v1/ctrader/select", body={"ctid": 501})
@@ -294,11 +305,10 @@ try:
     user_store.save(BOB, {"paper": True, "paper_balance": 100})
     b_started = call("POST", "/api/v1/ctrader/connect")[1]
     b_state = b_started["authorizeUrl"].split("state=")[1].split("&")[0]
+    _NEXT_TOKEN.update({"accessToken": "BOB-TOKEN-SECRET",
+                        "refreshToken": "BOB-REFRESH"})
     call("GET", f"/api/v1/ctrader/callback?code=c&state={b_state}", auth=None)
     CL.complete(BOB, b_started["nonce"],
-                exchanger=lambda c, u: {"accessToken": "BOB-TOKEN-SECRET",
-                                        "refreshToken": "BOB-REFRESH",
-                                        "expiresIn": 2592000},
                 lister=lambda a: [{"ctid": 777, "live": False, "label": "B"}])
     call("POST", "/api/v1/ctrader/select", body={"ctid": 777})
     st_own, b_own = call("GET", "/api/v1/accounts/777/positions")
@@ -604,11 +614,10 @@ try:
         # No — section 6 disconnected her. Reconnect, demo.
         s2 = call("POST", "/api/v1/ctrader/connect")[1]
         st2 = s2["authorizeUrl"].split("state=")[1].split("&")[0]
+        _NEXT_TOKEN.update({"accessToken": "ALICE-TOKEN-SECRET",
+                            "refreshToken": "R"})
         call("GET", f"/api/v1/ctrader/callback?code=c&state={st2}", auth=None)
         CL.complete(ALICE, s2["nonce"],
-                    exchanger=lambda c, u: {"accessToken": "ALICE-TOKEN-SECRET",
-                                            "refreshToken": "R",
-                                            "expiresIn": 2592000},
                     lister=lambda a: [{"ctid": 501, "live": False},
                                       {"ctid": 502, "live": True}])
         st, b = call("POST", "/api/v1/automation/start",
