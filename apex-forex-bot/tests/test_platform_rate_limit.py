@@ -112,6 +112,88 @@ check("the refusal carries a code the UI can branch on",
 check("and says which bucket", out["error"]["bucket"] == "candles", json.dumps(out))
 check("and how long to wait", out["error"]["retryAfterSec"] > 0, json.dumps(out))
 
+# ── 3b. the wait it reports is the wait there actually is ───────────────────
+# WHY THIS SECTION EXISTS
+#
+# The check above passes for any positive number, and the number was the
+# WINDOW LENGTH — a flat 60 — whichever second of the minute you were in. The
+# window is a floor of the clock (`int(time.time() // window_s)`), so it rolls
+# at the top of the next minute: 59 seconds in, the true wait is one second
+# and the API said sixty.
+#
+# The owner hit RATE_LIMITED twice while connecting a broker account, and both
+# times the only thing the page could tell him was "wait a moment". A number
+# that is wrong by up to a minute is worse than no number, because a countdown
+# is exactly what a person acts on.
+print("\n[3b] the reported wait tracks the clock, not the window length")
+import time as _time                                              # noqa: E402
+_real_time = _time.time
+
+
+def _at(second_of_minute):
+    """A clock parked at a known offset into the window."""
+    base = 1_700_000_000
+    return float(base - (base % 60)) + float(second_of_minute)
+
+
+# The fractional offsets are the ones that matter: at a whole second, rounding
+# up and rounding down agree, so integer cases alone cannot tell a correct
+# implementation from one that under-reports and sends the client back a beat
+# early — to be refused again. (A surviving mutant proved exactly that.)
+for _offset, _expected in ((0, 60), (5, 55), (30, 30), (59, 1),
+                           (30.4, 30), (0.1, 60), (58.6, 2), (59.5, 1)):
+    RL.reset_all()
+    RL.time.time = (lambda o=_offset: float(_at(o)))
+    try:
+        hdr3b = {"Authorization": f"Bearer clock-client-{_offset}"}
+        for _ in range(RL.LIMITERS["candles"].limit + 2):
+            A.handle("GET", "/api/v1/accounts/501/candles?symbol=EURUSD",
+                     hdr3b, None, client_key="9.9.9.9")
+        _st, _o = A.handle("GET", "/api/v1/accounts/501/candles",
+                           hdr3b, None, client_key="9.9.9.9")
+        _got = _o["error"]["retryAfterSec"]
+        check(f"{_offset}s into the window it reports {_expected}s, not 60",
+              _got == _expected, f"reported {_got}")
+    finally:
+        RL.time.time = _real_time
+RL.reset_all()
+
+# Never zero: a wait of zero invites an instant retry that fails again, which
+# is how a client ends up hammering a limiter it is already behind.
+RL.reset_all()
+RL.time.time = lambda: float(_at(59)) + 0.99
+try:
+    hdr3c = {"Authorization": "Bearer edge-client"}
+    for _ in range(RL.LIMITERS["candles"].limit + 2):
+        A.handle("GET", "/api/v1/accounts/501/candles?symbol=EURUSD",
+                 hdr3c, None, client_key="9.9.9.8")
+    _st, _o = A.handle("GET", "/api/v1/accounts/501/candles",
+                       hdr3c, None, client_key="9.9.9.8")
+    check("at the very end of the window it still asks for at least a second",
+          _o["error"]["retryAfterSec"] >= 1, str(_o["error"]["retryAfterSec"]))
+    check("and never more than the window itself",
+          _o["error"]["retryAfterSec"] <= 60, str(_o["error"]["retryAfterSec"]))
+finally:
+    RL.time.time = _real_time
+RL.reset_all()
+
+# And the message a person reads carries the number, because the page shows
+# the message.
+RL.reset_all()
+RL.time.time = lambda: float(_at(30))
+try:
+    hdr3d = {"Authorization": "Bearer message-client"}
+    for _ in range(RL.LIMITERS["candles"].limit + 2):
+        A.handle("GET", "/api/v1/accounts/501/candles?symbol=EURUSD",
+                 hdr3d, None, client_key="9.9.9.7")
+    _st, _o = A.handle("GET", "/api/v1/accounts/501/candles",
+                       hdr3d, None, client_key="9.9.9.7")
+    check("the human-readable message names the seconds",
+          "30" in _o["error"]["message"], _o["error"]["message"])
+finally:
+    RL.time.time = _real_time
+RL.reset_all()
+
 # ── 4. one client's loop does not lock out another ──────────────────────────
 print("\n[4] a limited client does not take anybody else down")
 st_other, out_other = A.handle(

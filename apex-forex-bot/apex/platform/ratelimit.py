@@ -46,6 +46,7 @@ share a counter should be told, not quietly served.
 
 import hashlib
 import os
+import math
 import re
 import time
 
@@ -153,14 +154,36 @@ def check(method, route, *, client_key=None, auth_header=None):
     except Exception:
         # A bug in the limiter must not become an outage of the platform.
         return True, bucket, 0
-    return bool(ok), bucket, (0 if ok else limiter.window_s)
+    return bool(ok), bucket, (0 if ok else _seconds_until_reset(limiter.window_s))
+
+
+def _seconds_until_reset(window_s):
+    """How long the caller must ACTUALLY wait, not how long a window lasts.
+
+    The window is a floor of the clock, so it rolls at the top of the next
+    one: fifty-nine seconds in, the wait is one second. This used to report
+    the window length flat, so a client was told to wait a minute when the
+    budget was about to come back — and a number that can be wrong by a whole
+    window is worse than none, because a countdown is what a person acts on.
+
+    Never zero: a wait of zero invites an instant retry that fails again.
+    """
+    remaining = window_s - (time.time() % window_s)
+    return max(1, min(int(window_s), math.ceil(remaining)))
 
 
 def refusal(bucket, retry_after):
-    """The platform API's own error shape, so the UI branches on a code."""
+    """The platform API's own error shape, so the UI branches on a code.
+
+    The seconds go in the MESSAGE as well as the field, because the field is
+    only as useful as the clients that read it, and the message is what every
+    surface already displays.
+    """
+    wait = (f"wait {int(retry_after)}s and try again" if retry_after
+            else "try again shortly")
     return 429, {"ok": False, "error": {
         "code": "RATE_LIMITED",
-        "message": "too many requests — wait a moment and try again",
+        "message": f"too many requests — {wait}",
         "bucket": bucket,
         "retryAfterSec": retry_after,
     }}
