@@ -480,10 +480,17 @@ def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
                      for a in accounts],
         "selectedCtid": None, "selectedMode": None,
     }
+    # The account NUMBERS are logged, not just the counts. A ctid is not a
+    # secret — the status bar renders it as "#4258018" — and without it the
+    # server cannot answer "which account am I on", which is the first
+    # question support ever gets. The owner had to ask it, and the log could
+    # not say. Ownership is what is confidential here, and that is carried by
+    # the user reference, which is keyed and reveals nobody.
     _log.event("accounts.result", attempt=attempt, ok=True,
                count=len(conn["accounts"]),
                demo=sum(1 for a in conn["accounts"] if a["mode"] == DEMO),
-               live=sum(1 for a in conn["accounts"] if a["mode"] == LIVE))
+               live=sum(1 for a in conn["accounts"] if a["mode"] == LIVE),
+               ctids=",".join(str(a["ctid"]) for a in conn["accounts"]))
     _store._write(_k_conn(user_id), conn)
     _log.event("complete.connected", attempt=attempt,
                user=_log.user_ref(user_id), count=len(conn["accounts"]),

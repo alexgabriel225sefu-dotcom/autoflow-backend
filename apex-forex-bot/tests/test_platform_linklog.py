@@ -138,6 +138,16 @@ try:
           "exchange.result" in out and "ok=true" in out.lower())
     check("so is how many accounts came back",
           "count=2" in out and "demo=1" in out and "live=1" in out)
+    # And WHICH accounts. A ctid is rendered in the UI as "#111"; it is not a
+    # secret, and without it the server cannot answer "which account am I
+    # on" — the owner asked exactly that and the log could not say.
+    check("the account numbers are there, so support can answer which one",
+          "111" in out and "222" in out, out)
+    # Identifiers, not whole records. Dumping the account objects would pass
+    # the check above and quietly log every field the shape ever grows — a
+    # mutation proved that, so the shape is pinned rather than trusted.
+    check("but not the whole account record",
+          "'label'" not in out and "Demo 111" not in out, out)
 
     print("\n5. the attempt id is a reference, not the thing itself")
     check("it is short enough to read aloud", len(attempt) == 8, attempt)
