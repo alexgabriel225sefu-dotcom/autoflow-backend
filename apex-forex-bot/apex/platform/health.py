@@ -160,6 +160,21 @@ def _ctrader():
     names = ("CTRADER_CLIENT_ID", "CTRADER_CLIENT_SECRET", "CTRADER_REDIRECT_URI")
     missing = [n for n in names if not _set(n)]
     if not missing:
+        # Whitespace around a credential is reported, never the credential.
+        # This check used to ask only "is it set?", using the STRIPPED value,
+        # while the connector sent the raw one — so a secret pasted with a
+        # trailing newline read as configured here and came back ACCESS_DENIED
+        # from cTrader's token endpoint, with nothing connecting the two.
+        # config.py now strips them, and this says so, because an operator
+        # comparing values between two services needs to know one is untidy.
+        padded = [n for n in names
+                  if (os.getenv(n) or "") != (os.getenv(n) or "").strip()]
+        if padded:
+            return _check("ctrader_oauth", DEGRADED,
+                          "configured, but stored with surrounding whitespace "
+                          "— harmless now that it is stripped on read, worth "
+                          "tidying in the dashboard",
+                          padded=padded)
         return _check("ctrader_oauth", OK, "client id, secret and redirect URI are configured")
     return _check("ctrader_oauth", FAIL,
                   f"not configured: {', '.join(missing)} — clients cannot "

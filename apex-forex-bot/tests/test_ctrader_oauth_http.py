@@ -377,3 +377,48 @@ from apex import user_store as _us                                # noqa: E402
 check("the parked code is unchanged by the refused attempt",
       _us.decrypt_value(_rec.get("code") or "") == "FIRST-CODE",
       repr(_us.decrypt_value(_rec.get("code") or ""))[:40])
+
+
+# ── 10. a credential pasted with whitespace ────────────────────────────────
+# The failure this pair of checks exists to stop: /readyz reported the
+# credentials configured, because it asked about the STRIPPED value, while the
+# connector sent the RAW one. cTrader answered ACCESS_DENIED to the token
+# exchange and nothing tied the two facts together. Cost a real session.
+print("\n[10] whitespace around a credential cannot pass silently")
+import importlib                                                  # noqa: E402
+
+_saved = {k: os.environ.get(k) for k in
+          ("CTRADER_CLIENT_ID", "CTRADER_CLIENT_SECRET", "CTRADER_REDIRECT_URI")}
+os.environ["CTRADER_CLIENT_ID"] = "  1000_appid_SAMPLEONLY\n"
+os.environ["CTRADER_CLIENT_SECRET"] = "s3cr3t-SAMPLEONLY  "
+os.environ["CTRADER_REDIRECT_URI"] = " https://example.test/cb\t"
+
+from apex import config as _cfg                                   # noqa: E402
+importlib.reload(_cfg)
+check("the client id is stripped when read",
+      _cfg.CTRADER_CLIENT_ID == "1000_appid_SAMPLEONLY",
+      repr(_cfg.CTRADER_CLIENT_ID))
+check("the client secret is stripped when read",
+      _cfg.CTRADER_CLIENT_SECRET == "s3cr3t-SAMPLEONLY",
+      repr(_cfg.CTRADER_CLIENT_SECRET))
+check("the redirect URI is stripped when read",
+      _cfg.CTRADER_REDIRECT_URI == "https://example.test/cb",
+      repr(_cfg.CTRADER_REDIRECT_URI))
+
+from apex.platform import health as _health                       # noqa: E402
+importlib.reload(_health)
+_c = _health._ctrader()
+check("and readiness reports the padding rather than a bare ok",
+      _c.get("status") == "degraded", str(_c))
+check("naming which variables are untidy",
+      set(_c.get("padded") or []) == set(_saved), str(_c.get("padded")))
+check("without putting any credential VALUE in the payload",
+      "s3cr3t-SAMPLEONLY" not in json.dumps(_c), json.dumps(_c)[:120])
+
+for k, v in _saved.items():
+    if v is None:
+        os.environ.pop(k, None)
+    else:
+        os.environ[k] = v
+importlib.reload(_cfg)
+importlib.reload(_health)

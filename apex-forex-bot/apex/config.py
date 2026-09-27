@@ -67,8 +67,15 @@ BROKER = _resolve_broker()
 
 # ─── cTrader Open API (BROKER=ctrader) ──────────────────
 # App credentials (per business, once) from openapi.ctrader.com/apps:
-CTRADER_CLIENT_ID     = os.getenv("CTRADER_CLIENT_ID", "")
-CTRADER_CLIENT_SECRET = os.getenv("CTRADER_CLIENT_SECRET", "")
+# .strip() because these are pasted into a dashboard by a human, often on a
+# phone, and a trailing newline or space survives that paste. Unstripped, the
+# secret goes to cTrader with the whitespace still on it and the token exchange
+# answers ACCESS_DENIED — while /readyz, which checked the STRIPPED value,
+# reported the credentials as configured. A green readiness check and a broken
+# exchange is the worst pair of symptoms to debug, and it cost a real session.
+# No legitimate cTrader credential has leading or trailing whitespace.
+CTRADER_CLIENT_ID     = os.getenv("CTRADER_CLIENT_ID", "").strip()
+CTRADER_CLIENT_SECRET = os.getenv("CTRADER_CLIENT_SECRET", "").strip()
 # Per-client (set via OAuth onboarding / configurator):
 CTRADER_ACCESS_TOKEN  = os.getenv("CTRADER_ACCESS_TOKEN", "")
 CTRADER_REFRESH_TOKEN = os.getenv("CTRADER_REFRESH_TOKEN", "")
@@ -78,7 +85,10 @@ CTRADER_ENV           = (os.getenv("CTRADER_ENV") or "demo").lower()  # demo | l
 # or "trading" (real orders — requires the app to be "Active" after KYC review).
 CTRADER_SCOPE         = (os.getenv("CTRADER_SCOPE") or "trading").lower()
 # Where cTrader redirects after the client authorizes (OAuth callback):
-CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "")
+# Same reasoning, and here whitespace is worse than a denial: OAuth compares
+# the redirect_uri at the token exchange against the one used to authorize, so
+# a stray character makes the two disagree in a way nothing reports.
+CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "").strip()
 
 # Maximum slippage tolerated on entry, in POINTS — the quote's last decimal, so
 # 10 points is one pip on a 5-digit pair and on a 3-digit JPY pair. Points, not
