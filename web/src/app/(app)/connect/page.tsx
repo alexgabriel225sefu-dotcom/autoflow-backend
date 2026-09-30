@@ -234,21 +234,30 @@ export default function ConnectPage() {
             The owner connected successfully and pressed Connect again five
             seconds later — the server log shows both — and reported the
             feature as broken. It was not; the page was telling him he had
-            not started. */}
+            not started. The server's connected verdict must also beat a
+            stale local pending nonce: sessionStorage is a recovery aid, not
+            the source of truth. */}
         <div className="card-head">
-          <h2>{pending ? "Step 2 — finish here"
-               : isConnected ? "Account connected"
+          <h2>{isConnected ? "Account connected"
+               : pending ? "Step 2 — finish here"
                : "Step 1 — authorise"}</h2>
           <span className="pill pill-accent">
-            {pending ? "2 of 2" : isConnected ? "Done" : "1 of 2"}
+            {isConnected ? "Done" : pending ? "2 of 2" : "1 of 2"}
           </span>
         </div>
-        {!pending && isConnected ? (
+        {isConnected ? (
           <>
             <p>
               cTrader is linked. Nothing is being traded yet — choose which
               account Apex4Traders should use.
             </p>
+            {pending ? (
+              <p className="notice" style={{ marginTop: ".6rem" }}>
+                A previous connection attempt is still saved in this tab. The
+                server already reports a linked account, so choose an account
+                now or start a fresh connection after that.
+              </p>
+            ) : null}
             <div className="btn-row">
               <a className="btn" href="/accounts">Choose an account</a>
               {/* Demoted, not removed: somebody with a second broker account

@@ -126,6 +126,15 @@ sel = S.demo_only("u-1", status_fn=status(
     connected=True, selected={"ctid": 501, "mode": "demo"}))
 check("a demo account proceeds", sel["ctid"] == 501)
 
+chosen = S.select_for_smoke(
+    "u-1", "501",
+    selector=lambda uid, ctid: {"selected": {"ctid": ctid, "mode": "demo"}})
+check("an explicit smoke ctid is selected through the link layer",
+      chosen["selected"]["ctid"] == "501", str(chosen))
+check("a missing explicit ctid does not select anything",
+      S.select_for_smoke("u-1", "", selector=lambda *_: {"selected": {}})
+      is None)
+
 # ── 5. nothing token-shaped reaches the output ──────────────────────────────
 print("\n[5] no token, no key, no account number in full")
 os.environ["CTRADER_ACCESS_TOKEN_SMOKE"] = "SUPER-SECRET-ACCESS-TOKEN-1234"
@@ -213,6 +222,8 @@ for module in ("bridge", "execution", "gates", "automation"):
           f"import {module}" not in src and f"platform import {module}" not in src)
 check("it does not import the broker directly either",
       "from apex.brokers" not in src)
+check("the optional selection uses ctrader_link, not the broker",
+      "_link.select_account" in src)
 # `str.index` raises when the needle is gone, which aborts the whole file and
 # skips every check below it — a crash is not a test result. This reports a
 # clean failure instead, and says which half was missing.

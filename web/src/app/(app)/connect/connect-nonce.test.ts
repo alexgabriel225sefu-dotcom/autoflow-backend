@@ -289,10 +289,10 @@ describe("a finished connection does not still invite step 1", () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
-    // The heading is chosen from the connection state, not from `pending`
-    // alone — which is what made it say "Step 1" to somebody who had just
-    // finished step 2.
-    expect(src).toMatch(/connected\s*&&\s*!pending|isConnected/);
+    // The heading is chosen from the connection state before `pending`.
+    // `pending` is a local recovery aid; when it beat the server state, a
+    // stale tab could put "Step 2" over an already-linked account.
+    expect(src).toMatch(/<h2>\{isConnected \? "Account connected"\s*: pending \? "Step 2 — finish here"/);
     expect(src).toContain("Account connected");
   });
 

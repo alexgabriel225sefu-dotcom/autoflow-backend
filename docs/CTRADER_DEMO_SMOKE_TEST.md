@@ -82,6 +82,7 @@ wrong.
 ```bash
 export SMOKE_CONFIRM_DEMO_ONLY=yes
 export SMOKE_USER_ID=<the Supabase user id>
+export SMOKE_SELECT_CTID=<demo cTrader account id>  # optional; selects first
 export SMOKE_SYMBOL=EURUSD          # optional
 export SMOKE_TIMEFRAME=M15          # optional
 export SMOKE_RULE_ID=<a ruleDocId>  # optional — also previews it on real bars
@@ -106,6 +107,10 @@ cd apex-forex-bot && python3 scripts/smoke_ctrader_demo.py
 - If the selected account's mode is not `demo` — **whatever the environment
   says**. The environment's opinion and the stored link record are two
   separate statements, and both have to agree.
+- If `SMOKE_SELECT_CTID` names an account that is not connected to that user,
+  or names a live account while live accounts are blocked. The script uses the
+  same selection function as the API; it does not bypass ownership or mode
+  checks.
 
 ### What it cannot do
 

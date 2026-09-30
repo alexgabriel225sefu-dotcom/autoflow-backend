@@ -33,6 +33,7 @@ RUN IT
 
     export SMOKE_CONFIRM_DEMO_ONLY=yes
     export SMOKE_USER_ID=<the Supabase user id whose link to exercise>
+    export SMOKE_SELECT_CTID=<demo cTrader account id>  # optional
     export SMOKE_SYMBOL=EURUSD            # optional
     export SMOKE_TIMEFRAME=M15            # optional
     export SMOKE_RULE_ID=<a ruleDocId>    # optional — also previews it
@@ -156,6 +157,19 @@ def demo_only(user_id, *, status_fn=None):
     return selected
 
 
+def select_for_smoke(user_id, ctid, *, selector=None):
+    """Select the demo account that this smoke run should exercise.
+
+    Selection is a platform preference, not a broker action. It still goes
+    through ctrader_link.select_account so the same ownership and live-account
+    blocks apply here as in the HTTP API.
+    """
+    want = str(ctid or "").strip()
+    if not want:
+        return None
+    return (selector or _link.select_account)(user_id, want)
+
+
 class Report:
     """Steps and their outcomes. Everything printed goes through scrub()."""
 
@@ -277,9 +291,19 @@ def main(argv=None):
     rep = Report()
     try:
         user_id = guard()
+        select_ctid = (os.getenv("SMOKE_SELECT_CTID") or "").strip()
+        if select_ctid:
+            selected_status = select_for_smoke(user_id, select_ctid)
+            selected = selected_status.get("selected") or {}
+            rep.say(f"selected account {mask_ctid(selected.get('ctid'))} "
+                    "for this smoke run")
         selected = demo_only(user_id)
     except Refused as e:
         rep.say(f"\nREFUSED: {redact.scrub(str(e))}")
+        rep.say("Nothing was contacted.")
+        return 2
+    except _link.LinkError as e:
+        rep.say(f"\nREFUSED: {e.code}: {redact.scrub(e.detail)}")
         rep.say("Nothing was contacted.")
         return 2
     rep.say(f"cTrader demo smoke test — account {mask_ctid(selected['ctid'])}")
