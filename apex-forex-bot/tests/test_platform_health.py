@@ -65,8 +65,7 @@ def status_of(payload, name):
     return None
 
 
-def fresh(**env):
-    """Readiness computed now, under an environment overlay."""
+def with_env(fn, **env):
     old = {k: os.environ.get(k) for k in env}
     os.environ.update({k: v for k, v in env.items() if v is not None})
     for k, v in env.items():
@@ -74,7 +73,7 @@ def fresh(**env):
             os.environ.pop(k, None)
     try:
         H.reset_cache()
-        return H.ready(force=True)
+        return fn()
     finally:
         for k, v in old.items():
             if v is None:
@@ -82,6 +81,11 @@ def fresh(**env):
             else:
                 os.environ[k] = v
         H.reset_cache()
+
+
+def fresh(**env):
+    """Readiness computed now, under an environment overlay."""
+    return with_env(lambda: H.ready(force=True), **env)
 
 
 # ── 1. liveness says only that the process is running ───────────────────────
@@ -103,6 +107,15 @@ try:
           "checks" not in body, json.dumps(body))
 finally:
     user_store.redis_health = _real_health
+
+st2, body2 = fresh(RENDER_GIT_COMMIT="abcdef1234567890",
+                   RENDER_SERVICE_ID="srv-safe-release-id",
+                   RENDER_SERVICE_NAME="apex4traders-api")
+check("readiness names the release commit for smoke tests",
+      body2.get("release", {}).get("commit") == "abcdef123456")
+live2 = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT="abcdef1234567890")
+check("liveness carries the same safe release identifier",
+      live2.get("release", {}).get("commit") == "abcdef123456")
 
 # ── 2. development: degraded, but not refused ───────────────────────────────
 print("\n[2] a development box is degraded, not unready")
@@ -261,12 +274,18 @@ check("a fully configured checkout is ok", status_of(body, "billing") == "ok",
 print("\n[8] no secret, in any state, ever appears in a payload")
 payloads = []
 for env in ({}, {"APP_ENV": "production"}, {"A4T_CHECKOUT_ENABLED": "true"},
-            {"LIVE_TRADING_ENABLED": "true"}, {"SUPABASE_URL": None}):
+            {"LIVE_TRADING_ENABLED": "true"}, {"SUPABASE_URL": None},
+            {"RENDER_GIT_COMMIT": "abcdef1234567890",
+             "RENDER_SERVICE_ID": "srv-safe-release-id"}):
     payloads.append(json.dumps(fresh(**env)[1]))
-payloads.append(json.dumps(H.live()[1]))
+payloads.append(json.dumps(with_env(lambda: H.live()[1],
+                                    RENDER_GIT_COMMIT="abcdef1234567890",
+                                    RENDER_SERVICE_ID="srv-safe-release-id")))
 blob = "\n".join(payloads)
 for name, value in SECRETS.items():
     check(f"{name}'s VALUE is absent", value not in blob)
+check("safe Render release names are allowed, not arbitrary env values",
+      "abcdef123456" in blob and "srv-safe-rel" in blob)
 check("no Fernet-shaped value anywhere", "gAAAAA" not in blob)
 check("no whsec_ anywhere", "whsec_" not in blob)
 check("but the variable NAMES are usable by an operator",
@@ -331,6 +350,8 @@ try:
     check("it states whether checkout is on",
           out["capabilities"]["checkoutEnabled"] is False)
     check("it carries the checks", isinstance(out["checks"], list) and out["checks"])
+    check("it carries safe release metadata",
+          "release" in out and isinstance(out["release"], dict))
     blob = json.dumps(out)
     for name, value in SECRETS.items():
         check(f"{name}'s value is absent from the authenticated view too",

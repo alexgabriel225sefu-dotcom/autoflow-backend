@@ -38,6 +38,7 @@ than one that fails.
 """
 
 import os
+import subprocess
 import time
 
 from apex import user_store
@@ -80,13 +81,57 @@ def is_production():
     return user_store._is_production()
 
 
+def _short(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    return text[:12]
+
+
+def _git_commit():
+    env_commit = _short(os.getenv("RENDER_GIT_COMMIT")
+                        or os.getenv("SOURCE_VERSION")
+                        or os.getenv("GIT_COMMIT"))
+    if env_commit:
+        return env_commit
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.abspath(os.path.join(here, "..", ".."))
+        out = subprocess.run(
+            ["git", "rev-parse", "--short=12", "HEAD"], cwd=root,
+            capture_output=True, text=True, timeout=1, check=True)
+        return _short(out.stdout)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def release_info():
+    """Safe release metadata for smoke tests and operators.
+
+    The values are identifiers, never secret configuration. They answer the
+    first question after a manual Render deploy: which build am I testing?
+    """
+    out = {"commit": _git_commit()}
+    service = _short(os.getenv("RENDER_SERVICE_ID"))
+    name = _short(os.getenv("RENDER_SERVICE_NAME"))
+    if service:
+        out["serviceId"] = service
+    if name:
+        out["serviceName"] = name
+    return {k: v for k, v in out.items() if v}
+
+
 def live():
     """(status, payload). Proves the process is running and nothing else."""
-    return 200, {
+    payload = {
         "ok": True,
         "status": OK,
         "uptimeSec": round(time.time() - _STARTED_AT, 1),
     }
+    rel = release_info()
+    if rel:
+        payload["release"] = rel
+    return 200, payload
 
 
 def _check(name, status, message, **extra):
@@ -266,6 +311,9 @@ def ready(*, force=False):
         "checkedAt": int(now),
         "checks": checks,
     }
+    rel = release_info()
+    if rel:
+        payload["release"] = rel
     if failed:
         payload["failed"] = failed
     if degraded:
@@ -299,5 +347,6 @@ def system_status(principal):
             "liveTrading": False,
             "checkoutEnabled": _flag_on("A4T_CHECKOUT_ENABLED"),
         },
+        "release": release_info(),
         "user": {"userId": principal.user_id},
     }
