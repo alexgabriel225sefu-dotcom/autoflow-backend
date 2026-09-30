@@ -72,7 +72,21 @@ Record the result, the date and the **masked** account number (last three
 digits) in `docs/RELEASE_READINESS.md`. Do not paste a full account number, a
 token, or a screenshot containing either.
 
-## 4. The script
+## 4. Confirm the deployed build first
+
+Before running a smoke pass after a manual Render deploy, confirm which build is
+answering:
+
+```bash
+curl -s https://apex4traders-api.onrender.com/healthz | python3 -m json.tool
+curl -s https://apex4traders-api.onrender.com/readyz | python3 -m json.tool
+```
+
+Both responses include a safe `release.commit` when Render exposes
+`RENDER_GIT_COMMIT`. If that commit is not the branch head you intended to test,
+stop: the smoke pass would be testing the wrong build.
+
+## 5. The script
 
 `apex-forex-bot/scripts/smoke_ctrader_demo.py` automates steps 4–7's read
 side. It does not replace the walk-through — it cannot click anything, and

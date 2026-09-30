@@ -274,6 +274,18 @@ Nothing else changes: the client id and the redirect URI stay the same.
 
 Do these in order. Each one tells you something the next one assumes.
 
+**0 — the deployed commit is the one you meant to test.** `/healthz` and
+`/readyz` include safe `release` metadata when Render exposes it. Check this
+before interpreting a smoke result:
+
+```bash
+curl -s https://apex4traders-api.onrender.com/healthz | python3 -m json.tool
+```
+
+If `release.commit` is absent, the service is still usable, but the deploy must
+be matched from Render's own event log. If it is present and differs from the
+branch head you intended, stop and deploy the intended build before testing.
+
 **1 — the API is running.** `/healthz` touches no dependency, so it answers even
 when everything else is misconfigured:
 
