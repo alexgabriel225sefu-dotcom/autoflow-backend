@@ -21,7 +21,7 @@
 
 | Gate | Status |
 |---|---|
-| **PRIVATE DEMO BETA** | **NOT YET** — blocked on X1 |
+| **PRIVATE DEMO BETA** | **NOT YET** — X1 part-closed: reads proven 2026-09-30, controls and screens not |
 | **PUBLIC BETA** | **NO** |
 | **PUBLIC PAID LAUNCH** | **NO** |
 | **LIVE TRADING** | **FALSE**, and out of scope by design |
@@ -36,8 +36,8 @@ cTrader account is unverified, and that is one gate, not a detail.
 
 | # | Gate | Status | Evidence |
 |---|---|---|---|
-| 1 | Demo automation works | ⚠️ **unverified against a broker** | Start / pause / resume / stop are covered by `test_platform_http.py` and by dashboard tests. Never run against cTrader. `docs/CTRADER_DEMO_SMOKE_TEST.md` is the procedure that would close it. |
-| 2 | cTrader demo OAuth works | ⚠️ **unverified** | `test_platform_ctrader_link.py` covers the flow including the account-injection case. No real authorisation has been completed. |
+| 1 | Demo automation works | ⚠️ **the READS are verified; the controls are not** | 2026-09-30, account …456: the deployed server answered `canAutomate: true`, `liveExecutionEnabled: false`, badge `DEMO` for a real connected demo account. Start / pause / resume / stop have still never been sent to cTrader — they are covered only by `test_platform_http.py` and the dashboard tests. That is what is left of gate 1. |
+| 2 | cTrader demo OAuth works | ✅ | 2026-09-27: a real authorisation completed against cTrader and stored a working token for account …456. 2026-09-30: that token was still exchanging and reading, so the refresh path holds too. `test_platform_ctrader_link.py` covers the flow including the account-injection case. |
 | 3 | Payment/licence tested **or** intentionally disabled | ✅ | Both. The webhook has 12 test groups; checkout is disabled behind `A4T_CHECKOUT_ENABLED`, which is off, and says so before it says anything about configuration. |
 | 3b | Access model implemented, not just decided | ✅ | `free_demo` / `paid_live`, server-derived, all four combinations tested. Demo access needs no manual grant. |
 | 3c | Health endpoints | ✅ | `/healthz`, `/readyz`, `/api/v1/system/status`. Tested, including the production refusals. **Never answered from a deployed instance.** |
@@ -47,15 +47,35 @@ cTrader account is unverified, and that is one gate, not a detail.
 | 6 | No critical security issue | ✅ | No token under `/api/v1/`; rate limiting on every route; webhook verifies before parsing; ownership is the storage key. |
 | 7 | No live trading path | ✅ | `test_live_path_invariants.py`; `SUPPORTED_ORDER_TYPES = {MARKET}`; `automation.start` refuses a non-demo account. |
 | 8 | Frontend tests pass | ✅ | 215 / 215 |
-| 9 | Backend tests pass | ✅ | 162 / 162 files |
+| 9 | Backend tests pass | ✅ | 168 / 168 files |
 | 10 | Build passes | ✅ | 24 routes, TypeScript clean |
 | 11 | Mobile navigation works | ✅ | 8 of 8 destinations at 390 px, 0 px overflow |
-| 12 | Chart handles real connected data | ⚠️ **unverified** | Every failure state is tested. The success state has never had real candles in it. |
+| 12 | Chart handles real connected data | ⚠️ **real candles reached the platform; nobody has looked at the chart with them** | 2026-09-30, account …456: 199 closed EURUSD 15m bars, each with OHLC and a time, in ascending order, latest `1790736300` = 02:45:00 UTC and aligned to a 15m boundary. That is `broker_read.candles` answering from the broker. Whether the chart component *renders* those bars has not been observed — it needs a browser, not a script. |
 | 13 | No fake data appears | ✅ | `content.test.ts`; every empty state names its cause |
 
-**Verdict: NOT YET.** Gates 3–11 and 13 are met. Gates 1, 2 and 12 are all the
-same blocker — **X1, a real cTrader demo account** — and they are the three
-that matter most, because they are the product.
+**Verdict: NOT YET.** Gates 2–11 and 13 are met. Gate 1 is partly open and
+gate 12 is partly open, and both are what is left of **X1**.
+
+X1 has moved. On 2026-09-30 the read side ran end to end against a real
+cTrader demo account — capability, balance, positions, orders and 199 real
+15m candles, from the deployed instance, through the same `broker_read` the
+product uses. The sentence "nothing has run against a real broker" was true
+until that day and is not true now.
+
+Two things in X1 are still unproven, and they are not small:
+
+- **The controls.** `automation.start` / pause / resume / stop have never been
+  sent to cTrader. Every test of them is against a stub.
+- **The screens.** A script cannot see a chart, a badge or an empty state. The
+  eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md` is still the
+  only thing that closes that, and it needs a browser and a phone.
+
+One further gap found by that run, now fixed in the smoke script rather than
+in the product: the script asserted that a balance carries a currency.
+`broker_read.account()` has no currency in its contract, nothing in `web/`
+reads one, and the cTrader client has no asset-list call to derive one from.
+The assertion was wrong, not the product — but it had passed for weeks against
+a hand-written stub that invented the key.
 
 Phases E–I changed the *shape* of that verdict without changing the verdict.
 Before them, closing X1 would still have left a beta that needed a manual
@@ -93,7 +113,7 @@ thing.
 | 7 | HTTPS and domain | ❌ X6 |
 | 8 | Rate limiting enabled | ✅ — shared counters, with a reported per-process fallback |
 | 9 | Monitoring | ⚠️ X7 — `/healthz` and `/readyz` exist and are tested; nothing scrapes them yet |
-| 10 | Demo onboarding manually tested | ❌ X1 |
+| 10 | Demo onboarding manually tested | ❌ X1 — the reads are proven; no human has walked the screens |
 | 11 | Five external testers complete the flow | ❌ X9 |
 | 12 | All critical issues closed | ⚠️ the broker connector pins a vulnerable TLS stack and cannot be raised without X1 — `docs/DEPLOYMENT_READINESS.md` §6 |
 
@@ -185,7 +205,7 @@ Mobile destinations went from 1 of 8 to 8 of 8.
 
 | Decision | Answer | Who can change it |
 |---|---|---|
-| **Ship a private demo beta now?** | **No.** X1 is open: nothing has run against a real broker | Engineering, by running `docs/CTRADER_DEMO_SMOKE_TEST.md` once |
+| **Ship a private demo beta now?** | **No.** X1 is part-closed: the reads are proven against a real broker (2026-09-30, account …456), the automation controls and the screens are not | Engineering, by running the eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md` in a browser |
 | **Ship a public beta?** | **No.** Nine of twelve public-launch gates are open | Owner, for the decisions; engineering, for X2–X9 |
 | **Take money?** | **No.** Checkout is off, no price is approved, and the route refuses | Owner — D1, D2, D3, D5, D6 |
 | **Enable live trading?** | **No, and not by a flag.** It is not implemented. `LIVE_TRADING_ENABLED` has no execution path behind it and `/readyz` refuses to start if it is set | A separate milestone with its own review |

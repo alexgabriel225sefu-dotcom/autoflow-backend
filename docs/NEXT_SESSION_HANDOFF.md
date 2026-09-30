@@ -31,7 +31,7 @@ What that closes and what it does not is in §1g.
 | | |
 |---|---|
 | Tests | 168 backend files, 255 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
-| Private demo beta | **NOT YET** — X1 is now partly closed; see §1g |
+| Private demo beta | **NOT YET** — X1 part-closed: reads proven 2026-09-30, controls and screens not; see §2 |
 | Public beta | **NO** |
 | Taking money | **NO** — checkout off, no approved price |
 | Live trading | **NO**, and not implemented |
@@ -291,22 +291,44 @@ clients care about.
 
 ## 2. The one thing to do next
 
-**Run the data half of `docs/CTRADER_DEMO_SMOKE_TEST.md` on the deployment.**
+**Walk the eleven steps of `docs/CTRADER_DEMO_SMOKE_TEST.md` in a browser.**
 
-The connect half of that document is now PROVEN — repeatedly, against the real
-cTrader, from two devices. What has never run is everything after it:
-`ctrader/select` has **never been called once** in the entire production log,
-so no account has been selected, and therefore candles, positions, orders and
-preview have never been exercised against a real broker.
+The read half is done. On **2026-09-30**, from the deployed instance, against
+demo account **…456**:
 
-That is the remaining substance of X1. It can now be run either through the UI
-or by setting `SMOKE_SELECT_CTID=<demo account id>` and running
-`scripts/smoke_ctrader_demo.py` where the deployment credentials live. A pass
-must still be recorded only after the real broker reads succeed.
+| Step | Result |
+|---|---|
+| `capability` | `canAutomate: true`, `liveExecutionEnabled: false`, badge `DEMO` |
+| `balance` | read from the broker |
+| `positions` | read; the empty list is a fact, not a missing key |
+| `orders` | read |
+| `candles` | **199 closed EURUSD 15m bars**, OHLC and a time on each, ascending, latest `1790736300` = 02:45:00 UTC, aligned to a 15m boundary |
 
-Nothing in the code is known to be missing. Those reads are **unproven**,
-which is a different thing from broken, and must not be reported as the same
-thing.
+199 of 200 is the correct answer, not a shortfall: `get_candles` asks for 200
+over a 205-period window, and the 200th bar was still forming when the run
+happened (~03:08 UTC, so 03:00's bar was open and 02:45's was the last closed
+one).
+
+`ctrader/select` has now been called in production, so the sentence that it
+never had is no longer true.
+
+**What is still unproven, and it is not small:**
+
+- **The controls.** `automation.start` / pause / resume / stop have never been
+  sent to cTrader. Every test of them is against a stub. This is the larger
+  half of what remains, because it is the only part that changes something at
+  the broker rather than reading from it.
+- **The screens.** A script cannot see a chart, a badge, an empty state or a
+  phone. The eleven-step walk-through is the only thing that closes that.
+
+Not proven by that run either: **preview on real bars**. The run set no
+`SMOKE_RULE_ID`, so the evaluator has still only ever seen synthetic candles.
+Adding `SMOKE_RULE_ID=<a ruleDocId>` to the same command closes it, and costs
+nothing — preview places no order and has no execution path.
+
+Nothing in the code is known to be missing for any of these. They are
+**unproven**, which is a different thing from broken, and must not be reported
+as the same thing.
 
 ## 3. What is blocked on the owner, not on engineering
 
@@ -393,7 +415,7 @@ file must be rewritten by that milestone, not deleted.
 
 | Gap | Where |
 |---|---|
-| **The DATA half of the cTrader smoke test has not been run.** The connect half is proven against the real broker (2026-09-27); `ctrader/select` has never been called once in production, so candles, positions, orders and preview have never met a real account | blocker **X1**, now partial — `docs/CTRADER_DEMO_SMOKE_TEST.md`, §1g |
+| **The automation CONTROLS and the SCREENS have not been run against the broker.** Connect is proven (2026-09-27) and so are the reads (2026-09-30, account …456, 199 real 15m bars). Start / pause / resume / stop have never been sent to cTrader, no human has walked the screens, and preview has still only seen synthetic candles | blocker **X1**, now part-closed — `docs/CTRADER_DEMO_SMOKE_TEST.md`, §2 |
 | **The real TLS handshake has NOT been verified** — TCP 5035 is unreachable from this container; the inspecting proxy resets raw TLS on a non-HTTP port | `scripts/check_ctrader_tls.py`, run it on the deployment host |
 | `/readyz` has never answered from a deployed instance | `docs/LAUNCH_QA_REPORT.md` |
 | An active rule cannot be edited; editing must create a version | same |
