@@ -351,14 +351,17 @@ describe("a press that cannot work says so", () => {
 });
 
 describe("being already connected is always an escape route", () => {
-  it("the step-2 card names the connected account when there is one", async () => {
+  it("a connected visitor is always offered the account chooser", async () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
-    // Whatever state the button is in, somebody already connected can leave
-    // for /accounts without pressing it.
-    expect(src).toMatch(/Already connected/);
-    expect(src).toContain("/accounts");
+    // The escape route MOVED rather than went away. It used to live in the
+    // step-2 card, because `pending` took precedence and a connected visitor
+    // could be stuck looking at it. Now the connected verdict wins, so the
+    // connected branch is what must carry it — and the step-2 branch cannot
+    // be reached while connected at all.
+    expect(src).toContain("cTrader is linked");
+    expect(src).toMatch(/href="\/accounts">Choose an account/);
   });
 
   it("and shows which account, so the page can answer 'where am I'", async () => {
@@ -368,5 +371,54 @@ describe("being already connected is always an escape route", () => {
     // The ctid is rendered. The owner had to ask the server which account he
     // was on; the page holds that answer already.
     expect(src).toMatch(/accounts\[0\]|\.ctid/);
+  });
+});
+
+/**
+ * A connected client adding a SECOND account can still finish it.
+ *
+ * WHY THIS EXISTS
+ *
+ * The connected verdict rightly beats a stale local nonce — that is what
+ * stopped a linked account being buried under "Step 2 — finish here". But
+ * the same precedence removes the finish button from a case where the nonce
+ * is not stale at all: somebody already connected who starts a second
+ * connection, comes back, and whose automatic finish fails in a RETRYABLE
+ * way (RATE_LIMITED, ACCOUNTS_FAILED).
+ *
+ * Those refusals deliberately keep the nonce, because the authorization code
+ * behind it is already spent and the token already parked. With no button
+ * left, that live token cannot be claimed: the visitor is told to start over,
+ * which walks them through cTrader again to obtain something they already
+ * have.
+ *
+ * So the connected branch keeps a way to finish a pending attempt.
+ */
+describe("a pending attempt is still finishable while connected", () => {
+  it("the connected branch offers a finish action when one is pending", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    // Inside the isConnected branch, guarded by `pending`.
+    expect(src).toMatch(/Finish the saved attempt|Finish saved attempt/);
+    // And it calls complete(), not begin() — begin() would discard the
+    // parked token and start another round trip to cTrader.
+    expect(src).toMatch(
+      /Finish the saved attempt[\s\S]{0,200}?|onClick=\{\(\) => void complete\(\)\}[\s\S]{0,400}?Finish the saved attempt/);
+    // It must be complete(), not begin(): begin() discards the parked token.
+    const block = src.split("A connection attempt from this tab")[1] ?? "";
+    const upToRow = block.split("btn-row")[0] ?? "";
+    expect(upToRow).toContain("void complete()");
+    expect(upToRow).not.toContain("onClick={begin}");
+  });
+
+  it("does not leave a branch that can never render", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    // The step-2 branch is reached only when !isConnected, so an
+    // `isConnected ?` test inside it is dead code that reads as live.
+    const stepTwo = src.split('Once you have approved access in the cTrader tab')[1] ?? "";
+    expect(stepTwo).not.toMatch(/\{isConnected \?/);
   });
 });

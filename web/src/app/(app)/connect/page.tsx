@@ -252,11 +252,26 @@ export default function ConnectPage() {
               account Apex4Traders should use.
             </p>
             {pending ? (
-              <p className="notice" style={{ marginTop: ".6rem" }}>
-                A previous connection attempt is still saved in this tab. The
-                server already reports a linked account, so choose an account
-                now or start a fresh connection after that.
-              </p>
+              <>
+                <p className="notice" style={{ marginTop: ".6rem" }}>
+                  A connection attempt from this tab has not been finished.
+                  If you were adding a second account, finish it here.
+                </p>
+                {/* WHY THIS BUTTON SURVIVES THE CONNECTED BRANCH
+                    The server's verdict beating a stale nonce is right, but
+                    not every pending nonce is stale. Somebody already linked
+                    who starts a SECOND connection and whose automatic finish
+                    is refused retryably — RATE_LIMITED, ACCOUNTS_FAILED —
+                    still holds a live attempt whose code is spent and whose
+                    token is parked. Without this, that token cannot be
+                    claimed and the only offer is another round trip through
+                    cTrader to obtain something already obtained.
+                    complete(), never begin(): begin() would throw it away. */}
+                <button className="btn btn-ghost" style={{ marginTop: ".4rem" }}
+                        onClick={() => void complete()} disabled={busy}>
+                  {busy ? "Finishing…" : "Finish the saved attempt"}
+                </button>
+              </>
             ) : null}
             <div className="btn-row">
               <a className="btn" href="/accounts">Choose an account</a>
@@ -287,21 +302,10 @@ export default function ConnectPage() {
               This last step runs as you — which is how we know the account
               being linked is being linked by its owner.
             </p>
-            {/* An escape route that does not go through the button above.
-                Somebody whose account is already linked must be able to move
-                on whatever state this card is in — that is the position the
-                owner was stuck in, pressing finish against a connection that
-                had already succeeded twice. */}
-            {isConnected ? (
-              <p className="notice" style={{ marginTop: ".6rem" }}>
-                Already connected
-                {connectedCtid ? (
-                  <> to <span className="mono">#{connectedCtid}</span></>
-                ) : null}
-                . Finishing here would add another account —{" "}
-                <a href="/accounts">choose an account instead</a>.
-              </p>
-            ) : null}
+            {/* No "already connected" notice here: this branch is reached
+                only when isConnected is false, so the test would never be
+                true. It was live when `pending` took precedence; the
+                connected branch above carries that job now. */}
             <div className="btn-row">
               {/* Wrapped, not passed directly: complete() now takes an
                   optional nonce, and a bare handler would hand it the click
