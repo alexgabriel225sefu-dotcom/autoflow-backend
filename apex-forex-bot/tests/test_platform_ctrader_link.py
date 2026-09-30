@@ -249,6 +249,10 @@ try:
     check("completing before cTrader has come back is refused",
           refuses("NOT_READY", lambda: L.complete(
               BOB, L.begin(BOB)["nonce"], lister=lister)))
+    check("a finish request with no nonce is diagnosed directly",
+          refuses("NO_PENDING", lambda: L.complete(BOB, None, lister=lister)))
+    check("an empty nonce is the same client-side missing-attempt fault",
+          refuses("NO_PENDING", lambda: L.complete(BOB, "", lister=lister)))
 
     print("\n7. demo and live are separated, and live is blocked here")
     check("this environment does not allow live accounts",
@@ -382,8 +386,8 @@ try:
           len(glob.glob(os.path.join(ROOT, "apex", "platform", "*.py"))) >= 10)
 
     check("the old module is marked deprecated so nobody extends it",
-          open(os.path.join(ROOT, "apex", "ctrader_oauth.py")
-               ).read().lstrip().startswith('"""DEPRECATED'))
+          open(os.path.join(ROOT, "apex", "ctrader_oauth.py"),
+               encoding="utf-8").read().lstrip().startswith('"""DEPRECATED'))
     # The old module signs state with the bot token; this one must not, and
     # the surest way to show it is that the whole flow just ran without one.
     check("state signing works with no bot token present",

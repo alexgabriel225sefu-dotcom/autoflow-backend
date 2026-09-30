@@ -417,6 +417,10 @@ def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
     """
     now = time.time() if now is None else now
     user_id = str(user_id)
+    if not nonce:
+        _log.event("complete.no_pending", user=_log.user_ref(user_id))
+        raise LinkError("NO_PENDING",
+                        "there is no connection attempt to finish")
     attempt = _log.attempt_id(nonce)
     if ctx is not None:
         ctx["attempt"] = attempt
