@@ -35,7 +35,7 @@ RUN IT
     export SMOKE_USER_ID=<the Supabase user id whose link to exercise>
     export SMOKE_SELECT_CTID=<demo cTrader account id>  # optional
     export SMOKE_SYMBOL=EURUSD            # optional
-    export SMOKE_TIMEFRAME=M15            # optional
+    export SMOKE_TIMEFRAME=15m            # optional  (1m 5m 15m 30m 1h 4h 1d)
     export SMOKE_RULE_ID=<a ruleDocId>    # optional — also previews it
     cd apex-forex-bot && python3 scripts/smoke_ctrader_demo.py
 
@@ -180,6 +180,29 @@ def select_for_smoke(user_id, ctid, *, selector=None):
     return status
 
 
+def _is_number(v):
+    """A balance is a number. True is not one, whatever isinstance says."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _attempt(rep, name, call):
+    """Call a reader; a raised exception becomes a failed step.
+
+    Every reader in the sequence is contracted to answer with a status rather
+    than raise, so an exception here is a defect rather than a state of the
+    connection. It used to escape as a traceback, which aborted the run and
+    left every later step unreported — and a traceback is not a test result.
+    The step it belongs to now fails under its own name, and the caller gets
+    None so that the steps depending on the answer are skipped rather than
+    evaluated against a dict invented here.
+    """
+    try:
+        return call()
+    except Exception as e:                                  # noqa: BLE001
+        rep.step(name, False, f"{type(e).__name__}: {redact.scrub(str(e))}")
+        return None
+
+
 class Report:
     """Steps and their outcomes. Everything printed goes through scrub()."""
 
@@ -222,15 +245,24 @@ def run(user_id, *, report=None, readers=None, symbol=None, timeframe=None,
     }, **(readers or {}))
 
     symbol = symbol or (os.getenv("SMOKE_SYMBOL") or "EURUSD").strip()
-    timeframe = timeframe or (os.getenv("SMOKE_TIMEFRAME") or "M15").strip()
+    # apex.forex.TIMEFRAMES, not cTrader's M15/H1 notation: broker_read
+    # validates against the platform's own names and raises on anything
+    # else, so a default in the broker's dialect could never reach a bar.
+    timeframe = timeframe or (os.getenv("SMOKE_TIMEFRAME") or "15m").strip()
 
-    status = r["accounts"](user_id)
+    status = _attempt(rep, "accounts reads ok",
+                      lambda: r["accounts"](user_id))
+    if status is None:
+        return rep
     selected = status.get("selected") or {}
     rep.say(f"\naccount {mask_ctid(selected.get('ctid'))}  "
             f"mode={selected.get('mode')}  symbol={symbol}  tf={timeframe}")
     rep.say("")
 
-    cap = r["capability"](user_id)
+    cap = _attempt(rep, "the server says this client may automate",
+                   lambda: r["capability"](user_id))
+    if cap is None:
+        return rep
     rep.step("the server says this client may automate",
              cap.get("canAutomate") is True, cap.get("message"))
     rep.step("and that live execution is off",
@@ -238,30 +270,41 @@ def run(user_id, *, report=None, readers=None, symbol=None, timeframe=None,
     rep.step("and the badge is DEMO", cap.get("badge") == "DEMO",
              str(cap.get("badge")))
 
-    bal = r["balance"](user_id)
-    rep.step("balance reads ok", bal.get("status") == "ok",
-             str(bal.get("reason") or ""))
-    # A number is not asserted. The account's balance is whatever it is, and
-    # inventing an expectation for it would be the one thing this product
-    # does not do.
-    if bal.get("status") == "ok":
-        rep.step("and carries a currency", bool(bal.get("currency")),
-                 str(bal.get("currency") or "none"))
+    bal = _attempt(rep, "balance reads ok", lambda: r["balance"](user_id))
+    if bal is not None:
+        rep.step("balance reads ok", bal.get("status") == "ok",
+                 str(bal.get("reason") or ""))
+        # The amount is not asserted, and neither is a currency. The account's
+        # balance is whatever it is, and inventing an expectation for it would
+        # be the one thing this product does not do; the currency is not in
+        # broker_read's contract at all, so a step demanding one was asserting
+        # against a key nothing produces and nothing reads. What IS a contract
+        # is the type — a dashboard formats this number.
+        rep.step("and the balance is a number, not a string or a None",
+                 bal.get("status") != "ok" or _is_number(bal.get("balance")),
+                 type(bal.get("balance")).__name__)
 
-    pos = r["positions"](user_id)
-    rep.step("positions reads ok", pos.get("status") == "ok",
-             str(pos.get("reason") or ""))
-    rep.step("and an empty list is a FACT, not a missing key",
-             pos.get("status") != "ok" or isinstance(pos.get("positions"), list))
+    pos = _attempt(rep, "positions reads ok",
+                   lambda: r["positions"](user_id))
+    if pos is not None:
+        rep.step("positions reads ok", pos.get("status") == "ok",
+                 str(pos.get("reason") or ""))
+        rep.step("and an empty list is a FACT, not a missing key",
+                 pos.get("status") != "ok"
+                 or isinstance(pos.get("positions"), list))
 
-    orders = r["orders"](user_id)
-    rep.step("orders reads ok", orders.get("status") == "ok",
-             str(orders.get("reason") or ""))
+    orders = _attempt(rep, "orders reads ok", lambda: r["orders"](user_id))
+    if orders is not None:
+        rep.step("orders reads ok", orders.get("status") == "ok",
+                 str(orders.get("reason") or ""))
 
-    cds = r["candles"](user_id, symbol=symbol, timeframe=timeframe, limit=200)
-    ok_c = cds.get("status") == "ok"
-    rep.step("candles read ok", ok_c, str(cds.get("reason") or ""))
-    rows = cds.get("candles") or []
+    cds = _attempt(rep, "candles read ok",
+                   lambda: r["candles"](user_id, symbol=symbol,
+                                        timeframe=timeframe, limit=200))
+    ok_c = cds is not None and cds.get("status") == "ok"
+    if cds is not None:
+        rep.step("candles read ok", ok_c, str(cds.get("reason") or ""))
+    rows = (cds or {}).get("candles") or []
     if ok_c:
         rep.step("and there are bars in it", len(rows) > 0, f"{len(rows)} bars")
         rep.step("each bar has OHLC and a time",

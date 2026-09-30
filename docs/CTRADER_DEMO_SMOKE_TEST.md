@@ -84,7 +84,8 @@ export SMOKE_CONFIRM_DEMO_ONLY=yes
 export SMOKE_USER_ID=<the Supabase user id>
 export SMOKE_SELECT_CTID=<demo cTrader account id>  # optional; selects first
 export SMOKE_SYMBOL=EURUSD          # optional
-export SMOKE_TIMEFRAME=M15          # optional
+export SMOKE_TIMEFRAME=15m          # optional; one of 1m 5m 15m 30m 1h 4h 1d
+                                    # (the platform's own names, not cTrader's M15/H1)
 export SMOKE_RULE_ID=<a ruleDocId>  # optional — also previews it on real bars
 cd apex-forex-bot && python3 scripts/smoke_ctrader_demo.py
 ```

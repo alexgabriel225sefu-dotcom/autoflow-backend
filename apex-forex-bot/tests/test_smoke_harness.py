@@ -196,17 +196,66 @@ def rec(name, payload):
 
 bars = [{"time": i, "open": 1.0, "high": 1.1, "low": 0.9, "close": 1.05}
         for i in range(10)]
+
+# The four broker reads are NOT hand-written dicts. A hand-written stub can
+# carry keys the real reader never emits, and that is precisely how a step
+# asserting a currency on the balance passed here and then failed against the
+# broker: broker_read.account() has no currency in its contract, and only the
+# stub did. It can also skip validation the real reader performs, which is how
+# a default timeframe in cTrader's notation reached a live run. So these
+# payloads come out of broker_read itself, driven by a fake broker, and the
+# shape the script is asserted against is the shape a deployment answers with.
+from apex.platform import broker_read as BR                  # noqa: E402
+
+
+class FakeBroker:
+    """Exactly the four read methods broker_read is allowed to call."""
+
+    def get_balance(self):
+        return 10_000.0
+
+    def get_all_positions(self):
+        return []
+
+    def get_pending_orders(self):
+        return []
+
+    def get_candles(self, symbol, timeframe, limit):
+        return bars
+
+
+def _conn(user_id, ctid=None):
+    return {"ctid": 4762501, "mode": "demo"}
+
+
+_FAKE = {"connection_fn": _conn, "broker_fn": FakeBroker}
+
+
+def via(name, fn):
+    """Like rec(), but the payload is whatever the real reader answers."""
+    def call(*a, **kw):
+        called.append(name)
+        return fn(*a, **kw)
+    return call
+
+
 readers = {
     "accounts": rec("accounts", {"connected": True,
                                  "selected": {"ctid": 4762501, "mode": "demo"}}),
     "capability": rec("capability", {"canAutomate": True, "badge": "DEMO",
                                      "liveExecutionEnabled": False,
                                      "message": "ok"}),
-    "balance": rec("balance", {"status": "ok", "currency": "EUR"}),
-    "positions": rec("positions", {"status": "ok", "positions": []}),
-    "orders": rec("orders", {"status": "ok", "orders": []}),
-    "candles": rec("candles", {"status": "ok", "candles": bars}),
+    "balance": via("balance", lambda uid, **kw: BR.account(uid, **_FAKE)),
+    "positions": via("positions",
+                     lambda uid, **kw: BR.positions(uid, **_FAKE)),
+    "orders": via("orders", lambda uid, **kw: BR.orders(uid, **_FAKE)),
+    # Forwarded, so the script's own symbol and timeframe defaults go through
+    # validate_candle_query rather than past it.
+    "candles": via("candles",
+                   lambda uid, **kw: BR.candles(uid, **dict(kw, **_FAKE))),
 }
+os.environ.pop("SMOKE_SYMBOL", None)
+os.environ.pop("SMOKE_TIMEFRAME", None)
 out = io.StringIO()
 rep = S.run("u-1", report=S.Report(out=out), readers=readers)
 check("every step passed against the stub", rep.failures == [], str(rep.failures))
@@ -227,6 +276,71 @@ readers2 = dict(readers, candles=rec("candles", {"status": "unavailable",
 rep2 = S.run("u-1", report=S.Report(out=io.StringIO()), readers=readers2)
 check("an unavailable read fails the run rather than passing quietly",
       "candles read ok" in rep2.failures, str(rep2.failures))
+
+# ── the defaults must be ones broker_read will actually accept ──────────────
+# SMOKE_TIMEFRAME defaulted to cTrader's own "M15", which
+# validate_candle_query rejects by design. Against the broker the run died on
+# a traceback before it read a single bar, and no hand-written stub could have
+# caught it, because a stub validates nothing.
+seen = {}
+
+
+def _capture(uid, **kw):
+    seen.update(kw)
+    return {"status": "ok", "candles": bars}
+
+
+S.run("u-1", report=S.Report(out=io.StringIO()),
+      readers=dict(readers, candles=_capture))
+try:
+    BR.validate_candle_query(seen.get("symbol"), seen.get("timeframe"),
+                             seen.get("limit"))
+    check("the default symbol and timeframe pass broker_read's validator",
+          True, f"{seen.get('symbol')} {seen.get('timeframe')}")
+except ValueError as e:
+    check("the default symbol and timeframe pass broker_read's validator",
+          False, str(e))
+
+# ── a reader that raises fails its step; it does not abort the run ──────────
+# A traceback out of run() takes every later step with it, so one bad default
+# reads as a total unknown instead of one failed step.
+def _boom(*a, **kw):
+    raise ValueError("timeframe must be one of 1m, 5m, 15m, got 'M15'")
+
+
+buf3 = io.StringIO()
+rep3 = S.run("u-1", report=S.Report(out=buf3),
+             readers=dict(readers, candles=_boom))
+check("a reader that raises fails its step instead of aborting the run",
+      "candles read ok" in rep3.failures, str(rep3.failures))
+check("and the steps before it are still reported",
+      "balance reads ok" in [n for n, _ in rep3.steps],
+      str([n for n, _ in rep3.steps]))
+check("and the exception type reaches the report",
+      "ValueError" in buf3.getvalue(), buf3.getvalue()[-160:])
+
+# The answer must come back as None and not as an empty dict. An empty dict
+# would be evaluated by the dependent steps, and "an empty list is a FACT"
+# reads as a PASS against one — a step passing on a read that never happened.
+rep4 = S.run("u-1", report=S.Report(out=io.StringIO()),
+             readers=dict(readers, positions=_boom))
+check("and the steps that depended on it are skipped, not passed on a guess",
+      [n for n, _ in rep4.steps if n.startswith("and an empty list")] == [],
+      str([n for n, _ in rep4.steps]))
+
+# ── a balance is a number, because a dashboard formats it ───────────────────
+check("a float is a balance", S._is_number(10.0))
+check("and a whole number is too", S._is_number(10))
+check("a string that looks like one is not", not S._is_number("10.0"))
+check("and True is not a balance, whatever isinstance says",
+      not S._is_number(True))
+
+rep5 = S.run("u-1", report=S.Report(out=io.StringIO()),
+             readers=dict(readers, balance=lambda uid, **kw: {
+                 "connected": True, "status": "ok", "balance": "10000.00"}))
+check("a balance that arrives as a string fails the run",
+      "and the balance is a number, not a string or a None" in rep5.failures,
+      str(rep5.failures))
 
 # ── 7. it contains no execution path at all ─────────────────────────────────
 # A comment promising this is worth nothing; the file is read instead.
