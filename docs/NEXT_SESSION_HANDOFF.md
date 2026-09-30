@@ -1,6 +1,6 @@
 # Apex4Traders — handoff
 
-**State at:** `93aad74` on `claude/apex4traders-platform-v1`
+**State at:** `5fb0a1a` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-30
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
@@ -303,9 +303,9 @@ Commit after `a36e234`:
 
 | Commit | Change |
 |---|---|
-| `93aad74` | Adds a static cTrader browser-walkthrough contract test. It verifies the repo still exposes UI anchors for connect diagnostics, account selection, live-account blocking, server execution verdict, chart evidence, preview, and journal no-order states. It does not replace the real browser/phone smoke pass. |
+| `5fb0a1a` | Adds a static cTrader browser-walkthrough contract test. It verifies the repo still exposes UI anchors for connect diagnostics, account selection, live-account blocking, server execution verdict, chart evidence, preview, and journal no-order states. It does not replace the real browser/phone smoke pass. |
 
-Tests run after `93aad74`:
+Tests run after `5fb0a1a`:
 
 | Command | Result |
 |---|---|
@@ -538,6 +538,7 @@ Read `docs/RELEASE_READINESS.md` for the gates,
 `docs/PRODUCTION_RUNBOOK.md` for operating it, `docs/BETA_CONFIGURATION.md`
 for standing up a beta, and `docs/CTRADER_DEMO_SMOKE_TEST.md` for the thing
 to do next.
+
 
 
 
