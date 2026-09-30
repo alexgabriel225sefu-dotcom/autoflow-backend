@@ -1,6 +1,6 @@
 # Apex4Traders — handoff
 
-**State at:** `0965cfa` on `claude/apex4traders-platform-v1`
+**State at:** `d144ace` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-29
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
@@ -250,6 +250,27 @@ stalled on network package download (`ECONNRESET`), before `vitest`, `next` or
 `eslint` were installed. That is a verification gap, not a claim that web tests
 pass.
 
+### Follow-up on 2026-09-29 — missing completion nonce is no longer ambiguous
+
+Commit `d144ace` moves `NO_PENDING` into the backend as well as the browser.
+If `ctrader/complete` is reached without a nonce, it now logs
+`complete.no_pending` with only the redacted user reference and returns
+`NO_PENDING` instead of collapsing into `STATE_UNKNOWN`. That separates a
+client/page state problem from a stale, guessed, expired or lost pending record
+when reading production logs.
+
+Tests run after this commit:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_ctrader_link.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_linklog.py` | Pass, no OAuth code/token/secret/nonce/user-id leaks in link logs |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 28 platform modules |
+
+The same commit also makes `test_platform_ctrader_link.py` read the deprecated
+legacy OAuth module as UTF-8 explicitly, so the Windows test run does not fail
+on source text before it reaches the platform assertions.
+
 ## 1h. MT5: the finding that decides the approach
 
 MetaTrader 5 has no first-party machine interface for third parties. The only
@@ -453,3 +474,4 @@ Read `docs/RELEASE_READINESS.md` for the gates,
 `docs/PRODUCTION_RUNBOOK.md` for operating it, `docs/BETA_CONFIGURATION.md`
 for standing up a beta, and `docs/CTRADER_DEMO_SMOKE_TEST.md` for the thing
 to do next.
+
