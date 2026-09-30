@@ -1,9 +1,9 @@
-# MT5 without a client-installed bridge — spike
+# MT4/MT5 without a client-installed bridge — spike
 
 **Status:** spike, not a feature. Nothing here is wired into the platform, no
-route serves it, and the public UI makes no MT5 claim.
+route serves it, and the public UI makes no MT4 or MT5 claim.
 
-**Question asked:** can Apex4Traders support MetaTrader 5 with the same
+**Question asked:** can Apex4Traders support MetaTrader 4 and MetaTrader 5 with the same
 experience as cTrader — web-first, phone and PC, the client connects an
 account and we read it — without asking anyone to install an EA, a bridge, a
 desktop connector, or run a VPS?
@@ -140,6 +140,10 @@ It is not a path a new platform can take.
 
 ## 3. The finding that makes this safe to try
 
+The same cloud-provider shape applies to MT4 and MT5: `platform` chooses the
+terminal family, but the safety argument is the credential model, not the
+number after MetaTrader.
+
 MetaApi's account provisioning documents the password field as:
 
 > "The password can be either **investor password for read-only access** or
@@ -153,7 +157,7 @@ An **investor password** is an MT4/MT5 credential that grants *viewing* —
 balance, open positions, history — and **cannot place, modify or close an
 order**. The refusal happens at the broker's trade server.
 
-So a read-only MT5 connector is not read-only because our code has a flag
+So a read-only MT4/MT5 connector is not read-only because our code has a flag
 saying so. It is read-only because the credential cannot trade. That property
 survives:
 
@@ -172,11 +176,13 @@ doing at all.
 
 **Do this, in this order:**
 
-1. **Read-only MT5 through MetaApi, investor password only, behind two env
-   flags** (`A4T_MT5_SPIKE_ENABLED`, `A4T_MT5_SPIKE_VERIFIED`). Skeleton and
-   safety gates are in this commit. No UI, no route, no credential collection.
-2. **Prove it against one real MT5 demo account** before writing a line of
-   UI — the shortest proof is in §8.
+1. **Read-only MT4 and MT5 through MetaApi-style cloud terminals, investor
+   password only, behind separate env flags** (`A4T_MT4_SPIKE_ENABLED`,
+   `A4T_MT4_SPIKE_VERIFIED`, `A4T_MT5_SPIKE_ENABLED`,
+   `A4T_MT5_SPIKE_VERIFIED`). Skeletons and safety gates are in this commit.
+   No UI, no route, no credential collection.
+2. **Prove MT4 and MT5 separately against real demo accounts** before writing
+   a line of UI — the shortest proof is in §8.
 3. **Only then** design credential collection, which needs its own review: we
    would be asking clients to type a broker password into our web app.
 4. **Execution stays out of scope** until there is a separate decision with
@@ -222,16 +228,18 @@ largest source of failed connections.
 
 | Release | Scope |
 |---|---|
-| **V1** | cTrader only. MT5 absent from the UI entirely. |
-| **V1.5** | MT5 **read-only** behind flags, proven on a demo account, credential model reviewed, client warned explicitly. |
+| **V1** | cTrader only. MT4/MT5 absent from the UI entirely. |
+| **V1.5** | MT4/MT5 **read-only** behind flags, proven on demo accounts, credential model reviewed, client warned explicitly. |
 | **V2** | Reconsider execution — separate decision, separate gate, master password, and everything in §5 re-argued. |
 
 ---
 
 ## 7. The connector contract
 
-`apex/platform/brokers/base.py`. cTrader and MT5 plug into the same platform
-surface so the risk gates are not duplicated — the details are in that file's
+`apex/platform/brokers/base.py`. cTrader, MT4 and MT5 plug into the same platform
+surface so the risk gates are not duplicated. Current skeletons live in
+`apex/platform/brokers/mt4_cloud.py` and `apex/platform/brokers/mt5_cloud.py`
+— the details are in that file's
 docstring, which is the authoritative version.
 
 The shape:
@@ -254,7 +262,7 @@ construct, rather than inheriting a default that somebody later "fixes".
 Adding one is a reviewed edit to `base.py`, not something a provider can do by
 defining a method.
 
-`supports_automation` is False for MT5 read-only, because automation ends in
+`supports_automation` is False for MT4/MT5 read-only, because automation ends in
 an order. `supports_preview` is True, because preview evaluates a rule and
 decides nothing.
 

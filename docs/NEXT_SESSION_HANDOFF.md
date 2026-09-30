@@ -206,8 +206,8 @@ real flow with sentinel credentials and greps everything the process printed;
 five deliberate leaks were planted and all five failed it.
 
 **Also shipped:** `docs/MT5_CLOUD_CONNECTOR_SPIKE.md` and
-`apex/platform/brokers/` — a platform-neutral provider contract and a
-read-only MT5 skeleton behind two env flags, wired to nothing. See §1h.
+`apex/platform/brokers/` — a platform-neutral provider contract plus
+read-only MT4 and MT5 skeletons behind env flags, wired to nothing. See §1h.
 
 **A pre-existing hole closed:** `test_platform_live_invariants.py` enumerated
 modules with `os.listdir`, so anything in a subpackage escaped every check in
@@ -271,16 +271,16 @@ The same commit also makes `test_platform_ctrader_link.py` read the deprecated
 legacy OAuth module as UTF-8 explicitly, so the Windows test run does not fail
 on source text before it reaches the platform assertions.
 
-## 1h. MT5: the finding that decides the approach
+## 1h. MT4/MT5: the finding that decides the approach
 
-MetaTrader 5 has no first-party machine interface for third parties. The only
+MetaTrader 4 and MetaTrader 5 have no first-party machine interface for third parties that fits this product. The only
 approach meeting "no install, works from a phone" is a cloud vendor running
 the terminals.
 
 MetaApi's provisioning documents the password field as: *"The password can be
 either investor password for read-only access or master password to enable
 trading features."* An investor password **cannot place, modify or close an
-order** — the broker refuses. So a read-only MT5 connector is read-only
+order** — the broker refuses. So a read-only MT4/MT5 connector is read-only
 because the credential cannot trade, not because our code says so. That
 survives a bug here, a mistake in the gates, and a compromise of the vendor.
 

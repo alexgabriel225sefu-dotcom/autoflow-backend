@@ -29,6 +29,7 @@ os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("APP_ENV", "dev")
 
 from apex.platform.brokers import base                    # noqa: E402
+from apex.platform.brokers import mt4_cloud               # noqa: E402
 from apex.platform.brokers import mt5_cloud               # noqa: E402
 
 failures = []
@@ -130,18 +131,24 @@ for fn in sorted(os.listdir(BROKERS)):
     hits = sorted(set(MUTATING) & names)
     check(f"{fn} names no mutating operation", hits == [], str(hits))
 
-print("\n5. enabling the MT5 spike does not enable anything that trades")
-for var in ("A4T_MT5_SPIKE_ENABLED", "A4T_MT5_SPIKE_VERIFIED"):
+print("\n5. enabling the MT4/MT5 spikes does not enable anything that trades")
+for var in ("A4T_MT4_SPIKE_ENABLED", "A4T_MT4_SPIKE_VERIFIED",
+            "A4T_MT5_SPIKE_ENABLED", "A4T_MT5_SPIKE_VERIFIED"):
     os.environ.pop(var, None)
-check("off by default", mt5_cloud.enabled() is False)
-check("and not verified by default", mt5_cloud.verified() is False)
-check("no provider is handed out while off",
-      mt5_cloud.provider_if_enabled() is None)
+for module, label, enable, verify in (
+        (mt4_cloud, "MT4", "A4T_MT4_SPIKE_ENABLED", "A4T_MT4_SPIKE_VERIFIED"),
+        (mt5_cloud, "MT5", "A4T_MT5_SPIKE_ENABLED", "A4T_MT5_SPIKE_VERIFIED")):
+    check(f"{label} is off by default", module.enabled() is False)
+    check(f"{label} is not verified by default", module.verified() is False)
+    check(f"{label} hands out no provider while off",
+          module.provider_if_enabled() is None)
 
-os.environ["A4T_MT5_SPIKE_ENABLED"] = "true"
-try:
-    p = mt5_cloud.provider_if_enabled()
-    check("switching it on yields a provider", p is not None)
+for module, label, enable, verify in (
+        (mt4_cloud, "MT4", "A4T_MT4_SPIKE_ENABLED", "A4T_MT4_SPIKE_VERIFIED"),
+        (mt5_cloud, "MT5", "A4T_MT5_SPIKE_ENABLED", "A4T_MT5_SPIKE_VERIFIED")):
+    os.environ[enable] = "true"
+    p = module.provider_if_enabled()
+    check(f"switching {label} on yields a provider", p is not None)
     caps = p.capabilities()
     check("which is read-only", caps.mode == base.READ_ONLY)
     check("and states it cannot place orders",
@@ -151,17 +158,17 @@ try:
     check("preview is still offered, since it decides nothing",
           caps.supports_preview is True)
     check("enabled alone does NOT make it verified — a developer switching "
-          "the spike on must not thereby tell clients MT5 works",
+          "the spike on must not thereby tell clients MT4/MT5 works",
           caps.verified is False)
     check("the credential model is stated, and says investor password",
           "investor" in caps.credential_model.lower(),
           caps.credential_model)
 
     print("\n6. an unverified provider is never described to a client")
-    check("describe() omits it", base.describe([p]) == [])
-    os.environ["A4T_MT5_SPIKE_VERIFIED"] = "true"
-    p2 = mt5_cloud.provider_if_enabled()
-    check("and includes it once verified", len(base.describe([p2])) == 1)
+    check(f"describe() omits unverified {label}", base.describe([p]) == [])
+    os.environ[verify] = "true"
+    p2 = module.provider_if_enabled()
+    check(f"and includes {label} once verified", len(base.describe([p2])) == 1)
     shown = base.describe([p2])[0]
     check("what is shown still says it cannot place orders",
           shown["canPlaceOrders"] is False, str(shown))
@@ -185,9 +192,9 @@ try:
         check(f"{name} raises instead of returning a fabricated result",
               raises(base.ProviderError, lambda n=name, a=args:
                      getattr(p2, n)(*a)))
-finally:
-    for var in ("A4T_MT5_SPIKE_ENABLED", "A4T_MT5_SPIKE_VERIFIED"):
-        os.environ.pop(var, None)
+for var in ("A4T_MT4_SPIKE_ENABLED", "A4T_MT4_SPIKE_VERIFIED",
+            "A4T_MT5_SPIKE_ENABLED", "A4T_MT5_SPIKE_VERIFIED"):
+    os.environ.pop(var, None)
 
 print("\n9. provider errors are safe to surface")
 e = base.ProviderError("VENDOR_UNAVAILABLE", "the broker data service did "
@@ -277,7 +284,8 @@ check("and the scan detects a real importer when there is one",
       _found == ["apex.platform.brokers"], str(_found))
 
 api = io.open(os.path.join(plat, "api.py"), encoding="utf-8").read()
-check("and no route mentions mt5", "mt5" not in api.lower())
+check("and no route mentions mt4 or mt5",
+      "mt4" not in api.lower() and "mt5" not in api.lower())
 web = os.path.join(ROOT, "..", "web", "src")
 if os.path.isdir(web):
     hits = []
@@ -288,9 +296,9 @@ if os.path.isdir(web):
                 text = io.open(path, encoding="utf-8").read().lower()
             except UnicodeDecodeError:
                 continue
-            if "mt5" in text:
+            if "mt4" in text or "mt5" in text:
                 hits.append(os.path.relpath(path, web))
-    check("nor does the web UI claim MT5 anywhere", not hits,
+    check("nor does the web UI claim MT4/MT5 anywhere", not hits,
           ", ".join(sorted(hits)))
 
 print("\n" + "=" * 62)
