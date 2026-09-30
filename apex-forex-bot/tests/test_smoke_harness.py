@@ -342,6 +342,141 @@ check("a balance that arrives as a string fails the run",
       "and the balance is a number, not a string or a None" in rep5.failures,
       str(rep5.failures))
 
+# ── the preview step, against the REAL evaluator and a REAL rule doc ────────
+# This step had never been exercised at all, and it could not have passed:
+# it read `verdict` off the top level of preview()'s answer (it lives on
+# `decision`), it compared against a "SETUP" that has never been a verdict in
+# this product, and it sent no `ts` — which build_snapshot refuses on purpose
+# rather than reading the clock. Three of the same mistake as the currency
+# step. So it is driven here through apex.platform.preview itself, with a rule
+# doc the real validator accepts and bars in the shape broker_read emits.
+from apex.platform import decision as PD                     # noqa: E402
+from apex.platform import ruledoc as PRD                     # noqa: E402
+from apex.platform import store as PS                        # noqa: E402
+
+# ruledoc.blank() rather than a dict written here, so the document has every
+# field the UI would give it and the validator is answering about a real shape.
+RULE = dict(PRD.blank(user_id="u-1", account_id="ct-demo-1",
+                      symbols=["EUR_USD"], timeframe="15m"),
+            name="smoke rule", sides="BUY",
+            entry={"combine": "AND", "conditions": [
+                {"id": "rsi", "params": {"op": "below", "value": 30}}]},
+            exit={"combine": "OR", "conditions": [
+                {"id": "rsi", "params": {"op": "above", "value": 70}}]})
+_rule = PS.create("u-1", RULE)
+_rid = _rule["ruleDocId"]
+PS.activate("u-1", _rid)
+
+# FALLING closes, deliberately. RSI(14) then reads 0, the entry condition
+# passes and the verdict is BUY — a verdict that is in decision.VERDICTS and is
+# NOT in the ("SETUP", "HOLD", "REJECT") tuple the step used to check against.
+# Rising bars would give HOLD, which that broken tuple also contains, and the
+# check would pass while still being wrong. Five keys per bar, the same five
+# broker_read._shape() narrows a bar down to.
+_real_bars = [{"time": 1790700000 + i * 900, "open": 1.10 - i * 0.001,
+               "high": 1.101 - i * 0.001, "low": 1.099 - i * 0.001,
+               "close": 1.1005 - i * 0.001} for i in range(60)]
+
+
+def _with_bars(bars):
+    return dict(readers, candles=via("candles", lambda uid, **kw: {
+        "status": "ok", "candles": bars}))
+
+
+buf6 = io.StringIO()
+rep6 = S.run("u-1", report=S.Report(out=buf6),
+             readers=_with_bars(_real_bars), rule_id=_rid)
+_names6 = [n for n, _ in rep6.steps]
+check("the preview step runs the real evaluator on real-shaped bars",
+      "preview runs on real bars" in _names6, str(_names6))
+check("and it passes, so the payload satisfies build_snapshot",
+      "preview runs on real bars" not in rep6.failures,
+      buf6.getvalue()[-300:])
+check("and the verdict is an entry, which only a real evaluator produces",
+      "BUY" in buf6.getvalue(), buf6.getvalue()[-200:])
+check("and the verdict is explained",
+      "and the verdict is explained, not asserted" not in rep6.failures,
+      str(rep6.failures))
+check("and a preview is never executable",
+      "and the preview is reported as unexecutable" not in rep6.failures,
+      str(rep6.failures))
+check("SETUP is not and never was a verdict", "SETUP" not in PD.VERDICTS,
+      str(PD.VERDICTS))
+
+# ── the payload's symbol and timeframe must be the ones the bars came from ──
+# Dropping either lets build_snapshot fall back to the RULE's own symbol and
+# timeframe, and the evaluator then compares the rule against itself and always
+# agrees — so a rule written for GBPUSD 1h would be evaluated on EURUSD 15m
+# bars and answer BUY, with nothing anywhere saying the instrument was wrong.
+# evaluator.py rejects a mismatch on purpose (lines 219 and 222); these two
+# rules exist so that refusal is reachable, because a rule that matches the
+# bars cannot tell the two behaviours apart.
+def _rule_on(symbols, timeframe):
+    doc = PS.create("u-1", dict(
+        PRD.blank(user_id="u-1", account_id="ct-demo-1", symbols=symbols,
+                  timeframe=timeframe),
+        name=f"mismatch {symbols[0]} {timeframe}", sides="BUY",
+        entry={"combine": "AND", "conditions": [
+            {"id": "rsi", "params": {"op": "below", "value": 30}}]},
+        exit={"combine": "OR", "conditions": [
+            {"id": "rsi", "params": {"op": "above", "value": 70}}]}))
+    PS.activate("u-1", doc["ruleDocId"])
+    return doc["ruleDocId"]
+
+
+_other_symbol = _rule_on(["GBP_USD"], "15m")
+buf9 = io.StringIO()
+S.run("u-1", report=S.Report(out=buf9), readers=_with_bars(_real_bars),
+      symbol="EURUSD", timeframe="15m", rule_id=_other_symbol)
+check("EURUSD bars against a GBPUSD rule are refused, not evaluated",
+      "not one of this rule's instruments" in buf9.getvalue(),
+      buf9.getvalue()[-220:])
+
+_other_tf = _rule_on(["EUR_USD"], "1h")
+buf10 = io.StringIO()
+S.run("u-1", report=S.Report(out=buf10), readers=_with_bars(_real_bars),
+      symbol="EURUSD", timeframe="15m", rule_id=_other_tf)
+check("15m bars against a 1h rule are refused, not evaluated",
+      "rule runs on 1h" in buf10.getvalue(), buf10.getvalue()[-220:])
+
+# The two negative cases below DO stub preview, and that is the point: they
+# test whether the step's assertion is sensitive, not what the module returns.
+# The positive case above is the real module; these ask "if the answer were
+# wrong, would this step notice?" — which no amount of real data can show,
+# because the real module never answers wrongly.
+_real_preview = S._preview
+
+
+class _FixedPreview:
+    def __init__(self, answer):
+        self._answer = answer
+
+    def preview(self, rule_doc, payload):
+        return self._answer
+
+
+S._preview = _FixedPreview(
+    {"status": "ok", "executable": True,
+     "decision": {"verdict": "HOLD", "reason": "why",
+                  "conditions": [{"id": "rsi", "passed": False}]}})
+rep7 = S.run("u-1", report=S.Report(out=io.StringIO()),
+             readers=_with_bars(_real_bars), rule_id=_rid)
+check("a preview that calls itself executable fails the run",
+      "and the preview is reported as unexecutable" in rep7.failures,
+      str(rep7.failures))
+
+S._preview = _FixedPreview(
+    {"status": "ok", "executable": False, "decision": {"verdict": "HOLD"}})
+rep8 = S.run("u-1", report=S.Report(out=io.StringIO()),
+             readers=_with_bars(_real_bars), rule_id=_rid)
+check("a verdict with neither conditions nor a reason fails the run",
+      "and the verdict is explained, not asserted" in rep8.failures,
+      str(rep8.failures))
+
+S._preview = _real_preview
+check("the real preview module is put back",
+      S._preview is _real_preview)
+
 # ── 7. it contains no execution path at all ─────────────────────────────────
 # A comment promising this is worth nothing; the file is read instead.
 print("\n[7] the script cannot place, close or amend anything")

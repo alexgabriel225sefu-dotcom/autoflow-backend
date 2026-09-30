@@ -107,6 +107,7 @@ redact.install()
 
 from apex.platform import broker_read as _read              # noqa: E402
 from apex.platform import ctrader_link as _link             # noqa: E402
+from apex.platform import decision as _dec                  # noqa: E402
 from apex.platform import entitlement as _ent               # noqa: E402
 from apex.platform import preview as _preview               # noqa: E402
 from apex.platform import store as _store                   # noqa: E402
@@ -324,12 +325,38 @@ def run(user_id, *, report=None, readers=None, symbol=None, timeframe=None,
         # which tests/test_platform_http.py asserts structurally.
         try:
             doc = _store.get(user_id, rule_id)
-            out = _preview.preview(doc, {"candles": rows})
+            # symbol, timeframe and ts are all passed on purpose.
+            #
+            # build_snapshot REFUSES without `ts` rather than reading the
+            # clock, because a timestamp the platform chose would silently
+            # answer every session and weekday condition in the rule. The
+            # honest value is the last CLOSED bar, which is what these bars
+            # are — the forming bar is not in them.
+            #
+            # Without symbol and timeframe it falls back to the rule's own,
+            # which would label these bars as an instrument and a period they
+            # did not come from, and the evaluator would then compare the
+            # rule's instrument against itself and always agree.
+            out = _preview.preview(doc, {
+                "candles": rows, "symbol": symbol, "timeframe": timeframe,
+                "ts": rows[-1]["time"],
+            })
+            # The verdict lives on the decision, not at the top level, and the
+            # set of verdicts is decision.VERDICTS rather than a tuple written
+            # out here — a hand-written one drifts, and this step once checked
+            # for a "SETUP" that has never been a verdict in this product.
+            d = out.get("decision") or {}
             rep.step("preview runs on real bars",
-                     out.get("verdict") in ("SETUP", "HOLD", "REJECT"),
-                     str(out.get("verdict")))
+                     d.get("verdict") in _dec.VERDICTS,
+                     f"{d.get('verdict')} — {d.get('reason') or ''}"[:120])
             rep.step("and the verdict is explained, not asserted",
-                     bool(out.get("conditions") or out.get("reason")))
+                     bool(d.get("conditions") or d.get("reason")))
+            # A preview is never executable, whatever the verdict. Asserted
+            # here because this is the only place the real evaluator runs on
+            # real market data, which is exactly where that must hold.
+            rep.step("and the preview is reported as unexecutable",
+                     out.get("executable") is False,
+                     str(out.get("executable")))
         except Exception as e:                              # noqa: BLE001
             rep.step("preview runs on real bars", False,
                      f"{type(e).__name__}: {redact.scrub(str(e))}")
