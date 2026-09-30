@@ -56,7 +56,7 @@ on real bars with `SMOKE_RULE_ID`.
 | 13 | No fake data appears | ✅ | `content.test.ts`; every empty state names its cause |
 
 **Verdict: NOT YET.** Gates 2–11 and 13 are met. Gate 1 is partly open and
-gate 12 is partly open, and both are what is left of **X1**.
+gate 12 is partly open, and both are what is left of **X1**. A static regression test, `test_ctrader_browser_walkthrough_contract.py`, now verifies that the required UI anchors for the browser pass remain present; it does not claim the human browser/phone pass has run.
 
 X1 has moved. On 2026-09-30 the read side ran end to end against a real
 cTrader demo account — capability, balance, positions, orders and 199 real

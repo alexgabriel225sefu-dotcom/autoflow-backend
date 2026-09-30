@@ -1,6 +1,6 @@
 # Apex4Traders — handoff
 
-**State at:** `cdbe833` on `claude/apex4traders-platform-v1`
+**State at:** `93aad74` on `claude/apex4traders-platform-v1`
 **Date:** 2026-09-30
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
@@ -296,6 +296,23 @@ Web tests were still not runnable in this Windows worktree because
 failed on network package download. Treat that as a verification gap, not a
 pass.
 
+
+### Follow-up on 2026-09-30 — browser walkthrough contract
+
+Commit after `a36e234`:
+
+| Commit | Change |
+|---|---|
+| `93aad74` | Adds a static cTrader browser-walkthrough contract test. It verifies the repo still exposes UI anchors for connect diagnostics, account selection, live-account blocking, server execution verdict, chart evidence, preview, and journal no-order states. It does not replace the real browser/phone smoke pass. |
+
+Tests run after `93aad74`:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_ctrader_browser_walkthrough_contract.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_provider_safety.py` | Pass, MT4/MT5 providers remain hidden and read-only |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 29 platform modules |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_smoke_harness.py` | Pass |
 ## 1h. MT4/MT5: the finding that decides the approach
 
 MetaTrader 4 and MetaTrader 5 have no first-party machine interface for third parties that fits this product. The only
@@ -521,4 +538,6 @@ Read `docs/RELEASE_READINESS.md` for the gates,
 `docs/PRODUCTION_RUNBOOK.md` for operating it, `docs/BETA_CONFIGURATION.md`
 for standing up a beta, and `docs/CTRADER_DEMO_SMOKE_TEST.md` for the thing
 to do next.
+
+
 
