@@ -167,7 +167,17 @@ def select_for_smoke(user_id, ctid, *, selector=None):
     want = str(ctid or "").strip()
     if not want:
         return None
-    return (selector or _link.select_account)(user_id, want)
+    status = (selector or _link.select_account)(user_id, want)
+    selected = (status or {}).get("selected") or {}
+    if str(selected.get("ctid") or "") != want:
+        raise Refused("SMOKE_SELECT_CTID did not become the selected "
+                      "account. Stop and inspect ctrader/select before "
+                      "running broker reads")
+    if selected.get("mode") != DEMO:
+        raise Refused(
+            f"SMOKE_SELECT_CTID selected a {selected.get('mode')!r} "
+            f"account, not {DEMO!r}")
+    return status
 
 
 class Report:

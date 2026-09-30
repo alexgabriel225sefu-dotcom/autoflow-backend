@@ -134,6 +134,25 @@ check("an explicit smoke ctid is selected through the link layer",
 check("a missing explicit ctid does not select anything",
       S.select_for_smoke("u-1", "", selector=lambda *_: {"selected": {}})
       is None)
+try:
+    S.select_for_smoke(
+        "u-1", "501",
+        selector=lambda uid, ctid: {"selected": {"ctid": "999",
+                                                "mode": "demo"}})
+    check("a selection mismatch refuses", False, "it proceeded")
+except S.Refused as e:
+    check("a selection mismatch refuses",
+          "did not become the selected account" in str(e), str(e))
+try:
+    S.select_for_smoke(
+        "u-1", "501",
+        selector=lambda uid, ctid: {"selected": {"ctid": "501",
+                                                "mode": "live"}})
+    check("selecting live through the smoke script refuses", False,
+          "it proceeded")
+except S.Refused as e:
+    check("selecting live through the smoke script refuses",
+          "not 'demo'" in str(e), str(e))
 
 # ── 5. nothing token-shaped reaches the output ──────────────────────────────
 print("\n[5] no token, no key, no account number in full")
