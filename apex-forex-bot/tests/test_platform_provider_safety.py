@@ -280,9 +280,18 @@ api = io.open(os.path.join(plat, "api.py"), encoding="utf-8").read()
 check("and no route mentions mt5", "mt5" not in api.lower())
 web = os.path.join(ROOT, "..", "web", "src")
 if os.path.isdir(web):
-    hits = subprocess.run(
-        ["grep", "-ril", "mt5", web], capture_output=True, text=True).stdout
-    check("nor does the web UI claim MT5 anywhere", not hits.strip(), hits)
+    hits = []
+    for dirpath, _dirnames, filenames in os.walk(web):
+        for name in filenames:
+            path = os.path.join(dirpath, name)
+            try:
+                text = io.open(path, encoding="utf-8").read().lower()
+            except UnicodeDecodeError:
+                continue
+            if "mt5" in text:
+                hits.append(os.path.relpath(path, web))
+    check("nor does the web UI claim MT5 anywhere", not hits,
+          ", ".join(sorted(hits)))
 
 print("\n" + "=" * 62)
 if failures:
