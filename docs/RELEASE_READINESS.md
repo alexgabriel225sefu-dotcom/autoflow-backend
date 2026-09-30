@@ -1,7 +1,7 @@
 # Apex4Traders — release readiness
 
-**Assessed at:** `495fed056` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-26
+**Assessed at:** `cdbe833` on `claude/apex4traders-platform-v1`
+**Date:** 2026-09-30
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
 > only documentation, so the numbers still hold at it — that is the convention,
@@ -26,9 +26,11 @@
 | **PUBLIC PAID LAUNCH** | **NO** |
 | **LIVE TRADING** | **FALSE**, and out of scope by design |
 
-The honest summary: the software is in good shape and **nothing has been
-proved against a real broker**. Every gate below that depends on a live
-cTrader account is unverified, and that is one gate, not a detail.
+The honest summary: the software is in good shape and the read side has now
+been proven against a real cTrader demo account, but **private demo beta is
+still not ready**. The remaining cTrader gate is the part a script cannot prove:
+a human browser/phone walk-through of the screens and controls, plus preview
+on real bars with `SMOKE_RULE_ID`.
 
 ---
 
@@ -193,7 +195,11 @@ testers (X9).
 | H | `fb064679f` | Repo-wide copy audit with a reasoned allowlist; checkout answers about the product |
 | I | `1e428f100` | Final verification and release decisions |
 | J | `e057ffb16` | Handoff |
-| A–E (25 Sep) | `d8f03196f`…this commit | Critical framework CVEs, per-rule copy exemptions, route audit, AST live invariants, live spec, dependency audits |
+| A–E (25 Sep) | `d8f03196f`…`495fed056` | Critical framework CVEs, per-rule copy exemptions, route audit, AST live invariants, live spec, dependency audits |
+| Broker reads | `9c97154` / `759a58f` | First real cTrader broker reads recorded: capability, balance, positions, orders and 199 EURUSD 15m candles |
+| Smoke preview fix | `b94fc8a` | The smoke test's preview step can now exercise a real rule on broker candles |
+| Release identity | `50eae57` / `65ddd67` | Health responses expose safe release metadata; smoke docs require checking deployed commit before broker tests |
+| MT4/MT5 spike | `cdbe833` | MT4 and MT5 read-only cloud provider skeletons, hidden from routes/UI, with provider safety tests |
 
 Tests went from 44 to 175 in the web client and from 153 to 159 files in the
 backend. Lint went from 13 errors to 0. Unreadable controls went from 15 to 0.

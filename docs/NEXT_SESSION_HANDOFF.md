@@ -1,7 +1,7 @@
 # Apex4Traders — handoff
 
-**State at:** `d144ace` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-29
+**State at:** `cdbe833` on `claude/apex4traders-platform-v1`
+**Date:** 2026-09-30
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
 > only documentation, so the numbers still hold at it — that is the convention,
@@ -270,6 +270,31 @@ Tests run after this commit:
 The same commit also makes `test_platform_ctrader_link.py` read the deprecated
 legacy OAuth module as UTF-8 explicitly, so the Windows test run does not fail
 on source text before it reaches the platform assertions.
+
+### Follow-up on 2026-09-30 — release identity and MT4/MT5 skeletons
+
+Commits after the real broker-read pass:
+
+| Commit | Change |
+|---|---|
+| `50eae57` | `/healthz`, `/readyz` and authenticated system diagnostics include safe release metadata when Render exposes it, so a smoke test can confirm which commit is deployed. |
+| `65ddd67` | The smoke-test and Render setup docs now require checking the deployed commit before interpreting broker smoke results. |
+| `cdbe833` | Adds an MT4 cloud-provider skeleton beside MT5. Both are read-only, hidden from routes and UI, unverified by default, and cannot place orders. |
+
+Tests run after `cdbe833`:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_provider_safety.py` | Pass, MT4/MT5 providers stay hidden and read-only |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 29 platform modules |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_http.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_entitlement.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_smoke_harness.py` | Pass |
+
+Web tests were still not runnable in this Windows worktree because
+`web/node_modules` exists without `vitest`; earlier `npm ci` attempts stalled or
+failed on network package download. Treat that as a verification gap, not a
+pass.
 
 ## 1h. MT4/MT5: the finding that decides the approach
 
