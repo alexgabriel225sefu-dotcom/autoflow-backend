@@ -1,7 +1,7 @@
 # Apex4Traders — handoff
 
-**State at:** `4d02720d7` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-27
+**State at:** `0965cfa` on `claude/apex4traders-platform-v1`
+**Date:** 2026-09-29
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
 > only documentation, so the numbers still hold at it — that is the convention,
@@ -227,6 +227,29 @@ Independently, the connect page now offers an escape route that does not go
 through that button: when an account is already connected, the step-2 card
 says so, names it, and links to `/accounts`.
 
+### Follow-up on PR #6 — connected state and smoke selection
+
+Codex could not post an inline GitHub review comment from this environment:
+the GitHub connector returned `403 Resource not accessible by integration`.
+The review finding was applied directly in two commits on this branch:
+
+| Commit | Change |
+|---|---|
+| `214fe94` | The Connect page now lets the server's `connected` verdict beat a local `pending` nonce. `sessionStorage` is a recovery aid, not the source of truth, so a stale pending attempt can no longer keep an already-linked client in the finish flow. The cTrader smoke script also accepts optional `SMOKE_SELECT_CTID` and selects that account through `ctrader_link.select_account` before read checks. |
+| `0965cfa` | `SMOKE_SELECT_CTID` now refuses unless the selected account actually becomes the selected demo account. A mismatch or live selected mode stops with exit 2 before any broker reads. |
+
+Tests run after these commits:
+
+| Command | Result |
+|---|---|
+| `python tests/test_smoke_harness.py` | Pass |
+| `python tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 28 platform modules |
+
+Web tests were not run in this environment. `npm ci` repeatedly failed or
+stalled on network package download (`ECONNRESET`), before `vitest`, `next` or
+`eslint` were installed. That is a verification gap, not a claim that web tests
+pass.
+
 ## 1h. MT5: the finding that decides the approach
 
 MetaTrader 5 has no first-party machine interface for third parties. The only
@@ -247,8 +270,7 @@ clients care about.
 
 ## 2. The one thing to do next
 
-**Select the connected account, then run the data half of
-`docs/CTRADER_DEMO_SMOKE_TEST.md`.**
+**Run the data half of `docs/CTRADER_DEMO_SMOKE_TEST.md` on the deployment.**
 
 The connect half of that document is now PROVEN — repeatedly, against the real
 cTrader, from two devices. What has never run is everything after it:
@@ -256,8 +278,10 @@ cTrader, from two devices. What has never run is everything after it:
 so no account has been selected, and therefore candles, positions, orders and
 preview have never been exercised against a real broker.
 
-That is the remaining substance of X1, and it is one click followed by four
-reads.
+That is the remaining substance of X1. It can now be run either through the UI
+or by setting `SMOKE_SELECT_CTID=<demo account id>` and running
+`scripts/smoke_ctrader_demo.py` where the deployment credentials live. A pass
+must still be recorded only after the real broker reads succeed.
 
 Nothing in the code is known to be missing. Those reads are **unproven**,
 which is a different thing from broken, and must not be reported as the same
