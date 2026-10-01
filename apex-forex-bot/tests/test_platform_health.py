@@ -117,6 +117,74 @@ live2 = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT="abcdef1234567890")
 check("liveness carries the same safe release identifier",
       live2.get("release", {}).get("commit") == "abcdef123456")
 
+# ── /healthz must not fork a process per liveness probe ─────────────────────
+# Its whole contract is to answer cheaply without touching a dependency. The
+# git fallback made it depend on git being installed and .git being intact, on
+# EVERY call — and a pruned checkout costs the 1s timeout each time, which is
+# how a convenience becomes a restart loop. The commit cannot change while the
+# process runs, so it is read once. Counted rather than described, because a
+# comment promising it is worth nothing.
+_runs = []
+_real_run = H.subprocess.run
+
+
+def _counting_run(*a, **kw):
+    _runs.append(a[0] if a else kw.get("args"))
+    return _real_run(*a, **kw)
+
+
+H._git_commit_from_checkout.cache_clear()
+H.subprocess.run = _counting_run
+try:
+    for _ in range(5):
+        with_env(lambda: H.live()[1], RENDER_GIT_COMMIT=None,
+                 SOURCE_VERSION=None, GIT_COMMIT=None)
+finally:
+    H.subprocess.run = _real_run
+check("five liveness probes fork git at most once, not five times",
+      len(_runs) <= 1, f"{len(_runs)} subprocess call(s)")
+
+# And a failure must be remembered too: a checkout that is not there now will
+# not be there on the next probe either, so retrying it forever is the same
+# defect wearing a different hat.
+_runs.clear()
+
+
+def _always_fails(*a, **kw):
+    _runs.append("called")
+    raise OSError("git is not installed")
+
+
+H._git_commit_from_checkout.cache_clear()
+H.subprocess.run = _always_fails
+try:
+    out_a = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT=None,
+                     SOURCE_VERSION=None, GIT_COMMIT=None)
+    out_b = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT=None,
+                     SOURCE_VERSION=None, GIT_COMMIT=None)
+finally:
+    H.subprocess.run = _real_run
+    H._git_commit_from_checkout.cache_clear()
+check("a failed lookup is remembered, not retried on every probe",
+      len(_runs) <= 1, f"{len(_runs)} attempt(s)")
+check("and liveness still answers ok without a commit",
+      out_a.get("status") == "ok" and out_b.get("status") == "ok",
+      f"{out_a.get('status')} / {out_b.get('status')}")
+check("and it does not invent a commit it could not read",
+      not out_a.get("release", {}).get("commit"),
+      str(out_a.get("release")))
+
+# The environment, by contrast, must NOT be cached: it is free to read and on
+# Render it is the path that answers. A cached one would serve the previous
+# deploy's commit after a restart-in-place.
+H._git_commit_from_checkout.cache_clear()
+first = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT="aaaaaaaaaaaa1111")
+second = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT="bbbbbbbbbbbb2222")
+check("a changed RENDER_GIT_COMMIT is reported, not remembered",
+      first.get("release", {}).get("commit") == "aaaaaaaaaaaa"
+      and second.get("release", {}).get("commit") == "bbbbbbbbbbbb",
+      f"{first.get('release')} then {second.get('release')}")
+
 # ── 2. development: degraded, but not refused ───────────────────────────────
 print("\n[2] a development box is degraded, not unready")
 st, body = fresh()

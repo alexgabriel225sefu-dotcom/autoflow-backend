@@ -37,6 +37,7 @@ one. A readiness probe that passes because a variable was misspelled is worse
 than one that fails.
 """
 
+import functools
 import os
 import subprocess
 import time
@@ -88,12 +89,23 @@ def _short(value):
     return text[:12]
 
 
-def _git_commit():
-    env_commit = _short(os.getenv("RENDER_GIT_COMMIT")
-                        or os.getenv("SOURCE_VERSION")
-                        or os.getenv("GIT_COMMIT"))
-    if env_commit:
-        return env_commit
+@functools.lru_cache(maxsize=1)
+def _git_commit_from_checkout():
+    """HEAD from the checkout, read ONCE per process — failures included.
+
+    A running process cannot change its own HEAD, so this is asked once and
+    remembered; `None` is remembered too, because a checkout that is not there
+    will not appear later either.
+
+    The cache is the point, not an optimisation. /healthz is the endpoint
+    whose entire job is to answer cheaply without touching a dependency —
+    uncached, it forks git on every liveness probe, which makes "is this
+    process running?" depend on git being installed and `.git` being intact.
+    A pruned checkout would then spend the 1s timeout on EVERY probe, and a
+    liveness endpoint that takes a second to answer is one a load balancer
+    eventually judges dead. That turns release metadata, which is a
+    convenience, into a restart loop.
+    """
     try:
         here = os.path.dirname(os.path.abspath(__file__))
         root = os.path.abspath(os.path.join(here, "..", ".."))
@@ -103,6 +115,17 @@ def _git_commit():
         return _short(out.stdout)
     except Exception:  # noqa: BLE001
         return None
+
+
+def _git_commit():
+    # The environment is read on EVERY call and deliberately not cached: it
+    # costs nothing, and on Render it is the path that actually answers.
+    env_commit = _short(os.getenv("RENDER_GIT_COMMIT")
+                        or os.getenv("SOURCE_VERSION")
+                        or os.getenv("GIT_COMMIT"))
+    if env_commit:
+        return env_commit
+    return _git_commit_from_checkout()
 
 
 def release_info():
