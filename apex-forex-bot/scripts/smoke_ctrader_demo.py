@@ -211,6 +211,7 @@ class Report:
         self.out = out if out is not None else sys.stdout
         self.failures = []
         self.steps = []
+        self.skipped = []
 
     def say(self, line):
         # Belt and braces: redact.install() already wraps stdout, and this
@@ -224,6 +225,22 @@ class Report:
         self.say(f"  {'PASS' if ok else 'FAIL'}  {name}"
                  + (f"  —  {detail}" if detail else ""))
         return bool(ok)
+
+    def skip(self, name, why):
+        """A step that did not run — said out loud, and counted.
+
+        A skipped step must never be invisible. `exit 0` with a step missing
+        looks exactly like `exit 0` with every step passing: the only
+        difference is the number in the summary line, and nobody compares that
+        between runs. X1 gets closed on the strength of this script's exit
+        code, so a quiet skip is precisely how an untested path would end up
+        recorded as proven.
+
+        Not a failure. There is nothing wrong with having no rule to preview;
+        what is wrong is a report that does not say so.
+        """
+        self.skipped.append((name, why))
+        self.say(f"  SKIP  {name}  —  {why}")
 
 
 # The read-only sequence. Named as data so a test can assert the order
@@ -363,8 +380,41 @@ def run(user_id, *, report=None, readers=None, symbol=None, timeframe=None,
     elif rule_id:
         rep.step("preview runs on real bars", False,
                  "no candles to preview on — the step above failed")
+    else:
+        rep.skip("preview runs on real bars",
+                 "no SMOKE_RULE_ID was given, so the evaluator has still "
+                 "only ever seen synthetic candles")
 
     return rep
+
+
+def summarise(rep):
+    """The last thing an operator reads, and the exit code. 0, or 1.
+
+    Separated from main() on purpose: this is where a skipped step either
+    survives into the summary or quietly disappears, and main() cannot be
+    exercised at all without a broker — so without this split the summary is
+    the one part of the script no test can reach.
+    """
+    rep.say("")
+    if rep.failures:
+        rep.say(f"FAILED ({len(rep.failures)}):")
+        for f in rep.failures:
+            rep.say(f"  - {f}")
+        rep.say("\nThe connected path is NOT working. Do not record X1 as "
+                "closed.")
+        return 1
+    rep.say(f"All {len(rep.steps)} steps passed against a real demo account.")
+    if rep.skipped:
+        rep.say(f"\nBut {len(rep.skipped)} step(s) did NOT run, so this is "
+                f"not a complete pass:")
+        for name, why in rep.skipped:
+            rep.say(f"  - {name}: {why}")
+        rep.say("Record what was SKIPPED next to what passed, or the record "
+                "claims more than the run proved.")
+    rep.say("\nRecord this in docs/RELEASE_READINESS.md, with the date and "
+            "the masked account number.")
+    return 0
 
 
 def main(argv=None):
@@ -388,18 +438,7 @@ def main(argv=None):
         return 2
     rep.say(f"cTrader demo smoke test — account {mask_ctid(selected['ctid'])}")
     run(user_id, report=rep)
-    rep.say("")
-    if rep.failures:
-        rep.say(f"FAILED ({len(rep.failures)}):")
-        for f in rep.failures:
-            rep.say(f"  - {f}")
-        rep.say("\nThe connected path is NOT working. Do not record X1 as "
-                "closed.")
-        return 1
-    rep.say(f"All {len(rep.steps)} steps passed against a real demo account.")
-    rep.say("Record this in docs/RELEASE_READINESS.md, with the date and the "
-            "masked account number.")
-    return 0
+    return summarise(rep)
 
 
 if __name__ == "__main__":

@@ -403,6 +403,55 @@ check("and a preview is never executable",
 check("SETUP is not and never was a verdict", "SETUP" not in PD.VERDICTS,
       str(PD.VERDICTS))
 
+# ── a step that did not run must say so, and must reach the summary ─────────
+# The first clean run of this script exited 0 with twelve steps. The thirteenth
+# — preview on real bars — had not failed; it had never run, because the
+# account had no rule to preview. Nothing in the output said so, and `exit 0`
+# with a step missing is indistinguishable from `exit 0` with every step
+# passing unless somebody compares step counts between runs. X1 is closed on
+# this script's exit code.
+buf_skip = io.StringIO()
+rep_skip = S.run("u-1", report=S.Report(out=buf_skip),
+                 readers=_with_bars(_real_bars))        # no rule_id at all
+check("with no rule, the preview step is recorded as skipped",
+      [n for n, _ in rep_skip.skipped] == ["preview runs on real bars"],
+      str(rep_skip.skipped))
+check("and it is NOT counted as a passed step",
+      "preview runs on real bars" not in [n for n, _ in rep_skip.steps],
+      str([n for n, _ in rep_skip.steps]))
+check("and it is NOT a failure either, because nothing went wrong",
+      rep_skip.failures == [], str(rep_skip.failures))
+check("and the word SKIP appears in the report",
+      "SKIP" in buf_skip.getvalue(), buf_skip.getvalue()[-200:])
+
+# The summary is what an operator actually reads before recording a pass, so
+# the skip has to survive all the way into it. summarise() exists separately
+# from main() precisely so this can be checked without a broker.
+rc = S.summarise(rep_skip)
+sum_out = buf_skip.getvalue()
+check("a run with a skipped step still exits 0, because nothing failed",
+      rc == 0, str(rc))
+check("but the summary says it was not a complete pass",
+      "not a complete pass" in sum_out, sum_out[-400:])
+tail = sum_out.split("not a complete pass")[-1]
+check("and the summary names the step that did not run",
+      "preview runs on real bars" in tail, tail[:300])
+check("and tells the operator to record the skip, not just the pass",
+      "Record what was SKIPPED" in tail, tail[:300])
+
+# A clean run with nothing skipped must NOT carry that warning, or the warning
+# becomes noise that gets ignored on the run where it matters.
+clean = io.StringIO()
+rep_clean = S.run("u-1", report=S.Report(out=clean),
+                  readers=_with_bars(_real_bars), rule_id=_rid)
+rc_clean = S.summarise(rep_clean)
+check("a complete run exits 0 with no skip warning",
+      rc_clean == 0 and "not a complete pass" not in clean.getvalue(),
+      f"rc={rc_clean}")
+check("and it does carry the preview step, so the two runs differ",
+      "preview runs on real bars" in [n for n, _ in rep_clean.steps],
+      str([n for n, _ in rep_clean.steps]))
+
 # ── the payload's symbol and timeframe must be the ones the bars came from ──
 # Dropping either lets build_snapshot fall back to the RULE's own symbol and
 # timeframe, and the evaluator then compares the rule against itself and always

@@ -38,7 +38,7 @@ on real bars with `SMOKE_RULE_ID`.
 
 | # | Gate | Status | Evidence |
 |---|---|---|---|
-| 1 | Demo automation works | ⚠️ **the READS are verified; the controls are not** | 2026-09-30, account …456: the deployed server answered `canAutomate: true`, `liveExecutionEnabled: false`, badge `DEMO` for a real connected demo account. Start / pause / resume / stop have still never been sent to cTrader — they are covered only by `test_platform_http.py` and the dashboard tests. That is what is left of gate 1. |
+| 1 | Demo automation works | ⚠️ **the READS are verified; the controls are not** | 2026-10-01, account …456: the deployed server answered `canAutomate: true`, `liveExecutionEnabled: false`, badge `DEMO` for a real connected demo account. Start / pause / resume / stop have still never been sent to cTrader — they are covered only by `test_platform_http.py` and the dashboard tests. That is what is left of gate 1, and it is the only part of X1 that would *change* something at the broker rather than read from it. |
 | 2 | cTrader demo OAuth works | ✅ | 2026-09-27: a real authorisation completed against cTrader and stored a working token for account …456. 2026-09-30: that token was still exchanging and reading, so the refresh path holds too. `test_platform_ctrader_link.py` covers the flow including the account-injection case. |
 | 3 | Payment/licence tested **or** intentionally disabled | ✅ | Both. The webhook has 12 test groups; checkout is disabled behind `A4T_CHECKOUT_ENABLED`, which is off, and says so before it says anything about configuration. |
 | 3b | Access model implemented, not just decided | ✅ | `free_demo` / `paid_live`, server-derived, all four combinations tested. Demo access needs no manual grant. |
@@ -52,17 +52,25 @@ on real bars with `SMOKE_RULE_ID`.
 | 9 | Backend tests pass | ✅ | 169 / 169 files |
 | 10 | Build passes | ✅ | 24 routes, TypeScript clean |
 | 11 | Mobile navigation works | ✅ | 8 of 8 destinations at 390 px, 0 px overflow |
-| 12 | Chart handles real connected data | ⚠️ **real candles reached the platform; nobody has looked at the chart with them** | 2026-09-30, account …456: 199 closed EURUSD 15m bars, each with OHLC and a time, in ascending order, latest `1790736300` = 02:45:00 UTC and aligned to a 15m boundary. That is `broker_read.candles` answering from the broker. Whether the chart component *renders* those bars has not been observed — it needs a browser, not a script. |
+| 12 | Chart handles real connected data | ⚠️ **the data path is proven; nobody has looked at the chart with it** | 2026-10-01, account …456, deployed build `ad37fc64235c`: the read sequence passed **end to end, exit 0** — capability, balance (a `float`), positions, orders, and 199 closed EURUSD 15m bars with OHLC and a time on each, in ascending order, latest `1790824500` = 03:15:00 UTC and aligned to a 15m boundary. Whether the chart component *renders* those bars has not been observed — it needs a browser, not a script. |
 | 13 | No fake data appears | ✅ | `content.test.ts`; every empty state names its cause |
 
 **Verdict: NOT YET.** Gates 2–11 and 13 are met. Gate 1 is partly open and
 gate 12 is partly open, and both are what is left of **X1**. A static regression test, `test_ctrader_browser_walkthrough_contract.py`, now verifies that the required UI anchors for the browser pass remain present; it does not claim the human browser/phone pass has run.
 
-X1 has moved. On 2026-09-30 the read side ran end to end against a real
-cTrader demo account — capability, balance, positions, orders and 199 real
-15m candles, from the deployed instance, through the same `broker_read` the
-product uses. The sentence "nothing has run against a real broker" was true
-until that day and is not true now.
+X1 has moved. On **2026-10-01** the read side ran end to end against a real
+cTrader demo account and **exited 0** — capability, balance, positions, orders
+and 199 real 15m candles, from the deployed instance (`ad37fc64235c`), through
+the same `broker_read` the product uses. The sentence "nothing has run against
+a real broker" was true until 2026-09-30 and is not true now.
+
+**That run exercised twelve steps, not thirteen.** The preview-on-real-bars
+step did not fail; it never ran, because the account has no active rule to
+preview. The evaluator has therefore still only ever seen synthetic candles.
+The script now reports a skipped step as `SKIP` and repeats it in the summary,
+because `exit 0` with a step missing had looked exactly like `exit 0` with
+every step passing — and X1 is closed on the strength of that exit code.
+Closing it needs one active rule and a re-run; nothing else.
 
 Two things in X1 are still unproven, and they are not small:
 
