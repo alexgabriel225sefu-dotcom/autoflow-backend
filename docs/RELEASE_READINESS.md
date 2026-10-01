@@ -42,14 +42,14 @@ on real bars with `SMOKE_RULE_ID`.
 | 2 | cTrader demo OAuth works | ✅ | 2026-09-27: a real authorisation completed against cTrader and stored a working token for account …456. 2026-09-30: that token was still exchanging and reading, so the refresh path holds too. `test_platform_ctrader_link.py` covers the flow including the account-injection case. |
 | 3 | Payment/licence tested **or** intentionally disabled | ✅ | Both. The webhook has 12 test groups; checkout is disabled behind `A4T_CHECKOUT_ENABLED`, which is off, and says so before it says anything about configuration. |
 | 3b | Access model implemented, not just decided | ✅ | `free_demo` / `paid_live`, server-derived, all four combinations tested. Demo access needs no manual grant. |
-| 3c | Health endpoints | ✅ | `/healthz`, `/readyz`, `/api/v1/system/status`. Tested, including the production refusals. **Never answered from a deployed instance.** |
+| 3c | Health endpoints | ✅ | `/healthz`, `/readyz`, `/api/v1/system/status`. Tested, including the production refusals. **Answered from the deployed instance on 2026-10-01**: `/readyz` reported `status: ok`, `environment: production`, and every check ok (billing skipped by design, which is the correct answer while checkout is off). Both endpoints now carry `release.commit`, so an operator can tell which build replied. |
 | 3d | Rate limiting is real across instances | ✅ | Shared `INCR` with a TTL; the per-process fallback fails readiness in production rather than being served quietly. |
 | 4 | Legal blockers documented | ✅ | `docs/LEGAL_LAUNCH_BLOCKERS.md`, nine items, each a `[TO BE CONFIRMED]` in the product. |
 | 5 | Production configuration documented | ✅ | `docs/PRODUCTION_RUNBOOK.md`, `docs/BETA_CONFIGURATION.md`, `docs/MANUAL_LICENCE_OPERATIONS.md`. |
 | 6 | No critical security issue | ✅ | No token under `/api/v1/`; rate limiting on every route; webhook verifies before parsing; ownership is the storage key. |
 | 7 | No live trading path | ✅ | `test_live_path_invariants.py`; `SUPPORTED_ORDER_TYPES = {MARKET}`; `automation.start` refuses a non-demo account. |
 | 8 | Frontend tests pass | ✅ | 215 / 215 |
-| 9 | Backend tests pass | ✅ | 168 / 168 files |
+| 9 | Backend tests pass | ✅ | 169 / 169 files |
 | 10 | Build passes | ✅ | 24 routes, TypeScript clean |
 | 11 | Mobile navigation works | ✅ | 8 of 8 destinations at 390 px, 0 px overflow |
 | 12 | Chart handles real connected data | ⚠️ **real candles reached the platform; nobody has looked at the chart with them** | 2026-09-30, account …456: 199 closed EURUSD 15m bars, each with OHLC and a time, in ascending order, latest `1790736300` = 02:45:00 UTC and aligned to a 15m boundary. That is `broker_read.candles` answering from the broker. Whether the chart component *renders* those bars has not been observed — it needs a browser, not a script. |
@@ -110,8 +110,8 @@ thing.
 | 2 | Owner-approved legal, contact, refund | ❌ L1–L4, L6–L8 |
 | 3 | Verified payment webhook works | ❌ X5 — tested with a local signature, never a real delivery |
 | 4 | Licences granted correctly | ⚠️ correct in test; depends on gate 3 |
-| 5 | Production Redis / Upstash | ❌ X2 |
-| 6 | Production OAuth redirect works | ❌ X4 |
+| 5 | Production Redis / Upstash | ✅ — **X2 is done.** 2026-10-01, from the deployed instance: `shared_store` ok, `backend: redis`, `latencyMs: 7`, and `rate_limit_store` reports counters shared across instances rather than the per-process fallback |
+| 6 | Production OAuth redirect works | ✅ — **X4 is done.** `ctrader_oauth` reports client id, secret and redirect URI configured; and it is not merely configured — a real authorisation completed THROUGH it on 2026-09-27 (`[link] begin` → `exchange.attempt` → `complete` 200, redirect `https://apex4traders-api.onrender.com/api/v1/ctrader/callback`) and the token it stored was still exchanging and reading on 2026-09-30 |
 | 7 | HTTPS and domain | ❌ X6 |
 | 8 | Rate limiting enabled | ✅ — shared counters, with a reported per-process fallback |
 | 9 | Monitoring | ⚠️ X7 — `/healthz` and `/readyz` exist and are tested; nothing scrapes them yet |
@@ -156,14 +156,19 @@ work moved towards it.
 1. **Owner:** decide D6 — is paid access part of beta? If no, D1–D3 and D5
    leave the beta gate entirely and checkout stays off.
 2. **Owner:** create or name the production Supabase project (X3).
-3. **Owner:** register the production OAuth redirect URI in the cTrader
-   portal (X4), and provide `CTRADER_CLIENT_ID` / `CTRADER_CLIENT_SECRET`.
-4. **Owner:** provision Redis or Upstash (X2).
+3. ~~**Owner:** register the production OAuth redirect URI in the cTrader
+   portal (X4)~~ — **done.** Configured, and a real authorisation has
+   completed through it.
+4. ~~**Owner:** provision Redis or Upstash (X2)~~ — **done.** Redis answers
+   from production at 7 ms.
 5. **Engineering:** deploy to a non-public URL with the runbook's environment.
 6. **Together:** work through the nine manual steps on a real demo account.
 7. Re-assess this document.
 
-Items 1–4 are the critical path, and none of them is engineering work.
+Of items 1–4, **3 and 4 are now done** and verified from the deployed
+instance (2026-10-01). What remains on the critical path is item 1, which is a
+decision only the owner can make, and item 6 — the manual walk-through, which
+needs a browser and a phone and cannot be done from a script.
 
 ## The shortest path to a public paid launch
 

@@ -475,7 +475,7 @@ file must be rewritten by that milestone, not deleted.
 | Gap | Where |
 |---|---|
 | **The automation CONTROLS and the SCREENS have not been run against the broker.** Connect is proven (2026-09-27) and so are the reads (2026-09-30, account …456, 199 real 15m bars). Start / pause / resume / stop have never been sent to cTrader, no human has walked the screens, and preview has still only seen synthetic candles | blocker **X1**, now part-closed — `docs/CTRADER_DEMO_SMOKE_TEST.md`, §2 |
-| **The real TLS handshake has NOT been verified** — TCP 5035 is unreachable from this container; the inspecting proxy resets raw TLS on a non-HTTP port | `scripts/check_ctrader_tls.py`, run it on the deployment host |
+| ~~The real TLS handshake has not been verified~~ — **it is verified, and nobody had looked.** The deployed API logs it at every start: `[API] broker reachable: TLSv1.3 to demo.ctraderapi.com:5035, certificate verified` — seen on 2026-09-27, 2026-09-30 and 2026-10-01. It stays unverifiable from a development container, where the inspecting proxy resets raw TLS on a non-HTTP port; that is a property of the container, not of the broker path | the deployment's own startup log; `scripts/check_ctrader_tls.py` for an on-demand check |
 | `/readyz` has never answered from a deployed instance | `docs/LAUNCH_QA_REPORT.md` |
 | An active rule cannot be edited; editing must create a version | same |
 | No volume and no indicator overlay on the chart, both for stated reasons | same, and `docs/CHART_DEPENDENCY_DECISION.md` |
