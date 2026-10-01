@@ -126,7 +126,8 @@ services:
       # LIVE_TRADING_ENABLED        no execution path exists behind it, and
       #                             /readyz fails if it is set
       # APEX_ALLOW_LIVE_ACCOUNTS    would let a live account be selected
-      # A4T_CHECKOUT_ENABLED        no approved price, SKU or legal entity
+      # A4T_CHECKOUT_ENABLED        disabled until authenticated checkout/legal/tax are ready
+      # A4T_AUTHENTICATED_CHECKOUT_ENABLED disabled until checkout creation is behind verified platform auth
       # A4T_STRIPE_WEBHOOK_SECRET   checkout is off; the webhook answers 503
       # ALLOW_LOCAL_BACKEND_DEV     makes a per-container store acceptable
       # ALLOW_PLAINTEXT_DEV_STORAGE stores broker tokens unencrypted

@@ -17,11 +17,13 @@ legacy Telegram-era handler in apex/stripe_license.py does the same thing for
 the same reason, and this is deliberately a separate store keyed by the
 Supabase user id.
 
-WHAT IS NOT DECIDED HERE
+THE OWNER-APPROVED OFFER
 
-Price, currency, SKU and plan shape are read from the environment with no
-defaults. A default price is a business decision taken by whoever wrote the
-code, which is the wrong person. See docs/PAYMENT_AND_LICENCE_DECISIONS.md.
+The owner has chosen a one-time Founder Lifetime unlock at 499 USD. Checkout
+still remains disabled unless A4T_CHECKOUT_ENABLED is explicitly set and the
+authenticated checkout path has been reviewed. The defaults below exist so the
+approved offer is not retyped differently across deploys; they do not enable
+payments by themselves. See docs/PAYMENT_AND_LICENCE_DECISIONS.md.
 """
 
 import hashlib
@@ -52,6 +54,12 @@ REVOKING = ("charge.refunded", "charge.dispute.created",
 # reads the user id from here and from nowhere else.
 USER_META_KEY = "a4tUserId"
 
+APPROVED_PRICE_MINOR = 49900
+APPROVED_CURRENCY = "usd"
+APPROVED_SKU = "founder_lifetime"
+APPROVED_PLAN = "founder_lifetime"
+APPROVED_PURCHASE_MODE = "one_time"
+
 
 class BillingNotConfigured(RuntimeError):
     """Raised when the webhook is reachable but no secret is set.
@@ -73,12 +81,12 @@ def configured():
 
 
 def product_config():
-    """Price, currency and SKU — from the environment, with no defaults.
+    """The approved one-time offer, overrideable only by explicit env.
 
-    Returns None for anything the owner has not set. Callers must refuse
-    rather than substitute: `29700` and `"apex-bot"` describe the previous
-    product, and guessing either of them would put a number on an invoice that
-    nobody approved.
+    The previous product used `29700` and `"apex-bot"`; those values are never
+    fallback values here. The owner-approved default is the 499 USD Founder
+    Lifetime unlock. Leaving A4T_LICENCE_DAYS unset means no expiry, which is
+    the intended shape of a one-time purchase.
     """
     minor = _env("A4T_PRICE_MINOR")
     try:
@@ -86,10 +94,11 @@ def product_config():
     except ValueError:
         minor = None
     return {
-        "priceMinor": minor,
-        "currency": _env("A4T_CURRENCY"),
-        "sku": _env("A4T_SKU"),
-        "plan": _env("A4T_PLAN") or "standard",
+        "priceMinor": minor if minor is not None else APPROVED_PRICE_MINOR,
+        "currency": _env("A4T_CURRENCY") or APPROVED_CURRENCY,
+        "sku": _env("A4T_SKU") or APPROVED_SKU,
+        "plan": _env("A4T_PLAN") or APPROVED_PLAN,
+        "purchaseMode": _env("A4T_PURCHASE_MODE") or APPROVED_PURCHASE_MODE,
         # How long a granted licence lasts. Unset means no expiry, which is
         # correct for a one-off purchase and wrong for a subscription — which
         # is why the plan shape is an owner decision, not a default.

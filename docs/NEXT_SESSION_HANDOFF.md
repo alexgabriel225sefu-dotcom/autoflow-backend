@@ -33,7 +33,7 @@ What that closes and what it does not is in §1g.
 | Tests | 168 backend files, 255 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
 | Private demo beta | **NOT YET** — X1 part-closed: reads proven 2026-09-30, controls and screens not; see §2 |
 | Public beta | **NO** |
-| Taking money | **NO** — checkout off, no approved price |
+| Taking money | **NO** — 499 USD one-time founder offer recorded, checkout still off |
 | Live trading | **NO**, and not implemented |
 
 ## 1b. What phases A–E of 2026-09-25 changed
@@ -330,6 +330,26 @@ Verification after `cec3771`:
 | `npm run build` in `web/` | Pass; Next 16.3.6 generated 24 routes. Warned that the `middleware` file convention is deprecated in favor of `proxy`. |
 | `npx eslint src --format stylish` in `web/` | Pass with 0 errors and 8 warnings: existing `<img>` warnings in `components/blocks/hero-section-{1,2}.tsx` and one `no-unused-expressions` warning in `src/test/e2e.test.ts`. |
 | `npm test` / `npx vitest run src/app/routes.test.ts --reporter=verbose` | Not verified locally. Vitest starts under Windows Node `v24.20.0` but does not report completion before manual interruption; no product test failure was produced. |
+
+### Follow-up on 2026-09-30 — one-time founder offer recorded, checkout still gated
+
+Commit after `22e4bc8`:
+
+| Commit | Change |
+|---|---|
+| `PENDING` | Records the owner decision that demo remains free and the paid offer is a one-time Founder Lifetime unlock at 499 USD. Billing defaults now describe `49900` / `usd` / `founder_lifetime` / `one_time`, but checkout still fails readiness unless both `A4T_CHECKOUT_ENABLED` and `A4T_AUTHENTICATED_CHECKOUT_ENABLED` are explicitly set. The legacy browser checkout route also refuses before creating a Stripe PaymentIntent unless the authenticated-checkout gate is set. No payment activation was performed. |
+
+Tests run after `PENDING`:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_billing.py` | Pass; webhook remains the only grant path, the offer is one-time founder access, and the browser checkout route has the authenticated-checkout gate before Stripe PaymentIntent creation. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_health.py` | Pass; checkout enabled without `A4T_AUTHENTICATED_CHECKOUT_ENABLED` refuses readiness. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_entitlement.py` | Pass; demo remains free and paid live still unlocks no live execution in this release. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass; live execution remains unreachable across 29 platform modules. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_product_copy.py` | Pass; 127 files audited, no profit promise or live-trading-available claim. |
+| `npx eslint src --format stylish` in `web/` | Pass with 0 errors and 8 existing warnings. |
+| `npm run build` in `web/` | Pass; Next generated 24 routes. |
 ## 1h. MT4/MT5: the finding that decides the approach
 
 MetaTrader 4 and MetaTrader 5 have no first-party machine interface for third parties that fits this product. The only
@@ -393,8 +413,8 @@ as the same thing.
 
 | # | Decision | Effect while unanswered |
 |---|---|---|
-| D1–D3, D5 | Price, currency, SKU, plan shape, tax | Checkout answers 503 |
-| D6 | Is paid access part of beta at all? | Choosing "no" removes D1–D3 and D5 from the beta gate entirely |
+| D5 | Tax handling | Checkout remains off until tax handling is decided |
+| D6 | Is paid access part of beta at all? | Demo remains free; paid founder unlock is planned but not active |
 | L1–L2 | Legal entity, address, company number, governing law | Placeholders in the product |
 | L3 | Support contact address | The old one belonged to another brand and was removed, not replaced |
 | L4 | Refund policy | The webhook already revokes on refund |
@@ -555,9 +575,3 @@ Read `docs/RELEASE_READINESS.md` for the gates,
 `docs/PRODUCTION_RUNBOOK.md` for operating it, `docs/BETA_CONFIGURATION.md`
 for standing up a beta, and `docs/CTRADER_DEMO_SMOKE_TEST.md` for the thing
 to do next.
-
-
-
-
-
-

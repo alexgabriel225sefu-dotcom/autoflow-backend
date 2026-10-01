@@ -132,7 +132,8 @@ LIVE_TRADING_ENABLED           # no execution path exists behind it
 APEX_ALLOW_LIVE_ACCOUNTS       # would let a live account be selected
 ALLOW_LOCAL_BACKEND_DEV        # makes a per-container store acceptable
 ALLOW_PLAINTEXT_DEV_STORAGE    # stores broker tokens unencrypted
-A4T_CHECKOUT_ENABLED           # no approved price exists
+A4T_CHECKOUT_ENABLED=false     # price exists, but checkout is not approved for deployment yet
+A4T_AUTHENTICATED_CHECKOUT_ENABLED=false
 ```
 
 `/readyz` **fails** in production if any of the first four is set, and

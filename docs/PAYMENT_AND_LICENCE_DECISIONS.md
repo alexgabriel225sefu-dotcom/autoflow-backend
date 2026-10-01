@@ -1,9 +1,7 @@
-# Payment and licence — what exists, and what the owner still has to decide
+# Payment and licence — one-time founder access, checkout still gated
 
 This records what was found in the repository and what was built on top of it.
-Every business value below is read from the environment with **no default**,
-because a price or a refund policy chosen by whoever wrote the code is a
-business decision taken by the wrong person.
+The owner has now chosen the commercial shape: demo access stays free and the paid unlock is a one-time Founder Lifetime purchase at **499 USD**. Checkout still stays off until the authenticated checkout path, legal copy, refund policy and tax handling are reviewed.
 
 ---
 
@@ -53,9 +51,7 @@ merging the two would be a migration, not an accident of a shared key.
   everything while switched off is worse than one that is off, because the
   provider stops retrying and the operator never finds out.
 
-The Next.js checkout route now reads price, currency and SKU from the
-environment, refuses with 503 when any is unset, ignores any `amount` the
-browser sends, and is gated behind `A4T_CHECKOUT_ENABLED=true`, which is off.
+The Next.js checkout route now carries the approved one-time offer values, ignores any `amount` the browser sends, and is gated behind both `A4T_CHECKOUT_ENABLED=true` and `A4T_AUTHENTICATED_CHECKOUT_ENABLED=true`. Both are off. The second gate exists because this route still cannot stamp a verified platform user id onto Stripe metadata.
 
 ## 3. Why checkout is still switched off
 
@@ -68,9 +64,7 @@ and the webhook would then grant on it. So the route refuses instead. Enabling
 paid checkout means moving checkout creation behind the platform API, where
 `_authenticate` has already proved who the caller is.
 
-That is a small piece of work and it is deliberately not done yet: it should
-be done once the owner has decided the plan shape (D3), because a
-subscription and a one-off purchase create different Stripe objects.
+That is a small piece of work and it is deliberately not done yet. The owner has decided the plan shape: one-time purchase, not subscription. The remaining implementation task is to create checkout from the authenticated platform API so the webhook receives a server-written `a4tUserId`.
 
 ## 4. Environment variables
 
@@ -79,31 +73,31 @@ Backend (`apex-forex-bot`):
 | Variable | Meaning | Default |
 |---|---|---|
 | `A4T_STRIPE_WEBHOOK_SECRET` | verifies webhook deliveries | **none** — unset means 503 |
-| `A4T_PLAN` | the plan name recorded on a licence | `standard` |
-| `A4T_LICENCE_DAYS` | how long a grant lasts | **none** — unset means no expiry |
+| `A4T_PLAN` | the plan name recorded on a licence | `founder_lifetime` |
+| `A4T_PURCHASE_MODE` | records the commercial shape | `one_time` |
+| `A4T_LICENCE_DAYS` | how long a grant lasts | **none** — no expiry for the one-time founder unlock |
 
 Web (`web`):
 
 | Variable | Meaning | Default |
 |---|---|---|
 | `STRIPE_SECRET_KEY` | server-side only, never `NEXT_PUBLIC_` | **none** |
-| `A4T_PRICE_MINOR` | price in minor units | **none** |
-| `A4T_CURRENCY` | ISO currency | **none** |
-| `A4T_SKU` | product identifier | **none** |
-| `A4T_CHECKOUT_ENABLED` | must be `true` for the route to answer | off |
+| `A4T_PRICE_MINOR` | price in minor units | `49900` |
+| `A4T_CURRENCY` | ISO currency | `usd` |
+| `A4T_SKU` | product identifier | `founder_lifetime` |
+| `A4T_CHECKOUT_ENABLED` | first gate; must be `true` for the route to answer | off |
+| `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | second gate; must be `true` after checkout creation is moved behind verified platform auth | off |
 
-## 5. What the owner must decide
+## 5. Owner decisions
 
-None of these can be chosen here.
-
-| # | Decision | Consequence of leaving it |
+| # | Decision | Current answer |
 |---|---|---|
-| **D1** | **Price and currency** | Checkout returns 503. Licences can still be granted manually for a private beta. |
-| **D2** | **SKU** | Same. `"apex-bot"` names the previous product and is not reused. |
-| **D3** | **Plan shape** — one-off, monthly, or trial-then-paid | Decides whether `A4T_LICENCE_DAYS` is set, whether renewal events must extend a licence, and which Stripe object checkout creates. Until it is decided, moving checkout behind the authenticated API is premature. |
-| **D4** | **Refund policy** | The current Terms say "all sales are final once the source code has been delivered" — a sentence about a product that no longer exists. The webhook already revokes on refund; what a client is *entitled* to is not a code question. |
-| **D5** | **Tax handling** | Whether Stripe Tax is enabled, and whether the price is tax-inclusive. Affects the amount, so it blocks D1. |
-| **D6** | **Whether paid access is part of beta at all** | A private demo beta can run with checkout off and licences granted manually. That removes D1, D2, D3 and D5 from the beta gate entirely, and is the lower-risk path. |
+| **D1** | **Price and currency** | **499 USD**, represented as `49900` minor units and `usd`. |
+| **D2** | **SKU** | `founder_lifetime`. `"apex-bot"` names the previous product and is not reused. |
+| **D3** | **Plan shape** | **One-time purchase**, not a subscription. `A4T_LICENCE_DAYS` stays unset for no expiry. |
+| **D4** | **Refund policy** | Still open. The webhook already revokes on refund; what a client is entitled to must be decided before paid launch. |
+| **D5** | **Tax handling** | Still open. Decide whether Stripe Tax is enabled and whether the shown price is tax-inclusive. |
+| **D6** | **Whether paid access is part of beta at all** | Demo remains free. Paid Founder Lifetime unlock is planned, but checkout remains off until authenticated checkout, legal, refund and tax are ready. |
 
 ## 6. Dependencies outside the code
 

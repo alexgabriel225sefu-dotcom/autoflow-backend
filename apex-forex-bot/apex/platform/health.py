@@ -246,6 +246,8 @@ def _billing_check():
                       "checkout is disabled, so no payment configuration is required",
                       checkoutEnabled=False)
     missing = []
+    if not _flag_on("A4T_AUTHENTICATED_CHECKOUT_ENABLED"):
+        missing.append("A4T_AUTHENTICATED_CHECKOUT_ENABLED")
     if not _billing.configured():
         missing.append("A4T_STRIPE_WEBHOOK_SECRET")
     cfg = _billing.product_config()
@@ -258,7 +260,7 @@ def _billing_check():
         return _check("billing", FAIL,
                       f"checkout is enabled but not configured: {', '.join(missing)}",
                       checkoutEnabled=True)
-    return _check("billing", OK, "checkout is enabled and configured", checkoutEnabled=True)
+    return _check("billing", OK, "checkout is enabled and authenticated", checkoutEnabled=True)
 
 
 def _dev_flags():

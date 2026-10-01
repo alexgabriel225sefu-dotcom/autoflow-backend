@@ -65,10 +65,12 @@ Today `paid_live` is a name with nothing behind it, and that is deliberate
 | A per-client kill switch that outranks the entitlement | `licence.revoke()` already blocks everything including demo. It must also stop a running live loop, not only refuse the next start. |
 | Consent that expires | A consent given once, a year ago, is not informed consent for a loop running today. |
 
-**Open owner decisions that block this section entirely:** D1–D3, D5, D6 in
+**Open owner decisions that block this section entirely:** D5 and D6 in
 `docs/PAYMENT_AND_LICENCE_DECISIONS.md`, and L1–L4, L6–L8 in
-`docs/LEGAL_LAUNCH_BLOCKERS.md`. No price is approved; no legal entity is
-named. Until those exist there is nothing to sell and nobody to sell it.
+`docs/LEGAL_LAUNCH_BLOCKERS.md`. The 499 USD one-time founder offer is
+approved, but tax handling, refund policy, legal entity and authenticated
+checkout are not ready. Until those exist there is nothing to sell safely and
+nobody to sell it from.
 
 ## 3. Account-mode verification — the fact that must come from the broker
 
@@ -221,7 +223,7 @@ is a platform testing on somebody else's money.
       in tests.
 - [ ] A restore exercised once (**X8**), because the ledger is now the record
       of real money.
-- [ ] Owner sign-off on pricing (D1–D3, D5, D6) and legal (L1–L4, L6–L8).
+- [ ] Owner sign-off on tax/beta timing (D5, D6), refund/legal terms (L1–L4, L6–L8), and authenticated checkout readiness.
 - [ ] A separate security review of this specification's implementation.
 
 Until all of those are true, `entitlement.live_execution_enabled()` returns

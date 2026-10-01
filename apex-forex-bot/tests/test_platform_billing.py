@@ -227,14 +227,31 @@ try:
 finally:
     A._id.verify_token = _real_verify
 
-# ── 11. the price is never guessed ──────────────────────────────────────────
-print("\n[11] price, currency and SKU have no defaults")
-for var in ["A4T_PRICE_MINOR", "A4T_CURRENCY", "A4T_SKU"]:
+route_src = open(os.path.join(ROOT, "..", "web", "src", "app", "api",
+                              "create-payment-intent", "route.ts"),
+                 encoding="utf-8").read()
+check("the legacy browser checkout route has an authenticated-checkout gate",
+      "A4T_AUTHENTICATED_CHECKOUT_ENABLED" in route_src)
+check("and it checks that gate before creating a Stripe PaymentIntent",
+      route_src.index("A4T_AUTHENTICATED_CHECKOUT_ENABLED")
+      < route_src.index("paymentIntents.create"))
+
+# ── 11. the approved offer is one-time founder access ─────────────────────
+print("\n[11] the approved offer is one-time founder access")
+for var in ["A4T_PRICE_MINOR", "A4T_CURRENCY", "A4T_SKU",
+            "A4T_PLAN", "A4T_PURCHASE_MODE"]:
     os.environ.pop(var, None)
 cfg = B.product_config()
-check("no default price", cfg["priceMinor"] is None, repr(cfg["priceMinor"]))
-check("no default currency", cfg["currency"] is None, repr(cfg["currency"]))
-check("no default SKU", cfg["sku"] is None, repr(cfg["sku"]))
+check("approved price is 499 USD",
+      cfg["priceMinor"] == 49900 and cfg["currency"] == "usd", repr(cfg))
+check("approved SKU is founder_lifetime",
+      cfg["sku"] == "founder_lifetime", repr(cfg))
+check("approved plan is founder_lifetime",
+      cfg["plan"] == "founder_lifetime", repr(cfg))
+check("approved purchase mode is one_time, not subscription",
+      cfg["purchaseMode"] == "one_time", repr(cfg))
+check("one-time access has no expiry unless an operator sets one",
+      cfg["periodDays"] is None, repr(cfg))
 check("the old product's price is not the fallback", cfg["priceMinor"] != 29700)
 check("the old product's SKU is not the fallback", cfg["sku"] != "apex-bot")
 

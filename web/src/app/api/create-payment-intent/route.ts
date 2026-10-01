@@ -12,10 +12,11 @@ import Stripe from "stripe";
  * fallback put a number on an invoice that nobody had approved for this
  * product.
  *
- * Now every business value comes from the environment and there are no
- * defaults. If the owner has not set them, this route refuses. A price
- * chosen by whoever wrote the code is a business decision taken by the wrong
- * person — see docs/PAYMENT_AND_LICENCE_DECISIONS.md.
+ * The owner-approved offer is a one-time Founder Lifetime unlock at 499 USD.
+ * The environment may still override it for a reviewed deployment, but the
+ * previous product fallback is gone. Checkout remains disabled unless
+ * A4T_CHECKOUT_ENABLED=true, so these values do not enable payments by
+ * themselves — see docs/PAYMENT_AND_LICENCE_DECISIONS.md.
  *
  * WHAT STILL CANNOT HAPPEN HERE
  *
@@ -45,8 +46,19 @@ import Stripe from "stripe";
  */
 export const CHECKOUT_DISABLED =
   "Checkout is not enabled in this release. Demo accounts are free and " +
-  "require no payment. Licences are granted by a verified payment webhook " +
-  "only, never by this route.";
+  "require no payment. The paid unlock is planned as a one-time Founder " +
+  "Lifetime purchase. Paying through this route is not how an entitlement " +
+  "is granted; licences are granted by a verified payment webhook only, " +
+  "never by this route.";
+
+const APPROVED_PRICE_MINOR = "49900";
+const APPROVED_CURRENCY = "usd";
+const APPROVED_SKU = "founder_lifetime";
+
+export const AUTHENTICATED_CHECKOUT_REQUIRED =
+  "Checkout must be created by the authenticated platform API before it " +
+  "can be enabled. This browser route cannot stamp a verified platform " +
+  "user id onto the payment metadata.";
 
 const MISSING = (what: string) =>
   NextResponse.json(
@@ -75,15 +87,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (process.env.A4T_AUTHENTICATED_CHECKOUT_ENABLED !== "true") {
+    return NextResponse.json(
+      {
+        error: AUTHENTICATED_CHECKOUT_REQUIRED,
+        checkoutEnabled: false,
+      },
+      { status: 503 },
+    );
+  }
+
   const key = process.env.STRIPE_SECRET_KEY;
-  const priceMinor = process.env.A4T_PRICE_MINOR;
-  const currency = process.env.A4T_CURRENCY;
-  const sku = process.env.A4T_SKU;
+  const priceMinor = process.env.A4T_PRICE_MINOR ?? APPROVED_PRICE_MINOR;
+  const currency = process.env.A4T_CURRENCY ?? APPROVED_CURRENCY;
+  const sku = process.env.A4T_SKU ?? APPROVED_SKU;
 
   if (!key) return MISSING("STRIPE_SECRET_KEY");
-  if (!priceMinor) return MISSING("A4T_PRICE_MINOR");
-  if (!currency) return MISSING("A4T_CURRENCY");
-  if (!sku) return MISSING("A4T_SKU");
 
   const amount = Number.parseInt(priceMinor, 10);
   if (!Number.isFinite(amount) || amount <= 0) {

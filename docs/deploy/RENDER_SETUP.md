@@ -441,7 +441,8 @@ Listed so they can be recognised, not so they can be tried.
 |---|---|
 | `LIVE_TRADING_ENABLED` | intended to enable real-money execution. No execution path exists behind it in this release and `entitlement.live_execution_enabled()` returns a literal `False`, so it cannot actually enable anything — but `/readyz` fails if it is set, deliberately, because its presence means somebody is trying. |
 | `APEX_ALLOW_LIVE_ACCOUNTS` | would allow a real-money account to be selected. |
-| `A4T_CHECKOUT_ENABLED` | would open checkout. There is no approved price, currency, SKU, legal entity or refund policy yet. |
+| `A4T_CHECKOUT_ENABLED` | would open the first checkout gate. Keep off until authenticated checkout, tax, legal and refund policy are ready. |
+| `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | second checkout gate. Keep off until checkout creation is behind verified platform auth. |
 | `A4T_STRIPE_WEBHOOK_SECRET` | only meaningful with checkout on; the webhook answers 503 while it is off. |
 | `ALLOW_LOCAL_BACKEND_DEV` | makes a per-container store acceptable. In production that silently breaks ownership, entitlement and order idempotency. `/readyz` fails if it is set. |
 | `ALLOW_PLAINTEXT_DEV_STORAGE` | stores broker tokens **unencrypted**. `/readyz` fails if it is set. |

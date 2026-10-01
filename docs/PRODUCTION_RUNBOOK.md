@@ -30,7 +30,7 @@ this. Granting or withdrawing a client's entitlement by hand is
 | `APP_ENV` | yes | `production`. |
 | `PAPER_TRADING`, `CTRADER_ENV`, `BROKER` | — | **Do not change these as part of an operational task.** |
 | `A4T_STRIPE_WEBHOOK_SECRET` | only with billing | Unset means the webhook answers 503. |
-| `A4T_PLAN`, `A4T_LICENCE_DAYS` | optional | See `docs/PAYMENT_AND_LICENCE_DECISIONS.md`. |
+| `A4T_PLAN`, `A4T_PURCHASE_MODE`, `A4T_LICENCE_DAYS` | optional | Defaults describe the one-time `founder_lifetime` offer. Leave `A4T_LICENCE_DAYS` unset for no expiry. |
 | `RL_A4T_*_PER_MIN` | optional | Rate limits, below. |
 | `RATE_LIMIT_STORE` | optional | `auto` (default) uses the shared backend. `memory` forces the per-process limiter, which is a development choice and makes `/readyz` refuse in production. |
 
@@ -53,7 +53,8 @@ The store refuses to start if the first two are needed and `APP_ENV` is not
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **yes** | Public by design. Never the service key. |
 | `NEXT_PUBLIC_API_BASE_URL` | yes | Empty means same origin. |
 | `STRIPE_SECRET_KEY` | only with billing | Server-side only; never prefixed `NEXT_PUBLIC_`. |
-| `A4T_PRICE_MINOR`, `A4T_CURRENCY`, `A4T_SKU` | only with billing | No defaults. Unset means checkout answers 503. |
+| `A4T_PRICE_MINOR`, `A4T_CURRENCY`, `A4T_SKU` | only with billing | Defaults are `49900`, `usd`, `founder_lifetime`. Checkout still needs both gates below. |
+| `A4T_CHECKOUT_ENABLED`, `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | only with billing | Both must stay off until paid checkout is reviewed and created from authenticated platform API. |
 | `A4T_CHECKOUT_ENABLED` | only with billing | Must be `true`. Currently off. |
 
 A variable prefixed `NEXT_PUBLIC_` is compiled into the browser bundle. Anything

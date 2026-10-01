@@ -114,7 +114,7 @@ thing.
 
 | # | Gate | Status |
 |---|---|---|
-| 1 | Owner-approved pricing | ❌ D1, D2, D3, D5 |
+| 1 | Owner-approved pricing | ⚠️ D1-D3 decided: 499 USD one-time `founder_lifetime`; D5 tax handling still open |
 | 2 | Owner-approved legal, contact, refund | ❌ L1–L4, L6–L8 |
 | 3 | Verified payment webhook works | ❌ X5 — tested with a local signature, never a real delivery |
 | 4 | Licences granted correctly | ⚠️ correct in test; depends on gate 3 |
@@ -161,8 +161,7 @@ work moved towards it.
 
 ## The shortest path to a private beta
 
-1. **Owner:** decide D6 — is paid access part of beta? If no, D1–D3 and D5
-   leave the beta gate entirely and checkout stays off.
+1. **Owner:** D1-D3 are decided: the paid offer is a 499 USD one-time `founder_lifetime` unlock. D5 tax handling and D6 beta timing remain open, and checkout stays off until authenticated checkout, legal and refund policy are ready.
 2. **Owner:** create or name the production Supabase project (X3).
 3. ~~**Owner:** register the production OAuth redirect URI in the cTrader
    portal (X4)~~ — **done.** Configured, and a real authorisation has
@@ -180,8 +179,7 @@ needs a browser and a phone and cannot be done from a script.
 
 ## The shortest path to a public paid launch
 
-Everything above, then: L1–L4 and L6–L8 from the owner; D1–D3 and D5 from the
-owner; move checkout creation behind the authenticated platform API; register
+Everything above, then: L1–L4 and L6–L8 from the owner; D5 tax handling and refund policy from the owner; move checkout creation behind the authenticated platform API; register
 the Stripe endpoint and take one real delivery end to end (X5); HTTPS and
 domain (X6); monitoring (X7); exercise a restore once (X8); five external
 testers (X9).
@@ -226,7 +224,7 @@ Mobile destinations went from 1 of 8 to 8 of 8.
 |---|---|---|
 | **Ship a private demo beta now?** | **No.** X1 is part-closed: the reads are proven against a real broker (2026-09-30, account …456), the automation controls and the screens are not | Engineering, by running the eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md` in a browser |
 | **Ship a public beta?** | **No.** Nine of twelve public-launch gates are open | Owner, for the decisions; engineering, for X2–X9 |
-| **Take money?** | **No.** Checkout is off, no price is approved, and the route refuses | Owner — D1, D2, D3, D5, D6 |
+| **Take money?** | **No.** The 499 USD one-time Founder Lifetime offer is approved, but checkout is off and the route refuses until authenticated checkout, legal, refund and tax are ready | Owner — D5, D6 and legal/refund decisions; engineering — authenticated checkout |
 | **Enable live trading?** | **No, and not by a flag.** It is not implemented. `LIVE_TRADING_ENABLED` has no execution path behind it and `/readyz` refuses to start if it is set | A separate milestone with its own review |
 
 None of these is blocked on code that is missing and unwritten. Three are

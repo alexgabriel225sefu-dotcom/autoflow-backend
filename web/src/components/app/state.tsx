@@ -185,7 +185,7 @@ export function ExecutionBadge({ execution }: { execution?: Execution | null }) 
  *
  * Holding the wording in the backend is the point: a promise about pricing
  * written in a component is a promise nobody reviewed, and this product has
- * no approved price to promise.
+ * no active checkout to promise.
  */
 export function PlanNotice({ execution }: { execution?: Execution | null }) {
   if (!execution?.planNotice) return null;

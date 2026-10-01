@@ -68,6 +68,16 @@ export default function LicensePage() {
 
           <PlanNotice execution={me.result.data.execution} />
 
+          <div className="notice notice-accent">
+            <p style={{ fontWeight: 600 }}>Free demo now. One-time unlock later.</p>
+            <p className="muted" style={{ fontSize: ".85rem" }}>
+              Demo accounts require no payment. The planned paid offer is
+              Founder Lifetime access for $499 as a one-time purchase. Checkout
+              is not enabled yet, and live execution is not available in this
+              release.
+            </p>
+          </div>
+
           {me.result.data.licence.state === "revoked" ? (
             <div className="notice notice-warn" role="alert">
               <p>

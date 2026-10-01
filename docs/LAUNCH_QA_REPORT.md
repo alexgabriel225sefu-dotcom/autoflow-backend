@@ -176,8 +176,8 @@ greppable placeholder.
 
 | # | Blocked | Detail |
 |---|---|---|
-| D1–D3, D5 | Price, currency, SKU, plan shape, tax | `docs/PAYMENT_AND_LICENCE_DECISIONS.md`. Checkout answers 503 until set. |
-| D6 | Whether paid access is in beta at all | Choosing "no" removes D1–D3 and D5 from the beta gate entirely. |
+| D5 | Tax handling | Price/currency/SKU/plan are decided as 499 USD one-time `founder_lifetime`; checkout still answers 503 until tax and authenticated checkout are ready. |
+| D6 | Whether paid access is in beta at all | Demo remains free; paid Founder Lifetime unlock is planned but not active. |
 | L1–L2 | Legal entity, registered address, company number, governing law | `docs/LEGAL_LAUNCH_BLOCKERS.md` |
 | L3 | Support contact address | The old one belonged to another brand and was removed, not replaced. |
 | L4 | Refund policy | The webhook already revokes on refund; entitlement is not a code question. |

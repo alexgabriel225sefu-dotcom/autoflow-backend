@@ -293,11 +293,16 @@ check("billing is skipped while checkout is disabled",
 check("and skipped does not count as degraded",
       "billing" not in body.get("degraded", []))
 st, body = fresh(A4T_CHECKOUT_ENABLED="true")
-check("enabling checkout without a price refuses readiness", st == 503, str(st))
+check("enabling checkout without authenticated checkout refuses readiness",
+      st == 503, str(st))
 check("and billing is the failing check", status_of(body, "billing") == "fail")
-st, body = fresh(A4T_CHECKOUT_ENABLED="true", A4T_PRICE_MINOR="1000",
-                 A4T_CURRENCY="EUR", A4T_SKU="a4t-beta")
-check("a fully configured checkout is ok", status_of(body, "billing") == "ok",
+check("and the missing gate is named",
+      "A4T_AUTHENTICATED_CHECKOUT_ENABLED" in json.dumps(body))
+st, body = fresh(A4T_CHECKOUT_ENABLED="true",
+                 A4T_AUTHENTICATED_CHECKOUT_ENABLED="true",
+                 A4T_STRIPE_WEBHOOK_SECRET="whsec_ready")
+check("a fully configured authenticated checkout is ok",
+      status_of(body, "billing") == "ok",
       json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
 
 # ── 8. NOTHING secret ever reaches the response ─────────────────────────────
