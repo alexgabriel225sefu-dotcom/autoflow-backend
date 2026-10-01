@@ -313,6 +313,23 @@ Tests run after `5fb0a1a`:
 | `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_provider_safety.py` | Pass, MT4/MT5 providers remain hidden and read-only |
 | `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 29 platform modules |
 | `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_smoke_harness.py` | Pass |
+
+### Follow-up on 2026-09-30 — web dependency restore and verification
+
+Commit after `1fe3498`:
+
+| Commit | Change |
+|---|---|
+| `cec3771` | Removes an unused connected-account variable from the cTrader connect page, after local ESLint surfaced it. No product behavior changes. |
+
+Verification after `cec3771`:
+
+| Command | Result |
+|---|---|
+| `npm ci --prefer-offline --fetch-retries=2` in `web/` | Pass; 540 packages installed, 541 audited, 0 vulnerabilities. Warned that `unrs-resolver@1.12.2` has an install script not covered by `allowScripts`; no approval or policy change was made. |
+| `npm run build` in `web/` | Pass; Next 16.3.6 generated 24 routes. Warned that the `middleware` file convention is deprecated in favor of `proxy`. |
+| `npx eslint src --format stylish` in `web/` | Pass with 0 errors and 8 warnings: existing `<img>` warnings in `components/blocks/hero-section-{1,2}.tsx` and one `no-unused-expressions` warning in `src/test/e2e.test.ts`. |
+| `npm test` / `npx vitest run src/app/routes.test.ts --reporter=verbose` | Not verified locally. Vitest starts under Windows Node `v24.20.0` but does not report completion before manual interruption; no product test failure was produced. |
 ## 1h. MT4/MT5: the finding that decides the approach
 
 MetaTrader 4 and MetaTrader 5 have no first-party machine interface for third parties that fits this product. The only
@@ -538,6 +555,8 @@ Read `docs/RELEASE_READINESS.md` for the gates,
 `docs/PRODUCTION_RUNBOOK.md` for operating it, `docs/BETA_CONFIGURATION.md`
 for standing up a beta, and `docs/CTRADER_DEMO_SMOKE_TEST.md` for the thing
 to do next.
+
+
 
 
 

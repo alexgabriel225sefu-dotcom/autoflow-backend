@@ -95,12 +95,6 @@ export default function ConnectPage() {
   // which must never invite step 1 at somebody who has finished step 2.
   const isConnected = Boolean(
     status.result?.ok && status.result.data.connected);
-  // The first connected account, so the page can answer "which account am I
-  // on" without anybody having to ask the server.
-  const connectedCtid =
-    status.result?.ok && status.result.data.accounts?.length
-      ? status.result.data.accounts[0].ctid
-      : null;
 
   // Resume after the visitor comes back from cTrader. Two ways in, because on
   // a phone only the second one is reliable:
@@ -338,3 +332,4 @@ export default function ConnectPage() {
     </main>
   );
 }
+
