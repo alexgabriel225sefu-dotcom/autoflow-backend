@@ -337,14 +337,14 @@ Commit after `22e4bc8`:
 
 | Commit | Change |
 |---|---|
-| `PENDING` | Records the owner decision that demo remains free and the paid offer is a one-time Founder Lifetime unlock at 499 USD. Billing defaults now describe `49900` / `usd` / `founder_lifetime` / `one_time`, but checkout still fails readiness unless both `A4T_CHECKOUT_ENABLED` and `A4T_AUTHENTICATED_CHECKOUT_ENABLED` are explicitly set. The legacy browser checkout route also refuses before creating a Stripe PaymentIntent unless the authenticated-checkout gate is set. No payment activation was performed. |
+| `PENDING` | Records the owner decision that demo remains free and the paid offer is a one-time Founder Lifetime unlock at 499 USD. Billing defaults now describe `49900` / `usd` / `founder_lifetime` / `one_time`, but checkout still fails readiness unless both `A4T_CHECKOUT_ENABLED` and `A4T_AUTHENTICATED_CHECKOUT_ENABLED` are explicitly set. The legacy browser checkout route also refuses before creating a Stripe PaymentIntent unless the authenticated-checkout gate is set. No payment activation was performed. A follow-up also adds the authenticated `/api/v1/billing/checkout` route shape, but it returns 503 while checkout is off and 501 even when both gates are set, so it cannot charge yet. |
 
 Tests run after `PENDING`:
 
 | Command | Result |
 |---|---|
-| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_billing.py` | Pass; webhook remains the only grant path, the offer is one-time founder access, and the browser checkout route has the authenticated-checkout gate before Stripe PaymentIntent creation. |
-| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_health.py` | Pass; checkout enabled without `A4T_AUTHENTICATED_CHECKOUT_ENABLED` refuses readiness. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_billing.py` | Pass; webhook remains the only grant path, the offer is one-time founder access, `/api/v1/billing/checkout` cannot charge yet, and the browser checkout route has the authenticated-checkout gate before Stripe PaymentIntent creation. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_health.py` | Pass; checkout enabled without `A4T_AUTHENTICATED_CHECKOUT_ENABLED` refuses readiness. |`r`n| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_http.py` | Pass; platform HTTP routes still behave after adding the checkout route shape. |
 | `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_entitlement.py` | Pass; demo remains free and paid live still unlocks no live execution in this release. |
 | `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass; live execution remains unreachable across 29 platform modules. |
 | `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_product_copy.py` | Pass; 127 files audited, no profit promise or live-trading-available claim. |

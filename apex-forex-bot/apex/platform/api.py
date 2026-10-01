@@ -267,6 +267,18 @@ def _dispatch(method, route, headers, body, query=None):
             (headers or {}).get("Stripe-Signature")
             or (headers or {}).get("stripe-signature") or "")
 
+    if route == "billing/checkout" and method == "POST":
+        _authenticate(headers, fresh=True)
+        offer = _billing.public_offer()
+        if (not _billing.checkout_enabled()
+                or not _billing.authenticated_checkout_enabled()):
+            return _err(503, "CHECKOUT_NOT_ENABLED",
+                        "checkout is not enabled for this release",
+                        offer=offer)
+        return _err(501, "CHECKOUT_NOT_IMPLEMENTED",
+                    "authenticated checkout is not implemented yet",
+                    offer=offer)
+
     if route == "ctrader/callback" and method == "GET":
         return _ok(_link.handle_callback(query or {}), pendingOnly=True)
 

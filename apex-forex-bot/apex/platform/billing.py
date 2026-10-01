@@ -106,6 +106,31 @@ def product_config():
     }
 
 
+def checkout_enabled():
+    """First checkout gate. Off unless explicitly enabled."""
+    return _env("A4T_CHECKOUT_ENABLED") == "true"
+
+
+def authenticated_checkout_enabled():
+    """Second gate: checkout creation must be behind verified platform auth."""
+    return _env("A4T_AUTHENTICATED_CHECKOUT_ENABLED") == "true"
+
+
+def public_offer():
+    """Safe offer metadata for UI/API responses. Carries no provider secret."""
+    cfg = product_config()
+    return {
+        "sku": cfg["sku"],
+        "plan": cfg["plan"],
+        "purchaseMode": cfg["purchaseMode"],
+        "priceMinor": cfg["priceMinor"],
+        "currency": cfg["currency"],
+        "periodDays": cfg["periodDays"],
+        "checkoutEnabled": checkout_enabled()
+                            and authenticated_checkout_enabled(),
+    }
+
+
 def verify_signature(payload: bytes, sig_header: str, secret: str, *, now=None) -> bool:
     """True only for a body this secret actually signed, recently."""
     if not secret or not sig_header:

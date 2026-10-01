@@ -227,6 +227,42 @@ try:
 finally:
     A._id.verify_token = _real_verify
 
+print("\n[10b] authenticated checkout has a route, but cannot charge yet")
+reset(USER)
+st, out = A.handle("POST", "/api/v1/billing/checkout", {}, b"{}")
+check("checkout needs a signed-in session", st == 401, str(st))
+
+_real_verify = A._id.verify_token
+A._id.verify_token = lambda tok, **kw: _P()
+try:
+    for var in ["A4T_CHECKOUT_ENABLED", "A4T_AUTHENTICATED_CHECKOUT_ENABLED"]:
+        os.environ.pop(var, None)
+    st, out = A.handle("POST", "/api/v1/billing/checkout",
+                       {"Authorization": "Bearer x"}, b"{}")
+    check("closed checkout refuses before Stripe", st == 503, str(st))
+    check("and names the code the UI can branch on",
+          out["error"]["code"] == "CHECKOUT_NOT_ENABLED", json.dumps(out))
+    offer = out["error"].get("offer") or {}
+    check("and exposes only safe offer metadata",
+          offer.get("priceMinor") == 49900
+          and offer.get("currency") == "usd"
+          and offer.get("purchaseMode") == "one_time"
+          and "secret" not in json.dumps(offer).lower(), json.dumps(offer))
+    check("closed checkout grants no licence", state(USER) == "none", state(USER))
+
+    os.environ["A4T_CHECKOUT_ENABLED"] = "true"
+    os.environ["A4T_AUTHENTICATED_CHECKOUT_ENABLED"] = "true"
+    st, out = A.handle("POST", "/api/v1/billing/checkout",
+                       {"Authorization": "Bearer x"}, b"{}")
+    check("even with both gates, checkout creation is still not implemented",
+          st == 501 and out["error"]["code"] == "CHECKOUT_NOT_IMPLEMENTED",
+          json.dumps(out))
+    check("and still grants no licence", state(USER) == "none", state(USER))
+finally:
+    A._id.verify_token = _real_verify
+    for var in ["A4T_CHECKOUT_ENABLED", "A4T_AUTHENTICATED_CHECKOUT_ENABLED"]:
+        os.environ.pop(var, None)
+
 route_src = open(os.path.join(ROOT, "..", "web", "src", "app", "api",
                               "create-payment-intent", "route.ts"),
                  encoding="utf-8").read()
