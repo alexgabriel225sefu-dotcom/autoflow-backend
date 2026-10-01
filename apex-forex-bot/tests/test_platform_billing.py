@@ -291,6 +291,84 @@ check("one-time access has no expiry unless an operator sets one",
 check("the old product's price is not the fallback", cfg["priceMinor"] != 29700)
 check("the old product's SKU is not the fallback", cfg["sku"] != "apex-bot")
 
+# ── the readiness gate must be able to FAIL ─────────────────────────────────
+# health._billing_check() used to ask whether price, currency and SKU were
+# SET. Once those gained approved defaults in this module they can never be
+# unset, so the gate had been unfalsifiable: the one check meant to stop a
+# deploy from charging an unapproved amount could not fire. offer_drift()
+# answers the question that can still go wrong — does the environment move the
+# live offer off the approved one — and every branch of it is exercised here,
+# because a guard nobody tested against a bad input is the same decoration in
+# a different shape.
+_OFFER_VARS = ["A4T_PRICE_MINOR", "A4T_CURRENCY", "A4T_SKU", "A4T_PLAN",
+               "A4T_PURCHASE_MODE", "A4T_LICENCE_DAYS"]
+
+
+def drift_with(**env):
+    """offer_drift() under an environment overlay, restored afterwards."""
+    old = {k: os.environ.get(k) for k in _OFFER_VARS}
+    for k in _OFFER_VARS:
+        os.environ.pop(k, None)
+    os.environ.update({k: v for k, v in env.items() if v is not None})
+    try:
+        return B.offer_drift()
+    finally:
+        for k, v in old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+check("nothing set means no drift — the approved offer IS the offer",
+      drift_with() == [], str(drift_with()))
+check("a different price is drift",
+      drift_with(A4T_PRICE_MINOR="19900") == ["A4T_PRICE_MINOR"],
+      str(drift_with(A4T_PRICE_MINOR="19900")))
+check("the approved price stated explicitly is NOT drift",
+      drift_with(A4T_PRICE_MINOR="49900") == [],
+      str(drift_with(A4T_PRICE_MINOR="49900")))
+# The dangerous one: product_config() swallows the ValueError and hands back
+# the approved price, so a deployment would serve 499 while its environment
+# says "abc". Green everywhere, and wrong.
+check("a price that does not parse is drift, not a silent fallback",
+      drift_with(A4T_PRICE_MINOR="abc") == ["A4T_PRICE_MINOR"],
+      str(drift_with(A4T_PRICE_MINOR="abc")))
+check("a different currency is drift",
+      drift_with(A4T_CURRENCY="eur") == ["A4T_CURRENCY"],
+      str(drift_with(A4T_CURRENCY="eur")))
+check("but capitalisation is not — USD is usd",
+      drift_with(A4T_CURRENCY="USD") == [], str(drift_with(A4T_CURRENCY="USD")))
+check("a different SKU is drift",
+      drift_with(A4T_SKU="apex-bot") == ["A4T_SKU"],
+      str(drift_with(A4T_SKU="apex-bot")))
+check("a different plan is drift",
+      drift_with(A4T_PLAN="standard") == ["A4T_PLAN"],
+      str(drift_with(A4T_PLAN="standard")))
+check("a subscription purchase mode is drift",
+      drift_with(A4T_PURCHASE_MODE="subscription") == ["A4T_PURCHASE_MODE"],
+      str(drift_with(A4T_PURCHASE_MODE="subscription")))
+# An expiry on a one-time purchase is a contradiction, not a preference: the
+# buyer paid once for access that then stops.
+check("an expiry on a one-time purchase is drift",
+      drift_with(A4T_LICENCE_DAYS="30") == ["A4T_LICENCE_DAYS"],
+      str(drift_with(A4T_LICENCE_DAYS="30")))
+check("but an expiry on a subscription is not",
+      "A4T_LICENCE_DAYS" not in drift_with(A4T_PURCHASE_MODE="subscription",
+                                           A4T_LICENCE_DAYS="30"),
+      str(drift_with(A4T_PURCHASE_MODE="subscription",
+                     A4T_LICENCE_DAYS="30")))
+check("several overrides are all reported, not just the first",
+      sorted(drift_with(A4T_PRICE_MINOR="100", A4T_CURRENCY="gbp",
+                        A4T_SKU="other"))
+      == ["A4T_CURRENCY", "A4T_PRICE_MINOR", "A4T_SKU"],
+      str(drift_with(A4T_PRICE_MINOR="100", A4T_CURRENCY="gbp",
+                     A4T_SKU="other")))
+check("and drift names variables, never the values behind them",
+      all("499" not in n and "usd" not in n
+          for n in drift_with(A4T_PRICE_MINOR="100", A4T_CURRENCY="gbp")),
+      str(drift_with(A4T_PRICE_MINOR="100", A4T_CURRENCY="gbp")))
+
 os.environ["A4T_LICENCE_DAYS"] = "30"
 reset(USER)
 body = event("checkout.session.completed", paid_session(), eid="evt_expiry_1")

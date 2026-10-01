@@ -305,6 +305,47 @@ check("a fully configured authenticated checkout is ok",
       status_of(body, "billing") == "ok",
       json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
 
+# ── the billing gate must be able to fail on the offer itself ───────────────
+# It used to ask whether price, currency and SKU were SET. Once billing.py
+# gained approved defaults those can never be unset, so the one check meant to
+# stop a deploy from charging an unapproved amount had become unfalsifiable.
+# What it asks now is whether the environment moves the live offer off the
+# approved one — a question that can still be answered "yes".
+READY = {"A4T_CHECKOUT_ENABLED": "true",
+         "A4T_AUTHENTICATED_CHECKOUT_ENABLED": "true",
+         "A4T_STRIPE_WEBHOOK_SECRET": "whsec_ready"}
+st, body = fresh(**dict(READY, A4T_PRICE_MINOR="19900"))
+check("an overridden price refuses readiness", st == 503, str(st))
+check("and billing is the check that fails",
+      status_of(body, "billing") == "fail", status_of(body, "billing"))
+check("and the variable responsible is named",
+      "A4T_PRICE_MINOR" in json.dumps(body))
+
+# The quiet one: product_config() swallows an unparseable price and returns the
+# approved value, so without this the deployment serves 499 while its own
+# environment says otherwise — and every check reads green.
+st, body = fresh(**dict(READY, A4T_PRICE_MINOR="abc"))
+check("a price that does not parse refuses readiness too", st == 503, str(st))
+check("and it is not reported as merely missing",
+      "moves the offer off the approved one" in json.dumps(body),
+      json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
+
+st, body = fresh(**dict(READY, A4T_PURCHASE_MODE="subscription"))
+check("turning a one-time purchase into a subscription refuses readiness",
+      status_of(body, "billing") == "fail", status_of(body, "billing"))
+
+st, body = fresh(**dict(READY, A4T_CURRENCY="USD"))
+check("but stating the approved currency in capitals is still ok",
+      status_of(body, "billing") == "ok",
+      json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
+
+# The amount must not be in the payload. /readyz is unauthenticated, and a
+# message naming variables is enough for an operator to go and look.
+st, body = fresh(**dict(READY, A4T_PRICE_MINOR="19900"))
+check("and the failing payload names variables, not amounts",
+      "19900" not in json.dumps(body) and "49900" not in json.dumps(body),
+      json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
+
 # ── 8. NOTHING secret ever reaches the response ─────────────────────────────
 # /healthz and /readyz are unauthenticated. This is the test that keeps them
 # safe to leave that way.

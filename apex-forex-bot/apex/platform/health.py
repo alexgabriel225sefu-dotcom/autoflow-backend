@@ -250,17 +250,28 @@ def _billing_check():
         missing.append("A4T_AUTHENTICATED_CHECKOUT_ENABLED")
     if not _billing.configured():
         missing.append("A4T_STRIPE_WEBHOOK_SECRET")
-    cfg = _billing.product_config()
-    for name, value in (("A4T_PRICE_MINOR", cfg["priceMinor"]),
-                        ("A4T_CURRENCY", cfg["currency"]),
-                        ("A4T_SKU", cfg["sku"])):
-        if value in (None, ""):
-            missing.append(name)
     if missing:
         return _check("billing", FAIL,
                       f"checkout is enabled but not configured: {', '.join(missing)}",
                       checkoutEnabled=True)
-    return _check("billing", OK, "checkout is enabled and authenticated", checkoutEnabled=True)
+    # Price, currency, SKU and plan have approved defaults in billing.py, so
+    # asking "is it set?" can never fail — this gate did exactly that, and had
+    # been unfalsifiable since the defaults landed. What can go wrong is the
+    # environment moving the offer off the approved one, or setting it to
+    # something unusable that silently falls back to the approved value. Names
+    # only in the message: /readyz is reachable without a session.
+    drift = _billing.offer_drift()
+    if drift:
+        return _check("billing", FAIL,
+                      f"checkout is enabled and the environment moves the "
+                      f"offer off the approved one: {', '.join(drift)}. "
+                      f"Either that override is the decision, and the approved "
+                      f"values in billing.py should say so, or it is a mistake "
+                      f"— and it would have charged.",
+                      checkoutEnabled=True, offerDrift=drift)
+    return _check("billing", OK,
+                  "checkout is enabled, authenticated, and serving the "
+                  "approved offer", checkoutEnabled=True)
 
 
 def _dev_flags():

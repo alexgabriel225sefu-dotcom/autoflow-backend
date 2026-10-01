@@ -106,6 +106,57 @@ def product_config():
     }
 
 
+def offer_drift():
+    """Which environment variables move the live offer off the approved one.
+
+    NAMES ONLY, never values. This answer reaches /readyz, which is reachable
+    without a session, and a variable name is the whole truth an operator needs
+    in order to go and look.
+
+    WHY THIS EXISTS, rather than a presence check
+
+    Price, currency, SKU and plan now have approved defaults in this module, so
+    "is it set?" can never fail — and a readiness check that cannot fail is
+    decoration. The gate in health.py was asking exactly that, and had been
+    unfalsifiable since the defaults landed.
+
+    What can actually go wrong is the opposite: a deployment quietly
+    overriding the approved offer, or setting it to something unusable. Nothing
+    anywhere compared the live offer against the approved one, so a price
+    nobody approved could reach an invoice with every check green.
+    """
+    drift = []
+    raw = _env("A4T_PRICE_MINOR")
+    if raw is not None:
+        try:
+            if int(raw) != APPROVED_PRICE_MINOR:
+                drift.append("A4T_PRICE_MINOR")
+        except ValueError:
+            # Set, and unusable. product_config() swallows the ValueError and
+            # returns the APPROVED price, so without this the deployment would
+            # serve 499 while the environment plainly says something else —
+            # the most dangerous of the three states, because it looks fine.
+            drift.append("A4T_PRICE_MINOR")
+    # Case-folded on purpose: "USD" and "usd" are the same currency, and
+    # failing readiness over capitalisation would teach operators to ignore
+    # this check, which is how a real drift gets waved through.
+    for name, got, approved in (
+            ("A4T_CURRENCY", _env("A4T_CURRENCY"), APPROVED_CURRENCY),
+            ("A4T_SKU", _env("A4T_SKU"), APPROVED_SKU),
+            ("A4T_PLAN", _env("A4T_PLAN"), APPROVED_PLAN),
+            ("A4T_PURCHASE_MODE", _env("A4T_PURCHASE_MODE"),
+             APPROVED_PURCHASE_MODE)):
+        if got is not None and got.strip().lower() != approved:
+            drift.append(name)
+    # An expiry on a one-time purchase is a contradiction rather than a
+    # preference: the buyer paid once, for access that then stops.
+    cfg = product_config()
+    if (str(cfg.get("purchaseMode") or "").strip().lower() == "one_time"
+            and cfg.get("periodDays") is not None):
+        drift.append("A4T_LICENCE_DAYS")
+    return drift
+
+
 def checkout_enabled():
     """First checkout gate. Off unless explicitly enabled."""
     return _env("A4T_CHECKOUT_ENABLED") == "true"
