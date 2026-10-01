@@ -117,67 +117,31 @@ live2 = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT="abcdef1234567890")
 check("liveness carries the same safe release identifier",
       live2.get("release", {}).get("commit") == "abcdef123456")
 
-# ── /healthz must not fork a process per liveness probe ─────────────────────
-# Its whole contract is to answer cheaply without touching a dependency. The
-# git fallback made it depend on git being installed and .git being intact, on
-# EVERY call — and a pruned checkout costs the 1s timeout each time, which is
-# how a convenience becomes a restart loop. The commit cannot change while the
-# process runs, so it is read once. Counted rather than described, because a
-# comment promising it is worth nothing.
-_runs = []
-_real_run = H.subprocess.run
+# ── release metadata comes from the environment, and from nowhere else ──────
+# It briefly shelled out to `git rev-parse HEAD` when the environment said
+# nothing. That broke tests/test_no_remote_execution.py, which forbids every
+# execution primitive in the production package — /deploy once handed a string
+# to a shell on the trading host behind only an admin check, and the fix was to
+# leave no primitive for a later bug to reach. It also put a fork in the
+# liveness path, where /healthz must answer without touching anything.
+#
+# That test owns the static invariant. These own the behaviour it implies:
+# absent is an acceptable answer, and nothing is invented to avoid it.
+no_env = {"RENDER_GIT_COMMIT": None, "SOURCE_VERSION": None,
+          "GIT_COMMIT": None}
+bare = with_env(lambda: H.live()[1], **no_env)
+check("with nothing in the environment, liveness still answers ok",
+      bare.get("status") == "ok", str(bare.get("status")))
+check("and reports no commit rather than going to look for one",
+      not bare.get("release", {}).get("commit"), str(bare.get("release")))
+_, bare_ready = fresh(**no_env)
+check("readiness does the same",
+      not bare_ready.get("release", {}).get("commit"),
+      str(bare_ready.get("release")))
 
-
-def _counting_run(*a, **kw):
-    _runs.append(a[0] if a else kw.get("args"))
-    return _real_run(*a, **kw)
-
-
-H._git_commit_from_checkout.cache_clear()
-H.subprocess.run = _counting_run
-try:
-    for _ in range(5):
-        with_env(lambda: H.live()[1], RENDER_GIT_COMMIT=None,
-                 SOURCE_VERSION=None, GIT_COMMIT=None)
-finally:
-    H.subprocess.run = _real_run
-check("five liveness probes fork git at most once, not five times",
-      len(_runs) <= 1, f"{len(_runs)} subprocess call(s)")
-
-# And a failure must be remembered too: a checkout that is not there now will
-# not be there on the next probe either, so retrying it forever is the same
-# defect wearing a different hat.
-_runs.clear()
-
-
-def _always_fails(*a, **kw):
-    _runs.append("called")
-    raise OSError("git is not installed")
-
-
-H._git_commit_from_checkout.cache_clear()
-H.subprocess.run = _always_fails
-try:
-    out_a = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT=None,
-                     SOURCE_VERSION=None, GIT_COMMIT=None)
-    out_b = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT=None,
-                     SOURCE_VERSION=None, GIT_COMMIT=None)
-finally:
-    H.subprocess.run = _real_run
-    H._git_commit_from_checkout.cache_clear()
-check("a failed lookup is remembered, not retried on every probe",
-      len(_runs) <= 1, f"{len(_runs)} attempt(s)")
-check("and liveness still answers ok without a commit",
-      out_a.get("status") == "ok" and out_b.get("status") == "ok",
-      f"{out_a.get('status')} / {out_b.get('status')}")
-check("and it does not invent a commit it could not read",
-      not out_a.get("release", {}).get("commit"),
-      str(out_a.get("release")))
-
-# The environment, by contrast, must NOT be cached: it is free to read and on
-# Render it is the path that answers. A cached one would serve the previous
-# deploy's commit after a restart-in-place.
-H._git_commit_from_checkout.cache_clear()
+# The environment must NOT be cached: a remembered value would report the
+# previous deploy's commit after a restart in place, which defeats the one
+# thing the field exists for — telling an operator which build is live.
 first = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT="aaaaaaaaaaaa1111")
 second = with_env(lambda: H.live()[1], RENDER_GIT_COMMIT="bbbbbbbbbbbb2222")
 check("a changed RENDER_GIT_COMMIT is reported, not remembered",

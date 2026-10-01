@@ -37,9 +37,7 @@ one. A readiness probe that passes because a variable was misspelled is worse
 than one that fails.
 """
 
-import functools
 import os
-import subprocess
 import time
 
 from apex import user_store
@@ -89,43 +87,34 @@ def _short(value):
     return text[:12]
 
 
-@functools.lru_cache(maxsize=1)
-def _git_commit_from_checkout():
-    """HEAD from the checkout, read ONCE per process — failures included.
-
-    A running process cannot change its own HEAD, so this is asked once and
-    remembered; `None` is remembered too, because a checkout that is not there
-    will not appear later either.
-
-    The cache is the point, not an optimisation. /healthz is the endpoint
-    whose entire job is to answer cheaply without touching a dependency —
-    uncached, it forks git on every liveness probe, which makes "is this
-    process running?" depend on git being installed and `.git` being intact.
-    A pruned checkout would then spend the 1s timeout on EVERY probe, and a
-    liveness endpoint that takes a second to answer is one a load balancer
-    eventually judges dead. That turns release metadata, which is a
-    convenience, into a restart loop.
-    """
-    try:
-        here = os.path.dirname(os.path.abspath(__file__))
-        root = os.path.abspath(os.path.join(here, "..", ".."))
-        out = subprocess.run(
-            ["git", "rev-parse", "--short=12", "HEAD"], cwd=root,
-            capture_output=True, text=True, timeout=1, check=True)
-        return _short(out.stdout)
-    except Exception:  # noqa: BLE001
-        return None
-
-
 def _git_commit():
-    # The environment is read on EVERY call and deliberately not cached: it
-    # costs nothing, and on Render it is the path that actually answers.
-    env_commit = _short(os.getenv("RENDER_GIT_COMMIT")
-                        or os.getenv("SOURCE_VERSION")
-                        or os.getenv("GIT_COMMIT"))
-    if env_commit:
-        return env_commit
-    return _git_commit_from_checkout()
+    """The running commit, from the platform's environment or not at all.
+
+    THERE IS NO FALLBACK THAT READS THE CHECKOUT, AND THERE MUST NOT BE.
+
+    This used to shell out to `git rev-parse HEAD` when the environment said
+    nothing. That reintroduced an execution primitive into the production
+    package, which `tests/test_no_remote_execution.py` forbids outright —
+    because `/deploy` once handed a string to a shell on the trading host
+    behind nothing but an admin check, and the fix was to leave no primitive
+    for any future bug, injection or crafted message to reach. A convenience
+    for operators is not worth reopening that.
+
+    It also put a fork and exec in the liveness path, where /healthz must
+    answer cheaply without touching anything.
+
+    On Render RENDER_GIT_COMMIT is set by the platform, so production answers
+    from the environment. Anywhere else the field is simply absent, and an
+    operator who wants the commit can read it themselves — absent is honest,
+    and a liveness endpoint owes nobody a git lookup.
+
+    The environment is read on every call and deliberately not remembered: it
+    costs nothing, and a cached value would report the previous deploy's
+    commit after a restart in place, defeating the one thing the field is for.
+    """
+    return _short(os.getenv("RENDER_GIT_COMMIT")
+                  or os.getenv("SOURCE_VERSION")
+                  or os.getenv("GIT_COMMIT"))
 
 
 def release_info():
