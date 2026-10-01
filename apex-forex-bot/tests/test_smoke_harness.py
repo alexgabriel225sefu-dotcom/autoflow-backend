@@ -597,6 +597,257 @@ for _extra, _expected in _ORDER:
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()
+# ── 8. the CONTROLS script: it acts, so it has the opposite contract ────────
+# scripts/smoke_ctrader_demo.py is read-only and section 7 walks its source to
+# keep it that way. The controls script is the other half of X1 gate 1 — start,
+# pause, resume and stop are the only part of the platform that CHANGES
+# something at the broker — so it necessarily imports automation. Two scripts,
+# two opposite contracts, both asserted, because a single file could not hold
+# both and the read script's guarantee is worth more than the convenience.
+print("\n[8] the controls script acts, and always stops what it started")
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+import smoke_ctrader_controls as C                  # noqa: E402
+
+csrc = open(os.path.join(ROOT, "scripts", "smoke_ctrader_controls.py"),
+            encoding="utf-8").read()
+
+check("it does import automation, unlike the read-only script",
+      "from apex.platform import automation" in csrc)
+check("but it still places no order itself",
+      not any(f"{t}(" in csrc for t in ("place_order", "close_position",
+                                        "amend_sltp", "submit")))
+check("redaction is installed before any platform import",
+      csrc.find("redact.install()") < csrc.find("from apex.platform"))
+check("the declared sequence is the four controls plus their idempotency",
+      C.SEQUENCE == ("status", "start", "start_again", "pause", "resume",
+                     "stop", "stop_again"), str(C.SEQUENCE))
+
+# ── it refuses on both confirmations, separately ────────────────────────────
+# One variable covering both would let an operator who meant "this is a demo
+# account" also grant "you may trade on it".
+BASE_C = {"SMOKE_CONFIRM_DEMO_ONLY": "yes",
+          "SMOKE_CONFIRM_START_AUTOMATION": "yes",
+          "SMOKE_USER_ID": "u-1", "SMOKE_RULE_ID": "r-1",
+          "TOKEN_ENCRYPTION_KEY": "a-key-that-is-long-enough"}
+
+
+def crefusal(env):
+    try:
+        C.guard_env(env)
+        return None
+    except C.Refused as e:
+        return str(e)
+
+
+check("it refuses without the demo confirmation",
+      "SMOKE_CONFIRM_DEMO_ONLY" in (crefusal(
+          dict(BASE_C, SMOKE_CONFIRM_DEMO_ONLY="")) or ""),
+      str(crefusal(dict(BASE_C, SMOKE_CONFIRM_DEMO_ONLY=""))))
+check("and separately without the start-automation confirmation",
+      "SMOKE_CONFIRM_START_AUTOMATION" in (crefusal(
+          dict(BASE_C, SMOKE_CONFIRM_START_AUTOMATION="")) or ""),
+      str(crefusal(dict(BASE_C, SMOKE_CONFIRM_START_AUTOMATION=""))))
+check("and the start refusal says a position may be opened",
+      "OPEN A DEMO" in (crefusal(
+          dict(BASE_C, SMOKE_CONFIRM_START_AUTOMATION="")) or ""))
+check("it refuses without a rule, because start would refuse anyway",
+      "SMOKE_RULE_ID" in (crefusal(dict(BASE_C, SMOKE_RULE_ID="")) or ""),
+      str(crefusal(dict(BASE_C, SMOKE_RULE_ID=""))))
+check("the demo confirmation alone is not enough",
+      crefusal({"SMOKE_CONFIRM_DEMO_ONLY": "yes"}) is not None)
+
+# ── the sequence, against fake controls that record what was called ─────────
+ccalled = []
+
+
+def fake_controls(fail_at=None):
+    """The five control functions, recording order. `fail_at` raises on one."""
+    state = {"state": "stopped", "ruleDocId": None, "mode": None}
+
+    def status(uid):
+        ccalled.append("status")
+        return dict(state)
+
+    def start(uid, rid, **kw):
+        ccalled.append("start")
+        if fail_at == "start":
+            raise RuntimeError("engine refused")
+        if state["state"] == "running" and state["ruleDocId"] == rid:
+            return dict(state, started=False, alreadyRunning=True)
+        state.update({"state": "running", "ruleDocId": rid, "mode": "demo"})
+        return dict(state, started=True, alreadyRunning=False)
+
+    def pause(uid, **kw):
+        ccalled.append("pause")
+        if fail_at == "pause":
+            raise RuntimeError("could not halt")
+        state["state"] = "paused"
+        return dict(state, paused=True)
+
+    def resume(uid, **kw):
+        ccalled.append("resume")
+        state["state"] = "running"
+        return dict(state, started=True, alreadyRunning=False)
+
+    def stop(uid, **kw):
+        ccalled.append("stop")
+        already = state["state"] == "stopped"
+        state.update({"state": "stopped", "ruleDocId": None, "mode": None})
+        return dict(state, stopped=not already, alreadyStopped=already)
+
+    return {"status": status, "start": start, "pause": pause,
+            "resume": resume, "stop": stop}, state
+
+
+# The journal is real here; an empty one must fail the journal step rather than
+# pass it, so the step is asserted to be the ONLY failure.
+cbuf = io.StringIO()
+ctrl, cstate = fake_controls()
+ccalled.clear()
+crep = C.run("u-1", "r-1", report=C.Report(out=cbuf), controls=ctrl)
+check("start, the idempotent second start, pause, resume and stop all ran",
+      ccalled == ["status", "start", "start", "pause", "resume", "stop",
+                  "stop", "status"], str(ccalled))
+check("and the account is left stopped", cstate["state"] == "stopped",
+      cstate["state"])
+check("and every step but the journal passed",
+      crep.failures == ["the journal records the controls"],
+      str(crep.failures))
+
+# ── THE PROPERTY THAT MATTERS: a failure must not leave a loop running ──────
+# A smoke test that gives up halfway and leaves automation running is worse
+# than no smoke test, because the operator reads a failure and not a warning.
+cbuf2 = io.StringIO()
+ctrl2, cstate2 = fake_controls(fail_at="pause")
+ccalled.clear()
+crep2 = C.run("u-1", "r-1", report=C.Report(out=cbuf2), controls=ctrl2)
+check("when a control fails, stop still runs", "stop" in ccalled, str(ccalled))
+check("and the account is still left stopped", cstate2["state"] == "stopped",
+      cstate2["state"])
+check("and the failure is reported", "pause is accepted" in crep2.failures,
+      str(crep2.failures))
+
+# Even when the very first start raises: nothing was started, but stop must be
+# attempted anyway, because "nothing was started" is a belief and the record is
+# the only evidence.
+cbuf3 = io.StringIO()
+ctrl3, cstate3 = fake_controls(fail_at="start")
+ccalled.clear()
+crep3 = C.run("u-1", "r-1", report=C.Report(out=cbuf3), controls=ctrl3)
+check("a start that raises still reaches the stop", "stop" in ccalled,
+      str(ccalled))
+check("and it is reported as a failed step, not a traceback",
+      "start is accepted" in crep3.failures, str(crep3.failures))
+
+# ── a stop that cannot stop must shout ─────────────────────────────────────
+def stuck_controls():
+    def status(uid):
+        return {"state": "running", "ruleDocId": "r-1", "mode": "demo"}
+
+    def start(uid, rid, **kw):
+        return {"state": "running", "ruleDocId": rid, "mode": "demo",
+                "started": True, "alreadyRunning": False}
+
+    def pause(uid, **kw):
+        return {"state": "paused", "ruleDocId": "r-1", "paused": True}
+
+    def resume(uid, **kw):
+        return {"state": "running", "ruleDocId": "r-1"}
+
+    def stop(uid, **kw):
+        return {"state": "running", "ruleDocId": "r-1", "stopped": False,
+                "alreadyStopped": False}
+    return {"status": status, "start": start, "pause": pause,
+            "resume": resume, "stop": stop}
+
+
+cbuf4 = io.StringIO()
+crep4 = C.run("u-1", "r-1", report=C.Report(out=cbuf4),
+              controls=stuck_controls())
+check("a stop that does not stop fails the run",
+      "and the account is left with nothing running" in crep4.failures,
+      str(crep4.failures))
+check("and it tells the operator to go and stop it from the dashboard",
+      "COULD NOT STOP IT" in cbuf4.getvalue(), cbuf4.getvalue()[-200:])
+check("and that run cannot exit 0",
+      C.summarise(crep4) == 1, str(C.summarise(crep4)))
+
+# ── an exception that ESCAPES must still reach the stop ─────────────────────
+# _attempt catches Exception, so every failure above is handled inside the try
+# and `finally` is indistinguishable from `else`. The case that distinguishes
+# them is a control answering with an unexpected SHAPE: `.get` on a string
+# raises outside _attempt, escapes run()'s try, and only a `finally` stops the
+# loop on the way out. That is what `finally` is for, so it is tested.
+def shape_liar():
+    calls = []
+
+    def status(uid):
+        calls.append("status")
+        return "running"            # not a dict: .get will raise
+
+    def nop(*a, **kw):
+        calls.append("other")
+        return {"state": "stopped", "alreadyStopped": True}
+    return {"status": status, "start": nop, "pause": nop, "resume": nop,
+            "stop": nop}, calls
+
+
+cbuf6 = io.StringIO()
+sl, slcalls = shape_liar()
+_escaped = None
+try:
+    C.run("u-1", "r-1", report=C.Report(out=cbuf6), controls=sl)
+except Exception as e:                                       # noqa: BLE001
+    _escaped = e
+check("a control answering with the wrong shape still reaches the stop",
+      "other" in slcalls, str(slcalls))
+check("and the operator sees the stop attempt in the report",
+      "stop is accepted" in cbuf6.getvalue(), cbuf6.getvalue()[-200:])
+
+# ── controls that LIE about idempotency must fail the run ───────────────────
+# The honest fakes above never exercise these assertions, because they answer
+# correctly. The dangerous case is a second start that really did start a
+# second loop against one account and says so, and a stop that calls an
+# already-stopped account newly stopped.
+def lying_controls():
+    def status(uid):
+        return {"state": "stopped", "ruleDocId": None, "mode": None}
+
+    def start(uid, rid, **kw):
+        # Claims a fresh start EVERY time: a second loop on one account.
+        return {"state": "running", "ruleDocId": rid, "mode": "demo",
+                "started": True, "alreadyRunning": False}
+
+    def pause(uid, **kw):
+        return {"state": "paused", "ruleDocId": "r-1", "paused": True}
+
+    def resume(uid, **kw):
+        return {"state": "running", "ruleDocId": "r-1"}
+
+    def stop(uid, **kw):
+        return {"state": "stopped", "ruleDocId": None, "stopped": True,
+                "alreadyStopped": False}
+    return {"status": status, "start": start, "pause": pause,
+            "resume": resume, "stop": stop}
+
+
+crep7 = C.run("u-1", "r-1", report=C.Report(out=io.StringIO()),
+              controls=lying_controls())
+check("a second start that claims to be a fresh start fails the run",
+      "a second start is idempotent, not a second loop" in crep7.failures,
+      str(crep7.failures))
+check("and a stop that calls an already-stopped account newly stopped fails",
+      "stopping something stopped is fine" in crep7.failures,
+      str(crep7.failures))
+
+# ── the summary refuses to bless a failed run ─────────────────────────────
+cbuf5 = io.StringIO()
+crep5 = C.Report(out=cbuf5)
+crep5.step("something", True)
+check("a clean controls run exits 0", C.summarise(crep5) == 0)
+check("and says automation is stopped",
+      "automation is stopped" in cbuf5.getvalue(), cbuf5.getvalue()[-200:])
+
 if _fails:
     print(f"FAILED ({len(_fails)}):")
     for f in _fails:
