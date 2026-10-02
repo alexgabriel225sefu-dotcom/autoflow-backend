@@ -287,7 +287,7 @@ try:
              "dash": _ul.get_dash, "may": _own.may_trade,
              "auth": _gates.authorize_order, "units": _ul.forex.calc_units}
     try:
-        _ul._make_broker = lambda user: (_Broker(), _Cfg())
+        _ul._make_broker = lambda user, user_id=None: (_Broker(), _Cfg())
         _ul.user_store.load = lambda uid: {"paper": True,
                                            "paper_balance": 10000}
         _ul.get_dash = lambda uid: {}

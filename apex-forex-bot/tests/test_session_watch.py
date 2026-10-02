@@ -102,7 +102,7 @@ _orig_refresh = _ul._refresh_ctrader_token
 
 LIVE = {"ctrader_account_id": 47765456, "ctrader_env": "demo", "paper": False}
 
-_ul._make_broker = lambda user: (_Broker(2999.45), object())
+_ul._make_broker = lambda user, user_id=None: (_Broker(2999.45), object())
 ok, detail = sw._reconnect("u1", LIVE)
 check("a balance that returns → OK", ok is True, detail)
 check("...and the amount is reported, not just 'connected'",
@@ -113,7 +113,7 @@ def _reject(_n):
     raise RuntimeError("account auth failed: CH_ACCESS_TOKEN_INVALID")
 
 
-_ul._make_broker = lambda user: (_Broker(_reject), object())
+_ul._make_broker = lambda user, user_id=None: (_Broker(_reject), object())
 _ul._refresh_ctrader_token = lambda uid, cfg: False
 ok, detail = sw._reconnect("u1", LIVE)
 check("a rejected token → NOT ok", ok is False, detail)
@@ -122,7 +122,7 @@ check("...and the broker's own reason survives into the message",
 
 # The repair that matters: valid on Friday, expired by Sunday.
 _healed = _Broker(lambda n: (_reject(n) if n == 1 else 3100.0))
-_ul._make_broker = lambda user: (_healed, object())
+_ul._make_broker = lambda user, user_id=None: (_healed, object())
 _ul._refresh_ctrader_token = lambda uid, cfg: True
 ok, detail = sw._reconnect("u1", LIVE)
 check("an EXPIRED token is refreshed and retried → OK", ok is True, detail)
@@ -132,14 +132,14 @@ check("...and the client is told the token was refreshed",
 # The two post-refresh outcomes must not be reported as the same thing: one
 # sends the client to /ctrader, the other means the broker itself is down.
 _stuck = _Broker(_reject)
-_ul._make_broker = lambda user: (_stuck, object())
+_ul._make_broker = lambda user, user_id=None: (_stuck, object())
 _ul._refresh_ctrader_token = lambda uid, cfg: True
 ok, detail = sw._reconnect("u1", LIVE)
 check("refreshed but still unreachable → NOT ok", ok is False, detail)
 check("...and says the refresh WORKED, not that it failed",
       "token refreshed" in detail and "refresh failed" not in detail, detail)
 
-_ul._make_broker = lambda user: (_Broker(1.0), object())
+_ul._make_broker = lambda user, user_id=None: (_Broker(1.0), object())
 check("a paper account needs no broker session",
       sw._reconnect("u1", {"paper": True})[0] is True)
 check("an unlinked account fails loudly rather than claiming success",
@@ -180,7 +180,7 @@ check("both are ESSENTIAL",
 print("\n6. The open alert carries the reconnect VERDICT, not just the event")
 sent = []
 sw._alert = lambda uid, payload: sent.append(payload)
-_ul._make_broker = lambda user: (_Broker(_reject), object())
+_ul._make_broker = lambda user, user_id=None: (_Broker(_reject), object())
 _ul._refresh_ctrader_token = lambda uid, cfg: False
 sw._on_open([("u1", LIVE)])
 check("one message per user", len(sent) == 1, str(sent))
@@ -191,7 +191,7 @@ check("and the reason the client has to act on",
       sent and "CH_ACCESS_TOKEN_INVALID" in sent[0]["detail"])
 
 sent.clear()
-_ul._make_broker = lambda user: (_Broker(2999.45), object())
+_ul._make_broker = lambda user, user_id=None: (_Broker(2999.45), object())
 sw._on_open([("u1", LIVE)])
 check("a healthy reconnect reports ok=True", sent and sent[0]["ok"] is True)
 _ul._make_broker = _orig_make
@@ -201,7 +201,7 @@ print("\n7. One user's failure never silences the next")
 sent.clear()
 
 
-def _explode(user):
+def _explode(user, user_id=None):
     raise RuntimeError("boom")
 
 

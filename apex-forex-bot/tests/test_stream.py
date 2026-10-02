@@ -107,7 +107,7 @@ class FakeBroker:
 
 markets.snapshot = counting_snapshot
 _orig_make = user_loop._make_broker
-user_loop._make_broker = lambda user: (FakeBroker(), None)
+user_loop._make_broker = lambda user, user_id=None: (FakeBroker(), None)
 stream.reset()
 try:
     ids = []

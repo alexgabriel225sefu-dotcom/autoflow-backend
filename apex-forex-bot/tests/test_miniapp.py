@@ -144,7 +144,7 @@ class FakeBroker:
 import apex.user_loop as _ul  # noqa: E402
 _orig_make = _ul._make_broker
 fake = FakeBroker()
-_ul._make_broker = lambda user: (fake, object())
+_ul._make_broker = lambda user, user_id=None: (fake, object())
 
 print("\n5. The replay window is anchored to the TRADE, not to today")
 rep = api.replay(ME, api.trade_id(A), "15m")
@@ -194,7 +194,7 @@ except api.ReplayError as e:
           e.code == "INVALID_TIMEFRAME", e.code)
 
 
-def _boom(user):
+def _boom(user, user_id=None):
     raise RuntimeError("cTrader unavailable")
 
 
@@ -204,7 +204,7 @@ try:
 except api.ReplayError as e:
     check("a broker outage is a clean code",
           e.code == "MARKET_DATA_UNAVAILABLE", e.code)
-_ul._make_broker = lambda user: (FakeBroker(bars=0), object())
+_ul._make_broker = lambda user, user_id=None: (FakeBroker(bars=0), object())
 try:
     api.replay(ME, api.trade_id(A), "15m"); check("no bars raised", False)
 except api.ReplayError as e:
