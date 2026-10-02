@@ -144,11 +144,16 @@ def start(user_id, rule_doc_id, *, starter=None, now=None):
     # Cross-process guard. user_store.claim is SET NX, the only primitive that
     # sees another container; None means no shared backend to ask, which is
     # development and carries on.
-    token = user_store.claim(_k_lock(user_id), ttl_s=_START_LOCK_TTL_S)
+    # claim_value rather than claim, so the lock carries WHO holds it and only
+    # that holder can drop it. claim() writes a bare "1", which any process
+    # could then release — including one releasing somebody else's lock.
+    lock = _k_lock(user_id)
+    token = user_store.claim_value(lock, corr, ttl_s=_START_LOCK_TTL_S)
     if token is False:
         raise AutomationRefused(
             "START_IN_PROGRESS",
             "another start for this account is already in flight")
+    held = token is True
 
     if starter is None:
         from apex import user_loop
@@ -173,7 +178,7 @@ def start(user_id, rule_doc_id, *, starter=None, now=None):
                                 f"the account settings could not be saved "
                                 f"({type(e).__name__})")
 
-    ok = starter(user_id)
+    ok = _run_starter(starter, user_id, lock, corr, held)
     if ok is False:
         _jstore.record_error(
             "the engine refused to start this loop",
@@ -199,6 +204,30 @@ def start(user_id, rule_doc_id, *, starter=None, now=None):
                         f"account {conn.get('ctid')}.",
                    correlation_id=corr)
     return dict(status(user_id), started=True, alreadyRunning=False)
+
+
+def _run_starter(starter, user_id, lock, corr, held):
+    """Call the engine, then DROP THE START LOCK, whatever happened.
+
+    The lock exists to stop two containers starting one account at the same
+    moment; it is not meant to outlive the attempt. It was never released, so
+    it sat for its full TTL — and the first thing anybody does after pausing is
+    resume, which goes through start and was refused for thirty seconds with
+    "another start for this account is already in flight". That message was
+    false: nothing was in flight. Found on the first real run of
+    scripts/smoke_ctrader_controls.py against the broker.
+
+    The release is best-effort on purpose. Failing to drop a lock that expires
+    on its own must not fail a start that already succeeded.
+    """
+    try:
+        return starter(user_id)
+    finally:
+        if held:
+            try:
+                user_store.release_claim(lock, corr)
+            except Exception:                               # noqa: BLE001
+                pass
 
 
 def pause(user_id, *, stopper=None):
@@ -234,7 +263,14 @@ def resume(user_id, *, starter=None):
     # Everything is re-checked. A licence can lapse and a rule can be archived
     # while automation sits paused, and resuming is a fresh start, not the
     # undoing of a pause.
-    _write(user_id, dict(rec, state=STOPPED))
+    #
+    # The PAUSED record is NOT written away first. It used to be set to STOPPED
+    # before start was called, so a start that then refused left the client in
+    # stopped-but-still-remembering-a-rule — a state no control recovers from,
+    # because resume raises NOT_PAUSED and the screen says stopped for
+    # something they asked to resume. start() only treats RUNNING as a reason
+    # to refuse, so PAUSED passes through it untouched, and a failed resume
+    # leaves the pause exactly where it was.
     return start(user_id, rid, starter=starter)
 
 

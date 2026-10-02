@@ -363,6 +363,148 @@ finally:
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()
+# ── the start lock must be RELEASED, and a failed resume must stay paused ───
+# Both found on the first real run of scripts/smoke_ctrader_controls.py against
+# the broker, and neither had a test. START_IN_PROGRESS appeared nowhere in the
+# suite, and resume was exercised only through HTTP.
+print("\n[11] the start lock is dropped, and a failed resume keeps the pause")
+
+_locks = {}
+_lock_calls = []
+
+
+def _fake_claim_value(key, value, ttl_s=120):
+    """SET NX, in memory: True for the winner, False while somebody holds it."""
+    _lock_calls.append(("claim", str(value)))
+    if key in _locks:
+        return False
+    _locks[key] = str(value)
+    return True
+
+
+def _fake_release(key, value):
+    """Compare-and-delete, like the real Lua script: only the owner drops it."""
+    _lock_calls.append(("release", str(value)))
+    if _locks.get(key) == str(value):
+        del _locks[key]
+        return True
+    return False
+
+
+_real_cv = AU.user_store.claim_value
+_real_rel = AU.user_store.release_claim
+AU.user_store.claim_value = _fake_claim_value
+AU.user_store.release_claim = _fake_release
+try:
+    # Self-contained: earlier sections revoke the licence and archive rules, so
+    # this builds its own through the real API rather than borrowing theirs.
+    ST._write(f"{ST._ns()}:{ST._P}:licence:{USER}", None)
+    connect([DEMO_ACC, LIVE_ACC])
+    select(501)
+    _s, _b = A.handle("POST", "/api/v1/rules", HDR, json.dumps({
+        "name": "lock rule", "symbols": ["EUR_USD"], "timeframe": "1h",
+        "accountId": "501", "sides": "BUY",
+        "entry": {"combine": "AND", "conditions": [
+            {"id": "rsi", "params": {"op": "below", "value": 30}}]},
+        "exit": {"combine": "OR", "conditions": [
+            {"id": "rsi", "params": {"op": "above", "value": 70}}]},
+    }).encode())
+    rid = _b["rule"]["ruleDocId"]
+    A.handle("POST", f"/api/v1/rules/{rid}/activate", HDR, None)
+    AU.stop(USER)
+
+    # A successful start must leave no lock behind.
+    _locks.clear(); _lock_calls.clear()
+    AU.start(USER, rid, starter=lambda uid: True)
+    check("a successful start releases its lock", _locks == {}, str(_locks))
+    check("and releases it with the token it claimed with",
+          [v for k, v in _lock_calls if k == "claim"]
+          == [v for k, v in _lock_calls if k == "release"],
+          str(_lock_calls))
+
+    # THE REGRESSION: pause, then resume at once. This is what a client does,
+    # and it was refused for thirty seconds with "another start for this
+    # account is already in flight" — a sentence that was simply untrue.
+    AU.pause(USER)
+    _lock_calls.clear()
+    resumed = AU.resume(USER, starter=lambda uid: True)
+    check("resume immediately after pause is accepted",
+          resumed.get("state") == "running", str(resumed.get("state")))
+    check("and it leaves no lock behind either", _locks == {}, str(_locks))
+    AU.stop(USER)
+
+    # A start that the engine refuses must still drop the lock, or one refusal
+    # locks the account out for the TTL.
+    _locks.clear(); _lock_calls.clear()
+    try:
+        AU.start(USER, rid, starter=lambda uid: False)
+        check("an engine refusal raises", False, "it did not")
+    except AU.AutomationRefused as e:
+        check("an engine refusal raises ENGINE_REFUSED", e.code == "ENGINE_REFUSED",
+              e.code)
+    check("and a refused start still releases its lock", _locks == {},
+          str(_locks))
+
+    # And a starter that raises, which is not the same path.
+    _locks.clear()
+    try:
+        AU.start(USER, rid, starter=lambda uid: (_ for _ in ()).throw(
+            RuntimeError("engine exploded")))
+    except Exception:
+        pass
+    check("a starter that raises still releases its lock", _locks == {},
+          str(_locks))
+
+    # Somebody else's lock is not ours to drop.
+    _locks.clear(); _lock_calls.clear()
+    _locks[AU._k_lock(USER)] = "another-container"
+    try:
+        AU.start(USER, rid, starter=lambda uid: True)
+        check("a held lock refuses the start", False, "it proceeded")
+    except AU.AutomationRefused as e:
+        check("a held lock refuses with START_IN_PROGRESS",
+              e.code == "START_IN_PROGRESS", e.code)
+    check("and it does NOT release a lock it never won",
+          _locks.get(AU._k_lock(USER)) == "another-container", str(_locks))
+    _locks.clear()
+
+    # No shared backend: nothing was claimed, so nothing is released.
+    AU.user_store.claim_value = lambda key, value, ttl_s=120: None
+    _lock_calls.clear()
+    AU.stop(USER)
+    AU.start(USER, rid, starter=lambda uid: True)
+    check("with no shared backend, no release is attempted",
+          [k for k, _ in _lock_calls] == [], str(_lock_calls))
+    AU.user_store.claim_value = _fake_claim_value
+    AU.stop(USER)
+
+    # ── a failed resume must leave the pause intact ─────────────────────────
+    # It used to write STOPPED before calling start. A start that then refused
+    # left stopped-but-still-remembering-a-rule: resume raises NOT_PAUSED, and
+    # no control recovers it.
+    _locks.clear()
+    AU.start(USER, rid, starter=lambda uid: True)
+    AU.pause(USER)
+    try:
+        AU.resume(USER, starter=lambda uid: False)
+        check("a resume whose engine refuses raises", False, "it did not")
+    except AU.AutomationRefused:
+        pass
+    check("a failed resume leaves automation PAUSED, not stopped",
+          AU.status(USER).get("state") == "paused",
+          str(AU.status(USER).get("state")))
+    check("and the rule is still remembered, so it can be retried",
+          AU.status(USER).get("ruleDocId") == rid,
+          str(AU.status(USER).get("ruleDocId")))
+    # The proof that it is recoverable: the same call again, and it works.
+    again = AU.resume(USER, starter=lambda uid: True)
+    check("so resuming again works, instead of being stuck",
+          again.get("state") == "running", str(again.get("state")))
+    AU.stop(USER)
+finally:
+    AU.user_store.claim_value = _real_cv
+    AU.user_store.release_claim = _real_rel
+
 if _fails:
     print(f"FAILED ({len(_fails)}):")
     for f in _fails:
