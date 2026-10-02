@@ -1571,7 +1571,7 @@ def _loop(user_id, alert_fn, gen=None):
         except Exception as e:
             print(f"[UserLoop:{user_id}] cross-product scrub persist failed: {e}")
 
-    broker, cfg = _make_broker(user)
+    broker, cfg = _make_broker(user, user_id)
 
     symbol = cfg.SYMBOL
     # Multi-symbol scanner (premium spec): the client can watch ANY basket of
@@ -4993,7 +4993,7 @@ def live_balance(user_id):
     if user.get("paper", True):
         return None
     try:
-        broker, _cfg = _make_broker(user)
+        broker, _cfg = _make_broker(user, user_id)
         bal = broker.get_balance()
         user_store.update(str(user_id), {"paper_balance": round(bal, 2)})
         d = get_dash(str(user_id))
@@ -5220,7 +5220,7 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
     # signal — but they do have to clear the same entitlement, risk, ownership
     # and idempotency checks, because an order is an order whoever asked.
     # (Sizing happens below; the gate is re-entered with the real units.)
-    broker, cfg = _make_broker(user)
+    broker, cfg = _make_broker(user, user_id)
     sym = (symbol or cfg.SYMBOL).upper()
     # Crypto, indices, stocks, ETFs and USD-less FX crosses are all refused,
     # each for a concrete reason — see forex.is_tradeable. Accepting one would
@@ -5429,7 +5429,7 @@ def read_candles(user_id, symbol=None, count=50, timeframe=None):
     """
     try:
         user = user_store.load(str(user_id))
-        broker, bcfg = _make_broker(user)
+        broker, bcfg = _make_broker(user, user_id)
         sym = (symbol or bcfg.SYMBOL).upper()
         return broker.get_candles(sym, timeframe or bcfg.TIMEFRAME, int(count)) or []
     except Exception as e:
@@ -5467,7 +5467,7 @@ def force_close(user_id, origin="manual", emergency=False):
         return {"ok": False, "error": _decision.reason,
                 "detail": _decision.detail}
 
-    broker, cfg = _make_broker(user)
+    broker, cfg = _make_broker(user, user_id)
 
     sym = open_pos.get("symbol", cfg.SYMBOL)
     try:
@@ -5583,7 +5583,7 @@ def force_close_all(user_id):
         failed.append({"symbol": first.get("symbol"), "error": first.get("error")})
 
     user = user_store.load(user_id)
-    broker, fcfg = _make_broker(user)
+    broker, fcfg = _make_broker(user, user_id)
     try:
         remaining = broker.get_all_positions() or []
     except Exception as e:

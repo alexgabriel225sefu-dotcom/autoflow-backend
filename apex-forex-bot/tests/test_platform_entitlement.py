@@ -505,6 +505,48 @@ finally:
     AU.user_store.claim_value = _real_cv
     AU.user_store.release_claim = _real_rel
 
+# ── every broker built for a user must be told WHICH user ───────────────────
+# A platform client's cTrader token lives in the ctrader_link record, not in
+# the user_store record, so _make_broker can only find it when it is given the
+# user id. broker_read passes it; all six call sites inside user_loop did not,
+# and for a platform client CTRADER_ACCOUNT_ID was therefore the empty string.
+# The engine started, and then every broker read died on int('') — the loop was
+# running and blind. Seen in production on 2026-10-02:
+#   initial balance read failed: invalid literal for int() with base 10: ''
+# Checked on the source, because the defect was a MISSING ARGUMENT and no
+# behavioural test of a healthy Telegram user could ever see it: their token is
+# in the record, so the branch that needs the id never runs for them.
+print("\n[12] no broker is built without the user it belongs to")
+import re as _re                                    # noqa: E402
+
+_ul = open(os.path.join(ROOT, "apex", "user_loop.py"), encoding="utf-8").read()
+_bare = _re.findall(r"_make_broker\(\s*user\s*\)", _ul)
+check("user_loop builds no broker without a user id", _bare == [], str(_bare))
+_withid = _re.findall(r"_make_broker\(\s*user\s*,", _ul)
+check("and it does build them with one, so the check is not vacuous",
+      len(_withid) >= 6, f"{len(_withid)} call sites")
+
+_br = open(os.path.join(ROOT, "apex", "platform", "broker_read.py"),
+           encoding="utf-8").read()
+check("broker_read still passes the user id too",
+      "_make_broker(user, user_id)" in _br)
+
+# And the behaviour the argument buys: with the id, the ctid comes from the
+# link record; without it, it cannot.
+import apex.user_loop as _ULM                       # noqa: E402
+
+connect([DEMO_ACC, LIVE_ACC])
+select(501)
+_bare_user = {"paper": False}                        # no ctrader token at all
+_, _cfg_with = _ULM._make_broker(dict(_bare_user), USER)
+check("given the user id, the account id comes from the link record",
+      str(_cfg_with.CTRADER_ACCOUNT_ID) == "501",
+      repr(_cfg_with.CTRADER_ACCOUNT_ID))
+_, _cfg_without = _ULM._make_broker(dict(_bare_user))
+check("without it, the account id is empty — which is what int() choked on",
+      _cfg_without.CTRADER_ACCOUNT_ID == "",
+      repr(_cfg_without.CTRADER_ACCOUNT_ID))
+
 if _fails:
     print(f"FAILED ({len(_fails)}):")
     for f in _fails:
