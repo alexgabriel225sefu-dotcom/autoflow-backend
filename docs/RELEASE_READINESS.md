@@ -64,13 +64,15 @@ and 199 real 15m candles, from the deployed instance (`ad37fc64235c`), through
 the same `broker_read` the product uses. The sentence "nothing has run against
 a real broker" was true until 2026-09-30 and is not true now.
 
-**That run exercised twelve steps, not thirteen.** The preview-on-real-bars
-step did not fail; it never ran, because the account has no active rule to
-preview. The evaluator has therefore still only ever seen synthetic candles.
-The script now reports a skipped step as `SKIP` and repeats it in the summary,
-because `exit 0` with a step missing had looked exactly like `exit 0` with
-every step passing — and X1 is closed on the strength of that exit code.
-Closing it needs one active rule and a re-run; nothing else.
+**Preview on real bars is now proven too.** 2026-10-02, same account, rule
+`0b1c97f1`: the evaluator ran on live candles and answered `HOLD — entry
+conditions not met: - rsi (RSI(14) = 67.6)`, explained rather than asserted,
+and reported itself unexecutable. 15 of 15 steps, exit 0. The first clean run
+on 2026-10-01 had exercised twelve of thirteen — the preview step had not
+failed, it had never run, because no active rule existed. The script now
+reports a skipped step as `SKIP` and repeats it in the summary, because
+`exit 0` with a step missing had looked exactly like `exit 0` with every step
+passing, and X1 is closed on the strength of that exit code.
 
 Two things in X1 are still unproven, and they are not small:
 
