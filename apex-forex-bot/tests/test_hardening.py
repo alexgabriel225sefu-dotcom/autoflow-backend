@@ -279,8 +279,22 @@ check("UNKNOWN entitlement denies a LIVE order",
 check("the automatic path uses the same gate",
       "gates.authorize_order(" in LSRC and LSRC.count("gates.authorize_order(") >= 2)
 _fc = LSRC[LSRC.index("def force_close"):LSRC.index("def force_close_all")]
+# The property is that BOTH the record and the broker come from the one
+# caller-supplied user_id, and that no account can be named from outside. This
+# used to be spelled `"_make_broker(user)" in _fc`, which broke the moment the
+# broker was given the user id it needs to resolve a platform client's account
+# — a change that strengthened ownership while failing the check for it. The
+# signature assertion is the part that cannot drift: there is no parameter to
+# pass somebody else's account through.
+check("force_close takes a user and nothing that names an account",
+      LSRC[LSRC.index("def force_close("):].split(")")[0]
+      == "def force_close(user_id, origin=\"manual\", emergency=False",
+      LSRC[LSRC.index("def force_close("):].split(")")[0])
 check("force_close acts on the caller's OWN account",
-      "user_store.load(user_id)" in _fc and "_make_broker(user)" in _fc)
+      "user_store.load(user_id)" in _fc
+      and "_make_broker(user, user_id)" in _fc)
+check("and it resolves that broker for the SAME id it loaded the user with",
+      _fc.index("user_store.load(user_id)") < _fc.index("_make_broker(user, user_id)"))
 
 # ─────────────────────────────────────────────────────────────
 print("\n9. The ops surface exposes no generic executor")
