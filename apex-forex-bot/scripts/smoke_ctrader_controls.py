@@ -220,6 +220,20 @@ def _attempt(rep, name, call):
         return None
 
 
+def _as_mapping(rep, name, out):
+    """Return a control response mapping, or record a bad response shape.
+
+    The stop path runs inside `finally`; it must keep trying to stop and check
+    status even when a control returns nonsense instead of raising. Treating a
+    malformed response as an empty mapping preserves the later stop/status
+    attempts and turns the bad shape into a failed smoke result.
+    """
+    if isinstance(out, dict):
+        return out
+    rep.step(name, False, f"unexpected response: {type(out).__name__}")
+    return {}
+
+
 def _journal_statuses(user_id, limit=25):
     """The statuses this client's journal records, newest first.
 
@@ -245,12 +259,14 @@ def run(user_id, rule_id, *, report=None, controls=None):
                           lambda: c["status"](user_id))
         if before is None:
             return rep
+        before = _as_mapping(rep, "automation starts from stopped", before)
         rep.step("automation starts from stopped",
                  before.get("state") == STOPPED, str(before.get("state")))
 
         out = _attempt(rep, "start is accepted",
                        lambda: c["start"](user_id, rule_id))
         if out is not None:
+            out = _as_mapping(rep, "start is accepted", out)
             rep.step("start is accepted", out.get("state") == RUNNING,
                      str(out.get("state")))
             rep.step("and it reports that it started, not that it was already",
@@ -270,6 +286,8 @@ def run(user_id, rule_id, *, report=None, controls=None):
         again = _attempt(rep, "a second start is idempotent, not a second loop",
                          lambda: c["start"](user_id, rule_id))
         if again is not None:
+            again = _as_mapping(
+                rep, "a second start is idempotent, not a second loop", again)
             rep.step("a second start is idempotent, not a second loop",
                      again.get("alreadyRunning") is True
                      and again.get("started") is False,
@@ -282,6 +300,7 @@ def run(user_id, rule_id, *, report=None, controls=None):
         paused = _attempt(rep, "pause is accepted",
                           lambda: c["pause"](user_id))
         if paused is not None:
+            paused = _as_mapping(rep, "pause is accepted", paused)
             rep.step("pause is accepted", paused.get("state") == PAUSED,
                      str(paused.get("state")))
             # A 'paused' that forgot the rule could not be resumed, and a
@@ -294,6 +313,7 @@ def run(user_id, rule_id, *, report=None, controls=None):
         resumed = _attempt(rep, "resume is accepted",
                            lambda: c["resume"](user_id))
         if resumed is not None:
+            resumed = _as_mapping(rep, "resume is accepted", resumed)
             rep.step("resume is accepted", resumed.get("state") == RUNNING,
                      str(resumed.get("state")))
             rep.step("and it resumed the remembered rule",
@@ -317,6 +337,7 @@ def run(user_id, rule_id, *, report=None, controls=None):
         # than any failure it could report.
         final = _attempt(rep, "stop is accepted", lambda: c["stop"](user_id))
         if final is not None:
+            final = _as_mapping(rep, "stop is accepted", final)
             rep.step("stop is accepted", final.get("state") == STOPPED,
                      str(final.get("state")))
             rep.step("and stopping clears the rule, rather than remembering it",
@@ -325,12 +346,17 @@ def run(user_id, rule_id, *, report=None, controls=None):
         twice = _attempt(rep, "stopping something stopped is fine",
                          lambda: c["stop"](user_id))
         if twice is not None:
+            twice = _as_mapping(rep, "stopping something stopped is fine", twice)
             rep.step("stopping something stopped is fine",
                      twice.get("alreadyStopped") is True,
                      f"already={twice.get('alreadyStopped')}")
         now = _attempt(rep, "and the account is left with nothing running",
                        lambda: c["status"](user_id))
-        left = (now or {}).get("state")
+        left = None
+        if now is not None:
+            left = _as_mapping(
+                rep, "and the account is left with nothing running", now).get(
+                    "state")
         rep.step("and the account is left with nothing running",
                  left == STOPPED, str(left))
         if left != STOPPED:

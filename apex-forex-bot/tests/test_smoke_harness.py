@@ -582,7 +582,15 @@ _ORDER = (
      "TOKEN_ENCRYPTION_KEY"),
 )
 for _extra, _expected in _ORDER:
-    _env = {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")}
+    _env = {
+        "HOME": os.environ.get("HOME", ""),
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
+        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+        "TEMP": os.environ.get("TEMP", ""),
+        "TMP": os.environ.get("TMP", ""),
+    }
     _env.update(_extra)
     _p = subprocess.run(
         [sys.executable, os.path.join(ROOT, "scripts", "smoke_ctrader_demo.py")],
@@ -772,18 +780,18 @@ check("and it tells the operator to go and stop it from the dashboard",
 check("and that run cannot exit 0",
       C.summarise(crep4) == 1, str(C.summarise(crep4)))
 
-# ── an exception that ESCAPES must still reach the stop ─────────────────────
-# _attempt catches Exception, so every failure above is handled inside the try
-# and `finally` is indistinguishable from `else`. The case that distinguishes
-# them is a control answering with an unexpected SHAPE: `.get` on a string
-# raises outside _attempt, escapes run()'s try, and only a `finally` stops the
-# loop on the way out. That is what `finally` is for, so it is tested.
+# ── malformed control responses must still reach the stop ──────────────────
+# _attempt catches Exception, so raised failures become ordinary failed steps.
+# The other dangerous case is a control answering with the wrong SHAPE. That
+# used to raise at `.get(...)`; the smoke harness must record the bad shape
+# while continuing through stop and final status, because the whole point is to
+# avoid leaving a loop running after a bad control response.
 def shape_liar():
     calls = []
 
     def status(uid):
         calls.append("status")
-        return "running"            # not a dict: .get will raise
+        return "running"            # not a dict
 
     def nop(*a, **kw):
         calls.append("other")
@@ -794,15 +802,91 @@ def shape_liar():
 
 cbuf6 = io.StringIO()
 sl, slcalls = shape_liar()
-_escaped = None
-try:
-    C.run("u-1", "r-1", report=C.Report(out=cbuf6), controls=sl)
-except Exception as e:                                       # noqa: BLE001
-    _escaped = e
+crep6 = C.run("u-1", "r-1", report=C.Report(out=cbuf6), controls=sl)
 check("a control answering with the wrong shape still reaches the stop",
       "other" in slcalls, str(slcalls))
 check("and the operator sees the stop attempt in the report",
       "stop is accepted" in cbuf6.getvalue(), cbuf6.getvalue()[-200:])
+check("and the wrong status shape fails the run instead of crashing",
+      "automation starts from stopped" in crep6.failures, str(crep6.failures))
+
+# A malformed stop response used to be worse: it raised inside `finally`,
+# skipped the second stop and skipped the final status check. A bad first stop
+# must be a failed smoke result, not the end of cleanup.
+def bad_stop_shape_controls():
+    calls = []
+    state = {"state": "stopped", "ruleDocId": None, "mode": None}
+
+    def status(uid):
+        calls.append("status")
+        return dict(state)
+
+    def start(uid, rid, **kw):
+        calls.append("start")
+        if state["state"] == "running":
+            return dict(state, started=False, alreadyRunning=True)
+        state.update({"state": "running", "ruleDocId": rid, "mode": "demo"})
+        return dict(state, started=True, alreadyRunning=False)
+
+    def pause(uid, **kw):
+        calls.append("pause")
+        state["state"] = "paused"
+        return dict(state, paused=True)
+
+    def resume(uid, **kw):
+        calls.append("resume")
+        state["state"] = "running"
+        return dict(state)
+
+    def stop(uid, **kw):
+        calls.append("stop")
+        if calls.count("stop") == 1:
+            return "stopped"
+        already = state["state"] == "stopped"
+        state.update({"state": "stopped", "ruleDocId": None, "mode": None})
+        return dict(state, stopped=not already, alreadyStopped=already)
+
+    return {"status": status, "start": start, "pause": pause,
+            "resume": resume, "stop": stop}, calls, state
+
+
+cbuf8 = io.StringIO()
+bad_stop, bad_stop_calls, bad_stop_state = bad_stop_shape_controls()
+crep8 = C.run("u-1", "r-1", report=C.Report(out=cbuf8), controls=bad_stop)
+check("a malformed first stop response still reaches the second stop",
+      bad_stop_calls.count("stop") == 2, str(bad_stop_calls))
+check("and it still checks final status after the malformed stop",
+      bad_stop_calls[-1] == "status", str(bad_stop_calls))
+check("and the loop is left stopped after the retry",
+      bad_stop_state["state"] == "stopped", str(bad_stop_state))
+check("and the malformed stop response fails the run",
+      "stop is accepted" in crep8.failures, str(crep8.failures))
+
+
+def bad_final_status_controls():
+    ctrl, state = fake_controls()
+    calls = []
+
+    def wrap(name, fn):
+        def inner(*a, **kw):
+            calls.append(name)
+            if name == "status" and calls.count("status") == 2:
+                return "stopped"
+            return fn(*a, **kw)
+        return inner
+
+    return {name: wrap(name, fn) for name, fn in ctrl.items()}, calls, state
+
+
+cbuf9 = io.StringIO()
+bad_status, bad_status_calls, bad_status_state = bad_final_status_controls()
+crep9 = C.run("u-1", "r-1", report=C.Report(out=cbuf9),
+              controls=bad_status)
+check("a malformed final status is reported instead of crashing",
+      "and the account is left with nothing running" in crep9.failures,
+      str(crep9.failures))
+check("and it happens after stop already left the loop stopped",
+      bad_status_state["state"] == "stopped", str(bad_status_state))
 
 # ── controls that LIE about idempotency must fail the run ───────────────────
 # The honest fakes above never exercise these assertions, because they answer
