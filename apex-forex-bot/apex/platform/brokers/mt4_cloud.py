@@ -56,9 +56,13 @@ class Mt4CloudProvider:
             supports_automation=False,
             can_place_orders=False,
             credential_model=(
-                "MT4 login + INVESTOR password + broker server name, held by "
-                "the cloud vendor; investor password cannot place orders at "
-                "the broker"),
+                "MT4 login + INVESTOR password + broker server name, entered "
+                "by the CLIENT on the vendor's own page through a one-time "
+                "configuration link and held by the vendor; Apex4Traders never "
+                "receives it and the vendor will not disclose it back. Not "
+                "OAuth: the password exists, has no scope, and cannot be "
+                "revoked per-application at the broker. An investor password "
+                "cannot place orders, which is what keeps this read-only"),
             verified=verified(),
         )
 
