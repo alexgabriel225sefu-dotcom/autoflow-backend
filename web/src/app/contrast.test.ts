@@ -345,6 +345,56 @@ describe("the marketing palette", () => {
   });
 });
 
+/**
+ * The pricing cards, which are read by somebody deciding whether to pay.
+ *
+ * These exist because the vendored component shipped its own tints and its
+ * own alpha-based greys — `text-foreground/50` over a coloured card — and
+ * nothing could tell anyone what those actually computed to. They rendered
+ * as unreadable small print under the price. Every colour here is a token so
+ * the number is checkable.
+ */
+describe("the pricing cards", () => {
+  it("declares its surface tokens", () => {
+    for (const name of [
+      "--pc-card", "--pc-card-2", "--pc-head", "--pc-head-accent",
+      "--pc-note", "--pc-note-accent",
+    ]) {
+      expect(MKT[name], `${name} is missing from .mkt`).toBeTruthy();
+    }
+  });
+
+  it("the plan name and price are readable on both card heads", () => {
+    for (const head of [MKT["--pc-head"], MKT["--pc-head-accent"]]) {
+      expect(contrast(MKT["--mkt-text"], head)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("the small print under the price clears AA, on both heads", () => {
+    // The description, the price note and the sentence saying the plan is
+    // not on sale yet. All of it is the size that gets written off as
+    // decoration and then shipped at 2:1.
+    expect(contrast(MKT["--pc-note"], MKT["--pc-head"]))
+      .toBeGreaterThanOrEqual(4.5);
+    expect(contrast(MKT["--pc-note-accent"], MKT["--pc-head-accent"]))
+      .toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the accent head is a red, not a borrowed hue", () => {
+    // The specific failure this replaces: an amber card and a teal card on a
+    // page with no amber and no teal in it.
+    const [r, g, b] = [1, 3, 5].map((i) =>
+      parseInt(MKT["--pc-head-accent"].slice(i, i + 2), 16));
+    expect(r).toBeGreaterThan(g);
+    expect(r).toBeGreaterThan(b);
+  });
+
+  it("feature ticks use the readable red, never the fill", () => {
+    expect(contrast(MKT["--mkt-accent-text"], MKT["--pc-card"]))
+      .toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 describe("the hero glow stays out of the layout", () => {
   /**
    * A decorative blur must never take a grid cell.

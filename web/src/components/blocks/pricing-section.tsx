@@ -50,8 +50,11 @@ function planFor(offer: PublicOffer): PricingPlan[] {
       id: "demo",
       name: "Demo",
       description: "Practice accounts, at no cost. No card, no expiry.",
-      palette: "teal",
+      palette: "neutral",
       price: "Free",
+      // The only plan anybody can act on today, so it carries the filled
+      // button. The paid card below is disabled, and a prominent button that
+      // refuses to be pressed is worse than a quiet one.
       ctaLabel: "Create an account",
       ctaHref: "/signup",
       features: DEMO_FEATURES,
@@ -64,12 +67,12 @@ function planFor(offer: PublicOffer): PricingPlan[] {
       name: "Founder",
       description:
         "Real-money account access, for when live execution is enabled.",
-      palette: "amber",
+      palette: "accent",
       price: formatOfferPrice(offer),
       priceNote: lifetime
         ? "One-time payment, no renewal"
         : `One-time payment, access for ${offer.periodDays} days`,
-      ctaDark: true,
+      ctaQuiet: !offer.checkoutEnabled,
       featuredLabel: lifetime ? "Lifetime access" : undefined,
       ctaLabel: offer.checkoutEnabled ? "Get Founder access" : "Not on sale yet",
       ctaHref: offer.checkoutEnabled ? "/license" : undefined,

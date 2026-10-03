@@ -1227,3 +1227,126 @@ body {
   font-size: .82rem; color: var(--mkt-dim); padding: .72rem .6rem;
 }
 .wl-skip:hover { color: var(--mkt-text); }
+
+/* ── pricing cards ───────────────────────────────────────────────────────
+   The vendored component arrived with a tint per plan, drawn from a generic
+   palette: teal for one card, amber for the other, each with two coloured
+   blobs and a coloured orb. On a page whose whole identity is black and one
+   red, that rendered a turquoise card beside an orange one, and the lower
+   half of both inherited the APP's surface tokens (#111322, a blue) rather
+   than the marketing page's (#0A0A0C), so the cards sat on the page as two
+   foreign rectangles at the exact point somebody decides whether to pay.
+
+   The tints are gone. Two treatments remain, and they carry meaning instead
+   of decoration: `neutral` is the free plan, `accent` is the one that costs
+   money. Everything is a --mkt-* token, so contrast.test.ts can read the
+   numbers rather than anybody judging them by eye — which is how the teal
+   shipped in the first place. */
+.mkt {
+  --pc-card:        #121216;   /* same family as --mkt-surface */
+  --pc-card-2:      #0E0E11;
+  --pc-head:        #17171C;
+  --pc-head-accent: #2A0A10;   /* carries --mkt-text at 15.00:1 */
+  --pc-note:        #9A96A1;   /*  6.76:1 on --pc-head  */
+  --pc-note-accent: #C8C2CC;   /* 10.03:1 on --pc-head-accent */
+}
+
+.pc { display: grid; gap: 1.6rem; }
+.pc-head-row {
+  display: flex; flex-direction: column; gap: .35rem;
+}
+.pc-head-row h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem); letter-spacing: -0.025em;
+  font-weight: 700; margin: 0;
+}
+.pc-head-row p { color: var(--mkt-muted); font-size: .9rem; margin: 0; }
+
+.pc-card {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--mkt-line); border-radius: 18px;
+  background: var(--pc-card-2); padding: .3rem;
+}
+/* The paid plan is the one the page is arguing for, so it is the one that
+   wears the accent. Not a louder colour — the same red the rest of the page
+   uses, which is what makes it read as the same product. */
+.pc-card-accent { border-color: var(--mkt-accent-line); }
+
+.pc-top {
+  position: relative; overflow: hidden;
+  border-radius: 15px; padding: 1.3rem;
+  background: var(--pc-head); border: 1px solid var(--mkt-line-soft);
+}
+.pc-card-accent .pc-top {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), transparent 40%),
+    var(--pc-head-accent);
+  border-color: var(--mkt-accent-line);
+}
+.pc-card-accent .pc-top::after {
+  content: ""; position: absolute; inset: -40% -30% auto auto;
+  width: 240px; height: 240px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,18,40,.42), transparent 68%);
+  filter: blur(26px); pointer-events: none;
+}
+.pc-top > * { position: relative; z-index: 1; }
+
+.pc-badge {
+  display: inline-block; font-size: .7rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .2rem .55rem; border-radius: 999px;
+  color: var(--mkt-accent-text);
+  background: var(--mkt-accent-wash);
+  border: 1px solid var(--mkt-accent-line);
+}
+.pc-name {
+  font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em;
+  margin: .75rem 0 .25rem; color: var(--mkt-text);
+}
+.pc-desc { font-size: .84rem; line-height: 1.6; margin: 0; color: var(--pc-note); }
+.pc-card-accent .pc-desc { color: var(--pc-note-accent); }
+
+.pc-price-row { display: flex; align-items: baseline; gap: .5rem; margin-top: 1.1rem; }
+.pc-price {
+  font-size: 2.1rem; font-weight: 700; letter-spacing: -0.03em;
+  color: var(--mkt-text); line-height: 1;
+}
+.pc-was { font-size: .95rem; color: var(--pc-note); text-decoration: line-through; }
+.pc-price-note { font-size: .76rem; margin: .4rem 0 0; color: var(--pc-note); }
+.pc-card-accent .pc-price-note, .pc-card-accent .pc-was { color: var(--pc-note-accent); }
+
+.pc-cta {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; margin-top: 1.15rem; padding: .72rem 1rem;
+  border-radius: 999px; border: 1px solid transparent;
+  font: inherit; font-size: .9rem; font-weight: 600;
+  text-decoration: none; cursor: pointer;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+}
+.pc-cta:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); }
+.pc-cta-quiet {
+  background: transparent; color: var(--mkt-text);
+  border-color: var(--mkt-line);
+}
+.pc-cta-quiet:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+/* A plan that cannot be bought yet still shows its button, because hiding it
+   would read as the plan not existing. It must not look clickable. */
+.pc-cta:disabled, .pc-cta[aria-disabled="true"] {
+  background: var(--mkt-surface-2); color: var(--mkt-muted);
+  border-color: var(--mkt-line); cursor: not-allowed;
+}
+.pc-cta-note { font-size: .76rem; line-height: 1.55; margin: .6rem 0 0; color: var(--pc-note); }
+.pc-card-accent .pc-cta-note { color: var(--pc-note-accent); }
+
+.pc-body { padding: 1.2rem 1.1rem .4rem; }
+.pc-features { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.pc-features li {
+  display: flex; align-items: flex-start; gap: .55rem;
+  font-size: .86rem; line-height: 1.5; color: var(--mkt-text);
+}
+.pc-features .ico { color: var(--mkt-accent-text); flex: none; margin-top: .15rem; }
+.pc-foot {
+  margin-top: 1.1rem; padding-top: .9rem;
+  border-top: 1px solid var(--mkt-line-soft);
+}
+.pc-foot strong { display: block; font-size: .8rem; color: var(--mkt-text); }
+.pc-foot p { font-size: .78rem; line-height: 1.6; margin: .2rem 0 0; color: var(--mkt-muted); }

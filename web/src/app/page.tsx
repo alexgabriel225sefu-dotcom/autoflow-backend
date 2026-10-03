@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import {
-  Activity,
-  BookOpen,
   Eye,
   GaugeCircle,
   Link2,

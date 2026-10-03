@@ -155,6 +155,24 @@ services:
     # "Cannot find module '@tailwindcss/postcss'". Measured: a real `npm ci`
     # under NODE_ENV=production leaves @tailwindcss/postcss and typescript out
     # of node_modules; the same command with --include=dev installs both.
+    # CLEAR THE BUILD CACHE WHENEVER globals.css CHANGED.
+    #
+    # This has now cost a shipped-broken landing page twice, and the second
+    # time it reproduced on a clean local machine, so it is not a Render
+    # quirk: `next build` over a warm .next emits a CSS chunk that still
+    # holds the PREVIOUS stylesheet. Measured locally — a build on top of an
+    # existing .next produced a chunk with zero occurrences of the rules just
+    # added; `rm -rf .next` and the identical build produced them.
+    #
+    # The page renders completely in both cases. Every word is there, the
+    # markup is correct, nothing errors, and the tests pass — it is only
+    # unstyled, which is why nothing but looking at it catches this.
+    #
+    # Deploy the web service with `clearCache: true` after any stylesheet
+    # change, and confirm afterwards by fetching the chunk the live HTML
+    # links to and grepping for a selector the change introduced. The commit
+    # in /healthz does NOT settle it: the server can be on the new commit and
+    # still be serving the stale chunk.
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start
     plan: starter
