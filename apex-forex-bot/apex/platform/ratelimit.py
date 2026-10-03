@@ -70,6 +70,11 @@ _BUCKETS = {
     # The payment provider. Generous: it retries, and being throttled off a
     # legitimate retry is how a paying client ends up unprovisioned.
     "webhook": ("RL_A4T_WEBHOOK_PER_MIN", 120, 60),
+    # The one unauthenticated form on the site. Tight on purpose: it is the
+    # only route a stranger can write through, and the cost of being wrong is
+    # a list full of addresses nobody typed. Five a minute is generous for a
+    # human correcting a typo and useless for a script.
+    "waitlist": ("RL_A4T_WAITLIST_PER_MIN", 5, 60),
     # Everything else: reads the dashboard polls.
     "default": ("RL_A4T_DEFAULT_PER_MIN", 240, 60),
 }
@@ -96,6 +101,8 @@ def classify(method, route):
     route = (route or "").split("?", 1)[0].strip("/")
     if route == "billing/webhook":
         return "webhook"
+    if route == "waitlist":
+        return "waitlist"
     if route.startswith("ctrader/"):
         # A GET of the link status is a poll — the shell and the accounts
         # page both refresh it every 60 seconds, and two open tabs would

@@ -817,3 +817,206 @@ body {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   html { scroll-behavior: auto; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE MARKETING SURFACE
+   ═══════════════════════════════════════════════════════════════════════
+
+   Scoped to `.mkt` and deliberately NOT the app's palette.
+
+   WHY IT IS SEPARATE, rather than a rebrand
+
+   Red already means something inside the product: --a4t-short is short,
+   loss, and destructive, and the trading UI leans on that being unambiguous.
+   Making red the brand colour app-wide would put the brand in competition
+   with every losing position on the screen, and the reader would have to
+   work out which red they were looking at. So the brand red lives here, on
+   the pages a stranger sees, and the trading semantics are untouched.
+
+   Every value below was computed against the WCAG formula rather than
+   chosen by eye, and contrast.test.ts asserts them the same way it asserts
+   the app's. The fill carries white at 5.88:1; the red used AS TEXT is a
+   different, brighter token at 6.69:1 on the page, because #C81228 as text
+   on near-black is 2.1:1 and unreadable — the same mistake the app's teal
+   avoids by separating fill from foreground. */
+
+.mkt {
+  --mkt-bg:        #0A0A0C;
+  --mkt-bg-2:      #0E0E11;
+  --mkt-surface:   #121216;
+  --mkt-surface-2: #17171C;
+  --mkt-line:      #24242C;
+  --mkt-line-soft: #1B1B21;
+
+  --mkt-text:   #F5F3F0;   /* 17.86:1 on the page */
+  --mkt-muted:  #A8A4AE;   /*  8.09:1 */
+  --mkt-dim:    #726E7A;   /*  3.98:1 — large text and metadata only */
+
+  --mkt-accent:      #C81228;   /* FILL. Carries #FFF at 5.88:1 */
+  --mkt-accent-deep: #9B0D1B;
+  --mkt-on-accent:   #FFFFFF;
+  --mkt-accent-text: #FF5F6B;   /* the red used AS TEXT — 6.69:1 */
+  --mkt-accent-wash: rgba(200, 18, 40, 0.14);
+  --mkt-accent-line: rgba(255, 95, 107, 0.26);
+
+  /* The brand lockup draws itself from --a4t-accent so that one file works
+     on every surface. Redefining those four here lets it wear the marketing
+     red without the component knowing this page exists — and without the
+     app's own accent moving, since this only applies inside .mkt. */
+  --a4t-accent:        var(--mkt-accent);
+  --a4t-accent-strong: var(--mkt-accent-deep);
+  --a4t-on-accent:     var(--mkt-on-accent);
+  --a4t-long:          rgba(255, 255, 255, 0.55);
+
+  background: var(--mkt-bg);
+  color: var(--mkt-text);
+  min-height: 100%;
+}
+
+.mkt-wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2rem); }
+
+/* ── nav ─────────────────────────────────────────────────────────────── */
+.mkt-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 1.25rem 0;
+  border-bottom: 1px solid var(--mkt-line-soft);
+}
+.mkt-nav-links { display: flex; align-items: center; gap: .35rem; }
+
+/* ── controls ────────────────────────────────────────────────────────── */
+.mkt-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .62rem 1.05rem; border-radius: 999px;
+  font-size: .875rem; font-weight: 600; letter-spacing: -0.01em;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+  border: 1px solid transparent; text-decoration: none;
+  transition: background .18s ease, transform .18s ease;
+}
+.mkt-btn:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); }
+.mkt-btn:active { transform: translateY(1px); }
+.mkt-btn-ghost {
+  background: transparent; color: var(--mkt-text);
+  border-color: var(--mkt-line);
+}
+.mkt-btn-ghost:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+.mkt-btn-lg { padding: .8rem 1.4rem; font-size: .95rem; }
+
+/* ── hero ────────────────────────────────────────────────────────────── */
+.mkt-hero { position: relative; padding: clamp(3.5rem, 11vw, 7rem) 0 clamp(2.5rem, 7vw, 4.5rem); }
+.mkt-hero h1 {
+  font-size: clamp(2.3rem, 6.2vw, 4.1rem);
+  line-height: 1.02; letter-spacing: -0.035em; font-weight: 700;
+  margin: 0; max-width: 17ch;
+}
+.mkt-hero h1 em { font-style: normal; color: var(--mkt-accent-text); }
+.mkt-lede {
+  font-size: clamp(1rem, 1.7vw, 1.14rem); color: var(--mkt-muted);
+  max-width: 54ch; margin-top: 1.3rem; line-height: 1.66;
+}
+/* One soft red bloom behind the headline. Pointer-events off and sized in
+   vw so it never introduces a horizontal scrollbar on a phone. */
+.mkt-glow {
+  position: absolute; pointer-events: none; z-index: 0;
+  top: -14vw; left: -10vw; width: min(62vw, 640px); height: min(62vw, 640px);
+  background: radial-gradient(circle, rgba(200,18,40,.26) 0%, transparent 68%);
+  filter: blur(42px);
+}
+.mkt-hero > * { position: relative; z-index: 1; }
+
+.mkt-eyebrow {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .3rem .7rem; border-radius: 999px;
+  font-size: .76rem; font-weight: 600; letter-spacing: .02em;
+  color: var(--mkt-accent-text);
+  background: var(--mkt-accent-wash);
+  border: 1px solid var(--mkt-accent-line);
+  margin-bottom: 1.15rem;
+}
+
+/* ── waitlist form ───────────────────────────────────────────────────── */
+.mkt-cta { margin-top: 2rem; max-width: 30rem; }
+.wl-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.wl-input {
+  flex: 1 1 15rem; min-width: 0;
+  padding: .72rem .95rem; border-radius: 999px;
+  background: var(--mkt-surface); color: var(--mkt-text);
+  border: 1px solid var(--mkt-line); font-size: .92rem;
+  font-family: inherit;
+}
+.wl-input::placeholder { color: var(--mkt-dim); }
+.wl-input:focus-visible {
+  outline: 2px solid var(--mkt-accent-text); outline-offset: 1px;
+  border-color: transparent;
+}
+.wl-submit {
+  display: inline-flex; align-items: center; gap: .45rem; cursor: pointer;
+  padding: .72rem 1.25rem; border-radius: 999px; border: 1px solid transparent;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+  font-size: .9rem; font-weight: 600; font-family: inherit;
+  transition: background .18s ease;
+}
+.wl-submit:hover:not(:disabled) { background: var(--mkt-accent-deep); }
+.wl-submit:disabled { opacity: .55; cursor: not-allowed; }
+.wl-note { font-size: .78rem; color: var(--mkt-dim); margin-top: .7rem; line-height: 1.6; max-width: 44ch; }
+.wl-error { display: flex; align-items: center; gap: .4rem; font-size: .82rem; color: var(--mkt-accent-text); margin-top: .6rem; }
+.wl-done { display: flex; align-items: center; gap: .45rem; font-size: 1rem; font-weight: 600; color: var(--mkt-text); }
+.wl-spin { animation: wl-spin 1s linear infinite; }
+@keyframes wl-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wl-spin { animation: none; } }
+
+/* ── panels ──────────────────────────────────────────────────────────── */
+.mkt-section { padding: clamp(2.5rem, 7vw, 4.5rem) 0; border-top: 1px solid var(--mkt-line-soft); }
+.mkt-section h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem); letter-spacing: -0.025em;
+  font-weight: 700; margin: 0 0 .5rem;
+}
+.mkt-section > p { color: var(--mkt-muted); max-width: 58ch; line-height: 1.68; margin: 0; }
+
+.mkt-cards { display: grid; gap: 1rem; margin-top: 2rem; grid-template-columns: 1fr; }
+@media (min-width: 720px)  { .mkt-cards { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1000px) { .mkt-cards-3 { grid-template-columns: repeat(3, 1fr); } }
+
+.mkt-card {
+  background: var(--mkt-surface); border: 1px solid var(--mkt-line);
+  border-radius: 16px; padding: 1.4rem;
+}
+.mkt-card h3 {
+  font-size: 1rem; font-weight: 650; margin: .9rem 0 .4rem;
+  letter-spacing: -0.01em;
+}
+.mkt-card p { font-size: .875rem; color: var(--mkt-muted); line-height: 1.65; margin: 0; }
+.mkt-card-ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--mkt-accent-wash); border: 1px solid var(--mkt-accent-line);
+  color: var(--mkt-accent-text);
+}
+
+/* The rule, shown as the product writes it. Monospace because it is output,
+   not prose. */
+.mkt-rule {
+  margin-top: 1.6rem; padding: 1.15rem 1.3rem;
+  background: var(--mkt-bg-2); border: 1px solid var(--mkt-line);
+  border-left: 3px solid var(--mkt-accent); border-radius: 12px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .86rem; line-height: 1.8; color: var(--mkt-text);
+}
+
+.mkt-plain { font-size: .875rem; color: var(--mkt-muted); line-height: 1.7; max-width: 66ch; }
+.mkt-plain strong { color: var(--mkt-text); font-weight: 600; }
+
+.mkt-foot {
+  padding: 2.5rem 0 3rem; border-top: 1px solid var(--mkt-line);
+  font-size: .8rem; color: var(--mkt-dim);
+  display: flex; gap: .9rem; flex-wrap: wrap; justify-content: space-between;
+}
+.mkt-foot a { color: var(--mkt-muted); text-decoration: none; }
+.mkt-foot a:hover { color: var(--mkt-text); }
+
+/* The risk statement. Not a footnote in grey 10px — it is a sentence the
+   reader is meant to actually read, so it is sized like one. */
+.mkt-risk {
+  margin-top: 1.4rem; padding: 1rem 1.2rem; border-radius: 12px;
+  background: var(--mkt-surface); border: 1px solid var(--mkt-line);
+  font-size: .82rem; color: var(--mkt-muted); line-height: 1.7; max-width: 70ch;
+}

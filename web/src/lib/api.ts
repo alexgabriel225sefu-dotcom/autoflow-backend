@@ -240,6 +240,23 @@ export type PublicOffer = {
   checkoutEnabled: boolean;
 };
 
+/** What the waitlist route answers. It never returns the address. */
+export type WaitlistResult = { status: "added" | "already" };
+
+/**
+ * Ask to be told when access opens.
+ *
+ * POSTs without a session, because a visitor has none. Returns the same
+ * ApiResult shape as everything else, so the form has one way to be unsure.
+ */
+export async function joinWaitlist(
+  email: string,
+  source: "landing" | "pricing" | "direct",
+): Promise<ApiResult<WaitlistResult>> {
+  return request<WaitlistResult>(
+    "waitlist", { method: "POST", body: { email, source } }, null);
+}
+
 /** `priceMinor` + `currency` as the reader's locale would write them. */
 export function formatOfferPrice(offer: PublicOffer, locale?: string): string {
   const code = (offer.currency || "usd").toUpperCase();

@@ -42,6 +42,26 @@ function tokens(css: string): Record<string, string> {
 
 const TOKENS = tokens(CSS);
 
+/**
+ * The marketing palette, declared on `.mkt` rather than `:root`.
+ *
+ * It is held to the same bar as the app's. The landing page is the surface an
+ * advertisement pays to put in front of a stranger, and it is the one page
+ * where a reader has no reason to persevere with text they cannot read.
+ */
+function scopedTokens(css: string, selector: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const re = new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`, "g");
+  for (const block of css.matchAll(re)) {
+    for (const decl of block[1].matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/g)) {
+      out[decl[1]] = decl[2].trim();
+    }
+  }
+  return out;
+}
+
+const MKT = scopedTokens(CSS, ".mkt");
+
 /** globals.css with every var() substituted, so jsdom can compute colours. */
 function flattened(): string {
   let css = CSS;
@@ -273,5 +293,54 @@ describe("palette", () => {
     // If these ever collapse to one token, the 1.00:1 bug becomes reachable
     // again: a link styled as a button would inherit the fill's own hue.
     expect(TOKENS["--a4t-accent"]).not.toBe(TOKENS["--a4t-link"]);
+  });
+});
+
+describe("the marketing palette", () => {
+  it("declares the tokens the landing page uses", () => {
+    // If this ever reads empty the whole block below passes vacuously, which
+    // is the failure mode of every palette test written without it.
+    for (const name of [
+      "--mkt-bg", "--mkt-text", "--mkt-muted", "--mkt-dim",
+      "--mkt-accent", "--mkt-on-accent", "--mkt-accent-text",
+    ]) {
+      expect(MKT[name], `${name} is missing from .mkt`).toBeTruthy();
+    }
+  });
+
+  it("body text and muted text clear WCAG AA on the page", () => {
+    expect(contrast(MKT["--mkt-text"], MKT["--mkt-bg"])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(MKT["--mkt-muted"], MKT["--mkt-bg"])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("dim text clears the large-text threshold", () => {
+    expect(contrast(MKT["--mkt-dim"], MKT["--mkt-bg"])).toBeGreaterThanOrEqual(3);
+  });
+
+  it("the red fill carries its own foreground", () => {
+    expect(
+      contrast(MKT["--mkt-on-accent"], MKT["--mkt-accent"]),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the red used AS TEXT is a different token, and readable", () => {
+    // The whole reason there are two. The fill is dark enough to carry white,
+    // which makes it far too dark to read as text on a near-black page.
+    expect(
+      contrast(MKT["--mkt-accent-text"], MKT["--mkt-bg"]),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(MKT["--mkt-accent"], MKT["--mkt-bg"]),
+      "the fill would be unreadable as text — that is why it is not used as text",
+    ).toBeLessThan(4.5);
+    expect(MKT["--mkt-accent-text"]).not.toBe(MKT["--mkt-accent"]);
+  });
+
+  it("the marketing surface does not borrow the trading reds", () => {
+    // --a4t-short means short/loss/destructive inside the product. If the
+    // brand red were the same value, every losing position would be wearing
+    // the brand and the reader would have to work out which red they were
+    // looking at.
+    expect(MKT["--mkt-accent"]).not.toBe(TOKENS["--a4t-short"]);
   });
 });

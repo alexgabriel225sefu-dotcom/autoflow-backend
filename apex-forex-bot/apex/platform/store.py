@@ -114,6 +114,28 @@ def _write(key, doc):
             f.write(raw)
 
 
+def _set_add(key, member):
+    """Add to a set at an arbitrary key. Used where the owner-scoped index
+    below does not fit — a list that belongs to the deployment rather than to
+    a user."""
+    if user_store._USE_REDIS:
+        user_store._redis_sadd(key, member)
+        return
+    p = _local_path(key)
+    ids = json.loads(open(p).read()) if os.path.exists(p) else []
+    if member not in ids:
+        ids.append(member)
+        with open(p, "w") as f:
+            f.write(json.dumps(ids))
+
+
+def _set_members(key):
+    if user_store._USE_REDIS:
+        return [str(m) for m in (user_store._redis_smembers(key) or [])]
+    p = _local_path(key)
+    return json.loads(open(p).read()) if os.path.exists(p) else []
+
+
 def _index_add(owner, rid):
     if user_store._USE_REDIS:
         user_store._redis_sadd(_k_index(owner), rid)

@@ -42,6 +42,7 @@ from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
+from apex.platform import waitlist as _wait
 from apex import user_store as _ustore
 
 PREFIX = "/api/v1/"
@@ -261,14 +262,18 @@ def _dispatch(method, route, headers, body, query=None):
     # ── cTrader linking ─────────────────────────────────────────────────
     # THE UNAUTHENTICATED ROUTES, ALL OF THEM, IN ONE PLACE
     #
-    # Three, and no more. Kept together rather than discovered one at a time,
+    # Four, and no more. Kept together rather than discovered one at a time,
     # because "which routes need no session" is the first question an auditor
-    # asks and the one a scattered answer gets wrong. This comment claimed
-    # there was only one while sitting directly above the second.
+    # asks and the one a scattered answer gets wrong. This comment once
+    # claimed there was only one while sitting directly above the second.
     #
     #   billing/webhook   the provider's server has no session. Safe by
     #                     signature: the body is acted on only when it
     #                     verifies against the webhook secret.
+    #   waitlist          a visitor asking to be told when access opens has
+    #                     no session by definition. The only WRITE of the
+    #                     four: tight rate-limit bucket of its own, one
+    #                     field stored, nothing returned.
     #   billing/offer     a visitor reading the price has no session, and the
     #                     price is the public fact on the page. Read-only,
     #                     and public_offer() carries no provider secret.
@@ -297,6 +302,20 @@ def _dispatch(method, route, headers, body, query=None):
     # deciding for itself whether live execution is on.
     if route == "billing/offer" and method == "GET":
         return _ok(_billing.public_offer())
+
+    # Early access. The fourth route that needs no session, and the only one
+    # a stranger can WRITE through — so it is rate limited in its own tight
+    # bucket, stores one field, and answers the same shape whatever happens,
+    # carrying no address back.
+    if route == "waitlist" and method == "POST":
+        payload = _body(body) or {}
+        try:
+            outcome = _wait.join(payload.get("email"),
+                                 source=payload.get("source"))
+        except _wait.WaitlistError as e:
+            status = 503 if e.code == "NOT_CONFIGURED" else 400
+            return _err(status, e.code, e.detail)
+        return _ok(_wait.public_result(outcome))
 
     if route == "billing/checkout" and method == "POST":
         _authenticate(headers, fresh=True)
