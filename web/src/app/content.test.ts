@@ -11,7 +11,7 @@
  * test is about what a client can read, not about what a maintainer can.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const SRC = join(__dirname, "..");
@@ -33,7 +33,7 @@ function withoutComments(src: string): string {
 }
 
 const FILES = sources().map((f) => ({
-  path: f.replace(`${SRC}/`, ""),
+  path: relative(SRC, f).split(sep).join("/"),
   body: withoutComments(readFileSync(f, "utf8")),
 }));
 
@@ -213,7 +213,7 @@ describe("the UI and the backend refuse live trading in the same words", () => {
   });
 
   it("the plan notice promises no price, date or outcome", () => {
-    const notice = /PLAN_NOTICE = \(([\s\S]*?)\)\n/.exec(py)?.[1] ?? "";
+    const notice = /PLAN_NOTICE = \(([\s\S]*?)\)\r?\n/.exec(py)?.[1] ?? "";
     expect(notice).toContain("Demo accounts are free.");
     expect(notice).toContain("live execution is not enabled in this release");
     for (const word of ["soon", "guarantee", "profit", "$", "\u20ac"]) {

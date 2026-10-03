@@ -3,7 +3,7 @@
  *
  * Drawn as vectors rather than shipped as a raster: it has to stay crisp at
  * 20px in a sidebar and at 40px on a sign-in screen, and it has to inherit
- * colour so the same file works on a dark surface, on a teal fill and in a
+ * colour so the same file works on a dark surface, on a crimson fill and in a
  * disabled state.
  *
  * The monogram is a geometric A: two strokes rising to an apex, with the
@@ -30,14 +30,14 @@ export function BrandMark({
       {title ? <title>{title}</title> : null}
       <rect
         x="0.75" y="0.75" width="30.5" height="30.5" rx="8"
-        fill="var(--a4t-accent, #0B5960)"
-        stroke="var(--a4t-accent-strong, #0E6E77)"
+        fill="var(--a4t-accent, #B21E35)"
+        stroke="var(--a4t-accent-strong, #D62B45)"
         strokeWidth="1.5"
       />
       {/* The apex: two strokes meeting at the top, open at the base. */}
       <path
         d="M9 24 L16 8 L23 24"
-        stroke="var(--a4t-on-accent, #F4F0E8)"
+        stroke="var(--a4t-on-accent, #FFF7F3)"
         strokeWidth="2.6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -46,7 +46,7 @@ export function BrandMark({
           rhythm rather than spelled out. */}
       <path
         d="M12.4 18.4 h2.1 M16.6 18.4 h2.1"
-        stroke="var(--a4t-long, #A5E7C5)"
+        stroke="var(--a4t-link-strong, #FF9AA4)"
         strokeWidth="2.2"
         strokeLinecap="round"
       />

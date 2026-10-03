@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import {
+  Activity,
+  BookOpen,
   Eye,
   GaugeCircle,
   Link2,
@@ -23,22 +25,9 @@ export const metadata: Metadata = {
 /**
  * The landing page.
  *
- * WHAT IT IS ALLOWED TO SAY
- *
- * Every figure a page like this normally carries — win rate, returns, traders
- * served, testimonials — is absent, because none of them would be measured.
- * content.test.ts enforces that mechanically. What is left is what the
- * software DOES, which a reader can check by using it.
- *
- * It is also deliberately not sold as a profit machine. The product is a
- * control panel: the trader brings the broker account and writes the rules,
- * and what this gives them is visibility, limits and a stop button. That is
- * both the honest description and the one that does not need a licence to
- * advertise.
- *
- * The primary action is the waitlist, not a purchase: checkout is off and
- * live execution is off, so asking for money here would be selling something
- * that does not run yet.
+ * No win rate, return, testimonial or account-balance claim appears here.
+ * The product is positioned as a control panel: the trader connects the
+ * broker, writes the rules, tests on demo, and keeps risk controls visible.
  */
 export default function Landing() {
   return (
@@ -52,22 +41,65 @@ export default function Landing() {
           </span>
         </nav>
 
-        <section className="mkt-hero">
+        <section className="mkt-hero mkt-hero-terminal">
           <span className="mkt-glow" aria-hidden />
-          <span className="mkt-eyebrow">Demo accounts first · cTrader</span>
-          <h1>
-            Your rules. Your broker. <em>One panel.</em>
-          </h1>
-          <p className="mkt-lede">
-            Apex4Traders is a control panel for trading automation. You connect
-            your own cTrader account, write your own rules from named
-            conditions, and see exactly what each one would decide before
-            anything runs. Risk limits, a full journal and a stop button are on
-            the same screen.
-          </p>
+          <div className="mkt-hero-copy">
+            <span className="mkt-eyebrow">Demo accounts first · cTrader private beta</span>
+            <h1>
+              Your rules. Your broker. <em>One control panel.</em>
+            </h1>
+            <p className="mkt-lede">
+              Apex4Traders lets traders connect their own cTrader account,
+              build rules from named conditions, preview decisions on demo, and
+              keep risk limits, account state and automation controls in one
+              workspace.
+            </p>
+            <div className="mkt-cta">
+              <WaitlistForm source="landing" />
+            </div>
+          </div>
 
-          <div className="mkt-cta">
-            <WaitlistForm source="landing" />
+          <div className="mkt-terminal" aria-label="Apex4Traders demo terminal preview">
+            <div className="mkt-terminal-top">
+              <span />
+              <span />
+              <span />
+              <strong>Apex4Traders / demo control</strong>
+            </div>
+            <div className="mkt-terminal-grid">
+              <div className="mkt-terminal-panel mkt-terminal-wide">
+                <small>Broker link</small>
+                <b>cTrader connected</b>
+                <p>Demo account selected · encrypted tokens · no custody</p>
+              </div>
+              <div className="mkt-terminal-panel">
+                <small>Execution mode</small>
+                <b className="mkt-terminal-safe">Demo only</b>
+                <p>Live unavailable in this release</p>
+              </div>
+              <div className="mkt-terminal-panel">
+                <small>Automation</small>
+                <b>Stopped</b>
+                <p>Start requires explicit confirmation</p>
+              </div>
+              <div className="mkt-terminal-panel mkt-terminal-wide">
+                <small>Rule preview</small>
+                <div className="mkt-terminal-rule">
+                  EURUSD · 15m · RSI + moving average · risk 1% · stop required
+                </div>
+                <p>User-configured summary, not a recommendation.</p>
+              </div>
+              <div className="mkt-terminal-panel mkt-terminal-accent">
+                <small>Risk guard</small>
+                <b>Refuse if unsafe</b>
+                <p>No silent substitution</p>
+              </div>
+              <div className="mkt-terminal-panel">
+                <small>Journal</small>
+                <b>Every decision</b>
+                <p>Including no-action outcomes</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -78,8 +110,8 @@ export default function Landing() {
             prediction.
           </p>
 
-          <div className="mkt-cards mkt-cards-3">
-            <article className="mkt-card">
+          <div className="mkt-bento">
+            <article className="mkt-card mkt-bento-large">
               <span className="mkt-card-ico"><Link2 size={17} aria-hidden /></span>
               <h3>Connect your own account</h3>
               <p>
@@ -94,18 +126,16 @@ export default function Landing() {
               <h3>Write rules in named conditions</h3>
               <p>
                 Moving averages, RSI, MACD, ATR, Bollinger Bands, Stochastic,
-                sessions, weekdays, spread and position limits. No scripting,
-                and no rule we supply for you to trust.
+                sessions, weekdays, spread and position limits.
               </p>
             </article>
 
             <article className="mkt-card">
               <span className="mkt-card-ico"><Eye size={17} aria-hidden /></span>
-              <h3>See the decision before it runs</h3>
+              <h3>Preview before it runs</h3>
               <p>
-                Preview a rule against real candles from your own account and
-                read back which conditions passed, which failed, and what it
-                would have done. Nothing is placed by a preview.
+                Read which conditions passed, which failed, and what the rule
+                would decide. Nothing is placed by a preview.
               </p>
             </article>
 
@@ -114,32 +144,50 @@ export default function Landing() {
               <h3>Risk limits you set</h3>
               <p>
                 Risk per trade, stop distance, target, and a cap on open
-                positions — enforced on the server, not in the page. A rule
-                that asks for something the limits refuse is refused, never
-                quietly adjusted.
+                positions are enforced on the server.
               </p>
             </article>
 
             <article className="mkt-card">
               <span className="mkt-card-ico"><PlayCircle size={17} aria-hidden /></span>
-              <h3>Start, pause, stop — yourself</h3>
+              <h3>Start, pause, stop</h3>
               <p>
-                Automation runs only while you have started it, and stopping is
-                one button on every screen. The panel always shows whether
-                something is running, and says &ldquo;unknown&rdquo; rather than
-                guessing when it cannot tell.
+                Automation runs only while you have started it. The panel says
+                unknown rather than guessing when it cannot tell.
               </p>
             </article>
 
-            <article className="mkt-card">
+            <article className="mkt-card mkt-bento-large">
               <span className="mkt-card-ico"><ShieldCheck size={17} aria-hidden /></span>
               <h3>A journal of every decision</h3>
               <p>
                 Each evaluation is recorded with the reason it acted or did
-                not. When something does not happen, the journal tells you
-                which condition stopped it.
+                not. When nothing happens, the journal tells you which condition
+                stopped it.
               </p>
             </article>
+          </div>
+        </section>
+
+        <section className="mkt-section mkt-flow">
+          <div>
+            <span className="mkt-eyebrow">Launch flow</span>
+            <h2>From broker connection to controlled demo automation.</h2>
+          </div>
+          <div className="mkt-flow-steps">
+            {[
+              ["01", "Connect cTrader", "Approve access in cTrader and return to the platform."],
+              ["02", "Select demo account", "The page shows which account is selected before any action."],
+              ["03", "Build your rule", "Use named conditions and visible risk controls."],
+              ["04", "Preview decision", "Read the decision before starting automation."],
+              ["05", "Start, pause, stop", "Controls are explicit and recorded in the journal."],
+            ].map(([n, title, body]) => (
+              <div className="mkt-flow-step" key={n}>
+                <span>{n}</span>
+                <strong>{title}</strong>
+                <p>{body}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -172,8 +220,8 @@ export default function Landing() {
             configure</strong>. It is not financial advice, it does not manage
             money for you, it does not supply signals, and it makes no claim
             about returns. We do not take custody of your funds: orders are
-            placed through a broker account that you connect and can
-            disconnect at any time.
+            placed through a broker account that you connect and can disconnect
+            at any time.
           </p>
           <div className="mkt-risk">
             <strong style={{ color: "var(--mkt-text)" }}>Risk warning.</strong>{" "}
@@ -182,12 +230,6 @@ export default function Landing() {
             instructions faster and without hesitating. You are responsible for
             the rules you run and for the outcomes they produce.
           </div>
-          {/* Stated here in full, in the source, rather than only through
-              PLAN_NOTICE: test_product_copy reads this file and requires the
-              sentence to be present, and it is right to — a public page that
-              carries the limit only inside an imported constant can lose it
-              to a refactor without anybody noticing, and silence about live
-              trading reads as yes. */}
           <div className="mkt-risk">
             <strong style={{ color: "var(--mkt-text)" }}>
               Live trading is not available in this release.
