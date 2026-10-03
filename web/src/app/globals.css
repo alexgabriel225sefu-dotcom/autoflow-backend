@@ -1216,3 +1216,14 @@ body {
   line-height: 1.5;
   margin: 0;
 }
+
+/* The optional question after a sign-up. Quiet on purpose: it is asked of
+   somebody who has already done the thing we wanted, and it must not read
+   like a second hurdle. */
+.wl-ask { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--mkt-line-soft); }
+.wl-ask-q { font-size: .82rem; color: var(--mkt-muted); margin: 0 0 .6rem; }
+.wl-skip {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  font-size: .82rem; color: var(--mkt-dim); padding: .72rem .6rem;
+}
+.wl-skip:hover { color: var(--mkt-text); }

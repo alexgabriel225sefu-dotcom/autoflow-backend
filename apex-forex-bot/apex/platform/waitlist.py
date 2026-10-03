@@ -57,6 +57,20 @@ _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s.]+(\.[^@\s.]+)+$")
 # would be stored and later read back by somebody who trusted it.
 SOURCES = ("landing", "pricing", "direct")
 
+# What the visitor trades on. A closed set for the same reason SOURCES is one:
+# a free string from a public form is something somebody else chooses and we
+# later read back as if we had.
+#
+# This exists to answer a question the product cannot otherwise answer without
+# guessing — which platform to support next, and whether MetaTrader is worth
+# its cost at all. It is volunteered, never required, and never inferred.
+PLATFORMS = ("ctrader", "mt4", "mt5", "other")
+
+# The broker cannot be a closed set — there are hundreds, and the useful
+# answer is the long tail. So it is free text, bounded hard: long enough for
+# "IC Markets (Global)", short enough that the field is not storage.
+MAX_BROKER = 60
+
 
 class WaitlistError(ValueError):
     """Refused. `code` is what the client branches on, never the message."""
@@ -118,7 +132,24 @@ def _k_index():
     return f"{_store._ns()}:{_store._P}:waitlist:index"
 
 
-def join(email, *, source="direct", now=None):
+def _platform(value):
+    """One of PLATFORMS, or None. Never a string somebody else chose."""
+    v = (value or "").strip().lower()
+    return v if v in PLATFORMS else None
+
+
+def _broker(value):
+    """A broker name as typed, bounded, or None.
+
+    Kept as written rather than normalised to a known list: the point of
+    asking is to find out which brokers exist in this market, and folding
+    anything unrecognised into "other" would delete the answer.
+    """
+    v = " ".join((value or "").split())[:MAX_BROKER]
+    return v or None
+
+
+def join(email, *, source="direct", platform=None, broker=None, now=None):
     """Record an address. Idempotent, and says which it was.
 
     Returns {"status": "added"|"already"}. The two are distinguished for the
@@ -142,13 +173,39 @@ def join(email, *, source="direct", now=None):
     # success for something that was never written.
     existing = _store._read_strict(key)
     if existing:
-        return {"status": "already", "joinedAt": existing.get("joinedAt")}
+        # The same person answering a question they skipped. Only ABSENT
+        # fields are filled: a second call cannot rewrite what somebody
+        # already said, and cannot clear it either. This exists because the
+        # form asks about platform and broker AFTER the sign-up has
+        # succeeded — a question on the way in costs conversions, and the
+        # answer is worth less than the address.
+        added = {}
+        plat = _platform(platform)
+        if plat and not existing.get("platform"):
+            added["platform"] = plat
+        brk = _broker(broker)
+        if brk and not existing.get("broker"):
+            added["broker"] = brk
+        if added:
+            _store._write(key, dict(existing, **added))
+        return {"status": "already", "joinedAt": existing.get("joinedAt"),
+                "answered": bool(added)}
 
-    _store._write(key, {
+    rec = {
         "email": user_store.encrypt_value(address),
         "joinedAt": stamp,
         "source": src,
-    })
+    }
+    # Only written when answered. An absent key and an empty string are
+    # different facts: "did not say" is not "uses no broker", and an export
+    # that cannot tell them apart cannot count either.
+    plat = _platform(platform)
+    if plat:
+        rec["platform"] = plat
+    brk = _broker(broker)
+    if brk:
+        rec["broker"] = brk
+    _store._write(key, rec)
     # The index is written AFTER the record, so a failure between the two
     # leaves an address stored and unlisted rather than listed and absent.
     # An export that misses somebody is a bug to find; an export that names
@@ -189,9 +246,40 @@ def export():
             "email": address,
             "joinedAt": rec.get("joinedAt"),
             "source": rec.get("source"),
+            "platform": rec.get("platform"),
+            "broker": rec.get("broker"),
         })
     out.sort(key=lambda r: r.get("joinedAt") or 0)
     return {"entries": out, "unresolved": missing, "unreadable": unreadable}
+
+
+def tally():
+    """What the list says about platforms and brokers.
+
+    The whole reason the two fields exist. Counts only what people actually
+    answered: "did not say" is its own bucket rather than being folded into
+    the smallest one, because a question most people skipped is a weaker
+    answer than the raw counts would suggest and the reader has to be able
+    to see that.
+    """
+    dump = export()
+    plats, brokers, said = {}, {}, 0
+    for e in dump["entries"]:
+        p = e.get("platform")
+        if p:
+            said += 1
+            plats[p] = plats.get(p, 0) + 1
+        b = (e.get("broker") or "").strip()
+        if b:
+            brokers[b.lower()] = brokers.get(b.lower(), 0) + 1
+    return {
+        "total": len(dump["entries"]),
+        "answered": said,
+        "platforms": dict(sorted(plats.items(), key=lambda kv: -kv[1])),
+        "brokers": dict(sorted(brokers.items(), key=lambda kv: -kv[1])),
+        "unresolved": dump["unresolved"],
+        "unreadable": dump.get("unreadable", []),
+    }
 
 
 def public_result(outcome):

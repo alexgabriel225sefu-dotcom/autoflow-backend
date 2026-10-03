@@ -311,7 +311,9 @@ def _dispatch(method, route, headers, body, query=None):
         payload = _body(body) or {}
         try:
             outcome = _wait.join(payload.get("email"),
-                                 source=payload.get("source"))
+                                 source=payload.get("source"),
+                                 platform=payload.get("platform"),
+                                 broker=payload.get("broker"))
         except _wait.WaitlistError as e:
             status = 503 if e.code == "NOT_CONFIGURED" else 400
             return _err(status, e.code, e.detail)

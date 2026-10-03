@@ -251,7 +251,11 @@ export type PublicOffer = {
 };
 
 /** What the waitlist route answers. It never returns the address. */
-export type WaitlistResult = { status: "added" | "already" };
+export type WaitlistResult = {
+  status: "added" | "already";
+  /** Present on a repeat call: whether it filled in a blank. */
+  answered?: boolean;
+};
 
 /**
  * Ask to be told when access opens.
@@ -262,9 +266,12 @@ export type WaitlistResult = { status: "added" | "already" };
 export async function joinWaitlist(
   email: string,
   source: "landing" | "pricing" | "direct",
+  answers?: { platform?: string; broker?: string },
 ): Promise<ApiResult<WaitlistResult>> {
   return request<WaitlistResult>(
-    "waitlist", { method: "POST", body: { email, source } }, null);
+    "waitlist",
+    { method: "POST", body: { email, source, ...(answers ?? {}) } },
+    null);
 }
 
 /** `priceMinor` + `currency` as the reader's locale would write them. */

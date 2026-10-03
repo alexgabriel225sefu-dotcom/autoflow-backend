@@ -15,7 +15,10 @@ vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
   return {
     ...actual,
-    joinWaitlist: (email: string, source: string) => joinWaitlist(email, source),
+    // Forwards EVERY argument. An earlier version forwarded two, which was
+    // written before the third existed and silently dropped it — the test
+    // then asserted against a call the component never made.
+    joinWaitlist: (...args: unknown[]) => joinWaitlist(...args),
   };
 });
 
@@ -135,5 +138,75 @@ describe("what it promises", () => {
     expect(note).toMatch(/one email/i);
     expect(note).toMatch(/no tracking/i);
     expect(note).toMatch(/does not place live orders/i);
+  });
+});
+
+/**
+ * The question asked after the sign-up, never before it.
+ *
+ * Which platform somebody trades on decides what this product supports next.
+ * It is also not worth losing a sign-up over, so the address is taken first
+ * and this is asked of people who have already said yes. Everything below is
+ * about that order holding.
+ */
+describe("the platform question", () => {
+  async function joinThen() {
+    joinWaitlist.mockResolvedValue({ ok: true, data: { status: "added" } });
+    render(<WaitlistForm source="landing" />);
+    type("a@b.com");
+    fireEvent.click(screen.getByRole("button"));
+    await waitFor(() => expect(screen.getByText("You are on the list.")).toBeTruthy());
+    joinWaitlist.mockClear();
+  }
+
+  it("is not on the form before signing up", () => {
+    render(<WaitlistForm />);
+    // One field and one button. Anything more is a hurdle in front of the
+    // only thing this page asks for.
+    expect(screen.queryByLabelText(/trading platform/i)).toBeNull();
+    expect(screen.queryByPlaceholderText(/broker/i)).toBeNull();
+  });
+
+  it("appears only after the server confirmed the sign-up", async () => {
+    await joinThen();
+    expect(screen.getByLabelText(/trading platform/i)).toBeTruthy();
+  });
+
+  it("sends the answer against the same address", async () => {
+    await joinThen();
+    fireEvent.change(screen.getByLabelText(/trading platform/i),
+                     { target: { value: "mt5" } });
+    fireEvent.change(screen.getByLabelText(/^broker$/i),
+                     { target: { value: "IC Markets" } });
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await waitFor(() => expect(joinWaitlist).toHaveBeenCalledWith(
+      "a@b.com", "landing", { platform: "mt5", broker: "IC Markets" }));
+  });
+
+  it("can be skipped, and skipping sends nothing", async () => {
+    await joinThen();
+    fireEvent.click(screen.getByRole("button", { name: /skip/i }));
+    await waitFor(() => expect(screen.getByText(/noted/i)).toBeTruthy());
+    expect(joinWaitlist).not.toHaveBeenCalled();
+  });
+
+  it("cannot be sent empty", async () => {
+    await joinThen();
+    expect(screen.getByRole("button", { name: /^send$/i }))
+      .toHaveProperty("disabled", true);
+  });
+
+  it("never takes back the confirmation, whatever the answer does", async () => {
+    await joinThen();
+    joinWaitlist.mockResolvedValue({
+      ok: false, status: 503, code: "STORE_UNAVAILABLE", message: "down" });
+    fireEvent.change(screen.getByLabelText(/trading platform/i),
+                     { target: { value: "mt4" } });
+    fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    await waitFor(() => expect(screen.getByText(/noted/i)).toBeTruthy());
+    // The address is already recorded. A failed afterthought must not make
+    // somebody think their sign-up did not happen.
+    expect(screen.getByText("You are on the list.")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

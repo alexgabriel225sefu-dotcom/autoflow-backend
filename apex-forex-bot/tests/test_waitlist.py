@@ -104,8 +104,10 @@ check("and it decrypts back to what was typed",
 check("the key does not contain the address either",
       "trader" not in W._key("trader@example.com"),
       W._key("trader@example.com"))
-check("only the three fields we asked for are kept",
+check("only the fields we asked for are kept, and no more",
       set(raw) == {"email", "joinedAt", "source"}, str(sorted(raw)))
+# That record answered no question, so it carries no answer. The two optional
+# fields are written only when somebody actually answers them — see [9].
 
 # The hash is keyed. An unkeyed SHA-256 of an email is a pseudonym, not a
 # protection: the input space is small enough to enumerate.
@@ -114,6 +116,94 @@ import hashlib                                          # noqa: E402
 check("the key is not a bare digest anyone could recompute",
       hashlib.sha256(b"trader@example.com").hexdigest()
       not in W._key("trader@example.com"))
+
+print("\n[9] what the visitor volunteers, and only that")
+# Added to answer a question the business could not otherwise answer without
+# guessing: which platform to support next, and whether MetaTrader earns its
+# cost. Optional by design — an unanswered question must never cost a sign-up.
+W.join("plat@example.com", source="landing", platform="MT5 ", broker="  IC  Markets ")
+_p = _store._read(W._key("plat@example.com"))
+check("a known platform is stored, folded to lower case",
+      _p.get("platform") == "mt5", json.dumps(_p.get("platform")))
+check("the broker is kept as typed, with the spacing tidied",
+      _p.get("broker") == "IC Markets", json.dumps(_p.get("broker")))
+
+W.join("junk@example.com", platform="definitely-not-a-platform")
+_j = _store._read(W._key("junk@example.com"))
+check("a platform we do not know is not stored at all",
+      "platform" not in _j, json.dumps(_j))
+check("and the sign-up still succeeds — the question is optional",
+      _j.get("joinedAt") is not None)
+
+W.join("quiet@example.com")
+_q = _store._read(W._key("quiet@example.com"))
+check("somebody who answers nothing carries no empty fields",
+      "platform" not in _q and "broker" not in _q, json.dumps(sorted(_q)))
+
+W.join("long@example.com", broker="B" * 200)
+_l = _store._read(W._key("long@example.com"))
+check("a broker name cannot be used as storage",
+      len(_l.get("broker") or "") == W.MAX_BROKER, len(_l.get("broker") or ""))
+
+W.join("empty@example.com", broker="   ")
+check("whitespace is not an answer",
+      "broker" not in _store._read(W._key("empty@example.com")))
+
+# The form asks about platform and broker on the CONFIRMATION, not on the way
+# in: a question before the address costs sign-ups, and the address is worth
+# more than the answer. So a second call must be able to fill in a blank.
+W.join("later@example.com", source="landing")
+_r = W.join("later@example.com", platform="mt4", broker="XM")
+check("answering afterwards is recorded", _r.get("answered") is True, json.dumps(_r))
+_lr = _store._read(W._key("later@example.com"))
+check("and lands on the original record",
+      _lr.get("platform") == "mt4" and _lr.get("broker") == "XM", json.dumps(_lr))
+check("the original joining moment is untouched",
+      _lr.get("joinedAt") is not None)
+
+# But it cannot REWRITE an answer, and cannot clear one.
+W.join("later@example.com", platform="ctrader", broker="Someone Else")
+_lr2 = _store._read(W._key("later@example.com"))
+check("a later call cannot overwrite what was already said",
+      _lr2.get("platform") == "mt4" and _lr2.get("broker") == "XM",
+      json.dumps(_lr2))
+_r3 = W.join("later@example.com")
+check("and a call with nothing to add says so",
+      _r3.get("answered") is False, json.dumps(_r3))
+check("nor can it clear an answer",
+      _store._read(W._key("later@example.com")).get("platform") == "mt4")
+
+print("\n[10] the tally, which is the point of asking")
+W.join("a1@example.com", platform="mt5", broker="IC Markets")
+W.join("a2@example.com", platform="mt5", broker="ic markets")
+W.join("a3@example.com", platform="ctrader", broker="Pepperstone")
+_t = W.tally()
+check("platforms are counted", _t["platforms"].get("mt5", 0) >= 3,
+      json.dumps(_t["platforms"]))
+check("brokers are counted case-insensitively",
+      _t["brokers"].get("ic markets", 0) >= 3, json.dumps(_t["brokers"]))
+check("the most common platform comes first",
+      list(_t["platforms"])[0] == "mt5", json.dumps(_t["platforms"]))
+check("and it reports how many people answered at all, not only the winners",
+      _t["answered"] < _t["total"],
+      f"answered {_t['answered']} of {_t['total']}")
+
+print("\n[11] the two new fields reach the record over HTTP")
+_st, _b = post("http2@example.com", "landing", ip="203.0.113.21")
+check("a plain sign-up still works", _st == 200, f"{_st}")
+_res = _API._handle("POST", "/api/v1/waitlist", headers={},
+                    body=json.dumps({"email": "wired@example.com",
+                                     "source": "landing",
+                                     "platform": "mt4",
+                                     "broker": "XM Global"}),
+                    client_key="203.0.113.22")
+check("the route accepts them", _res[0] == 200, json.dumps(_res[1]))
+_w = _store._read(W._key("wired@example.com"))
+check("and they land on the record",
+      _w.get("platform") == "mt4" and _w.get("broker") == "XM Global",
+      json.dumps({k: _w.get(k) for k in ("platform", "broker")}))
+check("while the response still carries only a status",
+      set(_res[1]) <= {"ok", "status"}, str(sorted(_res[1])))
 
 print("\n[4] the source is ours or it is nothing")
 W.join("src@example.com", source="landing")

@@ -296,8 +296,32 @@ if os.path.isdir(web):
                 text = io.open(path, encoding="utf-8").read().lower()
             except UnicodeDecodeError:
                 continue
-            if "mt4" in text or "mt5" in text:
-                hits.append(os.path.relpath(path, web))
+            if "mt4" not in text and "mt5" not in text:
+                continue
+            rel = os.path.relpath(path, web)
+            # Tests are not UI. This check is about what a CLIENT can read,
+            # and nothing in a .test file reaches a browser — the same line
+            # web/src/app/content.test.ts draws for the same reason. A test
+            # that asserts the UI does not claim MT has to be allowed to say
+            # "MT" in order to assert it.
+            if ".test." in os.path.basename(rel):
+                continue
+            # ONE narrow exemption, and it polices itself.
+            #
+            # The waitlist asks a visitor which platform THEY trade on, so
+            # that the product can decide what to support next. Naming
+            # MetaTrader there is a question, not a claim — but only while
+            # the form also states what IS supported. Strip that sentence
+            # and this fires again, which is the point: the exemption is for
+            # a question, not for the filename.
+            if "waitlist-form" in rel:
+                if "connects to cTrader today" in io.open(
+                        path, encoding="utf-8").read():
+                    continue
+                hits.append(f"{rel} (names MetaTrader without saying what "
+                            f"IS supported)")
+                continue
+            hits.append(rel)
     check("nor does the web UI claim MT4/MT5 anywhere", not hits,
           ", ".join(sorted(hits)))
 

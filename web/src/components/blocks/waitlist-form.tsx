@@ -35,6 +35,18 @@ export function WaitlistForm({
   const noteId = `${fieldId}-note`;
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const [platform, setPlatform] = useState("");
+  const [broker, setBroker] = useState("");
+  const [asked, setAsked] = useState(false);
+
+  async function answer(e: React.FormEvent) {
+    e.preventDefault();
+    setAsked(true);
+    // Fire and forget, deliberately. The sign-up is already recorded; if this
+    // fails there is nothing for the visitor to do about it and nothing worth
+    // showing them. Their address — the thing that mattered — is safe.
+    void joinWaitlist(email, source, { platform, broker });
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,6 +82,67 @@ export function WaitlistForm({
           We will email you once when early access opens. Nothing else, and no
           one else gets your address.
         </p>
+
+        {/* ASKED HERE, NOT ON THE WAY IN
+            Which platform somebody trades on decides what this product
+            supports next, and it is not a question worth losing a sign-up
+            over. So the address is taken first and this is asked of people
+            who have already said yes. Skipping it costs them nothing and the
+            sign-up is already recorded. */}
+        {asked ? (
+          <p className="wl-note" role="status">Noted — thank you.</p>
+        ) : (
+          <form className="wl-ask" onSubmit={answer}>
+            {/* This sentence is load-bearing, and a test enforces it.
+                The dropdown below names MetaTrader, and a reader who met
+                those names with no context could reasonably conclude the
+                product supports them. It does not. Saying what IS supported,
+                in the same breath as the question, is what keeps a question
+                from reading as an offer. */}
+            <p className="wl-ask-q">
+              Apex4Traders connects to cTrader today. We are asking so we know
+              what to support next — what do you trade on?
+            </p>
+            <div className="wl-row">
+              <select
+                className="wl-input"
+                aria-label="Trading platform"
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
+              >
+                <option value="">Platform…</option>
+                <option value="ctrader">cTrader</option>
+                <option value="mt5">MetaTrader 5</option>
+                <option value="mt4">MetaTrader 4</option>
+                <option value="other">Something else</option>
+              </select>
+              <input
+                className="wl-input"
+                placeholder="Broker (optional)"
+                aria-label="Broker"
+                maxLength={60}
+                value={broker}
+                onChange={(e) => setBroker(e.target.value)}
+              />
+            </div>
+            <div className="wl-row" style={{ marginTop: ".5rem" }}>
+              <button
+                className="wl-submit"
+                type="submit"
+                disabled={platform === "" && broker.trim() === ""}
+              >
+                Send
+              </button>
+              <button
+                className="wl-skip"
+                type="button"
+                onClick={() => setAsked(true)}
+              >
+                Skip
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     );
   }
