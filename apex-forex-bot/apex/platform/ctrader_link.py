@@ -537,7 +537,7 @@ def _read_conn(user_id):
     connected while every call that needed the token failed with something
     obscure about refreshing.
     """
-    rec = _store._read(_k_conn(str(user_id)))
+    rec = _store._read_strict(_k_conn(str(user_id)))
     if not rec:
         raise LinkError("NOT_CONNECTED", "no cTrader account is connected")
     if str(rec.get("userId")) != str(user_id):
@@ -548,7 +548,15 @@ def _read_conn(user_id):
 
 
 def public_status(user_id):
-    """What may be shown in a browser. Carries no token, ever."""
+    """What may be shown in a browser. Carries no token, ever.
+
+    `connected: False` here is a claim about the reader's account, and the
+    UI prints it as the sentence "no cTrader account is connected". So only
+    a LinkError produces it — a store that could not be asked raises
+    StoreUnavailable through, and the API answers 503, for the same reason
+    an unreachable auth backend is never a 401: "we cannot check" and "you
+    have nothing" are different answers and only one of them is true.
+    """
     try:
         rec = _read_conn(user_id)
     except LinkError:

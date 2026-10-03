@@ -71,12 +71,15 @@ def _local_path(key):
     return os.path.join(d, f"{safe}.json")
 
 
-def _read(key):
+def _raw(key, *, strict):
     if user_store._USE_REDIS:
-        raw = user_store.get_blob(key)
-    else:
-        p = _local_path(key)
-        raw = open(p).read() if os.path.exists(p) else None
+        return (user_store.get_blob_strict(key) if strict
+                else user_store.get_blob(key))
+    p = _local_path(key)
+    return open(p).read() if os.path.exists(p) else None
+
+
+def _decode(key, raw):
     if not raw:
         return None
     try:
@@ -85,6 +88,21 @@ def _read(key):
         # A corrupt record is not an empty one. Returning None here would let
         # a caller create a "first" document over the top of a damaged one.
         raise ValueError(f"stored document at {key} is not readable JSON")
+
+
+def _read(key):
+    return _decode(key, _raw(key, strict=False))
+
+
+def _read_strict(key):
+    """`_read`, but a store that could not be reached raises.
+
+    `_read` cannot tell the two apart, because get_blob collapses them into
+    None. For a cache that is the right trade. For a document whose absence
+    the product states as a fact about the user's account it is not: see
+    user_store.StoreUnavailable.
+    """
+    return _decode(key, _raw(key, strict=True))
 
 
 def _write(key, doc):

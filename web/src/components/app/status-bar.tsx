@@ -18,9 +18,10 @@ import type { ApiResult } from "@/lib/api";
 type Tone = "long" | "short" | "accent" | "neutral";
 
 function Chip({
-  tone, live, label, value, href,
+  tone, live, label, value, href, title,
 }: {
-  tone?: Tone; live?: boolean; label: string; value: React.ReactNode; href?: string;
+  tone?: Tone; live?: boolean; label: string; value: React.ReactNode;
+  href?: string; title?: string;
 }) {
   const body = (
     <>
@@ -30,8 +31,18 @@ function Chip({
     </>
   );
   return href
-    ? <a className="stat-chip" href={href}>{body}</a>
-    : <span className="stat-chip">{body}</span>;
+    ? <a className="stat-chip" href={href} title={title}>{body}</a>
+    : <span className="stat-chip" title={title}>{body}</span>;
+}
+
+/* A read that failed is not a read still in flight.
+ *
+ * Both used to arrive here as a null payload and both rendered the loading
+ * shimmer, so a 503 from the API read on screen as "still loading", for ever.
+ * That is the same mistake as rendering it as "not connected", just quieter:
+ * the strip claims a state it does not have. An unknown state now says so. */
+function Unknown({ label, title }: { label: string; title: string }) {
+  return <Chip label={label} value="Unknown" title={title} />;
 }
 
 export function StatusBar({
@@ -42,6 +53,10 @@ export function StatusBar({
   auto: ApiResult<AutomationState> | null;
 }) {
   const account = ct?.ok ? ct.data : null;
+  // A result that arrived and said no is a third state, distinct from both
+  // "we have an answer" and "we are still asking".
+  const ctFailed = ct != null && !ct.ok;
+  const autoFailed = auto != null && !auto.ok;
   const selected = account?.selected ?? null;
   const running = auto?.ok ? auto.data : null;
   const licence = me?.ok ? me.data.licence.state : null;
@@ -51,7 +66,12 @@ export function StatusBar({
       {/* Account. "Not connected" is a fact from the API, never a placeholder
           shown while we wait. */}
       {account === null ? (
-        <Chip label="Account" value={<span className="skel" style={{ width: 52, display: "inline-block" }} />} />
+        ctFailed ? (
+          <Unknown label="Account"
+                   title="The platform could not read your broker link just now — this is not a statement that nothing is connected" />
+        ) : (
+          <Chip label="Account" value={<span className="skel" style={{ width: 52, display: "inline-block" }} />} />
+        )
       ) : !account.connected ? (
         <a className="stat-chip" href="/connect">
           <Plug className="ico" style={{ width: 12, height: 12 }} aria-hidden />
@@ -71,7 +91,12 @@ export function StatusBar({
 
       {/* Automation. The single most consequential thing on the screen. */}
       {running === null ? (
-        <Chip label="Automation" value={<span className="skel" style={{ width: 44, display: "inline-block" }} />} />
+        autoFailed ? (
+          <Unknown label="Automation"
+                   title="The platform could not read whether automation is running — do not read this as stopped" />
+        ) : (
+          <Chip label="Automation" value={<span className="skel" style={{ width: 44, display: "inline-block" }} />} />
+        )
       ) : (
         <Chip
           href={running.ruleDocId ? `/rules/${running.ruleDocId}` : "/rules"}

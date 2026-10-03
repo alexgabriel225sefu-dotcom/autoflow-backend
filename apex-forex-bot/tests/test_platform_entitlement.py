@@ -547,6 +547,195 @@ check("without it, the account id is empty — which is what int() choked on",
       _cfg_without.CTRADER_ACCOUNT_ID == "",
       repr(_cfg_without.CTRADER_ACCOUNT_ID))
 
+# ── [13] ───────────────────────────────────────────────────────────────────
+# Seen in production on 2026-10-02: the owner's phone showed "No cTrader
+# account is connected" on one screen and the connected DEMO account on
+# another, minutes apart, for the only user that exists in Supabase — a user
+# whose link record is intact.
+#
+# The cause was not the UI. user_store's read helpers return None on ANY
+# failure — a 429, a timeout, a dropped connection — and `_read_conn` turns
+# None into NOT_CONNECTED, which public_status turns into connected=false,
+# which the browser prints as a sentence about the reader's own account. A
+# failed read rendered as a fact. `_redis_set` carries a docstring about this
+# exact bug being fixed for WRITES; the read half was never done.
+print("\n[13] a store that cannot be reached is never rendered as a fact")
+from apex import user_store as _US                  # noqa: E402
+from apex.platform import api as _API               # noqa: E402
+from apex.platform import identity as _ID           # noqa: E402
+
+connect([DEMO_ACC, LIVE_ACC])
+select(501)
+
+# Controls first. The fix must not make a healthy read, or a genuinely empty
+# one, into an error — otherwise everything below passes for the wrong reason.
+check("control: a reachable store reports the connection",
+      CL.public_status(USER).get("connected") is True)
+check("control: an absent record is still connected=false, not an error",
+      CL.public_status("ffffffff-2222-4222-8222-ffffffffffff")
+      .get("connected") is False)
+
+_saved = (_US._USE_REDIS, _US.get_blob, _US.get_blob_strict)
+
+
+def _down_strict(key):
+    raise _US.StoreUnavailable("upstash GET failed: ReadTimeout")
+
+
+try:
+    # A deployment with a shared backend, whose backend is not answering.
+    _US._USE_REDIS = True
+    _US.get_blob = lambda key: None          # what the lenient path still does
+    _US.get_blob_strict = _down_strict
+
+    check("the lenient read still reports None, so the two paths differ",
+          ST._read(CL._k_conn(USER)) is None)
+
+    try:
+        ST._read_strict(CL._k_conn(USER))
+        check("the strict read raises instead of reading back empty", False)
+    except _US.StoreUnavailable:
+        check("the strict read raises instead of reading back empty", True)
+
+    try:
+        _st = CL.public_status(USER)
+        check("public_status does not claim the account has nothing",
+              False, f"returned connected={_st.get('connected')!r}")
+    except _US.StoreUnavailable:
+        check("public_status does not claim the account has nothing", True)
+
+    # And the answer the browser actually receives.
+    _ID_saved = _ID.verify_token
+    _API_verify = _API._id.verify_token
+    try:
+        _API._id.verify_token = lambda token, **kw: _ID.Principal(
+            user_id=USER, email="o@apex4traders.test", email_verified=True)
+        _res = _API._handle("GET", "/api/v1/ctrader/status",
+                            headers={"Authorization": "Bearer stub"},
+                            client_key="203.0.113.13")
+        check("the endpoint answers at all", _res is not None)
+        _status, _body = _res
+        check("an unreachable store answers 503, not 200", _status == 503,
+              f"status {_status}")
+        check("with a code the client can branch on",
+              ((_body or {}).get("error") or {}).get("code")
+              == "STORE_UNAVAILABLE", json.dumps(_body)[:160])
+        check("and the body never carries a connected flag to render",
+              "connected" not in json.dumps(_body), json.dumps(_body)[:160])
+    finally:
+        _API._id.verify_token = _API_verify
+finally:
+    _US._USE_REDIS, _US.get_blob, _US.get_blob_strict = _saved
+
+# get_blob_strict must actually reach the strict GET. Every check above stubs
+# get_blob_strict itself, so none of them executes its body — a mutation that
+# pointed it back at the lenient _redis_get survived them all. This drives the
+# real chain: get_blob_strict -> _redis_get_strict -> _upstash_strict, on a
+# backend declared present and in fact unconfigured.
+_saved2 = (_US._USE_REDIS, _US._BACKEND)
+try:
+    _US._USE_REDIS, _US._BACKEND = True, "upstash"
+    _k = "forex:platform:probe"
+    check("the lenient blob read swallows the failure and answers None",
+          _US.get_blob(_k) is None)
+    try:
+        _US.get_blob_strict(_k)
+        check("the strict blob read does not", False, "returned without raising")
+    except _US.StoreUnavailable:
+        check("the strict blob read does not", True)
+finally:
+    _US._USE_REDIS, _US._BACKEND = _saved2
+
+# The failure message must not carry the key or the value: an Upstash argument
+# is a key or a value, and the values include encrypted broker tokens. The old
+# code interpolated the requests exception, which carries the whole URL.
+_leaked = None
+try:
+    _US._upstash_strict(["SET", "forex:platform:ctrader:secret-user",
+                         "gAAAAA-encrypted-token-material"])
+except _US.StoreUnavailable as e:
+    _leaked = str(e)
+except Exception as e:                               # noqa: BLE001
+    _leaked = f"wrong exception {type(e).__name__}: {e}"
+check("a failed command raises StoreUnavailable",
+      _leaked is not None and not _leaked.startswith("wrong exception"),
+      str(_leaked))
+check("and its message carries neither the key nor the value",
+      _leaked is not None
+      and "secret-user" not in _leaked
+      and "encrypted-token-material" not in _leaked,
+      str(_leaked))
+check("while still naming the command, so a log line is diagnosable",
+      bool(_leaked) and "SET" in _leaked, str(_leaked))
+
+# ── [14] ───────────────────────────────────────────────────────────────────
+# The envelope every read route answers in.
+#
+# The defect: GET ctrader/status wrapped its payload as {"ctrader": {...}}
+# while GET accounts returned the SAME payload flat. Five screens read
+# `connected` off the top level of ctrader/status, got undefined, and printed
+# "no cTrader account is connected" about a connected account. The status
+# strip read the flat route and showed the account, so the two disagreed on
+# the same screen. TypeScript could not catch it: the client casts the body
+# with `payload as T` and never checks it.
+#
+# So the shape is pinned here, on the server, which is the only side that
+# knows it. A read answers the resource flat; an action answers it under a
+# key that names what changed.
+print("\n[14] a read route answers the resource flat")
+connect([DEMO_ACC, LIVE_ACC])
+select(501)
+
+
+def _body(route, method="GET", payload=None):
+    _res = _API._handle(method, "/api/v1/" + route,
+                        headers={"Authorization": "Bearer stub"},
+                        body=(json.dumps(payload) if payload else None),
+                        client_key="203.0.113.%d" % (hash(route) % 200 + 20))
+    assert _res is not None, route
+    return _res
+
+
+_vt = _API._id.verify_token
+try:
+    _API._id.verify_token = lambda token, **kw: _ID.Principal(
+        user_id=USER, email="o@apex4traders.test", email_verified=True)
+
+    for _route in ("ctrader/status", "accounts"):
+        _s, _b = _body(_route)
+        check(f"GET {_route} answers 200", _s == 200, f"status {_s}")
+        check(f"GET {_route} carries connected at the top level",
+              _b.get("connected") is True,
+              f"keys {sorted((_b or {}).keys())}")
+        check(f"GET {_route} carries the selection at the top level",
+              (_b.get("selected") or {}).get("ctid") == 501,
+              json.dumps(_b.get("selected")))
+        check(f"GET {_route} does not nest it under a key the client ignores",
+              "ctrader" not in _b, f"keys {sorted((_b or {}).keys())}")
+
+    # Both routes read the same thing, so they must answer the same thing —
+    # the discrepancy itself was the bug, not either shape on its own.
+    _, _b1 = _body("ctrader/status")
+    _, _b2 = _body("accounts")
+    check("and the two read routes agree, key for key",
+          {k: v for k, v in _b1.items() if k != "ok"}
+          == {k: v for k, v in _b2.items() if k != "ok"},
+          f"{sorted(_b1)} vs {sorted(_b2)}")
+
+    # The action routes keep their naming envelope, which one client screen
+    # already reads correctly — flattening those would break it.
+    # 501, the demo account. The live one is refused in this environment, so
+    # selecting it would test the environment's refusal, not the envelope.
+    _s, _b = _body("ctrader/select", "POST", {"ctid": 501})
+    check("POST ctrader/select answers 200", _s == 200, f"status {_s}")
+    check("an action still names what it changed",
+          isinstance(_b.get("ctrader"), dict), json.dumps(_b)[:120])
+    check("and what it names is the same shape the read answers flat",
+          (_b.get("ctrader") or {}).get("connected") is True,
+          json.dumps(_b)[:120])
+finally:
+    _API._id.verify_token = _vt
+
 if _fails:
     print(f"FAILED ({len(_fails)}):")
     for f in _fails:

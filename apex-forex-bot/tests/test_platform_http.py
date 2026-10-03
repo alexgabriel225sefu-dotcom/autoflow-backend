@@ -233,8 +233,15 @@ try:
     check("and never echoes the authorization code",
           "abc123" not in json.dumps(b), json.dumps(b)[:80])
     st, b = call("GET", "/api/v1/ctrader/status")
+    # Flat, like GET accounts twelve lines below, which returns this very
+    # payload. This file used to read one of them wrapped and the other flat
+    # without noticing — which is exactly the discrepancy five client screens
+    # then tripped over, reading `connected` off a level where it did not
+    # exist and printing "not connected" about a connected account.
     check("the account is not connected until it is completed",
-          b["ctrader"]["connected"] is False, str(b))
+          b["connected"] is False, str(b))
+    check("and the read is not nested under a key of its own",
+          "ctrader" not in b, str(sorted(b)))
 
     print("\n5. reads answer with a stated status, never a bare empty list")
     # Nothing is 501 any more. What replaced it is a stronger claim: each of

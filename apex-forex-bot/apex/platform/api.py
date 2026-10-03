@@ -42,6 +42,7 @@ from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
+from apex import user_store as _ustore
 
 PREFIX = "/api/v1/"
 
@@ -194,6 +195,13 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         # the platform that cannot check right now, and telling them their
         # login is invalid would be a lie that also hides the real fault.
         return _err(503, "AUTH_UNAVAILABLE", str(e))
+    except _ustore.StoreUnavailable as e:
+        # 503, never a 200 that says the account has nothing. The record may
+        # be perfectly intact; it is the store that did not answer, and
+        # rendering that as "no cTrader account is connected" tells the
+        # account's owner a falsehood about their own account while hiding
+        # the real fault. Same reasoning as AUTH_UNAVAILABLE above.
+        return _err(503, "STORE_UNAVAILABLE", str(e))
     except _link.LinkConfigError as e:
         # The platform is misconfigured, which is not the client's fault and
         # must not read as one. 503, like every other "we cannot", never 400.
@@ -291,7 +299,21 @@ def _dispatch(method, route, headers, body, query=None):
         # cached session.
         p = _authenticate(headers, fresh=action in ("complete", "disconnect"))
         if action == "status":
-            return _ok({"ctrader": _link.public_status(p.user_id)})
+            # Flat, exactly like GET accounts — which returns this same
+            # payload and which the status strip reads correctly.
+            #
+            # This route used to wrap it as {"ctrader": {...}}, and five
+            # client screens read `connected` off the top level, where it was
+            # undefined and therefore falsy. Every one of them printed "no
+            # cTrader account is connected" about an account that was
+            # connected, while the strip — reading the flat route — showed
+            # the account. Seen on 2026-10-02; the server answered 200 to all
+            # nine calls, so nothing looked wrong anywhere but the screen.
+            #
+            # The convention this settles on: a READ answers the resource
+            # flat; an ACTION (complete, select) answers {"ctrader": ...},
+            # naming what its result changed.
+            return _ok(_link.public_status(p.user_id))
         if action == "connect":
             _id.require_verified_email(p)
             return _ok(_link.begin(p.user_id))

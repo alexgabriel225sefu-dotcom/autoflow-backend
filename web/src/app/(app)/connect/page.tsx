@@ -93,8 +93,8 @@ export default function ConnectPage() {
   const autoRan = useRef(false);
   // Whether a broker account is already linked. Drives the heading below,
   // which must never invite step 1 at somebody who has finished step 2.
-  const isConnected = Boolean(
-    status.result?.ok && status.result.data.connected);
+  const linked = status.result?.ok ? status.result.data : null;
+  const isConnected = Boolean(linked?.connected);
 
   // Resume after the visitor comes back from cTrader. Two ways in, because on
   // a phone only the second one is reliable:
@@ -244,6 +244,18 @@ export default function ConnectPage() {
             <p>
               cTrader is linked. Nothing is being traded yet — choose which
               account Apex4Traders should use.
+            </p>
+            {/* WHICH account, not just that there is one.
+                Without this the page says "linked" and the reader still has
+                to go elsewhere to learn what they are linked to — which is
+                the question they came here with. The selected account when
+                one is chosen, otherwise the ones on offer. */}
+            <p className="mono muted" style={{ marginTop: ".4rem" }}>
+              {linked?.selected
+                ? `Selected: ${linked.selected.mode === "live" ? "LIVE" : "DEMO"} #${linked.selected.ctid}`
+                : linked?.accounts?.length
+                  ? `Linked: ${linked.accounts.map((a) => `${a.mode === "live" ? "LIVE" : "DEMO"} #${a.ctid}`).join(", ")} — none selected yet`
+                  : "No account details came back with the link."}
             </p>
             {pending ? (
               <>

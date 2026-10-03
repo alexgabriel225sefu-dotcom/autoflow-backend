@@ -387,6 +387,24 @@ if not _NS:
 _ACTIVE_SET = f"{_NS}:active_users"
 
 
+class StoreUnavailable(RuntimeError):
+    """The shared store could not be asked. NOT the same as "nothing there".
+
+    Every read helper below returns None on failure, which is correct for a
+    cache and wrong for anything a user reads as a fact. `_redis_set` was
+    fixed for this exact reason — a Redis outage used to look identical to a
+    successful save — and this is the read half of that fix.
+
+    The read path mattered less visibly but lies harder. A 429 from Upstash
+    makes the cTrader connection record read back as absent, and the browser
+    renders that absence as the sentence "no cTrader account is connected":
+    a failed read presented to the account's owner as a fact about their
+    account. Callers that must not do that read through the `_strict`
+    helpers and let this propagate; the API answers 503, exactly as it
+    already does for an auth backend it cannot reach.
+    """
+
+
 # ─── Redis helpers ────────────────────────────────────────
 def _upstash(cmd_parts):
     """Upstash REST: each command argument is one path segment.
@@ -403,13 +421,29 @@ def _upstash(cmd_parts):
     must stay literal, or every existing key changes and the store looks empty.
     """
     try:
+        return _upstash_strict(cmd_parts)
+    except StoreUnavailable as e:
+        print(f"[Redis] command failed {cmd_parts[0]}: {e}")
+        return None
+
+
+def _upstash_strict(cmd_parts):
+    """`_upstash`, but a command that could not be sent raises.
+
+    The raised message names the command and the exception type and nothing
+    else. Every other Upstash argument is a key or a value, and the values
+    here include encrypted broker tokens and licence keys; the old version
+    interpolated the requests exception, which carries the full URL, so a
+    single SET timeout could put a token in the logs.
+    """
+    try:
         url = f"{_UPD_URL}/{'/'.join(_quote(str(p), safe=':') for p in cmd_parts)}"
         r = _req.get(url, headers={"Authorization": f"Bearer {_UPD_TOKEN}"}, timeout=8)
         r.raise_for_status()
         return r.json().get("result")
     except Exception as e:
-        print(f"[Redis] command failed {cmd_parts[0]}: {e}")
-        return None
+        raise StoreUnavailable(
+            f"upstash {cmd_parts[0]} failed: {type(e).__name__}") from e
 
 
 def _upstash_post(cmd_parts):
@@ -457,6 +491,22 @@ def _redis_get(key):
             print(f"[Redis] GET failed: {e}")
             return None
     return _upstash(["GET", key])
+
+
+def _redis_get_strict(key):
+    """GET that tells "absent" and "could not ask" apart.
+
+    Returns None only when the backend answered and the key is not there.
+    Anything else raises StoreUnavailable — see that class for why the
+    difference is worth a second function.
+    """
+    if _BACKEND == "redis":
+        try:
+            return _r.get(key)
+        except Exception as e:
+            raise StoreUnavailable(
+                f"redis GET failed: {type(e).__name__}") from e
+    return _upstash_strict(["GET", key])
 
 
 def _redis_set(key, value_str):
@@ -618,6 +668,18 @@ def get_blob(key):
     if not _USE_REDIS:
         return None
     return _redis_get(key)
+
+
+def get_blob_strict(key):
+    """`get_blob`, but an unreachable store raises instead of reading empty.
+
+    Without a shared backend there is nothing to be unreachable, so the
+    development branch still answers None — the caller's file fallback owns
+    that case.
+    """
+    if not _USE_REDIS:
+        return None
+    return _redis_get_strict(key)
 
 
 def set_blob(key, value_str, ttl_s=None):

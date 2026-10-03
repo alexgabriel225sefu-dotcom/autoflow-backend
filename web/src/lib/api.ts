@@ -46,6 +46,8 @@ export type ApiResult<T> = { ok: true; data: T } | ApiError;
 export const CODES = {
   AUTH_REQUIRED: "AUTH_REQUIRED",
   AUTH_UNAVAILABLE: "AUTH_UNAVAILABLE",
+  /** The platform could not reach its store. Never means "you have none". */
+  STORE_UNAVAILABLE: "STORE_UNAVAILABLE",
   LICENCE_REQUIRED: "LICENCE_REQUIRED",
   NOT_FOUND: "NOT_FOUND",
   UNSUPPORTED: "UNSUPPORTED",
