@@ -1,4 +1,5 @@
 import { PLAN_NOTICE } from "@/lib/api";
+import { PricingSection } from "@/components/blocks/pricing-section";
 import { BrandLockup } from "@/components/brand/logo";
 import type { Metadata } from "next";
 import { BookOpen, ShieldCheck, SlidersHorizontal, Sparkles } from "lucide-react";
@@ -110,6 +111,14 @@ export default function Landing() {
             configuration. It is not a recommendation, and it is not a rule we
             supply.
           </p>
+        </section>
+
+        {/* Pricing, before "what this is not", because a visitor who has
+            read what the product does asks the price next. The figure is not
+            here — PricingSection reads it from the server, which is the only
+            place the approved offer lives. */}
+        <section className="card" style={{ marginTop: ".85rem" }}>
+          <PricingSection />
         </section>
 
         <section className="card">

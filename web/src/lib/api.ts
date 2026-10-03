@@ -77,6 +77,25 @@ async function bearer(): Promise<string | null> {
   }
 }
 
+/**
+ * A GET that carries no session, for the routes that need none.
+ *
+ * There are three of those on the API and only one a browser reads:
+ * billing/offer, which a visitor on the pricing page has no session for. It
+ * goes through the same response handling as `api`, so a failure arrives as
+ * the same ApiError and no screen has to invent a second way to be unsure.
+ *
+ * Deliberately GET-only and deliberately separate, so "no token" stays a
+ * decision made per call site rather than a fallback inside `api` that an
+ * authenticated route could reach by accident.
+ */
+export async function publicApi<T>(
+  path: string,
+  init: { signal?: AbortSignal } = {},
+): Promise<ApiResult<T>> {
+  return request<T>(path, { signal: init.signal }, null);
+}
+
 export async function api<T>(
   path: string,
   init: { method?: string; body?: unknown; signal?: AbortSignal } = {},
@@ -85,13 +104,21 @@ export async function api<T>(
   if (!token) {
     return fail(401, CODES.AUTH_REQUIRED, "Sign in to continue.");
   }
+  return request<T>(path, init, token);
+}
+
+async function request<T>(
+  path: string,
+  init: { method?: string; body?: unknown; signal?: AbortSignal },
+  token: string | null,
+): Promise<ApiResult<T>> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}/api/v1/${path.replace(/^\//, "")}`, {
       method: init.method ?? "GET",
       signal: init.signal,
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
@@ -190,6 +217,47 @@ export type CtraderStatus = {
   connectedAt?: number;
   expiresAt?: number | null;
 };
+
+/**
+ * The offer, as the SERVER states it. Never assembled in the browser.
+ *
+ * `priceMinor` is in the currency's minor unit, which is what the payment
+ * provider works in and therefore what billing.py keeps. Formatting happens
+ * at the edge, in one place, so no screen rounds it differently.
+ *
+ * `checkoutEnabled` is both of the server's checkout gates, already combined.
+ * A component must not decide this: payments are off in this release, and a
+ * button that offers to take money when the server will refuse is the
+ * dangerous direction to be wrong in.
+ */
+export type PublicOffer = {
+  sku: string;
+  plan: string;
+  purchaseMode: string;
+  priceMinor: number;
+  currency: string;
+  periodDays: number | null;
+  checkoutEnabled: boolean;
+};
+
+/** `priceMinor` + `currency` as the reader's locale would write them. */
+export function formatOfferPrice(offer: PublicOffer, locale?: string): string {
+  const code = (offer.currency || "usd").toUpperCase();
+  const major = (offer.priceMinor ?? 0) / 100;
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      // A whole-number price should not read as "$499.00" on a pricing card,
+      // and a price with cents must not be silently rounded away.
+      minimumFractionDigits: Number.isInteger(major) ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(major);
+  } catch {
+    // An unknown currency code must not take the page down with it.
+    return `${major} ${code}`;
+  }
+}
 
 /** Reads that can be "we could not ask". `status` is never assumed. */
 export type ReadState = "ok" | "not_connected" | "reauth_required" | "unavailable";

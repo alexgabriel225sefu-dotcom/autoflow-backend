@@ -398,6 +398,54 @@ st, out = B.handle_event(body, sign(body), secret=SECRET)
 check("the retry is NOT refused as a duplicate", out.get("duplicate") is not True, json.dumps(out))
 check("the buyer is provisioned on retry", state(USER) == "active", state(USER))
 
+# ── the offer a visitor reads ──────────────────────────────────────────────
+# The pricing page has no session, so it reads GET billing/offer. The point
+# of the route is that the UI never states a price of its own: billing.py
+# holds the approved offer and offer_drift() reports a deployment that moves
+# off it, and a number typed into a component is a second source of truth no
+# gate can see.
+print("\n[offer] the price is public, readable without a session, and the "
+      "approved one")
+from apex.platform import api as _API                   # noqa: E402
+
+_res = _API._handle("GET", "/api/v1/billing/offer", headers={},
+                    client_key="198.51.100.7")
+check("the route exists", _res is not None)
+_st, _b = _res
+check("and answers without any Authorization header", _st == 200, f"status {_st}")
+check("the price is the approved one, in minor units",
+      _b.get("priceMinor") == B.APPROVED_PRICE_MINOR,
+      f"{_b.get('priceMinor')} vs {B.APPROVED_PRICE_MINOR}")
+check("the currency is the approved one", _b.get("currency") == B.APPROVED_CURRENCY,
+      str(_b.get("currency")))
+check("the sku is the approved one", _b.get("sku") == B.APPROVED_SKU,
+      str(_b.get("sku")))
+check("a one-time purchase carries no expiry",
+      _b.get("purchaseMode") == "one_time" and _b.get("periodDays") is None,
+      json.dumps({k: _b.get(k) for k in ("purchaseMode", "periodDays")}))
+
+# The gate the button reads. Both server gates, already combined, so no
+# component has to know there are two — or get the AND wrong.
+check("checkout is reported off, because it is off in this release",
+      _b.get("checkoutEnabled") is False, str(_b.get("checkoutEnabled")))
+
+# Nothing a provider could use. This body is served to anyone.
+_blob = json.dumps(_b).lower()
+for _secret in ("sk_", "whsec", "secret", "key", "token"):
+    check(f"the public offer carries no {_secret!r}", _secret not in _blob,
+          json.dumps(_b)[:160])
+
+# Flat, like every other read route — the envelope defect that printed "not
+# connected" over a connected account came from exactly this disagreeing.
+check("the offer is answered flat, not nested",
+      "offer" not in _b and "billing" not in _b, str(sorted(_b)))
+
+# And it is a READ: a POST must not reach it.
+_st2, _b2 = _API._handle("POST", "/api/v1/billing/offer", headers={},
+                         client_key="198.51.100.8") or (None, None)
+check("a POST to the offer is not treated as a read",
+      _st2 != 200, f"status {_st2}")
+
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()

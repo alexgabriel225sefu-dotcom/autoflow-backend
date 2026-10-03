@@ -259,21 +259,44 @@ def _dispatch(method, route, headers, body, query=None):
                     capability=head)
 
     # ── cTrader linking ─────────────────────────────────────────────────
-    # The callback is the ONLY unauthenticated route on this API, and it has
-    # to be: cTrader redirects the client's browser here, and a browser
-    # arriving from a redirect carries no bearer token. It is safe because it
-    # finishes nothing — it parks the code and hands back a nonce, and the
-    # link is completed by an authenticated call below.
-    # The payment webhook. Unauthenticated by necessity and safe by
-    # signature: the provider's server has no session, and the body is only
-    # acted on when it verifies against the webhook secret. It is listed here,
-    # beside the OAuth callback, so the two unauthenticated routes in this API
-    # are visible together rather than discovered one at a time.
+    # THE UNAUTHENTICATED ROUTES, ALL OF THEM, IN ONE PLACE
+    #
+    # Three, and no more. Kept together rather than discovered one at a time,
+    # because "which routes need no session" is the first question an auditor
+    # asks and the one a scattered answer gets wrong. This comment claimed
+    # there was only one while sitting directly above the second.
+    #
+    #   billing/webhook   the provider's server has no session. Safe by
+    #                     signature: the body is acted on only when it
+    #                     verifies against the webhook secret.
+    #   billing/offer     a visitor reading the price has no session, and the
+    #                     price is the public fact on the page. Read-only,
+    #                     and public_offer() carries no provider secret.
+    #   ctrader/callback  cTrader redirects the client's BROWSER here, and a
+    #                     browser arriving from a redirect carries no bearer
+    #                     token. Safe because it finishes nothing: it parks
+    #                     the code and hands back a nonce, and the link is
+    #                     completed by the authenticated POST below, from a
+    #                     session that must be the same user that began it.
+    #
+    # Everything else on this API calls _authenticate first.
     if route == "billing/webhook" and method == "POST":
         return _billing.handle_event(
             body if isinstance(body, (bytes, bytearray)) else (body or "").encode(),
             (headers or {}).get("Stripe-Signature")
             or (headers or {}).get("stripe-signature") or "")
+
+    # The offer, readable without a session. A pricing page is seen by
+    # visitors who have none, and the price is public by definition — it is
+    # the thing on the page. public_offer() carries no provider secret.
+    #
+    # It exists so the UI never states a price of its own. billing.py keeps
+    # the approved offer and offer_drift() reports when a deployment moves
+    # off it; a price typed into a component would be a second source of
+    # truth that no gate can see, which is the same mistake as a component
+    # deciding for itself whether live execution is on.
+    if route == "billing/offer" and method == "GET":
+        return _ok(_billing.public_offer())
 
     if route == "billing/checkout" and method == "POST":
         _authenticate(headers, fresh=True)

@@ -1,10 +1,17 @@
 "use client";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, ExecutionBadge, LicencePill, PlanNotice, Spinner } from "@/components/app/state";
-import type { Me } from "@/lib/api";
+import { formatOfferPrice, type Me, type PublicOffer } from "@/lib/api";
 
 export default function LicensePage() {
   const me = useRead<Me>("me");
+  // The price is read, never written here. This paragraph used to spell it
+  // out, which made the page a second source of truth: billing.offer_drift()
+  // reports on /readyz when a deployment moves off the approved offer, and it
+  // can only see the server — a figure in this file would keep telling the
+  // signed-in customer the old number with nothing to catch it.
+  const offer = useRead<PublicOffer>("billing/offer");
+  const price = offer.result?.ok ? formatOfferPrice(offer.result.data) : null;
   return (
     <main>
       <div className="page-head">
@@ -72,9 +79,10 @@ export default function LicensePage() {
             <p style={{ fontWeight: 600 }}>Free demo now. One-time unlock later.</p>
             <p className="muted" style={{ fontSize: ".85rem" }}>
               Demo accounts require no payment. The planned paid offer is
-              Founder Lifetime access for $499 as a one-time purchase. Checkout
-              is not enabled yet, and live execution is not available in this
-              release.
+              Founder Lifetime access
+              {price ? <> for <strong>{price}</strong></> : null} as a one-time
+              purchase. Checkout is not enabled yet, and live execution is not
+              available in this release.
             </p>
           </div>
 

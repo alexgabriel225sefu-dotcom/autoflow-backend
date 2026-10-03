@@ -70,6 +70,49 @@ describe("no profit claims and no invented figures", () => {
   });
 });
 
+describe("no screen states a price of its own", () => {
+  /**
+   * The generalisation of the old-price rule above.
+   *
+   * billing.py holds the one approved offer and offer_drift() reports on
+   * /readyz when a deployment moves off it. That gate can only see the
+   * server. A figure typed into a component is a price the product shows
+   * that no gate is watching — and the pricing component this came from
+   * shipped six invented prices as DEFAULT props, which is exactly how one
+   * arrives by accident.
+   *
+   * So: no currency literal anywhere a client can read. The price reaches
+   * the browser from GET billing/offer and is formatted in one place.
+   */
+  const CURRENCY_LITERAL = /[$\u20ac\u00a3]\s?\d|\b\d+\s?(usd|eur|gbp)\b/i;
+
+  it("no component contains a currency figure", () => {
+    const hits = FILES.filter((f) => CURRENCY_LITERAL.test(f.body)).map((f) => f.path);
+    expect(hits, `a price is written into ${hits.join(", ")}`).toEqual([]);
+  });
+
+  it("and the rule is not vacuous — it catches one when it is there", () => {
+    expect(CURRENCY_LITERAL.test("price: \"$499\"")).toBe(true);
+    expect(CURRENCY_LITERAL.test("originalPrice: \"$299\",")).toBe(true);
+    expect(CURRENCY_LITERAL.test("499 USD")).toBe(true);
+  });
+
+  it("the price the browser shows comes from the server's offer", () => {
+    const section = FILES.find((f) => f.path.endsWith("blocks/pricing-section.tsx"));
+    expect(section, "the pricing section is missing").toBeTruthy();
+    expect(section!.body).toContain("billing/offer");
+    expect(section!.body).toContain("formatOfferPrice");
+  });
+
+  it("and no component decides for itself whether checkout is open", () => {
+    const flag = ["checkout", "Enabled"].join("");
+    const bad = new RegExp(`${flag}\\s*[:=]\\s*true`);
+    for (const f of FILES) {
+      expect(bad.test(f.body), `${f.path} hardcodes ${flag}`).toBe(false);
+    }
+  });
+});
+
 describe("nothing external is embedded", () => {
   it("no iframe, no third-party script tag, no tracking pixel", () => {
     for (const f of FILES) {
