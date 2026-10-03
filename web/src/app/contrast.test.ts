@@ -344,3 +344,48 @@ describe("the marketing palette", () => {
     expect(MKT["--mkt-accent"]).not.toBe(TOKENS["--a4t-short"]);
   });
 });
+
+describe("the hero glow stays out of the layout", () => {
+  /**
+   * A decorative blur must never take a grid cell.
+   *
+   * `.mkt-hero > *` set position:relative on every direct child to lift
+   * content above the glow. It also hit the glow, which killed its
+   * position:absolute. Once the hero became a grid, the glow became a grid
+   * ITEM: it took the first column, the copy moved to the second and the
+   * terminal wrapped to its own row, leaving half the hero empty. Nothing
+   * failed; it just looked wrong, on the page an advertisement pays for.
+   *
+   * Asserted through the real cascade rather than by reading the file, so
+   * the order of the two rules is what is being tested.
+   */
+  afterEach(() => { document.head.querySelectorAll("style[data-glow]").forEach((n) => n.remove()); });
+
+  function heroWith(children: string) {
+    const style = document.createElement("style");
+    style.setAttribute("data-glow", "1");
+    style.textContent = flattened();
+    document.head.appendChild(style);
+    const root = document.createElement("main");
+    root.className = "mkt";
+    root.innerHTML = `<section class="mkt-hero mkt-hero-terminal">${children}</section>`;
+    document.body.appendChild(root);
+    return root;
+  }
+
+  it("the glow is absolutely positioned, so it is not a grid item", () => {
+    const root = heroWith(
+      `<span class="mkt-glow"></span><div class="mkt-hero-copy">c</div>`);
+    const glow = root.querySelector(".mkt-glow")!;
+    expect(getComputedStyle(glow).position).toBe("absolute");
+    root.remove();
+  });
+
+  it("while the content beside it IS lifted, which is why the rule exists", () => {
+    const root = heroWith(
+      `<span class="mkt-glow"></span><div class="mkt-hero-copy">c</div>`);
+    const copy = root.querySelector(".mkt-hero-copy")!;
+    expect(getComputedStyle(copy).position).toBe("relative");
+    root.remove();
+  });
+});

@@ -921,7 +921,16 @@ body {
   background: radial-gradient(circle, rgba(200,18,40,.26) 0%, transparent 68%);
   filter: blur(42px);
 }
-.mkt-hero > * { position: relative; z-index: 1; }
+/* Lift the content above the glow — but NOT the glow itself.
+   This was `.mkt-hero > *`, written when the hero was a simple stack. It set
+   position:relative on every direct child, and because it comes after
+   .mkt-glow in this file it beat that rule's position:absolute. The glow then
+   stopped being out of flow, became a GRID ITEM when the hero turned into a
+   grid, took the first column, and pushed the copy into the second and the
+   terminal onto its own row — half the hero empty on desktop. The :not() is
+   the whole fix: it stops the rule matching the one child that must stay
+   absolute. */
+.mkt-hero > *:not(.mkt-glow) { position: relative; z-index: 1; }
 
 .mkt-eyebrow {
   display: inline-flex; align-items: center; gap: .45rem;
