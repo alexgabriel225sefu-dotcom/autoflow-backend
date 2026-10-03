@@ -544,11 +544,33 @@ def _summary(doc):
             "accountId": doc.get("accountId")}
 
 
+def _selected_ctid(user_id):
+    """The account this client has chosen, or "".
+
+    Read rather than asked of the browser. The link record is where the
+    selection lives, and a rule bound to an account the client has not
+    selected is a rule that will not run on the account they are looking at.
+    """
+    try:
+        sel = (_link.public_status(user_id) or {}).get("selected") or {}
+    except Exception:                                   # noqa: BLE001
+        return ""
+    return str(sel.get("ctid") or "")
+
+
 def _create(principal, payload):
     """A new draft. The blank is built here, not accepted from the browser, so
-    a document can never arrive missing fields the evaluator later assumes."""
+    a document can never arrive missing fields the evaluator later assumes.
+
+    accountId falls back to the client's SELECTED account. The rule builder
+    never sent one, so every rule it created carried "" and was refused at
+    activation with "accountId: required" — a dead end reached only after the
+    client had filled in eleven steps. The browser is not the right place to
+    learn this anyway: the server already knows which account is selected.
+    """
     doc = _rd.blank(user_id=principal.user_id,
-                    account_id=str(payload.get("accountId") or ""),
+                    account_id=(str(payload.get("accountId") or "")
+                                or _selected_ctid(principal.user_id)),
                     symbols=payload.get("symbols") or [],
                     timeframe=payload.get("timeframe") or "1h")
     for field in ("name", "sides", "entry", "exit", "order", "sizing",

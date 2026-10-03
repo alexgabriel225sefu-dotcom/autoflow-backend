@@ -129,6 +129,16 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
 
   const doc = rule.result?.ok ? rule.result.data.rule : null;
   const licence = me.result?.ok ? me.result.data.licence.state : undefined;
+  // From the server, never derived here. While `me` is still in flight the
+  // answer is unknown, and unknown renders as "not yet" rather than as a
+  // refusal — an activation control offered before the server has spoken
+  // would be a guess, and a refusal shown instead of a wait would be a lie.
+  // `?? null`, because a body without an `execution` key yields undefined and
+  // the branch below would then read a property off it and take the page
+  // down. A response missing the field is a response that has not told us
+  // what this account may do, which is the same answer as "still asking".
+  const exec = (me.result?.ok ? me.result.data.execution : null) ?? null;
+  const activationRefusal = exec?.activationRefusal ?? null;
   const selected = ct.result?.ok ? ct.result.data.selected : null;
   const isDemo = selected?.mode === "demo";
   const running = auto.result?.ok ? auto.result.data : null;
@@ -365,11 +375,23 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
               <LicencePill state={licence} />
             </div>
             {doc.state === "draft" ? (
-              licence !== "active" ? (
-                /* No licence — no path to activation, and the reason is on
-                   screen rather than discovered by pressing a button. */
+              !exec ? (
+                /* Still asking. Neither offering the control nor refusing:
+                   one would be a guess and the other a lie. */
+                <p className="muted" style={{ fontSize: ".85rem" }}>
+                  Checking what this account may do&hellip;
+                </p>
+              ) : exec.canActivate !== true ? (
+                /* Refused, in the server's words rather than a rule this
+                   component invented.
+                   It used to read `licence !== "active"`, which is a stricter
+                   test than the server applies and dead-ended the entire free
+                   tier: a demo client could build a rule and never activate
+                   it, so they could never start anything. Activation records
+                   terms; it does not trade. Only a WITHDRAWN licence stops
+                   it, and the server is the one that says so. */
                 <div className="notice notice-warn">
-                  <p>Activating a rule needs an active licence.</p>
+                  <p>{activationRefusal ?? "This account cannot activate rules."}</p>
                   <a className="btn btn-sm btn-ghost" href="/license">See your licence</a>
                 </div>
               ) : (

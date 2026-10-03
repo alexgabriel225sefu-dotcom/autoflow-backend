@@ -736,6 +736,133 @@ try:
 finally:
     _API._id.verify_token = _vt
 
+# ── [15] ───────────────────────────────────────────────────────────────────
+# Activation and automation are different permissions.
+#
+# The rule page decided activation for itself with `licence !== "active"`,
+# which is stricter than require_activation and dead-ended the whole free
+# tier: a demo client could build a rule and never activate it, so they could
+# never start anything. The product the landing page invites people to was
+# unusable by the people it invited. The server states it now.
+print("\n[15] a free demo client can activate a rule")
+connect([DEMO_ACC, LIVE_ACC])
+select(501)
+
+_cap = E.capability(USER)
+check("the capability says activation is allowed with no licence",
+      _cap.get("canActivate") is True, json.dumps(_cap.get("canActivate")))
+check("and gives no refusal to display",
+      _cap.get("activationRefusal") is None, str(_cap.get("activationRefusal")))
+check("the licence really is absent, so this is not passing by accident",
+      _cap.get("licenceState") == "none", str(_cap.get("licenceState")))
+check("and the entitlement is the free one",
+      _cap.get("entitlement") == E.FREE_DEMO, str(_cap.get("entitlement")))
+
+# The behaviour behind the flag: require_activation must agree with it.
+try:
+    E.require_activation(USER)
+    check("require_activation permits it too", True)
+except Exception as e:                                   # noqa: BLE001
+    check("require_activation permits it too", False, f"{type(e).__name__}: {e}")
+
+# And the one case that is refused, so the flag is not simply always true.
+_real_status = L.status_for
+try:
+    L.status_for = lambda uid, **kw: {"state": L.REVOKED, "expiresAt": None,
+                                      "plan": None}
+    _rev = E.capability(USER)
+    check("a withdrawn licence cannot activate",
+          _rev.get("canActivate") is False, str(_rev.get("canActivate")))
+    check("and the server supplies the sentence to show",
+          bool(_rev.get("activationRefusal")), str(_rev.get("activationRefusal")))
+    try:
+        E.require_activation(USER)
+        check("require_activation refuses it too", False, "it did not refuse")
+    except E.NotEntitled:
+        check("require_activation refuses it too", True)
+finally:
+    L.status_for = _real_status
+
+check("and the flag is back to allowed once the licence is not withdrawn",
+      E.capability(USER).get("canActivate") is True)
+
+# ── [16] ───────────────────────────────────────────────────────────────────
+# The rule the builder actually produces must be activatable.
+#
+# Found by driving the real screens in a browser. The builder's own default —
+# eleven steps, every field filled, summary reading "stop 1.5x ATR; target 2R"
+# — saved a document that activation refused on two counts:
+#
+#   accountId: required                 the form never sent one
+#   exit.conditions: at least one ...   the form offers "managed by stop and
+#                                       target only" as a complete answer
+#
+# So the happy path ended in a refusal nobody could act on, after the work was
+# done. Both are fixed here rather than in the form, because the server is
+# what knows the selected account and what defines a valid rule.
+print("\n[16] the default rule the builder writes can be activated")
+from apex.platform import ruledoc as _RD                 # noqa: E402
+from apex.platform import api as _API2                   # noqa: E402
+
+connect([DEMO_ACC, LIVE_ACC])
+select(501)
+
+_vt2 = _API2._id.verify_token
+try:
+    _API2._id.verify_token = lambda token, **kw: _ID.Principal(
+        user_id=USER, email="o@apex4traders.test", email_verified=True)
+
+    # Exactly what the form posts: no accountId, no exit conditions.
+    _res = _API2._handle(
+        "POST", "/api/v1/rules", headers={"Authorization": "Bearer stub"},
+        body=json.dumps({
+            "name": "Builder default", "symbols": ["EURUSD"],
+            "timeframe": "1h", "sides": "BOTH",
+            "entry": {"combine": "AND",
+                      "conditions": [{"id": "atr", "params": {"period": 14,
+                                      "direction": "above", "value": 10}}]},
+            "exit": {"combine": "OR", "conditions": []},
+        }),
+        client_key="203.0.113.41")
+    _st, _b = _res
+    check("the rule is created", _st == 200, f"{_st} {json.dumps(_b)[:120]}")
+    _doc = (_b.get("rule") or {})
+    _rid = _doc.get("ruleDocId")
+
+    # 1 — the account came from the selection, not from the browser.
+    check("it is bound to the selected account even though none was sent",
+          _doc.get("accountId") == "501", repr(_doc.get("accountId")))
+
+    # 2 — and it validates, with the exit block left empty.
+    _problems = _RD.validate(_doc, known_condition_ids=None)
+    check("the document the builder writes is valid",
+          _problems == [], json.dumps(_problems))
+    check("and its exit block really is empty, so this is not passing because "
+          "something filled it in",
+          (_doc.get("exit") or {}).get("conditions") == [],
+          json.dumps(_doc.get("exit")))
+finally:
+    _API2._id.verify_token = _vt2
+
+# The guard that makes an empty exit safe: a stop is mandatory. If that ever
+# stops being true, an empty exit block becomes a position with no way out.
+_nostop = dict(_doc, stopLoss={"mode": "none"})
+check("a rule with no stop is still refused",
+      any("stopLoss" in p for p in _RD.validate(_nostop)),
+      json.dumps(_RD.validate(_nostop)))
+
+# Entry is NOT relaxed. A rule that enters on nothing enters on everything.
+_noentry = dict(_doc, entry={"combine": "AND", "conditions": []})
+check("an empty ENTRY block is still refused",
+      any("entry.conditions" in p for p in _RD.validate(_noentry)),
+      json.dumps(_RD.validate(_noentry)))
+
+# And the message a client without a selected account now gets.
+_noacct = dict(_doc, accountId="")
+_msg = " ".join(_RD.validate(_noacct))
+check("a missing account says what to do about it",
+      "select an account" in _msg, _msg[:140])
+
 if _fails:
     print(f"FAILED ({len(_fails)}):")
     for f in _fails:

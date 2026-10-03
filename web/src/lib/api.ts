@@ -192,6 +192,16 @@ export type Execution = {
   liveExecutionEnabled: boolean;
   planNotice: string;
   canAutomate: boolean;
+  /**
+   * Whether this client may freeze a rule version. NOT the same permission as
+   * canAutomate, and not derivable from the licence state by a component:
+   * activation records terms, it does not trade, and the free tier is allowed
+   * it. The rule page decided this for itself once and dead-ended every free
+   * demo client — they could build a rule and never activate it.
+   */
+  canActivate: boolean;
+  /** Why not, when canActivate is false. The server's words. */
+  activationRefusal: string | null;
   reason:
     | null
     | "NOT_CONNECTED"

@@ -384,3 +384,59 @@ describe("Rule Detail — preview cannot trade", () => {
     expect(verdictShown()).toBe(false);
   });
 });
+
+/**
+ * Activation is the server's call, not this page's.
+ *
+ * The page used to test `licence !== "active"` and refuse activation itself.
+ * That is stricter than the server, which only refuses a WITHDRAWN licence —
+ * activation records terms, it does not trade — and it dead-ended the entire
+ * free tier: a demo client could build a rule through eleven steps and then
+ * never activate it, so they could never start anything. Found by driving the
+ * real screens in a browser.
+ */
+describe("Rule Detail — who decides activation", () => {
+  function withExecution(exec: unknown) {
+    const r = baseRoutes();
+    r.me = { ok: true, data: {
+      user: { userId: "u1", email: "a@b.c", emailVerified: true },
+      licence: { state: "none", expiresAt: null, plan: null },
+      ...(exec === undefined ? {} : { execution: exec }),
+    } };
+    return r;
+  }
+
+  it("offers activation to a client with NO licence when the server allows it", async () => {
+    routes = withExecution({ canActivate: true, activationRefusal: null });
+    await renderPage();
+    expect(await screen.findByRole("button", { name: /activate this rule/i })).toBeTruthy();
+    expect(screen.queryByText(/needs an active licence/i)).toBeNull();
+  });
+
+  it("refuses in the server's words when the server refuses", async () => {
+    routes = withExecution({
+      canActivate: false,
+      activationRefusal: "this licence was withdrawn — contact support",
+    });
+    await renderPage();
+    expect(await screen.findByText(/withdrawn — contact support/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /activate this rule/i })).toBeNull();
+  });
+
+  it("neither offers nor refuses while the answer is still missing", async () => {
+    // A body with no `execution` has not said what this account may do.
+    // Offering the control would be a guess; refusing would be a lie.
+    routes = withExecution(undefined);
+    await renderPage();
+    expect(await screen.findByText(/checking what this account may do/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /activate this rule/i })).toBeNull();
+    expect(screen.queryByText(/cannot activate/i)).toBeNull();
+  });
+
+  it("and does not crash on it, which is how this guard was found", async () => {
+    routes = withExecution(undefined);
+    await renderPage();
+    expect(document.body.textContent).toContain("Checking what this account");
+    expect(document.body.textContent!.length).toBeGreaterThan(200);
+  });
+});

@@ -151,6 +151,16 @@ def capability(user_id, *, now=None):
     ent = PAID_LIVE if lic.get("state") == _lic.ACTIVE else FREE_DEMO
     mode = account_mode(user_id)
 
+    # Activation and automation are different permissions and the UI must not
+    # infer one from the other. Freezing a rule version records terms; it does
+    # not trade, needs no connected account, and is allowed on the free tier —
+    # see require_activation. The rule page used to decide this for itself with
+    # `licence !== "active"`, which dead-ended every free demo client: they
+    # could build a rule and then never activate it, so they could never start
+    # anything. Carried here so the server states it and no screen has to
+    # guess.
+    can_activate = lic.get("state") != _lic.REVOKED
+
     out = {
         "accountMode": mode,
         "entitlement": ent,
@@ -158,6 +168,9 @@ def capability(user_id, *, now=None):
         "liveExecutionEnabled": live_execution_enabled(),
         "planNotice": PLAN_NOTICE,
         "canAutomate": False,
+        "canActivate": can_activate,
+        "activationRefusal": ("this licence was withdrawn — contact support"
+                              if not can_activate else None),
         "reason": None,
         "message": "",
         "badge": BADGE_NOT_CONNECTED,

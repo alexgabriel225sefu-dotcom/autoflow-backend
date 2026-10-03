@@ -59,14 +59,27 @@ def _err(problems, field, msg):
     problems.append(f"{field}: {msg}")
 
 
-def _check_conditions(problems, where, conditions):
+def _check_conditions(problems, where, conditions, *, required=True):
     """Shape only. Whether a condition ID is real is the library's question,
-    asked separately in validate() so this module does not import it."""
+    asked separately in validate() so this module does not import it.
+
+    `required` is False for the EXIT block, and that is not a relaxation.
+    A stop is mandatory (see below: "a rule without a stop has no defined
+    risk"), so every valid rule already has a guaranteed way out, sitting at
+    the broker where a disconnect cannot cancel it. An exit CONDITION is an
+    additional, earlier way out — useful, not necessary.
+
+    Requiring one anyway made the product's own default unusable: the builder
+    offers "managed by stop and target only" as a complete configuration and
+    writes exactly that, and activation then refused it. A client could build
+    a rule the UI called finished and never activate it.
+    """
     if not isinstance(conditions, list):
         _err(problems, where, "must be a list")
         return
     if not conditions:
-        _err(problems, where, "at least one condition is required")
+        if required:
+            _err(problems, where, "at least one condition is required")
         return
     for i, c in enumerate(conditions):
         at = f"{where}[{i}]"
@@ -136,7 +149,13 @@ def validate(doc, *, known_condition_ids=None):
     for field in ("ruleDocId", "userId", "accountId"):
         v = doc.get(field)
         if not v or not isinstance(v, str):
-            _err(problems, field, "required")
+            # accountId is the one of these three a client can actually do
+            # something about, so it says what to do. "required" is a fine
+            # message for an internal field and a dead end on a screen.
+            _err(problems, field,
+                 "no cTrader account is attached to this rule — connect and "
+                 "select an account, then save the rule again"
+                 if field == "accountId" else "required")
         elif field == "ruleDocId" and not _ID_RE.match(v):
             _err(problems, field, "must be 1-64 chars of [A-Za-z0-9_-]")
 
@@ -164,7 +183,7 @@ def validate(doc, *, known_condition_ids=None):
         if block.get("combine") not in COMBINE:
             _err(problems, f"{half}.combine", "must be AND or OR")
         _check_conditions(problems, f"{half}.conditions",
-                          block.get("conditions"))
+                          block.get("conditions"), required=(half == "entry"))
 
     if doc.get("sides") not in SIDES:
         _err(problems, "sides", f"must be one of {', '.join(SIDES)}")
