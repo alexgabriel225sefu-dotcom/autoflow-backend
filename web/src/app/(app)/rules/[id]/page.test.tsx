@@ -440,3 +440,78 @@ describe("Rule Detail — who decides activation", () => {
     expect(document.body.textContent!.length).toBeGreaterThan(200);
   });
 });
+
+/**
+ * Who decides whether automation may START.
+ *
+ * The same defect as the activation block above, and it survived the fix that
+ * removed it from there: `licence !== "active"` sat on the Start button
+ * twenty lines below the comment explaining why it had been wrong.
+ *
+ * Demo automation is free. A client with no licence is `free_demo` and the
+ * server answers canAutomate: true for them — so this screen refused with
+ * "An active licence is required" while the dashboard's Start button, reading
+ * the same account, was enabled and worked. Two screens in one product
+ * disagreeing about whether somebody may start, and the one that says no is
+ * the one you reach from the rule itself.
+ */
+describe("Rule Detail — who decides whether automation may start", () => {
+  function withExecution(exec: unknown, licence = "none") {
+    const r = baseRoutes();
+    // ACTIVE, because a draft is refused by the step before this one and
+    // every case below would then pass for the wrong reason.
+    r["rules/r1"] = { ok: true, data: { rule: { ...RULE, state: "active" } } };
+    r.me = { ok: true, data: {
+      user: { userId: "u1", email: "a@b.c", emailVerified: true },
+      licence: { state: licence, expiresAt: null, plan: null },
+      ...(exec === undefined ? {} : { execution: exec }),
+    } };
+    return r;
+  }
+
+  it("lets a client with NO licence start, when the server says they may", async () => {
+    routes = withExecution(
+      { canActivate: true, activationRefusal: null, canAutomate: true });
+    await renderPage();
+    const start = await screen.findByRole("button", { name: /start on demo/i });
+    expect(start).toHaveProperty("disabled", false);
+    expect(screen.queryByText(/an active licence is required/i)).toBeNull();
+  });
+
+  it("refuses in the SERVER's words, not in a sentence this page invented", async () => {
+    routes = withExecution({
+      canActivate: true, activationRefusal: null,
+      canAutomate: false,
+      message: "this licence was withdrawn — contact support",
+    });
+    await renderPage();
+    expect(await screen.findByText(/withdrawn — contact support/i)).toBeTruthy();
+    expect((await screen.findByRole("button", { name: /start on demo/i })))
+      .toHaveProperty("disabled", true);
+  });
+
+  it("does not claim access while the answer is still missing", async () => {
+    // No `execution` key: the server has not said. Enabling the control would
+    // be a guess, and naming a licence as the reason would be an invention.
+    routes = withExecution(undefined);
+    await renderPage();
+    const start = await screen.findByRole("button", { name: /start on demo/i });
+    expect(start).toHaveProperty("disabled", true);
+    expect(document.body.textContent).toMatch(/access is being checked/i);
+  });
+
+  it("an ACTIVE licence is not what unlocks it either", async () => {
+    // The mirror of the first case, and the one that makes it non-vacuous:
+    // if the gate were still reading the licence, this would pass while a
+    // free-tier client stayed locked out. Here the licence is active and the
+    // server still says no, and the server wins.
+    routes = withExecution(
+      { canActivate: true, activationRefusal: null, canAutomate: false,
+        message: "connect a cTrader demo account and select it" },
+      "active");
+    await renderPage();
+    expect((await screen.findByRole("button", { name: /start on demo/i })))
+      .toHaveProperty("disabled", true);
+    expect(await screen.findByText(/connect a ctrader demo account/i)).toBeTruthy();
+  });
+});

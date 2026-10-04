@@ -21,7 +21,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { useRead, whenSynced } from "./use-api";
+import { invalidate, useRead, whenSynced } from "./use-api";
 import * as apiModule from "./api";
 
 /** A pending call whose result the test decides, later. */
@@ -172,5 +172,63 @@ describe("whenSynced says how old the numbers are", () => {
     expect(whenSynced(now - 1_000)).toBe("just now");
     expect(whenSynced(now - 30_000)).toBe("30s ago");
     expect(whenSynced(now - 600_000)).toBe("10m ago");
+  });
+});
+
+/**
+ * `invalidate` — the status strip must not outlive the control that changed it.
+ *
+ * Found in a browser, not by a test. The dashboard polled `automation` on its
+ * own clock and so did the app shell, for the status strip. Pressing Start
+ * reloaded the dashboard's copy and left the shell's alone, so for up to
+ * thirty seconds the server said `running`, the panel said "Watching market",
+ * and the strip at the top of every screen said "Automation STOPPED".
+ *
+ * On the rule page the strip is the ONLY automation indicator, so the whole
+ * screen said stopped over a loop that had started. That is the one thing
+ * this strip exists to never do.
+ */
+describe("invalidate reaches every reader of a path", () => {
+  it("reloads BOTH copies of the same endpoint, not just the caller's", async () => {
+    const spy = vi.spyOn(apiModule, "api")
+      .mockResolvedValue({ ok: true, data: { state: "stopped" } } as never);
+
+    // Two components, same endpoint — the shell and the page.
+    const shell = renderHook(() => useRead("automation"));
+    const page = renderHook(() => useRead("automation"));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+
+    await act(async () => { invalidate("automation"); });
+    // Four, not three. Three would be the bug: one of them did not reload.
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(4));
+
+    shell.unmount();
+    page.unmount();
+  });
+
+  it("leaves other endpoints alone", async () => {
+    const spy = vi.spyOn(apiModule, "api")
+      .mockResolvedValue({ ok: true, data: {} } as never);
+    const other = renderHook(() => useRead("positions"));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+
+    await act(async () => { invalidate("automation"); });
+    // Deliberately exact-match: a prefix rule would reload reads the caller
+    // never named, and the naming is the part a reviewer can check.
+    expect(spy).toHaveBeenCalledTimes(1);
+    other.unmount();
+  });
+
+  it("forgets a reader that unmounted", async () => {
+    const spy = vi.spyOn(apiModule, "api")
+      .mockResolvedValue({ ok: true, data: {} } as never);
+    const gone = renderHook(() => useRead("automation"));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    gone.unmount();
+
+    await act(async () => { invalidate("automation"); });
+    // A left-over subscription would call api() against a component that no
+    // longer exists, and React would warn on the state it tried to set.
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

@@ -19,7 +19,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Activity, Plug, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
-import { useRead, whenSynced } from "@/lib/use-api";
+import { invalidate, useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
 import { ErrorNotice, ExecutionBadge, PlanNotice, Spinner } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
@@ -94,8 +94,10 @@ export default function Dashboard() {
     const body = action === "start" && activeRule
       ? { ruleDocId: activeRule.ruleDocId } : undefined;
     const r = await api<AutomationState>(`automation/${action}`, { method: "POST", body });
-    void auto.reload();
-    void jr.reload();
+    // By endpoint, not by this page's private copies. The app shell polls
+    // `automation` too, for the status strip, and reloading only the local
+    // read left the strip claiming STOPPED while this panel said running.
+    invalidate("automation", "journal?limit=8", "me");
     if (!r.ok) return `${r.code}: ${r.message}`;
     return `Automation is now ${r.data.state}`;
   }

@@ -6,7 +6,7 @@ import {
 import { api, type ApiError, type AutomationState, type CandlesRead,
          type ConditionSpec, type CtraderStatus, type Me, type PreviewResult,
          type RuleDoc } from "@/lib/api";
-import { useRead } from "@/lib/use-api";
+import { invalidate, useRead } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
 import { ErrorNotice, LicencePill, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
 import { RuleSentence, RuleTerms, humanise } from "@/components/app/rule-summary";
@@ -210,7 +210,11 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
     const body = action === "start" ? { ruleDocId: id } : undefined;
     const r = await api<AutomationState & { started?: boolean }>(
       `automation/${action}`, { method: "POST", body });
-    void auto.reload();
+    // Every mounted reader of these endpoints, not this page's copies. The
+    // status strip at the top of this screen is the ONLY automation
+    // indicator here, and it is the shell's own read — reloading just the
+    // local one left it saying STOPPED over a loop that had started.
+    invalidate("automation", "journal?limit=8", "me");
     if (!r.ok) return `${r.code}: ${r.message}`;
     return `Automation is now ${r.data.state}`;
   }
@@ -446,10 +450,24 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
                     <ConfirmAction
                       label="Start on demo"
                       question="Start automation for this rule?"
-                      disabled={doc.state !== "active" || licence !== "active"}
+                      /* THE SERVER DECIDES, NOT THIS COMPONENT.
+                         This read `licence !== "active"` — the same stricter
+                         test that had already been found and removed from the
+                         ACTIVATION block twenty lines above, and left behind
+                         here by that fix. Demo automation is free: a client
+                         with no licence is `free_demo` and the server answers
+                         canAutomate: true for them. So this screen refused
+                         with "An active licence is required" while the
+                         dashboard's Start button, reading the same account,
+                         was enabled and worked. Two screens in one product
+                         disagreeing about whether somebody may start, and the
+                         one that said no is the one you reach from the rule. */
+                      disabled={doc.state !== "active" || !exec?.canAutomate}
                       disabledReason={doc.state !== "active"
                         ? "Activate the rule first"
-                        : licence !== "active" ? "An active licence is required" : undefined}
+                        : !exec?.canAutomate
+                          ? exec?.message ?? "Access is being checked"
+                          : undefined}
                       onConfirm={() => control("start")}
                     />
                   ) : null}
