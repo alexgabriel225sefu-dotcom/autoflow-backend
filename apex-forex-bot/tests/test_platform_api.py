@@ -157,6 +157,63 @@ try:
     check("the list is a summary, not every parameter",
           "entry" not in b["rules"][0])
 
+    st, before = call("GET", f"/api/v1/rules/{rid}")
+    st, patched = call("PUT", f"/api/v1/rules/{rid}", body={
+        "name": "alice rule renamed",
+        "version": 999,
+        "createdAt": 1,
+        "activatedAt": 2,
+        "userId": BOB,
+    })
+    after = patched["rule"]
+    check("a partial PUT preserves the stored rule version",
+          st == 200 and after["version"] == before["rule"]["version"] == 1,
+          json.dumps(after))
+    check("a partial PUT preserves createdAt instead of trusting the body",
+          after["createdAt"] == before["rule"]["createdAt"],
+          json.dumps(after))
+    check("a partial PUT preserves the activation timestamp",
+          after["activatedAt"] == before["rule"]["activatedAt"],
+          json.dumps(after))
+    check("a partial PUT still cannot move ownership",
+          after["userId"] == ALICE, json.dumps(after))
+    check("a partial PUT keeps omitted trading terms",
+          after["entry"] == before["rule"]["entry"]
+          and after["limits"] == before["rule"]["limits"],
+          json.dumps(after))
+    st, b = call("POST", f"/api/v1/rules/{rid}/validate")
+    check("the patched draft remains valid",
+          st == 200 and b["valid"] is True, str(b.get("problems")))
+
+    st, before_limits = call("GET", f"/api/v1/rules/{rid}")
+    st, patched_limits = call("PUT", f"/api/v1/rules/{rid}", body={
+        "limits": {"maxOpenPositions": 3},
+    })
+    limits = patched_limits["rule"]["limits"]
+    check("a nested limits patch changes the requested field",
+          st == 200 and limits["maxOpenPositions"] == 3, json.dumps(limits))
+    check("a nested limits patch keeps the omitted risk controls",
+          limits["onLimit"] == before_limits["rule"]["limits"]["onLimit"]
+          and limits["maxSpreadPips"] == before_limits["rule"]["limits"]["maxSpreadPips"]
+          and "maxDailyTrades" in limits
+          and "maxExposurePercent" in limits,
+          json.dumps(limits))
+
+    st, before_entry = call("GET", f"/api/v1/rules/{rid}")
+    st, patched_entry = call("PUT", f"/api/v1/rules/{rid}", body={
+        "entry": {"combine": "OR"},
+    })
+    entry = patched_entry["rule"]["entry"]
+    check("a nested entry patch changes the requested field",
+          st == 200 and entry["combine"] == "OR", json.dumps(entry))
+    check("a nested entry patch keeps omitted conditions",
+          entry["conditions"] == before_entry["rule"]["entry"]["conditions"],
+          json.dumps(entry))
+
+    st, b = call("POST", f"/api/v1/rules/{rid}/validate")
+    check("the nested-patched draft remains valid",
+          st == 200 and b["valid"] is True, str(b.get("problems")))
+
     print("\n6. activation is the gate, and it is not a formality")
     st, b = call("POST", f"/api/v1/rules/{rid}/validate")
     check("validate reports the rule as complete", b["valid"] is True,

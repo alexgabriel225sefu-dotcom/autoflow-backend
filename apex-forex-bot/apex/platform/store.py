@@ -219,20 +219,52 @@ def list_docs(owner_id, *, states=None):
     return sorted(out, key=lambda d: d.get("updatedAt") or 0, reverse=True)
 
 
+
+_PATCH_OBJECT_FIELDS = frozenset((
+    "entry", "exit", "order", "sizing", "stopLoss", "takeProfit",
+    "trailingStop", "breakEven", "limits", "schedule",
+))
+
+
+def _merge_patch(current, incoming):
+    """Apply a RuleDoc patch without dropping siblings in known objects."""
+    out = dict(current)
+    for key, value in incoming.items():
+        if (key in _PATCH_OBJECT_FIELDS and isinstance(value, dict)
+                and isinstance(current.get(key), dict)):
+            nested = dict(current[key])
+            nested.update(value)
+            out[key] = nested
+        else:
+            out[key] = value
+    return out
+
 def save_draft(owner_id, doc):
-    """Overwrite a DRAFT in place.
+    """Patch a DRAFT in place.
 
     An active document is refused here. Editing one would rewrite terms a
     position may already have been opened under; `ruledoc.next_version` is how
     an active rule is changed.
+
+    PUT callers may send only the fields they are editing. Omitted fields are
+    kept from the stored draft so a partial browser payload cannot erase
+    versioning, timestamps, risk controls, or entry/exit conditions. The few
+    fields that define ownership and history are always taken from the stored
+    document, never from the request body.
     """
     owner_id = str(owner_id)
-    rid = str(doc.get("ruleDocId") or "")
+    incoming = dict(doc or {})
+    rid = str(incoming.get("ruleDocId") or "")
     current = get(owner_id, rid)          # ownership + existence
     ruledoc.assert_editable(current)
-    out = dict(doc)
+
+    out = _merge_patch(current, incoming)
+
     out["userId"] = owner_id              # never movable by the request body
     out["ruleDocId"] = rid
+    out["version"] = current.get("version")
+    out["createdAt"] = current.get("createdAt")
+    out["activatedAt"] = current.get("activatedAt")
     out["state"] = ruledoc.DRAFT
     out["updatedAt"] = time.time()
     _write(_k_current(owner_id, rid), out)
