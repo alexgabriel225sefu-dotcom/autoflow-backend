@@ -25,7 +25,7 @@ happened. Owns:
 - running the full verification set before every commit;
 - keeping `docs/NEXT_SESSION_HANDOFF.md` true.
 
-### Codex — architecture, security, release, review
+### Codex — architecture, security, release, review — and, since 2026-10-04, implementation
 
 Reads what Claude pushed and judges it. Owns:
 
@@ -33,6 +33,18 @@ Reads what Claude pushed and judges it. Owns:
 - security review, including supply-chain and secret handling;
 - release gating and the readiness verdict;
 - code review of the latest pushed commits and the handoff.
+
+**Amended 2026-10-04 by the owner.** He asked for the remaining work to be
+split roughly in half so the platform finishes sooner, which makes Codex an
+implementer as well as a reviewer. The standing split, with the file boundary
+that keeps the two halves from colliding, is `docs/CODEX_WORK_SPLIT.md`.
+
+This is recorded rather than assumed: §1 as written said Codex does not
+implement, and the rule immediately above is that the owner wins and the
+protocol is then updated instead of being quietly ignored.
+
+One thing the amendment does NOT change: Codex still reviews Claude's work, and
+nobody reviews their own. Where Codex implements, Claude reviews that change.
 
 Neither role is a rank. Codex does not implement around a review comment;
 Claude does not overrule a security objection by re-running a test.
