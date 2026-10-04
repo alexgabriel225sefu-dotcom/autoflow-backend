@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -123,6 +124,13 @@ def check_readyz() -> Result:
     return Result("api_readyz", True, "backend dependencies are ready", {"commit": _release_commit(data)})
 
 
+# A selector that only exists if the app's own stylesheet was built and
+# served. Deliberately a token name rather than a colour: the value may be
+# re-approved, the token is the thing the whole palette is defined against.
+STYLESHEET_MARKER = os.getenv("A4T_MONITOR_CSS_MARKER", "--a4t-accent")
+_CSS_HREF = re.compile(r'href="(/_next/static/[^"]+\.css)"')
+
+
 def check_web() -> Result:
     status, body, error = fetch(WEB_HOME)
     if error:
@@ -134,8 +142,56 @@ def check_web() -> Result:
     return Result("web_home", True, "web home page is reachable", {"status": status})
 
 
+def check_web_stylesheet() -> Result:
+    """The page can be whole and still be broken.
+
+    THE FAILURE THIS EXISTS FOR, which has shipped twice.
+
+    Both times the web service broke, it answered HTTP 200 with every word of
+    copy present and NO WORKING STYLESHEET — a build served a CSS chunk from a
+    previous build, or an empty one. Every content check passes on that page:
+    the markup is right, the text is right, nothing errors. It is simply
+    unreadable, and it is the landing page an advertisement pays to put in
+    front of a stranger.
+
+    So this follows the stylesheet the home page actually links, rather than
+    guessing a path, and asks whether the app's own tokens are in it. A chunk
+    that 200s with the wrong contents is the whole point; checking only that
+    the URL answers would miss it exactly as the content check does.
+    """
+    status, body, error = fetch(WEB_HOME)
+    if error or status != 200:
+        # check_web already alerts on this. Reporting it twice turns one
+        # outage into two pages, and the second one says nothing new.
+        return Result("web_css", True, "skipped: the home page is already alerting",
+                      {"skipped": True})
+
+    hrefs = _CSS_HREF.findall(body)
+    if not hrefs:
+        return Result("web_css", False,
+                      "the home page links no stylesheet at all",
+                      {"url": WEB_HOME})
+
+    href = hrefs[0]
+    url = WEB_HOME.rstrip("/") + href
+    status, css, error = fetch(url)
+    if error:
+        return Result("web_css", False, f"stylesheet transport failure: {error}", {"url": url})
+    if status != 200:
+        return Result("web_css", False, f"stylesheet returned HTTP {status}", {"url": url})
+    if STYLESHEET_MARKER not in css:
+        return Result(
+            "web_css", False,
+            f"the served stylesheet does not define {STYLESHEET_MARKER} — "
+            f"the page will render unstyled",
+            {"url": url, "bytes": len(css)})
+    return Result("web_css", True, "the served stylesheet carries the app tokens",
+                  {"bytes": len(css)})
+
+
 def run() -> list[Result]:
-    return [check_healthz(), check_readyz(), check_web()]
+    return [check_healthz(), check_readyz(), check_web(),
+            check_web_stylesheet()]
 
 
 def main() -> int:

@@ -48,6 +48,45 @@ M.fetch = lambda url: (200, '<html><title>Apex4Traders</title></html>', None)
 r = M.check_web()
 check("web home passes on HTTP 200 with Apex copy", r.ok is True, r.message)
 
+print("\n[4b] a page served without its stylesheet is caught")
+# THE FAILURE THIS COVERS. Both times the web service broke here it answered
+# 200 with every word of copy present and no working stylesheet, so [4] above
+# passes on exactly that page. The content check cannot see it; this can.
+HOME = '<html><title>Apex4Traders</title>' \
+       '<link rel="stylesheet" href="/_next/static/chunks/abc.css"></html>'
+
+def _serve(home, css_status, css_body):
+    def fetch(url):
+        if url.endswith(".css"):
+            return (css_status, css_body, None)
+        return (200, home, None)
+    return fetch
+
+M.fetch = _serve(HOME, 200, ":root{--a4t-accent:#c81228}")
+r = M.check_web_stylesheet()
+check("a stylesheet carrying the app tokens passes", r.ok is True, r.message)
+
+M.fetch = _serve(HOME, 200, ".someone-elses-build{color:red}")
+r = M.check_web_stylesheet()
+check("a stale chunk without the app tokens FAILS", r.ok is False, r.message)
+check("and the alert says the page will render unstyled",
+      "unstyled" in r.message, r.message)
+
+M.fetch = _serve(HOME, 404, "")
+r = M.check_web_stylesheet()
+check("a stylesheet that 404s fails", r.ok is False, r.message)
+
+M.fetch = _serve('<html><title>Apex4Traders</title></html>', 200, "")
+r = M.check_web_stylesheet()
+check("a page linking no stylesheet at all fails", r.ok is False, r.message)
+
+# One outage must not page twice. check_web already alerts when the home page
+# is down; this one stands aside rather than repeating it.
+M.fetch = lambda url: (503, "", None)
+r = M.check_web_stylesheet()
+check("it stands aside when the home page is already alerting",
+      r.ok is True and r.detail.get("skipped") is True, r.message)
+
 print("\n[5] the script has no service write verbs")
 src = open(SCRIPT, encoding="utf-8").read().lower()
 check("no POST/PUT/PATCH/DELETE request method is configured",

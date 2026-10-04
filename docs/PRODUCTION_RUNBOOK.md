@@ -243,7 +243,23 @@ correct, but means an overlap window is wanted.
 
 ## 10. Monitoring and alerting
 
-Provisioned first line: `.github/workflows/production-health.yml` runs the
+> **THE GITHUB WORKFLOW IS NOT THE FIRST LINE, BECAUSE IT DOES NOT RUN.**
+>
+> GitHub executes `schedule:` workflows **only from the default branch**. The
+> default branch of this repository is `main`, and this work lives on
+> `claude/apex4traders-platform-v1`, which the protocol forbids merging to
+> `main`. So the hourly cron below does not fire — not "might not", does not.
+> `workflow_dispatch` is the only trigger that works today.
+>
+> **The external uptime service is the first line and it is not set up yet.**
+> Until the three URLs below are in UptimeRobot (free tier, see costs) with an
+> alert contact the owner actually reads, nothing is watching production and a
+> customer is the alert. The workflow remains valuable as the manual deep
+> check: it parses `/readyz` per check and follows the stylesheet, neither of
+> which an uptime service can do.
+
+Second line, manual until the workflow sits on a default branch:
+`.github/workflows/production-health.yml` runs the
 read-only monitor in `apex-forex-bot/scripts/check_production_health.py` on an
 hourly schedule and on manual dispatch. It performs only unauthenticated
 `GET` requests against:
@@ -285,6 +301,8 @@ What each alert means and what to do:
 | `api_readyz` failed check: `dev_flags` | A development-only flag is set in production. | Remove the flag and redeploy. |
 | `api_readyz` failed check: `live_trading` | `LIVE_TRADING_ENABLED` is set even though this release has no reviewed live execution path. | Remove the flag immediately and redeploy. Do not add a live trading path during incident response. |
 | `web_home` transport failure or non-200 | The customer-facing web app is unreachable. | Open Render for `apex4traders-web`, check deploy logs, then retry `/`. If API checks are green, this is isolated to the web service. |
+| `web_css` the served stylesheet does not define `--a4t-accent` | The page answers 200 with all its copy and **no working stylesheet** — a build served a CSS chunk from a previous build, or an empty one. Every content check passes on this page; it is simply unreadable, and it is the page an advertisement pays to put in front of a stranger. **This has shipped twice.** | Redeploy the web service **with the build cache cleared** — see the note on `buildCommand` in `docs/deploy/render-apex4traders.yaml`. Then confirm by fetching the chunk the live HTML links and grepping it for `--a4t-accent`; the commit in `/healthz` does NOT settle this, because the server can be on the right commit and still serve the stale chunk. |
+| `web_css` links no stylesheet at all / stylesheet 404s | The build did not emit a stylesheet, or the asset path the HTML references is not being served. | Same as above, and check the build log for an error that did not fail the build. |
 
 `/readyz` alerts must name the failed check. Do not page on the sentence
 "readyz is red" alone; page on `supabase`, `shared_store`, `ctrader_oauth`,
