@@ -219,6 +219,26 @@ def list_docs(owner_id, *, states=None):
     return sorted(out, key=lambda d: d.get("updatedAt") or 0, reverse=True)
 
 
+
+_PATCH_OBJECT_FIELDS = frozenset((
+    "entry", "exit", "order", "sizing", "stopLoss", "takeProfit",
+    "trailingStop", "breakEven", "limits", "schedule",
+))
+
+
+def _merge_patch(current, incoming):
+    """Apply a RuleDoc patch without dropping siblings in known objects."""
+    out = dict(current)
+    for key, value in incoming.items():
+        if (key in _PATCH_OBJECT_FIELDS and isinstance(value, dict)
+                and isinstance(current.get(key), dict)):
+            nested = dict(current[key])
+            nested.update(value)
+            out[key] = nested
+        else:
+            out[key] = value
+    return out
+
 def save_draft(owner_id, doc):
     """Patch a DRAFT in place.
 
@@ -238,8 +258,7 @@ def save_draft(owner_id, doc):
     current = get(owner_id, rid)          # ownership + existence
     ruledoc.assert_editable(current)
 
-    out = dict(current)
-    out.update(incoming)
+    out = _merge_patch(current, incoming)
 
     out["userId"] = owner_id              # never movable by the request body
     out["ruleDocId"] = rid
