@@ -1,7 +1,12 @@
 # Apex4Traders — handoff
 
-**State at:** `5fb0a1a` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-30
+**State at:** `94c6c0b` on `claude/apex4traders-platform-v1`
+**Date:** 2026-10-04 (body written 2026-09-30; corrected in place since)
+
+> **Where this file is NOT the authority.** `docs/RELEASE_READINESS.md` owns
+> the status of blocker X1 and of every gate. This file restated that status
+> once, went stale within two days, and a later session acted on the stale
+> copy. Status that moves lives in one place; this file links to it.
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
 > only documentation, so the numbers still hold at it — that is the convention,
@@ -391,23 +396,44 @@ one).
 `ctrader/select` has now been called in production, so the sentence that it
 never had is no longer true.
 
+> **STOP — this section was out of date and it misled a later session.**
+>
+> What follows was written on 2026-09-30 and was overtaken two days later.
+> On **2026-10-04** a session read it, believed it, told the owner the
+> controls had never run, and asked him to decide how to build a harness
+> that already existed. **`docs/RELEASE_READINESS.md` is the authority on
+> X1, not this file.** Read it first and do not restate its status here.
+>
+> What actually happened after this was written:
+>
+> | Date | What ran |
+> |---|---|
+> | 2026-10-02 | **Preview on real bars.** Rule `0b1c97f1`, live candles, answered `HOLD` with the condition that stopped it. 15/15, exit 0. |
+> | 2026-10-02 | **The controls, against the real broker.** `scripts/smoke_ctrader_controls.py`, demo …456, **16/16**. It found three real bugs, now fixed (`0d4c973`, `8583543`). Gate 1 closed in `ec54e81`. |
+> | 2026-10-04 | **The screens, in a browser.** Eleven routes at 1440px and 390px, signed in through the real login form. Three real defects found and fixed — see below. |
+
 **What is still unproven, and it is not small:**
 
-- **The controls.** `automation.start` / pause / resume / stop have never been
-  sent to cTrader. Every test of them is against a stub. This is the larger
-  half of what remains, because it is the only part that changes something at
-  the broker rather than reading from it.
-- **The screens.** A script cannot see a chart, a badge, an empty state or a
-  phone. The eleven-step walk-through is the only thing that closes that.
+- **The screens WITH A CONNECTED ACCOUNT.** The 2026-10-04 walk-through ran
+  against a local API with no broker connection, so every screen was walked in
+  its *not-connected* state. What that proves is real — every route renders, no
+  console error, no failed request, no horizontal overflow at 390px, and it
+  found three defects no test could have (the app was still wearing the old
+  teal palette, the phone status row hid the licence chip and the demo badge
+  behind 201px of clipped overflow, and four identical filled buttons competed
+  on a first visit). What it does **not** show is a chart with real bars, a
+  populated positions table, a DEMO badge on a selected account, or the
+  activation path with a licence. Those need a session on the deployed
+  instance with a connected demo account.
+- **Nobody has watched the engine evaluate a rule and report a decision.** The
+  controls run logged no read errors underneath it, which is strong evidence
+  the engine can see the account. It is not the same statement, and the gate
+  says so.
 
-Not proven by that run either: **preview on real bars**. The run set no
-`SMOKE_RULE_ID`, so the evaluator has still only ever seen synthetic candles.
-Adding `SMOKE_RULE_ID=<a ruleDocId>` to the same command closes it, and costs
-nothing — preview places no order and has no execution path.
-
-Nothing in the code is known to be missing for any of these. They are
-**unproven**, which is a different thing from broken, and must not be reported
-as the same thing.
+Nothing in the code is known to be missing for either. They are **unproven**,
+which is a different thing from broken, and must not be reported as the same
+thing — and, as the box above shows, a stale "unproven" is just as costly as a
+false "proven".
 
 ## 3. What is blocked on the owner, not on engineering
 
@@ -494,9 +520,9 @@ file must be rewritten by that milestone, not deleted.
 
 | Gap | Where |
 |---|---|
-| **The automation CONTROLS and the SCREENS have not been run against the broker.** Connect is proven (2026-09-27) and so are the reads (2026-09-30, account …456, 199 real 15m bars). Start / pause / resume / stop have never been sent to cTrader, no human has walked the screens, and preview has still only seen synthetic candles | blocker **X1**, now part-closed — `docs/CTRADER_DEMO_SMOKE_TEST.md`, §2 |
+| ~~**The automation CONTROLS and the SCREENS have not been run against the broker.**~~ **Overtaken.** Controls: 16/16 against demo …456 on 2026-10-02, three real bugs found and fixed, gate 1 closed. Preview on real bars: 15/15, same day. Screens: eleven routes walked in a browser on 2026-10-04, three defects found and fixed. What remains is the screens **with a connected account** — see §2 | `docs/RELEASE_READINESS.md` is the authority; §2 here has the dates |
 | ~~The real TLS handshake has not been verified~~ — **it is verified, and nobody had looked.** The deployed API logs it at every start: `[API] broker reachable: TLSv1.3 to demo.ctraderapi.com:5035, certificate verified` — seen on 2026-09-27, 2026-09-30 and 2026-10-01. It stays unverifiable from a development container, where the inspecting proxy resets raw TLS on a non-HTTP port; that is a property of the container, not of the broker path | the deployment's own startup log; `scripts/check_ctrader_tls.py` for an on-demand check |
-| `/readyz` has never answered from a deployed instance | `docs/LAUNCH_QA_REPORT.md` |
+| ~~`/readyz` has never answered from a deployed instance~~ — **it has**, 2026-10-03: supabase, encryption, shared store (redis, 8ms), rate limit, cTrader OAuth and dev flags all ok; billing skipped because checkout is off | `docs/LAUNCH_QA_REPORT.md` |
 | An active rule cannot be edited; editing must create a version | same |
 | No volume and no indicator overlay on the chart, both for stated reasons | same, and `docs/CHART_DEPENDENCY_DECISION.md` |
 | Several rule fields are recorded but not enforced by the engine | labelled at the input in the rule builder |
@@ -504,7 +530,7 @@ file must be rewritten by that milestone, not deleted.
 | Checkout creation is a Next.js route with no verified session | `web/src/app/api/create-payment-intent/route.ts` — must move behind the platform API before it is ever enabled |
 | The broker connector pins a vulnerable TLS stack and cannot be raised | `docs/DEPLOYMENT_READINESS.md` §6 — needs X1 to verify any override |
 | A POST to an `/api/` route without a session gets a 307 to `/login`, not JSON | The middleware matcher covers `/api/*`. Harmless while checkout is off; wrong contract if it is ever enabled |
-| Nothing on this branch is deployed | §1c |
+| ~~Nothing on this branch is deployed~~ — **it is.** Both services deploy this branch; `/healthz` carries the live commit and `/readyz` answers from the deployed instance with every check ok (verified 2026-10-03) | §1c |
 
 ## 6b. Security concern with no fix yet: identifiers in the legacy bot
 

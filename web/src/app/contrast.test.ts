@@ -387,9 +387,18 @@ describe("the app wears the same brand as the landing page", () => {
   it("no petrol teal survives anywhere in the stylesheet", () => {
     // The app's previous accent. Named here for the reason the amber check
     // above exists: it came back once through a token block nobody re-read.
-    for (const banned of ["#0b5960", "#0e6e77", "#1a3c4a"]) {
-      expect(CSS.toLowerCase(), `${banned} was the app's teal accent`)
-        .not.toContain(banned);
+    //
+    // The rgb() forms are checked too, and that is not belt-and-braces: the
+    // first version of this test looked for hexes only, passed, and a
+    // teal glow shipped to production written as `rgba(11, 89, 96, .34)`
+    // inside a dead landing-page block. A colour nobody can grep for is a
+    // colour that comes back.
+    const css = CSS.toLowerCase().replace(/\s+/g, "");
+    for (const banned of [
+      "#0b5960", "#0e6e77", "#1a3c4a",
+      "11,89,96", "14,110,119", "26,60,74",
+    ]) {
+      expect(css, `${banned} was the app's teal accent`).not.toContain(banned);
     }
   });
 });
