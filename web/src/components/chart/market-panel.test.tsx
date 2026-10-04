@@ -100,7 +100,19 @@ describe("market panel — the request", () => {
     await mount({ ctid: null });
     await act(async () => { await Promise.resolve(); });
     expect(calls, "no account means nothing to ask").toHaveLength(0);
-    expect(screen.getByText(/cTrader account not connected/)).toBeDefined();
+    // SELECTION, not connection. A null ctid means no account is SELECTED,
+    // which is what this panel knows; whether cTrader is linked is a
+    // different fact it does not have. It used to say "cTrader account not
+    // connected" and send the reader to /connect, so an owner who had just
+    // linked — with the status strip beside this panel reading
+    // "cTrader Linked" — was told he had not, and went round the
+    // authorisation again. That second round is what spent the oauth budget.
+    expect(screen.getByText(/No account selected/)).toBeDefined();
+    expect(screen.queryByText(/not connected/i),
+           "this panel cannot know that, and saying it sent somebody back "
+           + "through OAuth for an account they already had").toBeNull();
+    expect(screen.getByRole("link", { name: /choose an account/i }))
+      .toHaveProperty("href", expect.stringContaining("/accounts"));
     expect(chartDrawn()).toBe(false);
   });
 });

@@ -96,6 +96,27 @@ export default function ConnectPage() {
   const linked = status.result?.ok ? status.result.data : null;
   const isConnected = Boolean(linked?.connected);
 
+  /**
+   * Step 1 is offered ONLY once the server has said they are not connected.
+   *
+   * It used to be offered whenever `isConnected` was false, and that is false
+   * while the read is still in flight and false again when the read FAILED.
+   * So on a phone — where the read is slow enough to see — an already-linked
+   * owner got "Step 1 — authorise" with a Connect button under it, pressed
+   * it because it was the only button on the card, and started a second
+   * OAuth round for an account he had already linked. The oauth bucket is 10
+   * requests a minute, so what he actually saw was RATE_LIMITED, and the
+   * screenshot shows the Status card above still reading "Loading…" while
+   * this card invited step 1.
+   *
+   * This file already carries two comments about this exact failure, written
+   * when the heading was chosen from a stale `pending` nonce. The server's
+   * verdict was made to beat the stale nonce — but "no verdict yet" was left
+   * reading as "not connected", which is the same mistake with a different
+   * cause. An answer we do not have is not an answer of no.
+   */
+  const canOfferStep1 = status.result?.ok === true && !linked?.connected;
+
   // Resume after the visitor comes back from cTrader. Two ways in, because on
   // a phone only the second one is reliable:
   //   ?n=<nonce>   the callback page sends them back here carrying it, which
@@ -234,9 +255,11 @@ export default function ConnectPage() {
         <div className="card-head">
           <h2>{isConnected ? "Account connected"
                : pending ? "Step 2 — finish here"
-               : "Step 1 — authorise"}</h2>
+               : canOfferStep1 ? "Step 1 — authorise"
+               : "Checking your link…"}</h2>
           <span className="pill pill-accent">
-            {isConnected ? "Done" : pending ? "2 of 2" : "1 of 2"}
+            {isConnected ? "Done" : pending ? "2 of 2"
+             : canOfferStep1 ? "1 of 2" : "…"}
           </span>
         </div>
         {isConnected ? (
@@ -288,6 +311,16 @@ export default function ConnectPage() {
               </button>
             </div>
           </>
+        ) : !pending && !canOfferStep1 ? (
+          /* The server has not said whether a link exists, so neither does
+             this card. Offering "Connect cTrader" here is what started a
+             second OAuth round on an account that was already linked, and
+             spent the minute's budget doing it. The Status card above
+             carries the loading state and the retry. */
+          <p className="muted">
+            Checking whether you already have a cTrader account linked. The
+            next step appears once we know.
+          </p>
         ) : !pending ? (
           <>
             <p className="muted">

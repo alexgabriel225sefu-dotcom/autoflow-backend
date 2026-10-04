@@ -86,13 +86,25 @@ export function MarketPanel({
       {/* No account selected: nothing can be fetched, and the selectors would
           imply otherwise. */}
       {!ctid ? (
+        /* SAY THE FACT THIS PANEL ACTUALLY HAS.
+           `ctid` being null means no account is SELECTED — the prop's own
+           doc says so. It said "cTrader account not connected" and pointed
+           at /connect, which is a different fact and a different remedy.
+           An owner who had just linked cTrader, with the status strip beside
+           this panel reading "cTrader Linked", was told here that he had not
+           connected and sent back to connect again. Reported from a phone on
+           2026-10-04; the second authorisation round is what spent the oauth
+           budget and produced RATE_LIMITED.
+           /accounts rather than /connect because it is right either way: it
+           lists the accounts to choose from when there is a link, and says
+           there is none and offers to connect when there is not. */
         <div className="notice">
-          <p style={{ fontWeight: 600 }}>cTrader account not connected</p>
+          <p style={{ fontWeight: 600 }}>No account selected</p>
           <p className="muted" style={{ fontSize: ".82rem" }}>
-            The chart shows bars read from your connected account. Connect one
-            to see the market this rule watches.
+            The chart shows bars read from the cTrader account you choose.
+            Pick one to see the market this rule watches.
           </p>
-          <Link className="btn btn-ghost btn-sm" href="/connect">Connect cTrader</Link>
+          <Link className="btn btn-ghost btn-sm" href="/accounts">Choose an account</Link>
         </div>
       ) : (
         <>

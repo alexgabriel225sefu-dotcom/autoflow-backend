@@ -125,9 +125,19 @@ export function plainRead(status: string, reason?: string): Plain | null {
     case "ok":
       return null;
     case "not_connected":
+      /* THE SERVER'S REASON, like every other branch here.
+         This one case discarded it, and it is the one case where the server
+         knows something the label does not: `broker_read` answers
+         "no cTrader account is connected, OR NONE HAS BEEN SELECTED".
+         Those are different situations with different remedies, and the
+         fixed label called both of them "not connected" — so an owner who
+         had just finished connecting, with the status strip beside it
+         reading "cTrader Linked", was told by this panel that he had not
+         connected. Reported from a phone on 2026-10-04 with both on screen
+         at once. */
       return {
         label: "cTrader account not connected",
-        detail: "Connect an account to see this.",
+        detail: reason ?? "Connect an account to see this.",
         tone: "neutral",
       };
     case "reauth_required":
