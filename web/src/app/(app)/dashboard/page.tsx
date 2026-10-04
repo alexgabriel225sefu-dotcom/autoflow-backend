@@ -18,7 +18,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Activity, Plug, RefreshCw } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, type ApiError } from "@/lib/api";
 import { invalidate, useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
 import { ErrorNotice, ExecutionBadge, PlanNotice, Spinner } from "@/components/app/state";
@@ -64,6 +64,10 @@ export default function Dashboard() {
   const jr = useRead<JournalPage>("journal?limit=8", 30_000);
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 120_000);
   const [busy, setBusy] = useState(false);
+  // A refusal from the account picker. Its own state rather than a shared
+  // one: it must survive the status reload that follows, which is the
+  // moment the old code lost it.
+  const [selectErr, setSelectErr] = useState<ApiError | null>(null);
 
   const account = ct.result?.ok ? ct.result.data : null;
   const selected = account?.selected ?? null;
@@ -83,11 +87,29 @@ export default function Dashboard() {
   const isDemo = selected?.mode === "demo";
   const runningThis = running && running.state !== "stopped";
 
+  /**
+   * Choosing which connected account to use.
+   *
+   * The result used to be thrown away: `await api(...)` with nothing read
+   * from it, then a reload. So a refusal produced NOTHING — the dropdown
+   * snapped back, the strip still said "No account selected", and the
+   * reader was given no reason and no retry. The owner hit it on a phone
+   * on 2026-10-04, where the server was answering
+   * `429 RATE_LIMITED retryAfterSec=42` because select shared a bucket with
+   * the OAuth round he had just spent. The rate limit is fixed; this is the
+   * reason he could not see it, and it would have hidden the next failure
+   * just as well.
+   *
+   * `me` is invalidated with the status because `execution` is derived from
+   * which account is selected — canAutomate and the DEMO badge both move.
+   */
   async function select(ctid: number | string) {
     setBusy(true);
-    await api("ctrader/select", { method: "POST", body: { ctid } });
+    setSelectErr(null);
+    const r = await api("ctrader/select", { method: "POST", body: { ctid } });
     setBusy(false);
-    void ct.reload();
+    if (!r.ok) setSelectErr(r);
+    invalidate("ctrader/status", "accounts", "me");
   }
 
   async function control(action: "start" | "pause" | "resume" | "stop") {
@@ -175,6 +197,15 @@ export default function Dashboard() {
                       ))}
                     </select>
                   </label>
+
+                  {/* The server's own words. Silence here is what made the
+                      account unselectable without saying so: the picker
+                      snapped back, the strip still read "No account
+                      selected", and nothing on screen said why. */}
+                  {selectErr ? (
+                    <ErrorNotice error={selectErr}
+                                 onRetry={selected ? undefined : () => setSelectErr(null)} />
+                  ) : null}
 
                   <div
                     className="verdict-banner"

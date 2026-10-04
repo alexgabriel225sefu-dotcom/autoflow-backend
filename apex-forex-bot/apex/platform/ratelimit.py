@@ -110,7 +110,29 @@ def classify(method, route):
         # connect, complete and disconnect meant a client who had left a tab
         # open could not disconnect their own account. The existing HTTP
         # suite caught exactly that.
-        return "default" if method == "GET" else "oauth"
+        if method == "GET":
+            return "default"
+        # ONLY the two that actually go through cTrader's OAuth.
+        #
+        # Everything else under ctrader/ used to land here too, and `select`
+        # is the one that made it visible: it is a client choosing which of
+        # THEIR OWN already-listed accounts to use, a local store write with
+        # nothing to guess at — the ctids were handed to them by this same
+        # API and ownership is checked on the way in. Metering it against the
+        # oauth bucket meant that a client who had just spent that budget
+        # connecting could not then pick the account they had connected.
+        #
+        # Observed in production on 2026-10-04: POST ctrader/select answered
+        # 429 with retryAfterSec=42, so the owner's phone showed
+        # "No account selected" on every screen while the account sat linked
+        # and unselectable. The bucket's own docstring says it is for flows
+        # that are "rare, and the interesting ones to guess at". Select is
+        # neither.
+        if route in ("ctrader/connect", "ctrader/complete"):
+            return "oauth"
+        # select and disconnect: they change which account automation would
+        # act on, which is exactly what the control bucket is for.
+        return "control"
     if _CANDLES_RE.match(route):
         return "candles"
     if _PREVIEW_RE.match(route):

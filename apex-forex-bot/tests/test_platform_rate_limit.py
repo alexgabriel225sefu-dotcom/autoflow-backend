@@ -48,7 +48,13 @@ cases = [
     ("POST", "ctrader/connect", "oauth"),
     ("POST", "ctrader/complete", "oauth"),
     ("GET", "ctrader/status", "default"),      # a poll, not a sensitive action
-    ("POST", "ctrader/disconnect", "oauth"),
+    # NOT oauth. Both change which account is in use; neither goes through
+    # cTrader's OAuth. Metering them against the tight oauth bucket meant a
+    # client who had just connected could not then select the account they
+    # had connected — seen in production on 2026-10-04 as a 429 on select
+    # with retryAfterSec=42, while the phone showed "No account selected".
+    ("POST", "ctrader/select", "control"),
+    ("POST", "ctrader/disconnect", "control"),
     ("POST", "billing/webhook", "webhook"),
     ("POST", "automation/start", "control"),
     ("POST", "automation/stop", "control"),
@@ -76,6 +82,21 @@ for _ in range(RL.LIMITERS["oauth"].limit * 3):
 allowed, bucket, _ = RL.check("POST", "ctrader/disconnect",
                               client_key="1.2.3.4", auth_header="Bearer poller")
 check("disconnect still goes through after heavy polling", allowed is True, bucket)
+
+# The bug the owner hit: connecting spends the oauth budget, and selecting the
+# account you just connected was metered against the same budget. The whole
+# point of the flow is that one follows the other.
+print("\n[1c] spending the oauth budget does not lock you out of your own account")
+RL.reset_all()
+for _ in range(RL.LIMITERS["oauth"].limit + 5):
+    RL.check("POST", "ctrader/connect", client_key="9.9.9.9", auth_header="Bearer u1")
+blocked, bucket, _ = RL.check("POST", "ctrader/connect",
+                              client_key="9.9.9.9", auth_header="Bearer u1")
+check("connect itself is still limited", blocked is False, bucket)
+allowed, bucket, _ = RL.check("POST", "ctrader/select",
+                              client_key="9.9.9.9", auth_header="Bearer u1")
+check("select still goes through", allowed is True, bucket)
+check("and it is not metered as oauth", bucket == "control", bucket)
 
 # ── 2. the key is the user when there is one ────────────────────────────────
 print("\n[2] authenticated callers are limited per user, not per address")

@@ -7,7 +7,7 @@
  * is safe to believe. Several tests below assert the WRONG sentence is
  * absent, not only that the right one is present.
  */
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiResult } from "@/lib/api";
 
@@ -325,5 +325,68 @@ describe("dashboard — the demo-only promise", () => {
       /order|close|amend|force/i.test(c.path) && c.init?.method === "POST");
     expect(forbidden, `dashboard called ${forbidden.map((c) => c.path).join(", ")}`)
       .toHaveLength(0);
+  });
+});
+
+/**
+ * Choosing an account must never fail in silence.
+ *
+ * The owner could not select the account he had just connected. The server
+ * was answering `429 RATE_LIMITED retryAfterSec=42` — select shared a rate
+ * bucket with the OAuth round he had spent getting there — and this page
+ * discarded the result of the call entirely. So the picker snapped back, the
+ * status strip went on reading "No account selected", and nothing on screen
+ * said why, on any of the five screenshots he sent.
+ *
+ * The rate limit is fixed in apex/platform/ratelimit.py. These assertions are
+ * about the other half: a refusal has to reach the reader, whatever its cause,
+ * because the next one will have a different cause.
+ */
+describe("dashboard — the account picker reports a refusal", () => {
+  const REFUSED = {
+    ok: false, status: 429, code: "RATE_LIMITED",
+    message: "too many requests — wait 42s and try again",
+  };
+
+  async function pick() {
+    const combo = await screen.findByRole("combobox", { name: /Account/i });
+    await act(async () => { fireEvent.change(combo, { target: { value: "902" } }); });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  }
+
+  beforeEach(() => {
+    routes["ctrader/status"] = { ok: true, data: {
+      connected: true,
+      accounts: [{ ctid: 501, mode: "demo" }, { ctid: 902, mode: "demo" }],
+      selected: null, liveAllowed: false,
+    } };
+  });
+
+  it("shows the server's own words when the selection is refused", async () => {
+    routes["ctrader/select"] = REFUSED;
+    await renderDash();
+    await pick();
+    expect(await screen.findByText(/wait 42s and try again/)).toBeTruthy();
+    expect(screen.getByText(/RATE_LIMITED/)).toBeTruthy();
+  });
+
+  it("does not fail silently — the whole defect in one assertion", async () => {
+    routes["ctrader/select"] = REFUSED;
+    await renderDash();
+    const before = document.body.textContent ?? "";
+    await pick();
+    const after = document.body.textContent ?? "";
+    // Something on the page has to change. The old code reloaded the status
+    // and rendered exactly what was there before, which is indistinguishable
+    // from nothing having been pressed.
+    expect(after).not.toBe(before);
+  });
+
+  it("says nothing when the selection succeeds", async () => {
+    routes["ctrader/select"] = { ok: true, data: { selected: { ctid: 902, mode: "demo" } } };
+    await renderDash();
+    await pick();
+    expect(screen.queryByText(/RATE_LIMITED/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
