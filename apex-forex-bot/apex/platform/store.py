@@ -220,19 +220,32 @@ def list_docs(owner_id, *, states=None):
 
 
 def save_draft(owner_id, doc):
-    """Overwrite a DRAFT in place.
+    """Patch a DRAFT in place.
 
     An active document is refused here. Editing one would rewrite terms a
     position may already have been opened under; `ruledoc.next_version` is how
     an active rule is changed.
+
+    PUT callers may send only the fields they are editing. Omitted fields are
+    kept from the stored draft so a partial browser payload cannot erase
+    versioning, timestamps, risk controls, or entry/exit conditions. The few
+    fields that define ownership and history are always taken from the stored
+    document, never from the request body.
     """
     owner_id = str(owner_id)
-    rid = str(doc.get("ruleDocId") or "")
+    incoming = dict(doc or {})
+    rid = str(incoming.get("ruleDocId") or "")
     current = get(owner_id, rid)          # ownership + existence
     ruledoc.assert_editable(current)
-    out = dict(doc)
+
+    out = dict(current)
+    out.update(incoming)
+
     out["userId"] = owner_id              # never movable by the request body
     out["ruleDocId"] = rid
+    out["version"] = current.get("version")
+    out["createdAt"] = current.get("createdAt")
+    out["activatedAt"] = current.get("activatedAt")
     out["state"] = ruledoc.DRAFT
     out["updatedAt"] = time.time()
     _write(_k_current(owner_id, rid), out)

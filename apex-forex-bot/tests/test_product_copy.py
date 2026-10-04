@@ -64,9 +64,6 @@ ALLOWED = {
     "apex-forex-bot/apex/platform/billing.py": (
         "names the old price and SKU as the defaults it refuses to substitute",
         frozenset({"the previous price", "the previous SKU"})),
-    "web/src/app/api/create-payment-intent/route.ts": (
-        "documents the old price and SKU as the fallback that was removed",
-        frozenset({"the previous price", "the previous SKU"})),
     "docs/PAYMENT_AND_LICENCE_DECISIONS.md": (
         "names the old price and SKU as what must NOT be defaulted to",
         frozenset({"the previous price", "the previous SKU"})),
@@ -264,19 +261,20 @@ check("and it promises no price",
 check("and no date", not re.search(r"\b(soon|shortly|Q[1-4]|20\d\d)\b", SENTENCE, re.I))
 check("and no outcome", not re.search(r"\b(profit|return|win|earn)\b", SENTENCE, re.I))
 
-# ── 5. checkout says it is disabled, whatever else is missing ───────────────
-print("\n[5] the checkout route answers about the product, not the deployment")
+# ── 5. checkout says it is disabled and cannot create payments ─────────────
+print("\n[5] the checkout route is fail-closed, not deployment-dependent")
 route = open(os.path.join(REPO, "web", "src", "app", "api",
                           "create-payment-intent", "route.ts"),
              encoding="utf-8").read()
-i_flag = route.index("A4T_CHECKOUT_ENABLED")
-i_key = route.index("process.env.STRIPE_SECRET_KEY")
-check("the disabled check runs BEFORE any configuration check", i_flag < i_key,
-      "otherwise a caller asking to buy is told a Stripe key is missing")
-check("and the answer says demo accounts are free",
+check("the route answers that demo accounts are free",
       "Demo accounts are free" in route)
-check("and that paying is not how an entitlement is granted",
-      "verified payment webhook" in route)
+check("the route names the authenticated platform API as the future boundary",
+      "authenticated platform API" in route)
+check("the route does not read Stripe configuration",
+      "STRIPE_SECRET_KEY" not in route and "process.env" not in route)
+check("the route cannot create a PaymentIntent",
+      "paymentIntents.create" not in route and "new Stripe" not in route
+      and "clientSecret" not in route)
 check("the route still cannot grant anything",
       "licence.grant" not in route and "grant(" not in route)
 

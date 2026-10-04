@@ -266,11 +266,15 @@ finally:
 route_src = open(os.path.join(ROOT, "..", "web", "src", "app", "api",
                               "create-payment-intent", "route.ts"),
                  encoding="utf-8").read()
-check("the legacy browser checkout route has an authenticated-checkout gate",
-      "A4T_AUTHENTICATED_CHECKOUT_ENABLED" in route_src)
-check("and it checks that gate before creating a Stripe PaymentIntent",
-      route_src.index("A4T_AUTHENTICATED_CHECKOUT_ENABLED")
-      < route_src.index("paymentIntents.create"))
+check("the legacy browser checkout route does not import Stripe",
+      "from \"stripe\"" not in route_src and "new Stripe" not in route_src,
+      route_src[:200])
+check("the legacy browser checkout route cannot create a PaymentIntent",
+      "paymentIntents.create" not in route_src and "clientSecret" not in route_src,
+      route_src)
+check("the legacy browser checkout route fails closed",
+      "CHECKOUT_DISABLED" in route_src and "status: 503" in route_src,
+      route_src)
 
 # ── 11. the approved offer is one-time founder access ─────────────────────
 print("\n[11] the approved offer is one-time founder access")
