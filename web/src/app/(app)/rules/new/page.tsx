@@ -134,7 +134,16 @@ export default function NewRulePage() {
                 Next: {STEPS[index + 1].label} <ChevronRight className="ico" aria-hidden />
               </button>
             ) : null}
-            <button className="btn btn-lg" onClick={save} disabled={busy}>
+            {/* ONE filled button per step, and it is the one that moves the
+                flow forward. Mid-flow that is "Next"; on the last step there
+                is no next, so saving becomes the primary action. Both were
+                filled before, which put two equally loud calls to action
+                side by side and left the step with no obvious next move. */}
+            <button
+              className={index < STEPS.length - 1 ? "btn btn-ghost" : "btn btn-lg"}
+              onClick={save}
+              disabled={busy}
+            >
               <Save className="ico" aria-hidden /> {busy ? "Saving…" : "Save draft"}
             </button>
             <Link className="btn btn-ghost" href="/rules">Cancel</Link>

@@ -92,7 +92,7 @@ export function MarketPanel({
             The chart shows bars read from your connected account. Connect one
             to see the market this rule watches.
           </p>
-          <Link className="btn btn-sm" href="/connect">Connect cTrader</Link>
+          <Link className="btn btn-ghost btn-sm" href="/connect">Connect cTrader</Link>
         </div>
       ) : (
         <>
@@ -134,9 +134,9 @@ export function MarketPanel({
                 <p style={{ fontWeight: 600 }}>{plain.label}</p>
                 {plain.detail ? <p className="muted" style={{ fontSize: ".82rem" }}>{plain.detail}</p> : null}
                 {read?.status === "reauth_required" ? (
-                  <Link className="btn btn-sm" href="/connect">Reconnect cTrader</Link>
+                  <Link className="btn btn-ghost btn-sm" href="/connect">Reconnect cTrader</Link>
                 ) : read?.status === "not_connected" ? (
-                  <Link className="btn btn-sm" href="/connect">Connect cTrader</Link>
+                  <Link className="btn btn-ghost btn-sm" href="/connect">Connect cTrader</Link>
                 ) : (
                   <button className="btn btn-ghost btn-sm" onClick={load}>Try again</button>
                 )}

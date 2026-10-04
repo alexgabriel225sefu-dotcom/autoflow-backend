@@ -38,10 +38,18 @@ function Unavailable({ status, reason }: { status: string; reason?: string }) {
     <div className={p.tone === "short" ? "notice notice-warn" : "notice"} role="status">
       <p style={{ fontWeight: 600 }}>{p.label}</p>
       {p.detail ? <p className="muted" style={{ fontSize: ".82rem" }}>{p.detail}</p> : null}
+      {/* QUIET, because this panel is not the one asking.
+          Every panel reports its own read, which is the point — an empty
+          table must never stand in for "we could not look". But on a first
+          visit all four of them are not-connected at once, and when each
+          carried a filled button the screen showed four identical shouting
+          calls to action with no way to tell which one to press. The
+          Automation panel keeps the filled one; these offer the same fix
+          without competing with it. */}
       {status === "not_connected" ? (
-        <Link className="btn btn-sm" href="/connect">Connect cTrader</Link>
+        <Link className="btn btn-ghost btn-sm" href="/connect">Connect cTrader</Link>
       ) : status === "reauth_required" ? (
-        <Link className="btn btn-sm" href="/connect">Reconnect cTrader</Link>
+        <Link className="btn btn-ghost btn-sm" href="/connect">Reconnect cTrader</Link>
       ) : null}
     </div>
   );

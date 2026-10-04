@@ -13,44 +13,58 @@
      Deep midnight plum for the page, graphite for what sits on it, then
      three steps up so a card separates from its background without a
      border doing all the work. */
-  --a4t-bg:        #111322;   /* deep midnight plum */
-  --a4t-bg-2:      #141727;
-  --a4t-surface:   #171B25;   /* graphite */
-  --a4t-surface-2: #1E2331;
-  --a4t-surface-3: #272D3D;
-  --a4t-line:      #2A3042;
-  --a4t-line-soft: #212636;
+  --a4t-bg:        #0A0A0C;   /* the same near-black the landing page uses */
+  --a4t-bg-2:      #0E0E11;
+  --a4t-surface:   #121216;
+  --a4t-surface-2: #17171C;
+  --a4t-surface-3: #1F1F26;
+  --a4t-line:      #26262F;
+  --a4t-line-soft: #1B1B21;
 
   /* ── text ───────────────────────────────────────────────────────────
      Warm off-white, then muted slate, then a dim step for metadata. */
-  --a4t-text:  #F4F0E8;   /* warm off-white */
-  --a4t-muted: #98A0B4;   /* muted slate */
-  --a4t-dim:   #6F7791;
+  --a4t-text:  #F4F0E8;   /* warm off-white — 17.40:1 */
+  --a4t-muted: #A8A4AE;   /*  8.09:1 */
+  --a4t-dim:   #75717E;   /*  4.16:1 — metadata and large text only */
 
   /* ── interaction ────────────────────────────────────────────────────
-     Petrol teal is the action FILL. It is dark, so it carries off-white
-     text, never dark text — 7.1:1.
-     Soft lilac is the interactive foreground: links, focus, the active
-     nav item. Teal on the page background is only 2.2:1 and cannot be
-     read as text, which is why the two are separate tokens rather than
-     one accent used both ways. */
-  --a4t-accent:        #0B5960;   /* petrol teal — fills */
-  --a4t-accent-strong: #0E6E77;
-  --a4t-accent-dim:    #1A3C4A;
-  --a4t-accent-wash:   rgba(11, 89, 96, 0.28);
-  --a4t-on-accent:     #F4F0E8;   /* text ON petrol teal */
+     The brand red is the action FILL, and it is the same #C81228 the
+     landing page uses. It was petrol teal until the landing page was
+     rebuilt in black and red, at which point somebody signing up walked
+     out of one product and into another — the screens are where that was
+     visible, and nothing but opening them showed it.
 
-  --a4t-link:       #C7B8FF;      /* soft lilac */
-  --a4t-link-strong:#DCD2FF;
-  --a4t-link-dim:   #3B3357;
-  --a4t-link-wash:  rgba(199, 184, 255, 0.12);
+     Red on the page is 2.4:1 and cannot be read as text, so the
+     interactive FOREGROUND is a separate token, exactly as it was when
+     the fill was teal. That token is a cool steel rather than a red for
+     a reason that is not taste: --a4t-short is coral, and a link in a
+     near-coral red sitting beside a losing position in coral is a pair
+     a trader has to stop and decode. It is not lilac either — a violet
+     interactive colour is the house style of every generated interface,
+     and this one is meant to look like a trading desk. */
+  --a4t-accent:        #C81228;   /* brand red — fills. Carries #FFF 5.88:1 */
+  --a4t-accent-strong: #9B0D1B;
+  --a4t-accent-dim:    #4A0A13;
+  --a4t-accent-wash:   rgba(200, 18, 40, 0.22);
+  --a4t-on-accent:     #FFFFFF;   /* text ON the brand red */
+
+  /* The broken crossbar inside the brand mark. Its own token because the
+     mark must not change when the link colour does — which is exactly what
+     happened when it borrowed --a4t-link-strong. Only ever drawn on the
+     accent fill, never on the page, so it is held to that pair. */
+  --a4t-mark-bar:   #FF9AA4;      /* on the red fill — 3.25:1, a graphic */
+
+  --a4t-link:       #93B4D8;      /* cool steel — 9.19:1 */
+  --a4t-link-strong:#B8CFE8;      /*             12.37:1 */
+  --a4t-link-dim:   #26384A;
+  --a4t-link-wash:  rgba(147, 180, 216, 0.12);
 
   /* ── trading semantics, and nothing else ────────────────────────────
      Mint means long or confirmed. Coral means short, warning or
      destructive. Neither is ever used for emphasis. */
   --a4t-long:    #A5E7C5;   /* seafoam mint */
   --a4t-short:   #FF8A73;   /* coral */
-  --a4t-neutral: #98A0B4;
+  --a4t-neutral: #A8A4AE;
   --a4t-long-wash:  rgba(165, 231, 197, 0.13);
   --a4t-short-wash: rgba(255, 138, 115, 0.13);
 
@@ -289,17 +303,25 @@ body {
 .topbar-spacer { flex: 1; }
 
 /* status strip — the answer to "what is running, on what, right now" */
+/* The status row. It carries whether an account is connected, whether
+   automation is running, the licence state and the demo/live badge — the
+   four facts that must never be guessed at.
+
+   It used to be `overflow-x: auto` with a hidden scrollbar. Measured on a
+   390px phone: 591px of content in a 390px row, so 201px — the licence chip
+   and the demo/live badge — sat off-screen behind a scrollbar that had been
+   styled away, on the one device where somebody is most likely to be
+   checking whether their automation is running. It wraps instead. Two short
+   lines on a phone is the whole cost. */
 .statusbar {
   position: sticky; top: var(--a4t-topbar); z-index: 25;
   min-height: var(--a4t-statusbar);
   display: flex; align-items: center; gap: .4rem;
+  flex-wrap: wrap;
   padding: .3rem clamp(12px, 3vw, 22px);
   background: var(--a4t-bg-2);
   border-bottom: 1px solid var(--a4t-line);
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.statusbar::-webkit-scrollbar { display: none; }
 
 .stat-chip {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -1233,7 +1255,7 @@ body {
    palette: teal for one card, amber for the other, each with two coloured
    blobs and a coloured orb. On a page whose whole identity is black and one
    red, that rendered a turquoise card beside an orange one, and the lower
-   half of both inherited the APP's surface tokens (#111322, a blue) rather
+   half of both inherited the APP's surface tokens, which were a blue, rather
    than the marketing page's (#0A0A0C), so the cards sat on the page as two
    foreign rectangles at the exact point somebody decides whether to pay.
 

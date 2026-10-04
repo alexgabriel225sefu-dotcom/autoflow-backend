@@ -346,6 +346,55 @@ describe("the marketing palette", () => {
 });
 
 /**
+ * The app and the landing page are the same product.
+ *
+ * They were not. The landing page was rebuilt in black and red while the app
+ * kept a petrol-teal accent on a midnight-blue page, so somebody who signed
+ * up walked out of one product and into another — and nothing caught it,
+ * because every test here held each palette to its own standard and no test
+ * compared them. Opening the screens in a browser is what showed it.
+ */
+describe("the app wears the same brand as the landing page", () => {
+  it("the action fill is the brand red, the same value in both", () => {
+    expect(TOKENS["--a4t-accent"]).toBe(MKT["--mkt-accent"]);
+  });
+
+  it("the page is the same black in both", () => {
+    expect(TOKENS["--a4t-bg"]).toBe(MKT["--mkt-bg"]);
+  });
+
+  it("the interactive foreground is NOT a red", () => {
+    // Not taste. --a4t-short is coral and means a losing position; a link in
+    // a near-coral red beside it is a pair somebody has to stop and decode.
+    // This fails if anybody "simplifies" the link token back onto the accent.
+    const h = (hex: string) => {
+      const [r, g, b] = rgb(hex).map((n) => n / 255);
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+      if (!d) return 0;
+      const x = max === r ? ((g - b) / d) % 6
+        : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return ((x * 60) + 360) % 360;
+    };
+    const gap = (a: number, b: number) =>
+      Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+    expect(
+      gap(h(TOKENS["--a4t-link"]), h(TOKENS["--a4t-short"])),
+      `link ${TOKENS["--a4t-link"]} is too close in hue to short ` +
+      `${TOKENS["--a4t-short"]}`,
+    ).toBeGreaterThan(60);
+  });
+
+  it("no petrol teal survives anywhere in the stylesheet", () => {
+    // The app's previous accent. Named here for the reason the amber check
+    // above exists: it came back once through a token block nobody re-read.
+    for (const banned of ["#0b5960", "#0e6e77", "#1a3c4a"]) {
+      expect(CSS.toLowerCase(), `${banned} was the app's teal accent`)
+        .not.toContain(banned);
+    }
+  });
+});
+
+/**
  * The pricing cards, which are read by somebody deciding whether to pay.
  *
  * These exist because the vendored component shipped its own tints and its

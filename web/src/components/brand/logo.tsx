@@ -43,10 +43,16 @@ export function BrandMark({
         strokeLinejoin="round"
       />
       {/* The crossbar, broken into four — the 4 in Apex4Traders, read as
-          rhythm rather than spelled out. */}
+          rhythm rather than spelled out.
+
+          Its own token, not --a4t-link-strong. It was that one while the
+          interactive colour happened to be a pink, and the mark then turned
+          cool blue the moment that token moved for reasons that had nothing
+          to do with the logo. A brand mark must not be downstream of what
+          links look like. */}
       <path
         d="M12.4 18.4 h2.1 M16.6 18.4 h2.1"
-        stroke="var(--a4t-link-strong, #FF9AA4)"
+        stroke="var(--a4t-mark-bar, #FF9AA4)"
         strokeWidth="2.2"
         strokeLinecap="round"
       />
