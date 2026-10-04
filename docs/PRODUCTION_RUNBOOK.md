@@ -243,16 +243,62 @@ correct, but means an overlap window is wanted.
 
 ## 10. Monitoring and alerting
 
-Not yet provisioned. What is worth watching, in priority order:
+Provisioned first line: `.github/workflows/production-health.yml` runs the
+read-only monitor in `apex-forex-bot/scripts/check_production_health.py` on an
+hourly schedule and on manual dispatch. It performs only unauthenticated
+`GET` requests against:
 
-1. `GET /readyz` answering 503, and which check is in its `failed` list.
-2. `AUTH_UNAVAILABLE` from `/api/v1/*` — identity provider unreachable.
-3. Backend process restarts.
-4. `429 RATE_LIMITED` by bucket — a spike on `candles` means a client is
+- `https://apex4traders-api.onrender.com/healthz`
+- `https://apex4traders-api.onrender.com/readyz`
+- `https://apex4traders-web.onrender.com/`
+
+The workflow has `contents: read`, no secrets, no deploy credentials and no
+service write path. Alert delivery is the GitHub Actions failure notification
+for this repository. The owner must watch this repository or configure GitHub
+Actions failure emails/mobile notifications; otherwise the monitor can fail
+correctly and nobody will read it. GitHub scheduled workflows run from the
+default branch, so if `claude/apex4traders-platform-v1` is not the repository's
+default branch, either move this workflow to the default branch after review or
+create the same checks in an external uptime service immediately.
+
+Cost at launch scale: the repository workflow is expected to run 24 times per
+day and should use well under one minute per run. That is roughly 730 included
+Actions minutes per month. Public repositories are free; private repositories
+on GitHub Free include 2,000 Actions minutes per month. The required external
+uptime-service fallback is UptimeRobot free tier: 50 monitors, 5-minute
+interval, $0/month at this scale. Do not choose a paid monitor while the total
+launch budget is 200-300 EUR unless the owner explicitly approves it.
+
+What each alert means and what to do:
+
+| Alert | Means | First action |
+|---|---|---|
+| `api_healthz` transport failure or non-200 | The API process is unreachable from outside Render, or Render returned an error before the app answered. Customers cannot rely on the API. | Open Render for `apex4traders-api`, check service status and recent deploy logs, then retry `/healthz`. If a deploy just happened and the previous revision worked, redeploy the previous revision. |
+| `api_healthz` missing or wrong `release.commit` | The app answered, but the monitor cannot identify the running build, or `A4T_EXPECTED_API_COMMIT` does not match. The deploy may not have taken. | Compare the monitor's commit with the commit Render says is live. If they differ after the deploy has finished, redeploy the intended commit or roll back deliberately. |
+| `api_readyz` transport failure | The API is not reachable enough to report dependency status. | Treat as an API outage first: check Render status/logs, then `/healthz`. |
+| `api_readyz` failed check: `supabase` | Identity is unavailable or misconfigured. The platform cannot tell who anyone is and should refuse authenticated work. | Check `SUPABASE_URL` and `SUPABASE_ANON_KEY` on the API service, then test `GET /api/v1/me` with a valid token. Do not bypass auth. |
+| `api_readyz` failed check: `encryption` | Broker-token encryption is missing. Tokens must not be stored without this in production. | Set/fix `TOKEN_ENCRYPTION_KEY` and redeploy. Do not rotate casually; rotation makes existing broker tokens unreadable. |
+| `api_readyz` failed check: `shared_store` | Ownership, entitlement, order idempotency or counters would be per-container, or the shared backend is down. | Check Upstash/Redis environment and provider status. Do not start automation until the shared backend is healthy. |
+| `api_readyz` failed check: `rate_limit_store` | Rate-limit counters are local to one process. With more than one instance, limits multiply by instance count. | Restore the shared rate-limit store configuration. |
+| `api_readyz` failed check: `ctrader_oauth` | Clients cannot connect cTrader accounts. | Check `CTRADER_CLIENT_ID`, `CTRADER_CLIENT_SECRET` and `CTRADER_REDIRECT_URI`, including exact redirect URI bytes in the cTrader portal. |
+| `api_readyz` failed check: `billing` | Checkout was enabled without the required reviewed payment configuration. | Turn checkout back off unless this is a reviewed payment launch. Then fix webhook/config before re-enabling. |
+| `api_readyz` failed check: `dev_flags` | A development-only flag is set in production. | Remove the flag and redeploy. |
+| `api_readyz` failed check: `live_trading` | `LIVE_TRADING_ENABLED` is set even though this release has no reviewed live execution path. | Remove the flag immediately and redeploy. Do not add a live trading path during incident response. |
+| `web_home` transport failure or non-200 | The customer-facing web app is unreachable. | Open Render for `apex4traders-web`, check deploy logs, then retry `/`. If API checks are green, this is isolated to the web service. |
+
+`/readyz` alerts must name the failed check. Do not page on the sentence
+"readyz is red" alone; page on `supabase`, `shared_store`, `ctrader_oauth`,
+or the exact check that failed.
+
+Still worth watching after the first-line monitor:
+
+1. `AUTH_UNAVAILABLE` from `/api/v1/*` — identity provider unreachable.
+2. Backend process restarts.
+3. `429 RATE_LIMITED` by bucket — a spike on `candles` means a client is
    looping, or the limit is too tight for normal use.
-5. `BILLING_FAILED` — a paid event that did not provision. These are the ones
+4. `BILLING_FAILED` — a paid event that did not provision. These are the ones
    a person has to look at.
-6. `broker_error` entries in the journal.
+5. `broker_error` entries in the journal.
 
 ## 11. Incident response
 
