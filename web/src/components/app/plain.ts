@@ -125,19 +125,27 @@ export function plainRead(status: string, reason?: string): Plain | null {
     case "ok":
       return null;
     case "not_connected":
-      /* THE SERVER'S REASON, like every other branch here.
-         This one case discarded it, and it is the one case where the server
-         knows something the label does not: `broker_read` answers
-         "no cTrader account is connected, OR NONE HAS BEEN SELECTED".
-         Those are different situations with different remedies, and the
-         fixed label called both of them "not connected" — so an owner who
-         had just finished connecting, with the status strip beside it
-         reading "cTrader Linked", was told by this panel that he had not
-         connected. Reported from a phone on 2026-10-04 with both on screen
-         at once. */
+      /* THIS STATUS COVERS TWO SITUATIONS AND THE LABEL CLAIMED ONE.
+         `broker_read` answers "no cTrader account is connected, OR NONE HAS
+         BEEN SELECTED" — one status for both, because from the reader's
+         point of view there is simply no account to read from. The label
+         said "cTrader account not connected", which is false in the second
+         case, and every panel that drew it also offered /connect.
+         So an owner who had linked cTrader and not yet picked an account was
+         told on three separate screens that he had not connected, each time
+         with the status strip directly above reading "cTrader Linked", and
+         each time invited to authorise again. Reported from a phone on
+         2026-10-04; the extra authorisation round is what produced
+         RATE_LIMITED.
+         "No account selected" is true in BOTH cases — nothing is selected
+         when nothing is linked either — and the server's own sentence,
+         carried here like every sibling branch already carries it, says
+         which of the two it is. The action belongs at /accounts, which is
+         right either way: it lists the accounts when there is a link, and
+         says there is none and offers to connect when there is not. */
       return {
-        label: "cTrader account not connected",
-        detail: reason ?? "Connect an account to see this.",
+        label: "No account selected",
+        detail: reason ?? "Choose a cTrader account to see this.",
         tone: "neutral",
       };
     case "reauth_required":

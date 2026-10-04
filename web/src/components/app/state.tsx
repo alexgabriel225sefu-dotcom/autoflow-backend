@@ -12,6 +12,11 @@
  */
 import { CircleAlert, Plug, RefreshCw, TriangleAlert } from "lucide-react";
 import type { ApiError, Execution, ReadState } from "@/lib/api";
+// ONE definition of what a broker read state says. It was written out
+// longhand here as well, and the two drifted: this copy claimed "No
+// cTrader account is connected" for a status that also means "linked
+// but nothing selected".
+import { plainRead } from "./plain";
 
 export function StatusPill({ mode }: { mode?: "demo" | "live" | null }) {
   if (!mode) return <span className="pill pill-muted">No account selected</span>;
@@ -78,13 +83,27 @@ export function ReadPanel({
 }) {
   if (read.status === "ok") return <>{children}</>;
   if (read.status === "not_connected") {
+    /* "No cTrader account is connected." was false half the time.
+       This status means there is nothing to read from, which is true both
+       when no account is linked and when one is linked but none has been
+       SELECTED — the server says so in `reason`: "no cTrader account is
+       connected, or none has been selected". The hardcoded sentence picked
+       one of those and the button sent the reader to /connect, so somebody
+       who had just linked was told on this screen that he had not, with the
+       status strip above it reading "cTrader Linked".
+       The server's words now carry which case it is, and /accounts is the
+       destination because it is correct for both. */
+    const p = plainRead(read.status, read.reason);
     return (
       <div className="notice">
-        <p className="muted" style={{ display: "flex", alignItems: "center", gap: ".45rem" }}>
+        <p style={{ display: "flex", alignItems: "center", gap: ".45rem", fontWeight: 600 }}>
           <Plug className="ico" aria-hidden style={{ width: 14, height: 14 }} />
-          No cTrader account is connected.
+          {p?.label}
         </p>
-        <a className="btn btn-sm" href="/connect">Connect cTrader</a>
+        {p?.detail ? (
+          <p className="muted" style={{ fontSize: ".82rem" }}>{p.detail}</p>
+        ) : null}
+        <a className="btn btn-sm" href="/accounts">Choose an account</a>
       </div>
     );
   }

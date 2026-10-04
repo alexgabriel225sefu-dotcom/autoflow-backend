@@ -148,7 +148,11 @@ export function MarketPanel({
                 {read?.status === "reauth_required" ? (
                   <Link className="btn btn-ghost btn-sm" href="/connect">Reconnect cTrader</Link>
                 ) : read?.status === "not_connected" ? (
-                  <Link className="btn btn-ghost btn-sm" href="/connect">Connect cTrader</Link>
+                  /* /accounts, not /connect: this status also covers an
+                     account that is linked but not selected, and sending
+                     that reader back through authorisation is what spent
+                     the oauth budget. The accounts page is right for both. */
+                  <Link className="btn btn-ghost btn-sm" href="/accounts">Choose an account</Link>
                 ) : (
                   <button className="btn btn-ghost btn-sm" onClick={load}>Try again</button>
                 )}

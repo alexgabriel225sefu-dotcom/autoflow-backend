@@ -19,15 +19,25 @@ describe("ReadPanel", () => {
     expect(screen.getByText("No open positions.")).toBeDefined();
   });
 
-  it("never renders an empty state when the account is not connected", () => {
+  it("never renders an empty state when there is no account to read from", () => {
     render(
-      <ReadPanel read={{ connected: false, status: "not_connected" }}>
+      <ReadPanel read={{
+        connected: false, status: "not_connected",
+        reason: "no cTrader account is connected, or none has been selected",
+      }}>
         <p>No open positions.</p>
       </ReadPanel>,
     );
     // The reassuring sentence must NOT appear: we did not ask anyone.
     expect(screen.queryByText("No open positions.")).toBeNull();
-    expect(screen.getByText(/No cTrader account is connected/)).toBeDefined();
+    // The SERVER's sentence, because this status covers two situations and
+    // only the server knows which. The panel used to hardcode "No cTrader
+    // account is connected" and link to /connect, which told an owner who
+    // had linked but not selected that he had not linked — on a screen whose
+    // status strip said "cTrader Linked" directly above it.
+    expect(screen.getByText(/or none has been selected/)).toBeDefined();
+    expect(screen.getByRole("link", { name: /choose an account/i }))
+      .toHaveProperty("href", expect.stringContaining("/accounts"));
   });
 
   it("offers reconnection, and only that, when the token needs reauth", () => {

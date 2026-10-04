@@ -238,7 +238,7 @@ describe("dashboard — automation state", () => {
 
 describe("dashboard — reads that failed are not empty successes", () => {
   it.each([
-    ["not_connected", /cTrader account not connected/],
+    ["not_connected", /No account selected/],
     ["reauth_required", /cTrader needs reconnecting/],
     ["unavailable", /Market data unavailable/],
   ])("positions status %s shows the reason, not 'No open positions'", async (status, expected) => {

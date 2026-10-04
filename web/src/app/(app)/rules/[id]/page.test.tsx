@@ -151,7 +151,7 @@ describe("Rule Detail — preview coupling", () => {
 
   it.each([
     ["reauth_required", /Reconnect cTrader/],
-    ["not_connected", /No cTrader account is connected/],
+    ["not_connected", /No account selected/],
   ])("shows the read state for %s instead of a verdict", async (status, expected) => {
     routes["accounts/501/candles"] = { ok: true, data: {
       connected: status !== "not_connected", status,

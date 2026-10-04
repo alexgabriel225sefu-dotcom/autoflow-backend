@@ -119,7 +119,7 @@ describe("market panel — the request", () => {
 
 describe("market panel — states that must not look like a quiet market", () => {
   it.each([
-    ["not_connected", /cTrader account not connected/],
+    ["not_connected", /No account selected/],
     ["reauth_required", /cTrader needs reconnecting/],
     ["unavailable", /Market data unavailable/],
   ])("read status %s is shown as itself, with no chart", async (status, expected) => {
