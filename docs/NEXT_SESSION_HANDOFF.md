@@ -36,7 +36,7 @@ What that closes and what it does not is in §1g.
 | | |
 |---|---|
 | Tests | 168 backend files, 255 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
-| Private demo beta | **NOT YET** — X1 part-closed: reads proven 2026-09-30, controls and screens not; see §2 |
+| Private demo beta | **NOT YET**, but narrower than this line used to say. Reads, preview on real bars and the controls are all proven against the real broker; the screens were walked on 2026-10-04 with nothing connected. `docs/RELEASE_READINESS.md` gate 1 is the authority; see §2 |
 | Public beta | **NO** |
 | Taking money | **NO** — 499 USD one-time founder offer recorded, checkout still off |
 | Live trading | **NO**, and not implemented |

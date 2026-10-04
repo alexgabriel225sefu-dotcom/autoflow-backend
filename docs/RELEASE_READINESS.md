@@ -21,16 +21,26 @@
 
 | Gate | Status |
 |---|---|
-| **PRIVATE DEMO BETA** | **NOT YET** — X1 part-closed: reads proven 2026-09-30, controls and screens not |
+| **PRIVATE DEMO BETA** | **NOT YET** — X1 nearly closed: reads 2026-09-30, preview on real bars and the controls 2026-10-02 (16/16), the screens walked in a browser 2026-10-04. What is left is the screens **with a connected account** |
 | **PUBLIC BETA** | **NO** |
 | **PUBLIC PAID LAUNCH** | **NO** |
 | **LIVE TRADING** | **FALSE**, and out of scope by design |
 
-The honest summary: the software is in good shape and the read side has now
-been proven against a real cTrader demo account, but **private demo beta is
-still not ready**. The remaining cTrader gate is the part a script cannot prove:
-a human browser/phone walk-through of the screens and controls, plus preview
-on real bars with `SMOKE_RULE_ID`.
+The honest summary: the software is in good shape, and against a real cTrader
+demo account the reads, preview on real bars and the automation controls have
+all now been proven. **Private demo beta is still not ready**, and what is left
+is narrower than it was: the screens have been walked in a browser at desktop
+and phone width, but with no broker connected, so every one of them was in its
+not-connected state. A chart with real bars, a populated positions table, a
+DEMO badge on a selected account and the activation path have not been seen by
+anybody.
+
+> **This status is restated in several places in this file, and that has
+> already cost real work.** On 2026-10-04 a session read a copy of it that had
+> gone stale, reported to the owner that the controls had never run, and asked
+> him to decide how to build a harness that already existed. Gate 1 in the
+> table below is the authority. When it moves, every sentence in this file that
+> describes it has to move with it — `grep -n "never been sent"` is the check.
 
 ---
 
@@ -74,13 +84,26 @@ reports a skipped step as `SKIP` and repeats it in the summary, because
 `exit 0` with a step missing had looked exactly like `exit 0` with every step
 passing, and X1 is closed on the strength of that exit code.
 
-Two things in X1 are still unproven, and they are not small:
+**The controls are proven too, and this paragraph used to say they were not.**
+2026-10-02, same account, `scripts/smoke_ctrader_controls.py`: **16 of 16** —
+start, its idempotent second start, pause remembering the rule, resume, stop
+clearing it, stop again, and the journal recording all of it. Automation was
+left stopped. Three real product bugs were found by running it and are fixed
+(`0d4c973`, `8583543`). Gate 1 below carries the detail.
 
-- **The controls.** `automation.start` / pause / resume / stop have never been
-  sent to cTrader. Every test of them is against a stub.
-- **The screens.** A script cannot see a chart, a badge or an empty state. The
-  eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md` is still the
-  only thing that closes that, and it needs a browser and a phone.
+One thing in X1 is still unproven, and it is not small:
+
+- **The screens, with an account connected.** They were walked on 2026-10-04 —
+  eleven routes, 1440px and 390px, signed in through the real login form — and
+  that found three real defects (the app still wore the old teal palette; the
+  phone status row hid the licence chip and the demo badge behind 201px of
+  clipped overflow; four identical filled buttons competed on a first visit).
+  But it ran against a local API with no broker connected, so every screen was
+  in its not-connected state. A chart with real bars, a populated positions
+  table, a DEMO badge on a selected account and the activation path have not
+  been seen. The eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md`
+  against a **connected** demo account is what closes it, and it needs a
+  browser and a phone.
 
 One further gap found by that run, now fixed in the smoke script rather than
 in the product: the script asserted that a balance carries a currency.
@@ -224,7 +247,7 @@ Mobile destinations went from 1 of 8 to 8 of 8.
 
 | Decision | Answer | Who can change it |
 |---|---|---|
-| **Ship a private demo beta now?** | **No.** X1 is part-closed: the reads are proven against a real broker (2026-09-30, account …456), the automation controls and the screens are not | Engineering, by running the eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md` in a browser |
+| **Ship a private demo beta now?** | **No**, but only just. Reads, preview on real bars and the controls are all proven against a real broker (…456; 2026-09-30 and 2026-10-02, 16/16). The screens were walked on 2026-10-04 with no account connected. What is left is walking them **connected** | Engineering, by running the eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md` in a browser against a connected demo account |
 | **Ship a public beta?** | **No.** Nine of twelve public-launch gates are open | Owner, for the decisions; engineering, for X2–X9 |
 | **Take money?** | **No.** The 499 USD one-time Founder Lifetime offer is approved, but checkout is off and the route refuses until authenticated checkout, legal, refund and tax are ready | Owner — D5, D6 and legal/refund decisions; engineering — authenticated checkout |
 | **Enable live trading?** | **No, and not by a flag.** It is not implemented. `LIVE_TRADING_ENABLED` has no execution path behind it and `/readyz` refuses to start if it is set | A separate milestone with its own review |
