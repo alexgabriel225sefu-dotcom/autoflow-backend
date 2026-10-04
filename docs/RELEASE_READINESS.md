@@ -126,7 +126,7 @@ One session on a real cTrader demo account, working through
 automates the read side of four of them and refuses to run against anything
 that is not a demo account. If they pass, gates 1, 2 and 12 close and this
 becomes **BETA READY**. Also needed:
-a Supabase project (X3) and a registered redirect URI (X4), both of which are
+a Supabase project (X3, now wired and answering) and a registered redirect URI (X4), both of which are
 configuration rather than work.
 
 Nothing in the code is known to be missing for those gates. They are unproven,
@@ -187,7 +187,12 @@ work moved towards it.
 ## The shortest path to a private beta
 
 1. **Owner:** D1-D3 are decided: the paid offer is a 499 USD one-time `founder_lifetime` unlock. D5 tax handling and D6 beta timing remain open, and checkout stays off until authenticated checkout, legal and refund policy are ready.
-2. **Owner:** create or name the production Supabase project (X3).
+2. ~~**Owner:** create or name the production Supabase project (X3)~~ — **done,
+   and it was done before this line was last read.** A real project is wired
+   into the deployed web bundle and answers; `/readyz` reports
+   `supabase: ok — URL and anon key are configured`. **Not claimed:** that a
+   sign-up completes end to end including the confirmation e-mail. That is
+   step 1 of the walk-through and nobody has run it.
 3. ~~**Owner:** register the production OAuth redirect URI in the cTrader
    portal (X4)~~ — **done.** Configured, and a real authorisation has
    completed through it.
