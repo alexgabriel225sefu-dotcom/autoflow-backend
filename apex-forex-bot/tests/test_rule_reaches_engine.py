@@ -80,18 +80,23 @@ BOOKKEEPING = {
 }
 
 REACHES_THE_ENGINE = {
-    "symbols",      # the FIRST one only
+    "symbols",       # the FIRST one only; the rest are reported as not applied
     "timeframe",
+    "sizing",        # risk_percent only; fixed volume is reported
+    "stopLoss",      # pips exactly; ATR switches the mode, not the multiple
+    "takeProfit",    # pips exactly; an RR target is reported
+    "trailingStop",  # on/off; the distance is the engine's
+    "breakEven",     # at R, or 0 for off
+    "limits",        # daily trades and spread cap; max positions is reported
 }
 
 RECORDED_ONLY = {
-    # Shown to the client as the terms of their rule. The loop does not read
-    # any of them. Each one that moves to REACHES_THE_ENGINE is a real
-    # improvement; each one that stays is something the screen must not
-    # present as governing the loop.
-    "evaluateOn", "entry", "exit", "sides", "order", "sizing",
-    "stopLoss", "takeProfit", "trailingStop", "breakEven", "limits",
-    "schedule",
+    # The loop reads none of these from the rule. Each one that moves up is a
+    # real improvement; each one that stays is something the screen must not
+    # present as governing the loop — and `engine_config.translate` must name
+    # it in `notApplied` so the client is told per rule rather than in
+    # general.
+    "evaluateOn", "entry", "exit", "sides", "order", "schedule",
 }
 
 print("\n[1] every field is accounted for")
@@ -172,30 +177,92 @@ check("the second instrument does not reach the engine",
       "XAUUSD" not in str(engine.get("symbol")),
       "if this now passes both, the rule page must stop implying one")
 
-print("\n[4] what does NOT cross — the terms the screen shows as the rule")
-for field, engine_key, rule_value in (
-    ("stopLoss.pips", "sl_pips", 77),
-    ("takeProfit.pips", "tp_pips", 155),
-    ("sizing.riskPercent", "risk", 0.25),
-    ("limits.maxOpenPositions", "maxpos", 1),
-    ("limits.maxDailyTrades", "max_trades_day", 2),
+print("\n[4] the rule's own terms now drive the loop")
+# Each of these differed from the account's stored setting, so a match proves
+# the rule's value crossed and did not merely happen to agree.
+for field, engine_key, want, was in (
+    ("sizing.riskPercent 0.25%", "risk", 0.0025, ENGINE_BEFORE["risk"]),
+    ("stopLoss 77 pips", "sl_pips", 77.0, ENGINE_BEFORE["sl_pips"]),
+    ("takeProfit 155 pips", "tp_pips", 155.0, ENGINE_BEFORE["tp_pips"]),
+    ("limits.maxDailyTrades 2", "max_trades_day", 2, ENGINE_BEFORE["max_trades_day"]),
 ):
-    before = ENGINE_BEFORE[engine_key]
-    now = engine.get(engine_key)
-    check(f"{field} does not reach the engine",
-          now == before,
-          f"the engine now holds {now!r}; if the rule's {rule_value!r} "
-          f"reached it, move this field to REACHES_THE_ENGINE and fix the "
-          f"rule page")
+    got = engine.get(engine_key)
+    check(f"{field} reaches the engine", got == want,
+          f"engine holds {got!r}, rule asked for {want!r}, account had {was!r}")
 
-check("trailingStop does not switch the engine's trailing off",
-      engine.get("trailing") is True,
-      "the rule says disabled and the engine still trails")
-check("breakEven does not reach the engine",
-      engine.get("breakeven_r") == 3.0, str(engine.get("breakeven_r")))
-check("the rule's schedule does not reach the engine's session filter",
+check("a pip stop switches ATR stops off",
+      engine.get("atr_stops") is False, str(engine.get("atr_stops")))
+check("the rule's trailing setting wins over the account's",
+      engine.get("trailing") is False,
+      f"the rule disables it, the account had {ENGINE_BEFORE['trailing']!r}")
+check("break even off is written as 0, not left alone",
+      engine.get("breakeven_r") == 0.0, str(engine.get("breakeven_r")))
+
+print("\n[4b] what still does NOT cross is REPORTED, not silent")
+from apex.platform import engine_config as _ecfg          # noqa: E402
+
+_applied, _missed = _ecfg.translate(_store.get(USER, rid))
+terms = {m["term"] for m in _missed}
+for term in ("Instruments", "Entry conditions", "Sides"):
+    check(f"{term!r} is named as not applied", term in terms, str(sorted(terms)))
+check("every reported term says WHY, in words a client can read",
+      all(len(m["why"]) > 40 for m in _missed),
+      str([m["term"] for m in _missed if len(m["why"]) <= 40]))
+check("the running record carries the report to the client",
+      {m["term"] for m in (AU.status(USER).get("notApplied") or [])} == terms,
+      str(AU.status(USER).get("notApplied")))
+
+print("\n[4b2] a term that does not map is NOT approximated")
+# The builder's own default rule uses an ATR stop and a 2R target, neither of
+# which the engine has a setting for. Applying something near enough — a pip
+# number derived from the R multiple, say — is the failure this module exists
+# to refuse: the client sees 2R on the screen and the engine trades a number
+# nobody chose. A mutation that did exactly that passed every other check
+# here, which is why this one asks directly.
+_default = _rd.blank(user_id=USER, account_id="901", symbols=["EURUSD"],
+                     timeframe="1h")
+_app, _miss = _ecfg.translate(_default)
+check("the builder's default target is an RR one",
+      _default["takeProfit"]["mode"] == "rr",
+      str(_default.get("takeProfit")))
+check("and NO pip target is invented from it",
+      "tp_pips" not in _app,
+      f"translate wrote tp_pips={_app.get('tp_pips')!r} for a rule that "
+      f"asked for {_default['takeProfit'].get('rr')}R")
+check("it is reported instead", "Take profit" in {m["term"] for m in _miss},
+      str(sorted(m["term"] for m in _miss)))
+check("the builder's default ATR stop writes no pip stop either",
+      "sl_pips" not in _app, f"sl_pips={_app.get('sl_pips')!r}")
+check("but it does switch the engine to ATR stops, which it CAN honour",
+      _app.get("atr_stops") is True, str(_app.get("atr_stops")))
+check("and the multiple it cannot honour is reported",
+      "Stop loss" in {m["term"] for m in _miss},
+      str(sorted(m["term"] for m in _miss)))
+
+print("\n[4c] the schedule still does not reach the session filter")
+check("and the account's own session filter is untouched",
       engine.get("session_filter") == ["LONDON"],
       str(engine.get("session_filter")))
+
+print("\n[4d] stopping puts the account's settings back")
+# Before this, a rule that ran once left its risk, stop and target on the
+# account for whatever ran next. With two terms that was untidy; with eight
+# it would mean a client who stopped a 0.25% rule still carries 0.25% risk.
+AU.stop(USER, stopper=lambda uid: True)
+restored = user_store.load(USER)
+for key in ("risk", "sl_pips", "tp_pips", "max_trades_day", "trailing",
+            "symbol", "timeframe"):
+    check(f"{key} is back to what the account had",
+          restored.get(key) == ENGINE_BEFORE[key],
+          f"{restored.get(key)!r}, was {ENGINE_BEFORE[key]!r}")
+check("and the loop is switched off", restored.get("active") is False,
+      str(restored.get("active")))
+check("the stopped record carries no stale report",
+      not AU.status(USER).get("notApplied"),
+      str(AU.status(USER).get("notApplied")))
+
+# Restart for the sections below, which expect a running loop.
+AU.start(USER, rid, starter=lambda uid: started.append(uid) or True)
 
 print("\n[5] the loop is not given the rule at all")
 # Not an inference from the fields above: the starter is called with the user
@@ -220,19 +287,26 @@ check("and the loop never reads a RuleDoc",
       "user_loop now mentions ruleDocId — if it reads one, this whole file "
       "is out of date and the rule page can start telling the truth")
 
-print("\n[6] the product must not claim otherwise")
-# The one place a client is told what their rule does. If the terms table
-# ever promises these drive the loop, it has to be here that it is caught.
+print("\n[6] the product tells the client which terms it will not act on")
+# Not a fixed sentence: which terms apply depends on the rule, so the screen
+# has to render the server's per-rule answer. A page that said "none of these
+# run" would now be as wrong as one that said they all do.
 terms = os.path.join(ROOT, "..", "web", "src", "components", "app",
                      "rule-summary.tsx")
-if os.path.exists(terms):
+page = os.path.join(ROOT, "..", "web", "src", "app", "(app)", "rules",
+                    "[id]", "page.tsx")
+for path in (terms, page):
+    check(f"{os.path.basename(path)} exists", os.path.exists(path), path)
+if os.path.exists(terms) and os.path.exists(page):
     body = open(terms, encoding="utf-8").read()
-    check("the rule terms carry a note that they are not all executed",
-          "not executed" in body.lower() or "recorded" in body.lower(),
-          "web/src/components/app/rule-summary.tsx shows every term as the "
-          "rule's own without saying which the loop actually reads")
-else:
-    check("the rule terms component was found", False, terms)
+    check("the terms component takes the server's per-rule answer",
+          "notApplied" in body, "RuleTerms cannot show what is not applied")
+    check("and renders each term's reason, not just its name",
+          "n.why" in body or "{n.term}" in body,
+          "the list is rendered without the explanation")
+    check("the rule page passes it down from the rule it loaded",
+          "notApplied" in open(page, encoding="utf-8").read(),
+          "the component can show it and the page never supplies it")
 
 shutil.rmtree(_TMP, ignore_errors=True)
 

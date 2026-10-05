@@ -167,50 +167,69 @@ function Conditions({
  * twenty, so the stop, the target and the risk a position would be opened
  * with were invisible.
  */
-/**
- * WHICH OF THESE TERMS ACTUALLY DRIVE THE RUNNING LOOP.
- *
- * Two of them. `automation.start` writes the rule's first instrument and its
- * timeframe into the engine's configuration and then starts the loop; the
- * loop reads nothing else from the rule. Every other row below is recorded on
- * the rule and does not reach the engine — it trades from the client's own
- * stored settings for stop, target, sizing and the rest.
- *
- * Named here rather than written out on each row, because the same table is
- * rendered on the rule page, in the builder's review step and in the editor,
- * and a caveat maintained in three places is a caveat that ends up in two.
- *
- * `apex-forex-bot/tests/test_rule_reaches_engine.py` measures this against a
- * real start and fails when it changes, in either direction. When a field is
- * wired through, move it here and the sentence below stops being true of it.
- */
-const DRIVES_THE_LOOP = ["Instruments", "Timeframe"] as const;
+/** One term the engine will not act on, and why — answered by the server
+ *  for this specific rule, because which terms apply depends on the rule. */
+export type NotApplied = { term: string; value?: string; why: string };
 
-function TermsScope() {
+/**
+ * WHAT THE ENGINE WILL ACTUALLY DO WITH THESE TERMS.
+ *
+ * Most of them now reach the loop: the risk percentage, a stop or target in
+ * pips, trailing, break even, the daily trade cap and the spread cap are
+ * written into the engine's settings when automation starts.
+ *
+ * Some do not, and WHICH ONES DEPENDS ON THE RULE — a stop in pips is applied
+ * exactly, the same stop expressed as an ATR multiple is not, because the
+ * engine has no per-rule setting for the multiple. A fixed sentence on this
+ * page cannot say that, so the server answers it per document
+ * (`apex/platform/engine_config.py`) and this renders the answer.
+ *
+ * When nothing is passed — the builder and the editor, where there is no
+ * saved rule to ask the server about — the note says the general shape and
+ * does not pretend to know the specifics.
+ */
+function TermsScope({ notApplied }: { notApplied?: NotApplied[] | null }) {
+  const list = notApplied ?? null;
   return (
     <div className="notice" role="note" style={{ marginBottom: "var(--sp-3)" }}>
       <p style={{ margin: 0 }}>
         <strong style={{ color: "var(--a4t-text)" }}>
-          What runs, and what is only recorded.
+          What the engine does with these terms.
         </strong>{" "}
-        Starting this rule sets the engine to trade{" "}
-        <strong style={{ color: "var(--a4t-text)" }}>
-          {DRIVES_THE_LOOP.join(" and ").toLowerCase()}
-        </strong>{" "}
-        from the terms below. The rest — the entry and exit conditions, the
-        stop, the target, the sizing and the limits — are stored on the rule
-        and are <strong style={{ color: "var(--a4t-text)" }}>not executed
-        </strong> in this release: the engine trades them from your account
-        settings instead. Carrying every term through to the engine is the
-        next milestone, and nothing here places a real order either way.
+        Starting this rule writes its instrument, timeframe, risk, stop,
+        target and limits into the engine, where the engine has a setting that
+        matches. Terms it cannot express are left out rather than approximated
+        {list === null
+          ? ", and this page names them once the rule is saved."
+          : list.length === 0
+            ? " — and for this rule there are none."
+            : ":"}
       </p>
+      {list && list.length > 0 ? (
+        <ul className="muted" style={{
+          fontSize: ".82rem", lineHeight: 1.6, margin: ".6rem 0 0",
+          paddingLeft: "1.1rem",
+        }}>
+          {list.map((n) => (
+            <li key={n.term}>
+              <strong style={{ color: "var(--a4t-text)" }}>{n.term}</strong>
+              {n.value ? <> (<span className="mono">{n.value}</span>)</> : null}
+              {" — "}{n.why}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
 
 export function RuleTerms({
-  doc, specs,
-}: { doc: Partial<RuleDoc>; specs?: Record<string, ConditionSpec> | null }) {
+  doc, specs, notApplied,
+}: {
+  doc: Partial<RuleDoc>;
+  specs?: Record<string, ConditionSpec> | null;
+  notApplied?: NotApplied[] | null;
+}) {
   const order = (doc.order ?? {}) as Record<string, unknown>;
   const limits = (doc.limits ?? {}) as Record<string, unknown>;
   const trail = (doc.trailingStop ?? {}) as Record<string, unknown>;
@@ -218,7 +237,7 @@ export function RuleTerms({
 
   return (
     <>
-      <TermsScope />
+      <TermsScope notApplied={notApplied} />
     <table className="tbl tbl-kv">
       <tbody>
         <Row k="Instruments" v={(doc.symbols as string[] | undefined)?.join(", ") || <span className="dim">none</span>} />

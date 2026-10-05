@@ -31,6 +31,7 @@ from apex.platform import automation as _auto
 from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
+from apex.platform import engine_config as _ecfg
 from apex.platform import entitlement as _ent
 from apex.platform import health as _health
 from apex.platform import identity as _id
@@ -514,7 +515,16 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         rid = m.group(1)
         if method == "GET":
-            return _ok({"rule": _store.get(p.user_id, rid)})
+            rule = _store.get(p.user_id, rid)
+            # WHICH OF THESE TERMS THE ENGINE WILL ACT ON, per rule.
+            #
+            # The screen lists every field as the rule's own. Some of them
+            # reach the loop and some do not, and which is which depends on
+            # the rule — a stop in pips is applied exactly, the same stop as
+            # an ATR multiple is not. A blanket sentence on the page cannot
+            # say that, so the server answers it for this document.
+            _applied, _missed = _ecfg.translate(rule)
+            return _ok({"rule": rule, "notApplied": _missed})
         if method == "PUT":
             doc = dict(_body(body))
             doc["ruleDocId"] = rid

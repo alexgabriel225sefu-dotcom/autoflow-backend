@@ -11,7 +11,9 @@ import { api, type ApiError, type AutomationState, type CandlesRead,
 import { invalidate, useRead } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
 import { ErrorNotice, LicencePill, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
-import { RuleSentence, RuleTerms, humanise } from "@/components/app/rule-summary";
+import {
+  RuleSentence, RuleTerms, humanise, type NotApplied,
+} from "@/components/app/rule-summary";
 import { TIMEFRAMES } from "@/components/app/rule-form";
 import { CandleChart, type ChartMarker } from "@/components/chart/candles";
 
@@ -109,7 +111,8 @@ function Verdict({ p, specs }: { p: PreviewResult; specs: Record<string, Conditi
 export default function RuleDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const rule = useRead<{ rule: RuleDoc }>(`rules/${id}`);
+  const rule = useRead<{ rule: RuleDoc; notApplied?: NotApplied[] }>(
+    `rules/${id}`);
   const me = useRead<Me>("me");
   const ct = useRead<CtraderStatus>("ctrader/status");
   const auto = useRead<AutomationState>("automation", 20_000);
@@ -559,7 +562,9 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
             Every field, including the ones left at their default
           </span>
         </div>
-        <RuleTerms doc={doc} specs={specs} />
+        <RuleTerms doc={doc} specs={specs}
+                   notApplied={rule.result?.ok
+                     ? rule.result.data.notApplied ?? [] : null} />
       </section>
     </main>
   );

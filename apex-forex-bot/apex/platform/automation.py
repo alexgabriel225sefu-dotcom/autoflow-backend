@@ -31,6 +31,7 @@ import uuid
 from apex import user_store
 from apex.platform import ctrader_link as _link
 from apex.platform import emergency as _emerg
+from apex.platform import engine_config as _ecfg
 from apex.platform import entitlement as _ent
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
@@ -82,7 +83,14 @@ def status(user_id):
     return {"status": "ok", "state": rec.get("state", STOPPED),
             "ruleDocId": rec.get("ruleDocId"), "mode": rec.get("mode"),
             "startedAt": rec.get("startedAt"),
-            "updatedAt": rec.get("updatedAt")}
+            "updatedAt": rec.get("updatedAt"),
+            # The terms of the running rule that this release does NOT act
+            # on, each with its reason. Carried to the browser because the
+            # alternative is a screen listing settings the loop ignores, with
+            # nothing to tell them apart. `engineSnapshot` is deliberately
+            # absent: it is the account's previous settings, which is state
+            # for stop() to use and not something to render.
+            "notApplied": rec.get("notApplied") or []}
 
 
 def _preflight(user_id, rule_doc_id, *, mode_lister=None):
@@ -220,11 +228,20 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
     # selected account is DEMO, and _make_broker derives the mode from that
     # same connection rather than from a stored boolean that could drift.
     try:
-        user_store.update(user_id, {
-            "active": True,
-            "symbol": (rule.get("symbols") or [None])[0],
-            "timeframe": rule.get("timeframe"),
-        })
+        # THE RULE'S TERMS, NOT JUST ITS INSTRUMENT.
+        #
+        # This wrote `symbol` and `timeframe` and nothing else, so a client
+        # who set 1% risk and a 25-pip stop got whatever their account held
+        # — four times the risk, in the case this was found on.
+        # `engine_config.translate` carries across every term that maps to a
+        # setting the loop reads, and returns the ones that do not so the
+        # client can be told rather than left to assume.
+        applied, not_applied = _ecfg.translate(rule)
+        # Captured BEFORE the write, so stop() can put back what was there.
+        # Without it a rule that ran once leaves its settings behind for
+        # whatever runs next.
+        snapshot = _ecfg.snapshot_of(user_store.load(user_id))
+        user_store.update(user_id, dict(applied, active=True))
     except Exception as e:  # noqa: BLE001
         raise AutomationRefused("STORE_UNAVAILABLE",
                                 f"the account settings could not be saved "
@@ -244,7 +261,14 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
     out = _write(user_id, {"state": RUNNING, "ruleDocId": rule_doc_id,
                            "mode": DEMO, "startedAt": now,
                            "accountId": conn.get("ctid"),
-                           "correlationId": corr})
+                           "correlationId": corr,
+                           # Kept on the automation record, not recomputed on
+                           # read: the rule can be edited into a new version
+                           # while this one runs, and what the client needs to
+                           # see is what the RUNNING loop was given.
+                           "appliedTerms": applied,
+                           "notApplied": not_applied,
+                           "engineSnapshot": snapshot})
     _jstore.record_automation(
         _jstore._j.AUTOMATION_STARTED, correlation_id=corr, user_id=user_id,
         account_id=str(conn.get("ctid")), rule_doc_id=rule_doc_id,
@@ -362,8 +386,21 @@ def stop(user_id, *, stopper=None):
         _jstore._j.AUTOMATION_STOPPED, correlation_id=uuid.uuid4().hex,
         user_id=user_id, account_id=str(rec.get("accountId") or ""),
         rule_doc_id=rec.get("ruleDocId"))
+    # Put the account's settings back the way the start found them. A rule
+    # that ran once used to leave its risk, stop and target behind for
+    # whatever ran next, which was already true of the instrument and the
+    # timeframe before any of the other terms were carried across.
+    try:
+        user_store.update(user_id,
+                          _ecfg.restore_patch(rec.get("engineSnapshot")))
+    except Exception:                                       # noqa: BLE001
+        # Best effort. A restore that fails must not fail a stop that has
+        # already halted the loop — the loop being stopped is the thing that
+        # mattered, and the settings are visible and editable.
+        pass
     _write(user_id, {"state": STOPPED, "ruleDocId": None, "mode": None,
-                     "startedAt": None})
+                     "startedAt": None, "appliedTerms": None,
+                     "notApplied": None, "engineSnapshot": None})
     ans = _flatten_answer(rec)
     _notify.notify(user_id, type=_notify.SYSTEM, title="Automation stopped",
                    body="The trading loop has been stopped. "
