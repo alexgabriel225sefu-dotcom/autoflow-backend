@@ -682,6 +682,70 @@ def get_blob_strict(key):
     return _redis_get_strict(key)
 
 
+def scan_keys(pattern, *, limit=100000):
+    """Every key matching `pattern`, or raise if the store could not be asked.
+
+    SCAN, never KEYS: KEYS blocks the server for the length of the keyspace,
+    and this runs against production during a backup.
+
+    It RAISES rather than returning [] when the store is unreachable. An empty
+    list is "there is nothing there", which a backup would faithfully record
+    as a snapshot of nothing and then happily restore over a live store. That
+    is the one failure mode a backup must not have.
+
+    `limit` is a guard, not a page size. Hitting it means the keyspace is
+    larger than this was built for, which the caller has to know about rather
+    than silently truncate a backup at.
+    """
+    if not _USE_REDIS:
+        raise StoreUnavailable("no shared store to scan")
+    out, cursor = [], "0"
+    while True:
+        if _BACKEND == "redis":
+            try:
+                cursor, batch = _r.scan(cursor=int(cursor), match=pattern,
+                                        count=500)
+                cursor = str(cursor)
+            except Exception as e:
+                raise StoreUnavailable(f"SCAN failed: {e}") from e
+        else:
+            res = _upstash_strict(["SCAN", cursor, "MATCH", pattern,
+                                   "COUNT", "500"])
+            if not isinstance(res, list) or len(res) != 2:
+                raise StoreUnavailable(f"SCAN returned {res!r}")
+            cursor, batch = str(res[0]), (res[1] or [])
+        out.extend(k.decode() if isinstance(k, bytes) else str(k) for k in batch)
+        if len(out) > limit:
+            raise StoreUnavailable(
+                f"more than {limit} keys match {pattern!r} — refusing to "
+                f"truncate a backup silently")
+        if cursor == "0":
+            # SCAN may return the same key twice across iterations; a backup
+            # that wrote one twice would be harmless but a count that is wrong
+            # is not, because it is what a drill compares against.
+            return sorted(set(out))
+
+
+def key_type(key):
+    """Redis TYPE, or None when the store could not say.
+
+    A backup has to know whether a key is a string or a set, because the two
+    are read and written by different commands and guessing wrong loses the
+    value.
+    """
+    if not _USE_REDIS:
+        return None
+    if _BACKEND == "redis":
+        try:
+            t = _r.type(key)
+            return t.decode() if isinstance(t, bytes) else str(t)
+        except Exception as e:
+            print(f"[Redis] TYPE failed: {e}")
+            return None
+    res = _upstash(["TYPE", key])
+    return str(res) if res else None
+
+
 def del_blob(key):
     """Remove `key`. Returns how many keys were removed, or None on failure.
 

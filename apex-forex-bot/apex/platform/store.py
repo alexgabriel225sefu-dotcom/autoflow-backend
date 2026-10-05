@@ -114,6 +114,69 @@ def _write(key, doc):
             f.write(raw)
 
 
+def namespace_prefix():
+    """Everything this module and its siblings write lives under this.
+
+    Named rather than spelled out at each call site because the backup has to
+    ask for exactly this set and nothing else — a prefix that drifts from the
+    one the writers use is a backup that misses a table.
+    """
+    return f"{_ns()}:{_P}:"
+
+
+def all_keys():
+    """Every platform key, from whichever backend is in use.
+
+    The shared store is scanned. The file fallback is listed and the key is
+    reconstructed from the filename, which is why `_local_path`'s mangling is
+    a single reversible substitution and not a hash.
+    """
+    if user_store._USE_REDIS:
+        return user_store.scan_keys(f"{namespace_prefix()}*")
+    d = os.path.join(user_store._DIR, _P)
+    if not os.path.isdir(d):
+        return []
+    out = []
+    for name in os.listdir(d):
+        if not name.endswith(".json"):
+            continue
+        key = name[:-len(".json")].replace("__", ":")
+        if key.startswith(namespace_prefix()):
+            out.append(key)
+    return sorted(out)
+
+
+def read_raw(key):
+    """The stored value at `key`, as a string, or None.
+
+    Used by the backup, which must not decode: a value is written back exactly
+    as it was read, so a record this version of the code does not understand
+    still survives a round trip.
+    """
+    return _raw(key, strict=True)
+
+
+def write_raw(key, raw):
+    if user_store._USE_REDIS:
+        user_store.set_blob(key, raw)
+        return
+    with open(_local_path(key), "w") as f:
+        f.write(raw)
+
+
+def is_set(key):
+    """True if `key` holds a set rather than a string.
+
+    On the file backend the two are both JSON files, and a set is the only
+    thing written as a bare JSON array — `_set_add` writes `[...]` and
+    `_write` writes an object.
+    """
+    if user_store._USE_REDIS:
+        return user_store.key_type(key) == "set"
+    raw = _raw(key, strict=False)
+    return bool(raw) and raw.lstrip().startswith("[")
+
+
 def _delete(key):
     """Remove whatever is stored at `key`. True only if something was there.
 

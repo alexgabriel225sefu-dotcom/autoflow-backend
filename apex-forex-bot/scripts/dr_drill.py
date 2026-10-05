@@ -35,8 +35,17 @@ from apex import backup, user_store  # noqa: E402
 FAIL = []
 
 
-def step(name, ok, detail=""):
-    print(f"  {'✅' if ok else '❌'} {name}" + (f"  {detail}" if detail else ""))
+def step(name, ok, detail="", on_fail=""):
+    """`detail` is shown either way; `on_fail` only when the check failed.
+
+    They used to be one argument, which printed a sentence explaining a
+    failure next to a green tick — "✅ credential decrypts  still ciphertext —
+    is TOKEN_ENCRYPTION_KEY the one that wrote it?". On the one output an
+    operator reads during a recovery, that is the worst place for a line that
+    passes and reads as a warning.
+    """
+    print(f"  {'✅' if ok else '❌'} {name}" + (f"  {detail}" if detail else "")
+          + (f"  {on_fail}" if on_fail and not ok else ""))
     if not ok:
         FAIL.append(name)
     return ok
@@ -53,8 +62,20 @@ def main():
 
     print("\n1. Dump production (read only)")
     snap = backup.dump()
-    step("dumped", bool(snap["users"]), json.dumps(snap["counts"]))
-    if not snap["users"]:
+    plat = snap.get("platform") or {"strings": {}, "sets": {}}
+    n_plat = len(plat.get("strings") or {}) + len(plat.get("sets") or {})
+    step("dumped", bool(snap["users"]) or bool(n_plat), json.dumps(snap["counts"]))
+    if snap.get("platform_error"):
+        step("the platform namespace was readable", False, snap["platform_error"])
+        print("\n⛔ Rules, licences, broker links and the early-access list are "
+              "NOT in this snapshot. Do not treat it as a backup.")
+        return 1
+    # Not `if not snap["users"]`. The engine's user records and the platform's
+    # own namespace are separate, and a deployment can legitimately have the
+    # second and not the first — which is what this one looks like while the
+    # legacy bot is untouched and the platform is where the clients are. The
+    # old test would have called a full platform backup "nothing to restore".
+    if not snap["users"] and not n_plat:
         print("   nothing to restore — is PRODUCT set correctly?")
         return 1
 
@@ -108,12 +129,43 @@ def main():
             if tok:
                 step(f"user {uid} credential decrypts",
                      not str(tok).startswith("enc:"),
-                     "still ciphertext — is TOKEN_ENCRYPTION_KEY the one that "
-                     "wrote it?")
+                     on_fail="still ciphertext — is TOKEN_ENCRYPTION_KEY the "
+                             "one that wrote it?")
             rows = user_store.load_trades(uid)
             step(f"user {uid} journal restored",
                  len(rows) == len(snap["journals"].get(uid, [])),
                  f"{len(rows)} rows")
+
+        print("\n6. The platform came back, not just the engine")
+        # Counted by kind, because "4,312 keys restored" says nothing about
+        # whether anybody still has a rule. These are the records a client
+        # would notice the absence of within one screen.
+        from apex.platform import store as _pstore          # noqa: E402
+        pfx = _pstore.namespace_prefix()
+        kinds = {"rule": "rules", "rulev": "frozen versions",
+                 "licence": "licences", "ctrader": "broker links",
+                 "jentry": "journal entries", "waitlist": "early-access"}
+        def _records(keys, kind):
+            # The per-owner indexes live under the same prefix as the records
+            # they index (`rules:` beside `rule:`, `waitlist:index` beside the
+            # addresses). Counting them as records made the early-access line
+            # read "5 of 4" against four sign-ups. Sets are counted separately
+            # just below, where they belong.
+            head = f"{pfx}{kind}:"
+            return sum(1 for k in keys
+                       if k.startswith(head) and not k.endswith(":index"))
+
+        for kind, label in kinds.items():
+            want = _records(plat["strings"], kind)
+            got = _records(_pstore.all_keys(), kind)
+            if not want:
+                print(f"   {label}: none in the snapshot")
+                continue
+            step(f"{label} restored", got >= want, f"{got} of {want}")
+        for key in plat["sets"]:
+            step(f"index {key.rsplit(':', 2)[-2]} restored as a set",
+                 _pstore.is_set(key) or bool(_pstore._set_members(key)),
+                 key)
     finally:
         user_store._USE_REDIS, user_store._DIR = _use, _dir
         shutil.rmtree(target, ignore_errors=True)

@@ -52,6 +52,7 @@ Usage:
     python -m apex.backup verify < apex-backup-2026-08-15.json
 """
 import json
+import re
 import sys
 import time
 
@@ -62,6 +63,33 @@ FORMAT_VERSION = 1
 # Key namespaces that are runtime coordination, not state. Never restored.
 REBUILDABLE_PREFIXES = ("own:user:", "cmdseen:", "cmdresult:", "commands",
                         "mcp_heartbeat", "oauth:state:", "order:")
+
+# The same idea, one namespace down. These are platform keys that exist only
+# for the length of an operation, and restoring one is worse than losing it:
+#
+#   ctlink:pending:  a half-finished OAuth authorisation. Restoring it revives
+#                    a nonce the user abandoned.
+#   ctlink:used:     the replay guard for a nonce that was already spent. It
+#                    expires on its own; a restored one guards nothing.
+#   autolock:        a control lock. A restored lock belongs to a request that
+#                    finished before the outage.
+#   notifylock:      the same, for the notification writer.
+#   jlock:           the same, for the journal writer. A restored journal lock
+#                    blocks the writer that the journal exists to record.
+PLATFORM_REBUILDABLE = ("ctlink:pending:", "ctlink:used:", "autolock:",
+                        "notifylock:", "jlock:")
+
+
+def _platform_rebuildable(key):
+    """True for a platform key that must not be restored.
+
+    Matched against the part AFTER the namespace prefix, so the test is about
+    what the key is for rather than about where the deployment put it.
+    """
+    from apex.platform import store as _pstore
+    prefix = _pstore.namespace_prefix()
+    tail = key[len(prefix):] if key.startswith(prefix) else key
+    return tail.startswith(PLATFORM_REBUILDABLE)
 
 
 def _ns():
@@ -129,10 +157,51 @@ def dump():
     except Exception as e:
         print(f"[Backup] audit log unreadable: {e}", file=sys.stderr)
 
+    # ── the platform's own namespace ────────────────────────────────────────
+    # Rules and their frozen versions, licences, broker links, platform
+    # journals, notifications, automation state and the early-access list all
+    # live under `{ns}:a4t:`, which the loop above does not touch — it reads
+    # `{ns}:user:{uid}` and the engine's journals, and nothing else.
+    #
+    # A backup without this section restores clients who have their settings
+    # back and no rules, no licence and no broker link. Worse, it loses the
+    # FROZEN versions, so every journal entry that survives points at terms
+    # that no longer exist — the one thing platform/store.py is built to
+    # prevent, undone by the recovery.
+    #
+    # Values are copied verbatim, never decoded. A record written by a newer
+    # version of the code still survives the round trip, and the encrypted
+    # broker tokens inside stay encrypted for the same reason the user records
+    # above do.
+    out["platform"] = {"strings": {}, "sets": {}}
+    out["platform_error"] = None
+    try:
+        from apex.platform import store as _pstore
+        for key in _pstore.all_keys():
+            if _platform_rebuildable(key):
+                continue
+            if _pstore.is_set(key):
+                out["platform"]["sets"][key] = sorted(
+                    str(m) for m in (user_store._redis_smembers(key) or [])
+                ) if user_store._USE_REDIS else json.loads(
+                    _pstore.read_raw(key) or "[]")
+            else:
+                raw = _pstore.read_raw(key)
+                if raw is not None:
+                    out["platform"]["strings"][key] = raw
+    except Exception as e:
+        # Recorded, never swallowed. A dump that could not read the platform
+        # namespace is not a dump with an empty platform — and verify() has to
+        # be able to tell those apart before anyone restores from it.
+        out["platform_error"] = f"{type(e).__name__}: {e}"
+        print(f"[Backup] platform namespace unreadable: {e}", file=sys.stderr)
+
     out["counts"] = {"users": len(out["users"]),
                      "journals": sum(len(v) for v in out["journals"].values()),
                      "access": len(out["access"]),
-                     "audit": len(out["audit"])}
+                     "audit": len(out["audit"]),
+                     "platform": (len(out["platform"]["strings"])
+                                  + len(out["platform"]["sets"]))}
     return out
 
 
@@ -167,7 +236,72 @@ def verify(snapshot):
     for uid, rows in (snapshot.get("journals") or {}).items():
         if not isinstance(rows, list):
             problems.append(f"journal for {uid} is not a list")
+
+    # A dump that COULD NOT READ the platform namespace and one where the
+    # namespace is genuinely empty produce the same `platform` section and
+    # must not produce the same verdict. Restoring the first over a live store
+    # replaces every rule and licence with nothing.
+    if snapshot.get("platform_error"):
+        problems.append(
+            f"the platform namespace could not be read when this backup was "
+            f"taken ({snapshot['platform_error']}) — rules, licences, broker "
+            f"links and the early-access list are NOT in it")
+    plat = snapshot.get("platform")
+    if plat is None:
+        problems.append(
+            "no platform section — this backup predates platform support and "
+            "restoring it would lose every rule, licence and broker link")
+        plat = {}
+    elif not isinstance(plat, dict) or not isinstance(plat.get("strings"), dict) \
+            or not isinstance(plat.get("sets"), dict):
+        problems.append("platform section is not {strings: {}, sets: {}}")
+        plat = {}
+    for key, raw in (plat.get("strings") or {}).items():
+        if not isinstance(raw, str):
+            problems.append(f"platform {key} is not a stored string")
+            continue
+        # The broker link record carries the cTrader tokens. Same rule as the
+        # user records above: a backup that decrypted on the way out is a
+        # credential file.
+        if ":ctrader:" in key:
+            for field in ("accessToken", "refreshToken"):
+                m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', raw)
+                if m and m.group(1) and not m.group(1).startswith(
+                        user_store._ENC_PREFIX):
+                    problems.append(
+                        f"platform {key}: {field} is NOT encrypted in this backup")
     return (not problems), problems
+
+
+
+def _pstore_write(key, raw):
+    from apex.platform import store as _pstore
+    _pstore.write_raw(key, raw)
+
+
+def _pstore_write_set(key, members):
+    """Replace a platform SET with exactly the members in the snapshot.
+
+    Replace, not add: a restore onto a store that still holds a partial set
+    would otherwise leave members the backup never knew about — for the rule
+    index that means a rule id with no document behind it, which `list_docs`
+    skips quietly and a reader never learns about.
+
+    READ BACK, because `_set_add` answers None on a failed write and prints.
+    A rule index that did not restore leaves every rule present and none of
+    them listable, which looks to the client exactly like having no rules at
+    all. That is the same silent failure the active-set restore above already
+    refuses to report as success.
+    """
+    from apex.platform import store as _pstore
+    want = sorted({str(m) for m in members})
+    _pstore._delete(key)
+    for m in want:
+        _pstore._set_add(key, m)
+    got = sorted({str(m) for m in _pstore._set_members(key)})
+    if got != want:
+        raise RuntimeError(
+            f"set did not read back: wrote {len(want)}, found {len(got)}")
 
 
 def restore(snapshot, dry_run=False):
@@ -187,14 +321,18 @@ def restore(snapshot, dry_run=False):
         "users": len(snapshot.get("users") or {}),
         "journals": sum(len(v or []) for v in (snapshot.get("journals") or {}).values()),
         "access": len(snapshot.get("access") or []),
+        "platform": sum(
+            1 for section in ("strings", "sets")
+            for k in ((snapshot.get("platform") or {}).get(section) or {})
+            if not _platform_rebuildable(k)),
     }
     # One shape, always. The early-return path used to omit `restored` and
     # `failed`, so any caller that read the report uniformly — a drill script,
     # a monitoring hook — crashed on the failure case instead of reporting it.
     # A report that is only well-formed when things went well is not a report.
-    zero = {"users": 0, "journals": 0, "access": 0}
+    zero = {"users": 0, "journals": 0, "access": 0, "platform": 0}
     report = {"verified": ok, "problems": problems, "users": 0, "journals": 0,
-              "access": 0, "skipped": [], "dry_run": bool(dry_run),
+              "access": 0, "platform": 0, "skipped": [], "dry_run": bool(dry_run),
               "expected": expected, "restored": dict(zero),
               "failed": dict(expected), "result": "FAILED"}
     if not ok:
@@ -262,6 +400,36 @@ def restore(snapshot, dry_run=False):
         except Exception as e:
             report["skipped"].append(f"access {uid}: {str(e)[:120]}")
 
+    # ── the platform namespace ──────────────────────────────────────────────
+    # Written verbatim, for the same reason the user records are: these values
+    # were read without decoding and a re-encode would re-encrypt ciphertext.
+    # The rebuildable keys are filtered again here rather than trusted to have
+    # been filtered at dump time, because a restore may be fed a snapshot this
+    # version of the code did not write.
+    plat = snapshot.get("platform") or {}
+    for key, raw in (plat.get("strings") or {}).items():
+        if _platform_rebuildable(key):
+            continue
+        if dry_run:
+            report["platform"] += 1
+            continue
+        try:
+            _pstore_write(key, raw)
+            report["platform"] += 1
+        except Exception as e:
+            report["skipped"].append(f"platform {key}: {str(e)[:120]}")
+    for key, members in (plat.get("sets") or {}).items():
+        if _platform_rebuildable(key):
+            continue
+        if dry_run:
+            report["platform"] += 1
+            continue
+        try:
+            _pstore_write_set(key, members or [])
+            report["platform"] += 1
+        except Exception as e:
+            report["skipped"].append(f"platform {key}: {str(e)[:120]}")
+
     # READ BACK. A write that reported success and is not there is the failure
     # mode a restore cannot afford to discover later, so every user record is
     # loaded again and compared. Skipped here rather than in dry-run, which
@@ -276,7 +444,7 @@ def restore(snapshot, dry_run=False):
                 report["skipped"].append(f"user {uid}: readback failed ({str(e)[:80]})")
                 report["users"] = max(0, report["users"] - 1)
 
-    got = {k: report[k] for k in ("users", "journals", "access")}
+    got = {k: report[k] for k in ("users", "journals", "access", "platform")}
     report["restored"] = got
     report["failed"] = {k: max(0, expected[k] - got[k]) for k in expected}
     total_missing = sum(report["failed"].values())

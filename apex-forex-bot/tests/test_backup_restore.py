@@ -73,6 +73,33 @@ try:
           on_disk["ctrader_access_token"].startswith("enc:"),
           on_disk["ctrader_access_token"][:20])
 
+    print("\n1b. The PLATFORM's own state goes in too")
+    # Everything the platform is, lives under a different namespace from the
+    # engine's user records. A backup that only knows about `{ns}:user:*`
+    # restores clients who have no rules, no licence, no broker link and no
+    # waitlist — and reports success doing it.
+    from apex.platform import licence as _lic               # noqa: E402
+    from apex.platform import ruledoc as _rd                # noqa: E402
+    from apex.platform import store as _pstore              # noqa: E402
+    from apex.platform import waitlist as _wait             # noqa: E402
+
+    OWNER = "11111111-2222-4333-8444-555555555555"
+    doc = _rd.blank(user_id=OWNER, account_id="47765456",
+                    symbols=["EURUSD"], timeframe="1h")
+    doc["name"] = "Backed-up rule"
+    doc["entry"]["conditions"] = [{"id": "rsi", "period": 14,
+                                   "op": "above", "value": 55}]
+    RID = doc["ruleDocId"]
+    _pstore.create(OWNER, doc)
+    _pstore.activate(OWNER, RID, known_condition_ids={"rsi"})
+    _lic.grant(OWNER, plan="paid_live")
+    _wait.join("backed-up@example.com", source="landing")
+    check("a rule exists to lose", _pstore.get(OWNER, RID)["name"] == "Backed-up rule")
+    check("and a frozen version the journal points at",
+          _pstore.get_version(OWNER, RID, 1)["state"] == "active")
+    check("and a licence", _lic.status_for(OWNER).get("plan") == "paid_live")
+    check("and somebody on the waitlist", _wait.count() >= 1)
+
     print("\n2. The dump does not decrypt")
     snap = backup.dump()
     check("the user is in the snapshot", UID in snap["users"])
@@ -122,6 +149,108 @@ try:
     rows = user_store.load_trades(UID)
     check("the journal survived intact", len(rows) == 2 and rows[0]["netPnl"] == 12.5,
           rows)
+
+    print("\n5b. So did the platform's state — rules, versions, licence, list")
+    # This is the half that makes the product the product. A client whose
+    # settings came back and whose RULES did not has nothing to run, and a
+    # frozen version that did not come back leaves every journal entry
+    # pointing at terms that no longer exist — the one thing store.py was
+    # written to prevent.
+    def _gone(fn):
+        """A record that is absent must FAIL a check, not end the run.
+
+        store.get() raises NotFound, which is right for the product and wrong
+        here: the first missing record would abort before the others were
+        asked about, and the report would name one casualty instead of all of
+        them.
+        """
+        try:
+            return fn()
+        except Exception as e:
+            return {"__missing__": f"{type(e).__name__}: {e}"}
+
+    r_back = _gone(lambda: _pstore.get(OWNER, RID))
+    check("the rule came back", r_back.get("name") == "Backed-up rule", r_back)
+    check("with its entry conditions",
+          (r_back.get("entry") or {}).get("conditions", [{}])[0].get("id") == "rsi",
+          r_back.get("entry") or r_back)
+    listed = _gone(lambda: [d["ruleDocId"] for d in _pstore.list_docs(OWNER)])
+    check("the owner's rule index came back, so the rule is listable",
+          listed == [RID], listed)
+    v1 = _gone(lambda: _pstore.get_version(OWNER, RID, 1))
+    check("the FROZEN version came back — the journal points at it",
+          v1.get("state") == "active" and v1.get("version") == 1, v1)
+    check("the licence came back",
+          _lic.status_for(OWNER).get("plan") == "paid_live",
+          _lic.status_for(OWNER))
+    check("the waitlist came back",
+          "backed-up@example.com" in [e["email"] for e in _wait.export()["entries"]],
+          [e["email"] for e in _wait.export()["entries"]])
+
+    print("\n5c. A platform lock or a half-finished OAuth is NOT restored")
+    # Same rule as the ownership leases below, one namespace down. A restored
+    # journal lock blocks the writer the journal exists to record, and a
+    # restored OAuth nonce revives an authorisation the user walked away from.
+    _pfx = _pstore.namespace_prefix()
+    for tail in ("ctlink:pending:abc", "ctlink:used:abc", "autolock:u1",
+                 "notifylock:u1", "jlock:u1"):
+        check(f"{tail} is declared rebuildable",
+              backup._platform_rebuildable(_pfx + tail), tail)
+    check("a real record is NOT declared rebuildable, so the filter is not "
+          "simply 'everything'",
+          not backup._platform_rebuildable(_pfx + f"rule:{OWNER}:{RID}"))
+
+    _pstore._write(_pfx + "jlock:u1", {"held": "by a request that is over"})
+    _pstore._write(_pfx + "ctlink:pending:abc", {"nonce": "abandoned"})
+    snap_locks = backup.dump()
+    check("a lock is not even carried in the dump",
+          not any("jlock:" in k for k in snap_locks["platform"]["strings"]),
+          [k for k in snap_locks["platform"]["strings"] if "lock" in k])
+    check("nor is a pending authorisation",
+          not any("ctlink:pending:" in k for k in snap_locks["platform"]["strings"]))
+
+    print("\n5d. The platform's own encrypted values stay encrypted")
+    # The broker link record holds the cTrader tokens. The user records above
+    # are already checked for this; the platform's copy is a second place the
+    # same mistake can be made, and nothing was checking it.
+    CT_TOKEN = "platform-ctrader-access-token"
+    _pstore._write(_pfx + f"ctrader:{OWNER}", {
+        "accessToken": user_store.encrypt_value(CT_TOKEN),
+        "refreshToken": user_store.encrypt_value("refresh-value"),
+        "ctid": 47765456, "mode": "demo"})
+    snap_ct = backup.dump()
+    check("the plaintext broker token appears NOWHERE in the dump",
+          CT_TOKEN not in json.dumps(snap_ct),
+          "a backup file would be a credential dump")
+    ok_ct, _ = backup.verify(snap_ct)
+    check("and a snapshot carrying encrypted tokens verifies", ok_ct)
+    leaked = json.loads(json.dumps(snap_ct))
+    leaked["platform"]["strings"][_pfx + f"ctrader:{OWNER}"] = json.dumps(
+        {"accessToken": CT_TOKEN, "refreshToken": "x"})
+    ok_leak, probs_leak = backup.verify(leaked)
+    check("a snapshot with a DECRYPTED broker token is refused", not ok_leak)
+    check("and says which field",
+          any("accessToken is NOT encrypted" in p for p in probs_leak),
+          probs_leak)
+
+    print("\n5e. A backup with no platform section is refused, not trusted")
+    # The dangerous case is not a corrupt file; it is a file written by the
+    # version of this code that did not know the platform existed. Restoring
+    # one would look like success and leave the product empty.
+    old_style = json.loads(json.dumps(snap))
+    old_style.pop("platform", None)
+    ok_old, probs_old = backup.verify(old_style)
+    check("a snapshot predating platform support does not verify", not ok_old)
+    check("and says what would be lost",
+          any("every rule, licence and broker link" in p for p in probs_old),
+          probs_old)
+    unread = json.loads(json.dumps(snap))
+    unread["platform_error"] = "StoreUnavailable: SCAN failed"
+    ok_unread, probs_unread = backup.verify(unread)
+    check("a dump that COULD NOT READ the namespace is refused too",
+          not ok_unread, "an unreadable namespace must not pass as an empty one")
+    check("and says so", any("could not be read" in p for p in probs_unread),
+          probs_unread)
 
     print("\n6. Runtime coordination data is NOT restored")
     for prefix in ("own:user:", "cmdseen:", "cmdresult:", "mcp_heartbeat"):
@@ -204,7 +333,8 @@ try:
         check(f"a FAILED report still carries {k}", k in rep_bad, sorted(rep_bad))
     check("and it says FAILED", rep_bad["result"] == "FAILED", rep_bad["result"])
     check("with everything counted as failed",
-          rep_bad["restored"] == {"users": 0, "journals": 0, "access": 0},
+          rep_bad["restored"] == {"users": 0, "journals": 0, "access": 0,
+                                  "platform": 0},
           rep_bad["restored"])
     check("the DR drill ships as a runnable script",
           os.path.exists(os.path.join(

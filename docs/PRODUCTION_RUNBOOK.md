@@ -347,14 +347,49 @@ order. To re-enable, `grant()` with the plan.
 The state that matters lives in the shared backend: rule documents and their
 versions, the journal, notifications, licences, and encrypted broker links.
 
-- **Backup:** the Redis/Upstash provider's own snapshot mechanism.
-- **Recovery:** restore the snapshot; the application is stateless between
-  requests. Rate-limit counters live in the same backend and expire on their
-  own TTL, so a restore may reinstate a window that has already passed — it
-  clears itself within one window and needs no action.
-- **Not yet done:** a restore has not been exercised against this deployment.
-  Until it has, the backup is a plan and not a guarantee. This is listed as a
-  production-launch gate in `docs/RELEASE_READINESS.md`.
+There are **two** mechanisms, and they are not interchangeable.
+
+- **The provider's snapshot** (Redis/Upstash). Covers the whole keyspace,
+  because it is taken below the application. Recovery is to restore the
+  snapshot; the application is stateless between requests. Rate-limit counters
+  live in the same backend and expire on their own TTL, so a restore may
+  reinstate a window that has already passed — it clears itself within one
+  window and needs no action.
+- **The application-level backup**, `python -m apex.backup dump|verify|restore`
+  and `scripts/dr_drill.py`. Portable, readable, and restorable into a
+  different deployment, which the provider snapshot is not.
+
+**Until 2026-10-05 the application-level backup silently covered only half the
+product.** `dump()` read `{ns}:user:*`, the engine journals, access and audit —
+and never the `{ns}:a4t:` namespace, which is every rule, every frozen version,
+every licence, every encrypted broker link and the whole early-access list. A
+restore from such a file brought back clients with their settings intact and
+nothing to run, and reported COMPLETE doing it. Worst of all it lost the frozen
+versions, which is what the journal points at: the surviving entries would have
+described terms that no longer existed.
+
+That is fixed, and a snapshot taken by the older code now **fails `verify()`**
+rather than restoring as if it were whole. If you are holding a dump file
+written before that date, it is not a backup of this product.
+
+- **Exercised:** the full drill — dump, verify, restore, content check — has
+  been run end to end against a real Redis with rules, frozen versions,
+  licences, broker links and waitlist entries, and passes. Locks and
+  half-finished OAuth authorisations are deliberately excluded and were
+  confirmed absent from the dump.
+- **Still not done:** it has **not** been run against this deployment's own
+  data. Run it from the API service's shell, where the credentials live:
+
+  ```
+  cd ~/project/src/apex-forex-bot && python3 scripts/dr_drill.py
+  ```
+
+  Production is read-only throughout; the restore half writes into a temporary
+  directory with the shared backend forced off. Exit code 0 means pass. It
+  writes a snapshot to the system temp directory that holds licence keys —
+  delete it afterwards. This is the production-launch gate X8 in
+  `docs/RELEASE_READINESS.md`, and it stays open until that command has been
+  run here.
 
 ## 13. Secret and log redaction
 
