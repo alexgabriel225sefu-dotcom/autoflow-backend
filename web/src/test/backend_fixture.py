@@ -93,6 +93,21 @@ from apex import user_loop, user_store  # noqa: E402
 # The engine is not started for real: this test is about the web layer, and a
 # live trading loop has no business inside it.
 user_loop.start = lambda uid, alert_fn=None: True
+
+# The broker, standing in for cTrader's account list.
+#
+# `automation.start` re-verifies the account mode against the broker rather
+# than trusting the record written at link time (live spec §3), so a fixture
+# that starts automation has to have a broker to ask. Without this the start
+# refuses with MODE_UNVERIFIED, which is the correct product behaviour and a
+# useless test failure — the real deployment has a real broker here.
+#
+# It answers the same two accounts the link below is built with, so the
+# verification agrees with the record instead of reporting a mode change.
+from apex.brokers import ctrader as _ct_broker  # noqa: E402
+
+_ct_broker.list_accounts = lambda token: [{"ctid": 501, "live": False},
+                                          {"ctid": 502, "live": True}]
 user_loop.stop = lambda uid: None
 
 # The BROKER is stubbed too, and only the broker. get_candles has no paper
