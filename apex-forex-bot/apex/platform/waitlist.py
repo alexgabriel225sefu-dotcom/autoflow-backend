@@ -77,7 +77,7 @@ MAX_BROKER = 60
 # A single HTTPS call is enough; no SDK dependency for a launch-list email.
 EMAIL_PROVIDER = "resend"
 RESEND_ENDPOINT = "https://api.resend.com/emails"
-EMAIL_TIMEOUT_SEC = 10
+EMAIL_TIMEOUT_SEC = 3
 DELIVERY_SENT = "sent"
 DELIVERY_FAILED = "failed"
 DELIVERY_NOT_CONFIGURED = "not_configured"
@@ -203,7 +203,7 @@ def _placeholder_email(address):
         "text": (
             "You are on the Apex4Traders early access list. "
             "Demo access opens first. Live trading is not enabled in this "
-            "release. The final launch email copy is pending owner approval."
+            "release."
         ),
     }
     reply_to = (os.getenv("A4T_WAITLIST_REPLY_TO") or "").strip()
@@ -252,7 +252,8 @@ def send_waitlist_email(address, *, now=None, post=None):
 
 
 def _record_delivery(key, rec, delivery):
-    updated = dict(rec)
+    current = _store._read(key) or rec
+    updated = dict(current)
     updated["emailDelivery"] = delivery
     _store._write(key, updated)
     return updated

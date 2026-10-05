@@ -146,8 +146,36 @@ check("a provider exception is sanitised before it is recorded",
       leaky["status"] == W.DELIVERY_FAILED
       and "private-leak-test@example.com" not in json.dumps(leaky),
       json.dumps(leaky))
+check("provider timeout is capped for the conversion path",
+      W.EMAIL_TIMEOUT_SEC <= 3, str(W.EMAIL_TIMEOUT_SEC))
+payload = W._placeholder_email("customer@example.com")
+check("placeholder copy is customer-facing only",
+      "pending owner approval" not in payload["text"].lower()
+      and "final launch email copy" not in payload["text"].lower(),
+      payload["text"])
 os.environ.pop("RESEND_API_KEY", None)
 os.environ.pop("A4T_WAITLIST_FROM_EMAIL", None)
+
+_updates = []
+def _race(address, *, now=None):
+    current = _store._read(W._key(address))
+    raced = dict(current, platform="mt5", broker="IC Markets")
+    _store._write(W._key(address), raced)
+    _updates.append(address)
+    return {"provider": "test", "status": W.DELIVERY_SENT, "attemptedAt": int(now or 0)}
+
+W.send_waitlist_email = _race
+try:
+    raced = W.join("race@example.com", source="landing", now=105)
+    raced_rec = _store._read(W._key("race@example.com"))
+    check("delivery recording preserves mid-send record updates",
+          raced["status"] == "added"
+          and raced_rec.get("platform") == "mt5"
+          and raced_rec.get("broker") == "IC Markets"
+          and raced_rec["emailDelivery"]["status"] == W.DELIVERY_SENT,
+          json.dumps({k: raced_rec.get(k) for k in ("platform", "broker", "emailDelivery")}))
+finally:
+    W.send_waitlist_email = _real_send
 
 print("\n[3] what is on disk")
 raw = _store._read(W._key("trader@example.com"))
