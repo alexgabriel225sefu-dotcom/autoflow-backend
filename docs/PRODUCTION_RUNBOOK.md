@@ -377,14 +377,21 @@ written before that date, it is not a backup of this product.
   licences, broker links and waitlist entries, and passes. Locks and
   half-finished OAuth authorisations are deliberately excluded and were
   confirmed absent from the dump.
-- **Run against this deployment on 2026-10-05, and it failed on the second
-  gate:** `verify()` refused a perfectly good snapshot with "snapshot contains
-  zero users". This service carries 24 platform keys and no engine user
-  records at all — which is what it IS — and that check predated the platform.
-  Fixed: a snapshot is refused for being empty everywhere, not for having no
-  engine users. Re-run the drill; it should now reach the end.
-- **Still not done:** it has **not** been run against this deployment's own
-  data. Run it from the API service's shell, where the credentials live:
+- **Run against this deployment on 2026-10-05, and it PASSED** — 24 of 24
+  platform records restored, 0 failed; rules 1/1, frozen versions 1/1, broker
+  links 1/1, journal entries 10/10, early-access 6/6, both indexes rebuilt as
+  sets. This is the first time the application-level backup has been proven on
+  this deployment's own data, and it closes gate X8.
+
+  It took two attempts. The first run stopped on the second gate: `verify()`
+  refused a perfectly good snapshot with "snapshot contains zero users". This
+  service carries the platform and no engine user records at all — which is
+  what it IS — and that check predated the platform. A snapshot is now refused
+  for being empty everywhere, not for having no engine users.
+- **Re-run it after any change to what the platform stores.** A new key shape
+  that `dump()` does not know about is invisible until a drill looks for it,
+  which is exactly how the `a4t:` namespace went missing for as long as it
+  did. From the API service's shell, where the credentials live:
 
   ```
   cd ~/project/src/apex-forex-bot && python3 scripts/dr_drill.py
@@ -393,9 +400,12 @@ written before that date, it is not a backup of this product.
   Production is read-only throughout; the restore half writes into a temporary
   directory with the shared backend forced off. Exit code 0 means pass. It
   writes a snapshot to the system temp directory that holds licence keys —
-  delete it afterwards. This is the production-launch gate X8 in
-  `docs/RELEASE_READINESS.md`, and it stays open until that command has been
-  run here.
+  delete it afterwards.
+
+- **Still unproven:** a restore **into** a live deployment, and broker
+  reconnection after one. The drill proves the snapshot is complete and
+  restorable into an isolated target. Reconnecting cTrader per user is the
+  normal startup path and has not been exercised following a recovery.
 
 ## 13. Secret and log redaction
 

@@ -209,10 +209,36 @@ needs a browser and a phone and cannot be done from a script.
 
 ## The shortest path to a public paid launch
 
-Everything above, then: L1–L4 and L6–L8 from the owner; D5 tax handling and refund policy from the owner; move checkout creation behind the authenticated platform API; register
-the Stripe endpoint and take one real delivery end to end (X5); HTTPS and
-domain (X6); monitoring (X7); exercise a restore once (X8); five external
-testers (X9).
+Everything above, then: L1–L4, L6–L8 and L10 from the owner; D5 tax handling
+and refund policy from the owner; move checkout creation behind the
+authenticated platform API; register the Stripe endpoint and take one real
+delivery end to end (X5); HTTPS and domain (X6); monitoring (X7); five
+external testers (X9).
+
+**X8 — exercise a restore once — is CLOSED (2026-10-05.)** The drill was run
+on the API service against this deployment's own Redis and passed end to end:
+
+    1. dumped  {"users": 0, "journals": 0, "access": 0, "audit": 0, "platform": 24}
+    2. ✅ verify passed
+    3. ✅ every credential is ciphertext in the dump
+    4. ✅ restore reports COMPLETE — 24 of 24 platform records, 0 failed
+    6. ✅ rules 1/1 · frozen versions 1/1 · broker links 1/1 ·
+          journal entries 10/10 · early-access 6/6 · both indexes restored
+
+Production was read only throughout; the restore half wrote into a temporary
+directory with the shared backend forced off.
+
+Getting there took two fixes, both found by running it rather than reading it.
+`dump()` never read the `a4t:` namespace at all, so a restore brought back
+clients with no rules, no licence, no broker link and no frozen versions — and
+reported COMPLETE. Then `verify()` refused the fixed snapshot because it
+contained no *engine* user records, which is what this deployment legitimately
+looks like. Both are in `docs/PRODUCTION_RUNBOOK.md` §12.
+
+What this does NOT claim: that a restore has been run **into** a live
+deployment, or that broker reconnection after one has been exercised. The
+drill proves the snapshot is complete and restorable. Reconnecting cTrader per
+user is the normal startup path and is still unproven after a recovery.
 
 ---
 
