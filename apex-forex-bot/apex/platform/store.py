@@ -114,6 +114,41 @@ def _write(key, doc):
             f.write(raw)
 
 
+def _delete(key):
+    """Remove whatever is stored at `key`. True only if something was there.
+
+    False is "there was nothing to remove", which is a fact a caller may act
+    on. A store that could not be reached raises instead of answering either,
+    because "we deleted your record" said over a failed write is the worst
+    thing this function could return.
+    """
+    if user_store._USE_REDIS:
+        removed = user_store.del_blob(key)
+        if removed is None:
+            raise user_store.StoreUnavailable(
+                f"could not reach the store to delete {key}")
+        return bool(removed)
+    p = _local_path(key)
+    if not os.path.exists(p):
+        return False
+    os.remove(p)
+    return True
+
+
+def _set_remove(key, member):
+    if user_store._USE_REDIS:
+        user_store._redis_srem(key, member)
+        return
+    p = _local_path(key)
+    if not os.path.exists(p):
+        return
+    ids = json.loads(open(p).read())
+    if member in ids:
+        ids = [i for i in ids if i != member]
+        with open(p, "w") as f:
+            f.write(json.dumps(ids))
+
+
 def _set_add(key, member):
     """Add to a set at an arbitrary key. Used where the owner-scoped index
     below does not fit — a list that belongs to the deployment rather than to

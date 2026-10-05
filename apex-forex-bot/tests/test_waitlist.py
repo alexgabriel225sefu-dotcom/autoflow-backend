@@ -293,6 +293,62 @@ res = _API._handle("GET", "/api/v1/waitlist", headers={},
 check("GET does not join anybody",
       res is None or res[0] != 200, str(res and res[0]))
 
+print("\n[9] an address can be taken off the list")
+# Somebody who asked to be told may ask to be forgotten. Until there was a
+# remove(), the only honest answer was that we could not.
+W.join("erase.me@example.com", source="landing")
+before = W.count()
+addresses = [e["email"] for e in W.export()["entries"]]
+check("the address is on the list to begin with",
+      "erase.me@example.com" in addresses, str(addresses))
+
+out = W.remove("erase.me@example.com")
+check("removing it says so", out.get("status") == "removed", json.dumps(out))
+check("the count drops by exactly one", W.count() == before - 1,
+      f"{W.count()} vs {before}")
+
+dump = W.export()
+check("and the address is gone from the export",
+      "erase.me@example.com" not in [e["email"] for e in dump["entries"]],
+      str([e["email"] for e in dump["entries"]]))
+# The index entry must go with the record. If it stayed, export() would
+# report it forever as an unresolved key — a deletion that leaves a scar.
+# (Section 5 plants its own ghost on purpose, so this asks about THIS key.)
+check("leaving no unresolved index entry behind",
+      W._key("erase.me@example.com") not in dump["unresolved"],
+      str(dump["unresolved"]))
+
+out = W.remove("erase.me@example.com")
+check("removing it again is 'absent', not an error",
+      out.get("status") == "absent", json.dumps(out))
+out = W.remove("never.joined@example.com")
+check("so is removing somebody who never joined",
+      out.get("status") == "absent", json.dumps(out))
+
+# Case is folded on the way in, so it must be folded on the way out too —
+# otherwise an erasure request typed with a capital letter silently does
+# nothing and reports "absent", which reads as "you were not on the list".
+W.join("mixedcase@example.com")
+out = W.remove("  MixedCase@Example.COM ")
+check("an address joined in one case is removed in another",
+      out.get("status") == "removed", json.dumps(out))
+
+try:
+    W.remove("not-an-email")
+    check("a bad address is refused rather than quietly deleting nothing",
+          False, "it returned instead of raising")
+except W.WaitlistError as e:
+    check("a bad address is refused rather than quietly deleting nothing",
+          e.code == "EMAIL_INVALID", e.code)
+
+# Removal is operator tooling. A public route that deletes by address would
+# let anyone remove anyone, and tell them who is on the list while doing it.
+res = _API._handle("DELETE", "/api/v1/waitlist", headers={},
+                   body=json.dumps({"email": "erase.me@example.com"}),
+                   client_key="203.0.113.7")
+check("there is no API route that removes an address",
+      res is None or res[0] != 200, str(res and res[0]))
+
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()

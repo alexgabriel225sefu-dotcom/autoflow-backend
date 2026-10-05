@@ -682,6 +682,25 @@ def get_blob_strict(key):
     return _redis_get_strict(key)
 
 
+def del_blob(key):
+    """Remove `key`. Returns how many keys were removed, or None on failure.
+
+    The distinction matters to the caller: 0 means the key was not there,
+    which is a fact, and None means the store could not say, which is not.
+    Reporting "deleted" for the second is how a record somebody asked to have
+    erased stays in the store.
+    """
+    if not _USE_REDIS:
+        return None
+    if _BACKEND == "redis":
+        try:
+            return _r.delete(key)
+        except Exception as e:
+            print(f"[Redis] DEL failed: {e}")
+            return None
+    return _upstash(["DEL", key])
+
+
 def set_blob(key, value_str, ttl_s=None):
     """Write a raw string, optionally expiring. No-op without a shared store."""
     if not _USE_REDIS:

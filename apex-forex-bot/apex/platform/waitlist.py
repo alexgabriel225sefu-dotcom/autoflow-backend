@@ -214,6 +214,36 @@ def join(email, *, source="direct", platform=None, broker=None, now=None):
     return {"status": "added", "joinedAt": stamp}
 
 
+def remove(email):
+    """Take an address off the list. Operator tooling — never an API route.
+
+    WHY THIS EXISTS
+
+    Somebody who asked to be told when access opens may ask to be forgotten,
+    and until now there was nowhere in this product to do it. A list you can
+    only add to is not a list you can honestly promise to delete from.
+
+    It is also what removes the sign-ups this product's own testing left in
+    the list: an address that was never a person still counts in the only
+    conversion number the advertising can be judged by.
+
+    NOT AN ENDPOINT, on purpose. The form is unauthenticated, and a public
+    route that deletes by address would let anyone remove anyone — and, by
+    the difference between "removed" and "was not there", read the list back
+    one address at a time.
+
+    Returns {"status": "removed"|"absent"}. The record is deleted BEFORE the
+    index entry, the reverse of `join`: a failure between the two leaves an
+    index entry with no record, which `export` already reports as unresolved,
+    rather than a listed address that is still stored and invisible.
+    """
+    address = normalise(email)
+    key = _key(address)
+    removed = _store._delete(key)
+    _store._set_remove(_k_index(), key)
+    return {"status": "removed" if removed else "absent"}
+
+
 def count():
     """How many addresses are on the list. Never the addresses themselves."""
     return len(_store._set_members(_k_index()))
