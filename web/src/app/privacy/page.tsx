@@ -16,6 +16,13 @@ export const metadata: Metadata = { title: "Privacy Policy — Apex4Traders" };
  * The previous version described collecting a name and email "when you make a
  * purchase" to "deliver your product", and gave a support address at a
  * different brand's domain.
+ *
+ * SECTION 2 EXISTS BECAUSE EVERY SECTION BUT THAT ONE IS ABOUT A SIGNED-IN
+ * CLIENT. The early-access form on the landing page takes an email address
+ * from somebody who has no account, no password, no rules and no journal —
+ * and this page, which is the one link under that form, described none of
+ * their data. That is the reader an advertisement pays to send here, and the
+ * only reader who has given us something before they have anything back.
  */
 export default function PrivacyPage() {
   return (
@@ -37,7 +44,7 @@ export default function PrivacyPage() {
         </div>
 
         <section>
-          <h2>1. What we collect</h2>
+          <h2>1. What we collect when you have an account</h2>
           <p>
             Your email address and password, held by our authentication
             provider; the trading rules you create and their versions; the
@@ -49,7 +56,34 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>2. Your broker tokens</h2>
+          <h2>2. If you join the early-access list</h2>
+          <p>
+            You do not need an account to join, and joining does not create
+            one. We keep your email address and the moment it arrived, and
+            nothing else: no name, no IP address, no referring page, no
+            tracking identifier. The address is encrypted where it is stored,
+            and it is stored under a keyed hash of itself, so the list cannot
+            be read by someone who can see the storage keys.
+          </p>
+          <p>
+            After you have joined, the form asks which platform you trade on
+            and which broker you use. Both are optional, both are stored only
+            if you answer, and they are used to decide which platform the
+            product supports next.
+          </p>
+          <p>
+            We will use the address to send you one email when early access
+            opens. There is no newsletter, the list is not shared or sold, and
+            the email carries no tracking pixel and no click tracking. Ask us
+            and we will take your address off the list.
+            <strong> [TO BE CONFIRMED — the email provider that will deliver
+            that message, and the address to write to in order to be removed.]
+            </strong>
+          </p>
+        </section>
+
+        <section>
+          <h2>3. Your broker tokens</h2>
           <p>
             cTrader access and refresh tokens are encrypted at rest on the
             server and are never sent to your browser. No part of the web
@@ -60,7 +94,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>3. What we do not collect</h2>
+          <h2>4. What we do not collect</h2>
           <p>
             We do not read your broker account&rsquo;s cash flow history —
             deposits, withdrawals, swaps and commissions are not requested, and
@@ -72,19 +106,22 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>4. Processors</h2>
+          <h2>5. Processors</h2>
           <p>
             Authentication and account storage are provided by Supabase. Market
             data and order execution go through cTrader and the broker you
             chose. If and when paid access is enabled, payments are processed
-            by Stripe and card details are never stored on our servers.
-            <strong> [TO BE CONFIRMED — hosting provider, data region, and the
-            full list of sub-processors with their locations.]</strong>
+            by Stripe and card details are never stored on our servers. The
+            early-access email, when it is sent, will be delivered by an email
+            provider, which will see the address it is sent to.
+            <strong> [TO BE CONFIRMED — hosting provider, data region, the
+            email provider, and the full list of sub-processors with their
+            locations.]</strong>
           </p>
         </section>
 
         <section>
-          <h2>5. Why we hold it</h2>
+          <h2>6. Why we hold it</h2>
           <p>
             To sign you in, to run the rules you configured, to show you what
             the platform decided and why, and to tell whether your account is
@@ -94,7 +131,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>6. How long</h2>
+          <h2>7. How long</h2>
           <p>
             <strong>[TO BE CONFIRMED — retention periods for account data,
             journal entries and disconnected broker links.]</strong>
@@ -102,17 +139,18 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>7. Your rights</h2>
+          <h2>8. Your rights</h2>
           <p>
-            You can disconnect your broker account at any time. For access,
-            correction, export or deletion of your data,
+            You can disconnect your broker account at any time, and you can ask
+            to be taken off the early-access list. For access, correction,
+            export or deletion of your data,
             <strong> [TO BE CONFIRMED — the rights that apply under the
             governing jurisdiction, and how to exercise them.]</strong>
           </p>
         </section>
 
         <section>
-          <h2>8. Cookies</h2>
+          <h2>9. Cookies</h2>
           <p>
             Session cookies are used to keep you signed in. There are no
             advertising or tracking cookies.
@@ -120,7 +158,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>9. Who is responsible, and how to reach us</h2>
+          <h2>10. Who is responsible, and how to reach us</h2>
           <p>
             <strong>[TO BE CONFIRMED — data controller name, registered
             address, and a contact address for privacy requests.]</strong>

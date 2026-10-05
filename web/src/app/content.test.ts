@@ -152,6 +152,44 @@ describe("the statements the product must make", () => {
   it("the Privacy policy states there is no tracking", () => {
     expect(privacy).toMatch(/no advertising or analytics\s+tracking/i);
   });
+
+  /**
+   * IF WE COLLECT IT, THIS PAGE HAS TO DESCRIBE IT.
+   *
+   * Every other section of the policy is about a signed-in client. The
+   * early-access form takes an address from somebody who has no account, and
+   * for a while this page — the only link under that form — described none of
+   * their data. That reader is the one an advertisement pays to send here.
+   *
+   * Keyed off the form's own existence rather than a hardcoded list, so
+   * deleting the form retires the requirement and nothing else does.
+   */
+  const landing = FILES.find((f) => f.path === "app/page.tsx")!.body;
+  const collectsEmailFromStrangers = /<WaitlistForm/.test(landing);
+
+  it.runIf(collectsEmailFromStrangers).each([
+    ["the early-access list at all", /early[- ]access list/i],
+    ["that no account is needed", /do not need an account/i],
+    ["what is kept besides the address", /no name, no IP address/i],
+    ["that it is one email, not a newsletter", /no newsletter/i],
+    ["that the list is not shared", /not shared or sold/i],
+    ["that an address can be removed on request", /take your address off/i],
+  ])("the Privacy policy describes %s", (_label, pattern) => {
+    expect(privacy).toMatch(pattern);
+  });
+
+  /**
+   * The form makes three promises in one sentence. A policy that contradicts
+   * any of them is worse than one that omits them, because the reader who
+   * clicks through is the one who was already checking.
+   */
+  it.runIf(collectsEmailFromStrangers)(
+    "and does not contradict what the form promised", () => {
+      const form = FILES.find(
+        (f) => f.path === "components/blocks/waitlist-form.tsx")!.body;
+      expect(form).toMatch(/No newsletter, no sharing, no tracking/i);
+      expect(privacy).toMatch(/no tracking pixel and no click\s+tracking/i);
+    });
 });
 
 describe("unfinished legal values are visibly unfinished", () => {
@@ -184,6 +222,43 @@ describe("unfinished legal values are visibly unfinished", () => {
       join(__dirname, "..", "..", "..", "docs", "LEGAL_LAUNCH_BLOCKERS.md"), "utf8");
     expect(doc).toContain("TO BE CONFIRMED");
     for (const id of ["L1", "L2", "L3", "L4"]) expect(doc).toContain(id);
+  });
+
+  /**
+   * EVERY "Privacy §N" IN THE BLOCKERS DOCUMENT HAS TO LAND SOMEWHERE REAL.
+   *
+   * The section numbers are hand-written on both sides, so inserting one
+   * section into the policy silently moves every pointer below it. The owner
+   * then opens the section a blocker names, finds nothing left to decide, and
+   * reasonably concludes it is done — which is how a launch blocker gets
+   * closed without being answered.
+   *
+   * It is not enough that the section exists: a blocker points at something
+   * still unfilled, so the section it names must still carry a placeholder.
+   */
+  it("each Privacy section a blocker points at exists and is still open", () => {
+    const doc = readFileSync(
+      join(__dirname, "..", "..", "..", "docs", "LEGAL_LAUNCH_BLOCKERS.md"), "utf8");
+    const page = FILES.find((f) => f.path === "app/privacy/page.tsx")!.body;
+
+    // Split the policy on its own headings, keeping each section's number.
+    const parts = page.split(/<h2>(\d+)\.\s/).slice(1);
+    const sections = new Map<string, string>();
+    for (let i = 0; i < parts.length; i += 2) sections.set(parts[i], parts[i + 1]);
+    expect(sections.size, "no numbered sections were parsed").toBeGreaterThan(5);
+
+    const cited = new Set(
+      [...doc.matchAll(/Privacy §(\d+)/g)].map((m) => m[1]));
+    expect(cited.size, "the document cites no Privacy section").toBeGreaterThan(0);
+
+    for (const n of cited) {
+      expect(sections.has(n), `a blocker cites Privacy §${n}, which does not exist`)
+        .toBe(true);
+      expect(sections.get(n),
+             `a blocker cites Privacy §${n}, but that section has nothing left `
+             + `to confirm — the pointer has drifted, or the blocker is stale`)
+        .toContain("TO BE CONFIRMED");
+    }
   });
 });
 
