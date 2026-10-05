@@ -95,6 +95,47 @@ check("three broken fields produce three problems", len(probs) >= 3,
 check("each names its field",
       all(":" in p for p in probs), str(probs)[:80])
 
+print("\n2b. RuleDoc — a field that is not an object is REFUSED, not a crash")
+# validate() exists to answer with the field that is wrong. A body like
+# {"limits": "none"} used to raise AttributeError out of `.get` instead,
+# which the API serves as a 500 — the one answer that tells the client
+# nothing and looks like our fault rather than their payload's.
+for field in ("entry", "exit", "order", "sizing", "stopLoss", "limits"):
+    for junk in ("none", 7, [], True):
+        d = good_doc()
+        d[field] = junk
+        try:
+            probs = R.validate(d)
+        except Exception as e:
+            check(f"{field}={junk!r} is refused, not raised", False,
+                  f"{type(e).__name__}: {e}")
+            continue
+        check(f"{field}={junk!r} is refused, not raised", bool(probs))
+        check(f"...and the problem names {field}",
+              any(p.startswith(f"{field}:") or p.startswith(f"{field}.")
+                  for p in probs), str(probs)[:120])
+
+# The same junk, with the condition library passed. That branch reaches into
+# entry/exit a second time, and it is the one the first fix does not cover.
+d = good_doc()
+d["entry"] = "none"
+try:
+    probs = R.validate(d, known_condition_ids={"rsi_below"})
+    check("a junk entry block survives the condition-library check",
+          any(p.startswith("entry") for p in probs), str(probs)[:120])
+except Exception as e:
+    check("a junk entry block survives the condition-library check", False,
+          f"{type(e).__name__}: {e}")
+
+d = good_doc()
+d["entry"]["conditions"] = "rsi"
+try:
+    check("a junk conditions list is refused too",
+          bool(R.validate(d, known_condition_ids={"rsi_below"})))
+except Exception as e:
+    check("a junk conditions list is refused too", False,
+          f"{type(e).__name__}: {e}")
+
 print("\n3. RuleDoc — unknown condition ids are caught when the library is passed")
 d = good_doc()
 d["entry"]["conditions"] = [{"id": "not_a_real_condition", "params": {}}]

@@ -135,6 +135,28 @@ def blank(*, user_id, account_id, symbols=None, timeframe="1h"):
     }
 
 
+def _as_object(problems, doc, field):
+    """The object at `field`, reporting a non-object instead of crashing.
+
+    This used to be written `doc.get(field) or {}`, which is right for an
+    absent field and wrong for one a client chooses: `{"limits": "none"}`
+    keeps the string, and the next `.get` raises AttributeError. The effect
+    at the boundary is a 500 on a malformed body — a crash where the whole
+    point of this function is to answer with the field that is wrong.
+
+    Absent stays {} rather than one complaint about the block, so the checks
+    below still name each missing field. That is the more useful message, and
+    it is what a client building a rule from nothing already receives.
+    """
+    value = doc.get(field)
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        _err(problems, field, "must be an object")
+        return {}
+    return value
+
+
 def validate(doc, *, known_condition_ids=None):
     """Every problem with `doc`, as a list. Empty list means valid.
 
@@ -175,11 +197,16 @@ def validate(doc, *, known_condition_ids=None):
     if not doc.get("timeframe"):
         _err(problems, "timeframe", "required")
 
+    # Kept so the condition-library check below reads the blocks this loop
+    # already proved are objects, rather than reaching into `doc` again and
+    # meeting the string this loop just rejected.
+    halves = {}
     for half in ("entry", "exit"):
         block = doc.get(half)
         if not isinstance(block, dict):
             _err(problems, half, "must be an object")
             continue
+        halves[half] = block
         if block.get("combine") not in COMBINE:
             _err(problems, f"{half}.combine", "must be AND or OR")
         _check_conditions(problems, f"{half}.conditions",
@@ -188,11 +215,11 @@ def validate(doc, *, known_condition_ids=None):
     if doc.get("sides") not in SIDES:
         _err(problems, "sides", f"must be one of {', '.join(SIDES)}")
 
-    order = doc.get("order") or {}
+    order = _as_object(problems, doc, "order")
     if order.get("type") not in ORDER_TYPES:
         _err(problems, "order.type", f"must be one of {', '.join(ORDER_TYPES)}")
 
-    sizing = doc.get("sizing") or {}
+    sizing = _as_object(problems, doc, "sizing")
     mode = sizing.get("mode")
     if mode not in SIZING:
         _err(problems, "sizing.mode", f"must be one of {', '.join(SIZING)}")
@@ -209,7 +236,7 @@ def validate(doc, *, known_condition_ids=None):
 
     # A stop is not optional. Without one, position size cannot be derived
     # from risk and the account has no defined worst case on the trade.
-    sl = doc.get("stopLoss") or {}
+    sl = _as_object(problems, doc, "stopLoss")
     if sl.get("mode") not in ("atr", "pips"):
         _err(problems, "stopLoss.mode", "must be 'atr' or 'pips' — a rule "
                                         "without a stop has no defined risk")
@@ -218,7 +245,7 @@ def validate(doc, *, known_condition_ids=None):
     elif sl.get("mode") == "pips" and not _pos_num(sl.get("pips")):
         _err(problems, "stopLoss.pips", "must be a number > 0")
 
-    limits = doc.get("limits") or {}
+    limits = _as_object(problems, doc, "limits")
     mop = limits.get("maxOpenPositions")
     if not isinstance(mop, int) or isinstance(mop, bool) or mop < 1:
         _err(problems, "limits.maxOpenPositions", "must be an integer >= 1")
@@ -228,8 +255,9 @@ def validate(doc, *, known_condition_ids=None):
     if known_condition_ids is not None:
         known = set(known_condition_ids)
         for half in ("entry", "exit"):
-            for i, c in enumerate(((doc.get(half) or {}).get("conditions")
-                                   or [])):
+            conditions = halves.get(half, {}).get("conditions")
+            for i, c in enumerate(conditions if isinstance(conditions, list)
+                                  else []):
                 if isinstance(c, dict) and c.get("id") and c["id"] not in known:
                     _err(problems, f"{half}.conditions[{i}].id",
                          f"unknown condition {c['id']!r}")
