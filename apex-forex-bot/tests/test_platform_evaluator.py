@@ -104,7 +104,8 @@ def snap(candles=None, *, symbol="EUR_USD", timeframe="1h", ts=TS,
 
 
 def doc(entry, *, exit_=None, sides="BUY", symbols=("EUR_USD",),
-        timeframe="1h", limits=None, schedule=None, state=R.ACTIVE):
+        timeframe="1h", limits=None, schedule=None, take_profit=None,
+        trailing_stop=None, break_even=None, state=R.ACTIVE):
     d = R.blank(user_id="u1", account_id="a1", symbols=list(symbols),
                 timeframe=timeframe)
     d["state"] = state
@@ -117,6 +118,12 @@ def doc(entry, *, exit_=None, sides="BUY", symbols=("EUR_USD",),
         d["limits"].update(limits)
     if schedule:
         d["schedule"].update(schedule)
+    if take_profit:
+        d["takeProfit"].update(take_profit)
+    if trailing_stop:
+        d["trailingStop"].update(trailing_stop)
+    if break_even:
+        d["breakEven"].update(break_even)
     return d
 
 
@@ -352,6 +359,39 @@ check("a schedule block is not reported as a broken rule",
       not D.is_config_error(D.OUTSIDE_SCHEDULE))
 check("a broken rule IS reported as one",
       D.is_config_error(D.RULE_INVALID))
+valid_tp = doc(AND(ALWAYS), take_profit={"mode": "pips", "pips": 12.5})
+check("takeProfit.pips validates when the bridge can honour it",
+      not R.validate(valid_tp), str(R.validate(valid_tp)))
+bad_tp = doc(AND(ALWAYS), take_profit={"mode": "rr", "rr": 0})
+check("takeProfit.rr with no positive target is refused",
+      any(p.startswith("takeProfit.rr:") for p in R.validate(bad_tp)),
+      str(R.validate(bad_tp)))
+d = EV.evaluate(bad_tp, s)
+check("an invalid takeProfit refuses before any entry",
+      d.refusal_code == D.RULE_INVALID, str(d.refusal_code))
+trail = doc(AND(ALWAYS), trailing_stop={"enabled": True, "atrMultiple": 1.2})
+check("trailingStop is refused until the engine implements it",
+      any(p.startswith("trailingStop.enabled:") for p in R.validate(trail)),
+      str(R.validate(trail)))
+d = EV.evaluate(trail, s)
+check("a trailingStop setting cannot be accepted silently",
+      d.refusal_code == D.RULE_INVALID, str(d.refusal_code))
+be = doc(AND(ALWAYS), break_even={"enabled": True, "atR": 1.0})
+check("breakEven is refused until the engine implements it",
+      any(p.startswith("breakEven.enabled:") for p in R.validate(be)),
+      str(R.validate(be)))
+d = EV.evaluate(be, s)
+check("a breakEven setting cannot be accepted silently",
+      d.refusal_code == D.RULE_INVALID, str(d.refusal_code))
+bad_sched = doc(AND(ALWAYS), schedule={
+    "timezone": "Europe/London", "days": [7],
+    "windows": [{"from": "09:00", "to": "09:00"}],
+})
+probs = R.validate(bad_sched)
+check("schedule timezone, days and windows are validated",
+      all(any(p.startswith(prefix) for p in probs) for prefix in (
+          "schedule.timezone:", "schedule.days[0]:",
+          "schedule.windows[0]:")), str(probs))
 
 
 print("\n11. a two-sided rule never guesses a direction")
