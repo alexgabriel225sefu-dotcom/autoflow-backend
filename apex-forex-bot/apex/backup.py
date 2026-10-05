@@ -219,8 +219,6 @@ def verify(snapshot):
     if not isinstance(users, dict):
         problems.append("no users section")
         users = {}
-    if not users:
-        problems.append("snapshot contains zero users")
     for uid, rec in users.items():
         if not str(uid).isdigit():
             problems.append(f"user id {uid!r} is not numeric")
@@ -256,6 +254,26 @@ def verify(snapshot):
             or not isinstance(plat.get("sets"), dict):
         problems.append("platform section is not {strings: {}, sets: {}}")
         plat = {}
+    # EMPTY MEANS EMPTY EVERYWHERE, NOT "NO ENGINE USERS".
+    #
+    # This read `if not users: "snapshot contains zero users"`, written when a
+    # user record was the only kind of state there was. The drill met the
+    # consequence on production on 2026-10-05:
+    #
+    #     dumped {"users": 0, ..., "platform": 24}
+    #     ❌ verify passed  snapshot contains zero users
+    #
+    # Nothing was wrong with that backup. The API service carries the platform
+    # and no engine users at all, which is what this deployment IS. Refusing it
+    # is the expensive direction of the mistake: it tells an operator in the
+    # middle of a recovery that their only good backup is unusable.
+    #
+    # The check that was meant is still worth having, so it is asked about the
+    # whole snapshot rather than one section of it.
+    if not users and not (plat.get("strings") or plat.get("sets")) \
+            and not (snapshot.get("access") or snapshot.get("journals")):
+        problems.append("snapshot is empty — no users and no platform state")
+
     for key, raw in (plat.get("strings") or {}).items():
         if not isinstance(raw, str):
             problems.append(f"platform {key} is not a stored string")

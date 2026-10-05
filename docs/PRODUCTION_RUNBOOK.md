@@ -377,6 +377,12 @@ written before that date, it is not a backup of this product.
   licences, broker links and waitlist entries, and passes. Locks and
   half-finished OAuth authorisations are deliberately excluded and were
   confirmed absent from the dump.
+- **Run against this deployment on 2026-10-05, and it failed on the second
+  gate:** `verify()` refused a perfectly good snapshot with "snapshot contains
+  zero users". This service carries 24 platform keys and no engine user
+  records at all — which is what it IS — and that check predated the platform.
+  Fixed: a snapshot is refused for being empty everywhere, not for having no
+  engine users. Re-run the drill; it should now reach the end.
 - **Still not done:** it has **not** been run against this deployment's own
   data. Run it from the API service's shell, where the credentials live:
 

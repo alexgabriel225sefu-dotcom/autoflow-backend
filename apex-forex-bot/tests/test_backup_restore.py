@@ -121,8 +121,9 @@ try:
     check("and says which field", any("NOT encrypted" in p for p in problems), problems)
     ok, problems = backup.verify({"format": 99, "users": {}})
     check("a wrong format version is refused", ok is False)
+    # Was "zero users", which is not what makes a snapshot useless — see 5d2.
     check("an empty snapshot is refused",
-          any("zero users" in p for p in problems), problems)
+          any("snapshot is empty" in p for p in problems), problems)
 
     print("\n4. Destroy the state, then restore it")
     shutil.rmtree(WORK, ignore_errors=True)
@@ -232,6 +233,39 @@ try:
     check("and says which field",
           any("accessToken is NOT encrypted" in p for p in probs_leak),
           probs_leak)
+
+    print("\n5d2. A platform-only deployment is a real deployment")
+    # What the drill actually met on production, 2026-10-05:
+    #   dumped {"users": 0, ..., "platform": 24}
+    #   ❌ verify passed  snapshot contains zero users
+    # Nothing was wrong with that backup. The API service carries the
+    # platform and no engine users at all, and "zero users" was written when
+    # a user record was the only kind of state there was.
+    #
+    # Refusing it is the expensive direction of this mistake: it tells an
+    # operator mid-recovery that their only good backup is unusable.
+    platform_only = json.loads(json.dumps(snap))
+    platform_only["users"] = {}
+    platform_only["journals"] = {}
+    platform_only["access"] = []
+    ok_po, probs_po = backup.verify(platform_only)
+    check("a snapshot with no engine users but real platform state verifies",
+          ok_po, probs_po)
+
+    # And the one that must still be refused: nothing in it at all.
+    empty = json.loads(json.dumps(platform_only))
+    empty["platform"] = {"strings": {}, "sets": {}}
+    ok_e, probs_e = backup.verify(empty)
+    check("a snapshot with nothing in it at all is still refused", not ok_e)
+    check("and says it is empty, not that it has no users",
+          any("empty" in p.lower() for p in probs_e), probs_e)
+
+    rep_po = backup.restore(platform_only)
+    check("and a platform-only snapshot actually restores",
+          rep_po["result"] == "COMPLETE", rep_po["result"])
+    check("with the platform records counted",
+          rep_po["restored"]["platform"] == rep_po["expected"]["platform"]
+          and rep_po["restored"]["platform"] > 0, rep_po["restored"])
 
     print("\n5e. A backup with no platform section is refused, not trusted")
     # The dangerous case is not a corrupt file; it is a file written by the

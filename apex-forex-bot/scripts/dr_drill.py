@@ -116,6 +116,12 @@ def main():
             print(f"   skipped: {s}")
 
         print("\n5. Content, not just counts")
+        if not snap["users"]:
+            # Otherwise this prints a heading and nothing under it, which
+            # reads as a check that quietly did no work rather than one with
+            # nothing to do.
+            print("   no engine user records on this deployment — the "
+                  "platform is checked in step 6")
         for uid, orig in snap["users"].items():
             back = user_store.load(uid)
             if not step(f"user {uid} is readable", bool(back)):
