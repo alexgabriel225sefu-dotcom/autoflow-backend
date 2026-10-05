@@ -1,106 +1,1363 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Apex4Traders — operations console
+
+   One accent. Green and red mean a trading state and nothing else, so a
+   green pill is never decoration. Every colour is a token: a literal in a
+   component is how a second palette gets born.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── surfaces ───────────────────────────────────────────────────────
+     Deep midnight plum for the page, graphite for what sits on it, then
+     three steps up so a card separates from its background without a
+     border doing all the work. */
+  --a4t-bg:        #0A0A0C;   /* the same near-black the landing page uses */
+  --a4t-bg-2:      #0E0E11;
+  --a4t-surface:   #121216;
+  --a4t-surface-2: #17171C;
+  --a4t-surface-3: #1F1F26;
+  --a4t-line:      #26262F;
+  --a4t-line-soft: #1B1B21;
+
+  /* ── text ───────────────────────────────────────────────────────────
+     Warm off-white, then muted slate, then a dim step for metadata. */
+  --a4t-text:  #F4F0E8;   /* warm off-white — 17.40:1 */
+  --a4t-muted: #A8A4AE;   /*  8.09:1 */
+  --a4t-dim:   #75717E;   /*  4.16:1 — metadata and large text only */
+
+  /* ── interaction ────────────────────────────────────────────────────
+     The brand red is the action FILL, and it is the same #C81228 the
+     landing page uses. It was petrol teal until the landing page was
+     rebuilt in black and red, at which point somebody signing up walked
+     out of one product and into another — the screens are where that was
+     visible, and nothing but opening them showed it.
+
+     Red on the page is 2.4:1 and cannot be read as text, so the
+     interactive FOREGROUND is a separate token, exactly as it was when
+     the fill was teal. That token is a cool steel rather than a red for
+     a reason that is not taste: --a4t-short is coral, and a link in a
+     near-coral red sitting beside a losing position in coral is a pair
+     a trader has to stop and decode. It is not lilac either — a violet
+     interactive colour is the house style of every generated interface,
+     and this one is meant to look like a trading desk. */
+  --a4t-accent:        #C81228;   /* brand red — fills. Carries #FFF 5.88:1 */
+  --a4t-accent-strong: #9B0D1B;
+  --a4t-accent-dim:    #4A0A13;
+  --a4t-accent-wash:   rgba(200, 18, 40, 0.22);
+  --a4t-on-accent:     #FFFFFF;   /* text ON the brand red */
+
+  /* The broken crossbar inside the brand mark. Its own token because the
+     mark must not change when the link colour does — which is exactly what
+     happened when it borrowed --a4t-link-strong. Only ever drawn on the
+     accent fill, never on the page, so it is held to that pair. */
+  --a4t-mark-bar:   #FF9AA4;      /* on the red fill — 3.25:1, a graphic */
+
+  --a4t-link:       #93B4D8;      /* cool steel — 9.19:1 */
+  --a4t-link-strong:#B8CFE8;      /*             12.37:1 */
+  --a4t-link-dim:   #26384A;
+  --a4t-link-wash:  rgba(147, 180, 216, 0.12);
+
+  /* ── trading semantics, and nothing else ────────────────────────────
+     Mint means long or confirmed. Coral means short, warning or
+     destructive. Neither is ever used for emphasis. */
+  --a4t-long:    #A5E7C5;   /* seafoam mint */
+  --a4t-short:   #FF8A73;   /* coral */
+  --a4t-neutral: #A8A4AE;
+  --a4t-long-wash:  rgba(165, 231, 197, 0.13);
+  --a4t-short-wash: rgba(255, 138, 115, 0.13);
+
+  --a4t-demo: var(--a4t-long);
+  --a4t-live: var(--a4t-short);
+
+  /* ── type scale ─────────────────────────────────────────────────────
+     Six steps. A scale with more than that stops being a scale. */
+  --fs-3xs: .66rem;
+  --fs-2xs: .72rem;
+  --fs-xs:  .78rem;
+  --fs-sm:  .84rem;
+  --fs-md:  .92rem;
+  --fs-lg:  1.05rem;
+  --fs-xl:  1.35rem;
+  --fs-2xl: clamp(1.4rem, 3vw, 1.7rem);
+
+  /* ── spacing scale ──────────────────────────────────────────────────
+     A 4px base. Every gap and pad below is one of these. */
+  --sp-1: .25rem;
+  --sp-2: .5rem;
+  --sp-3: .75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+
+  /* ── borders and elevation ──────────────────────────────────────────── */
+  --a4t-radius:    10px;
+  --a4t-radius-sm: 8px;
+  --a4t-radius-lg: 14px;
+  --a4t-border:      1px solid var(--a4t-line);
+  --a4t-border-soft: 1px solid var(--a4t-line-soft);
+
+  --elev-0: none;
+  --elev-1: 0 1px 0 rgba(244, 240, 232, .03) inset, 0 6px 18px -12px rgba(0, 0, 0, .85);
+  --elev-2: 0 1px 0 rgba(244, 240, 232, .04) inset, 0 14px 34px -18px rgba(0, 0, 0, .9);
+
+  /* ── layout ─────────────────────────────────────────────────────────── */
+  --a4t-sidebar: 232px;
+  --a4t-inspector: 320px;
+  --a4t-topbar:  56px;
+  --a4t-statusbar: 40px;
+  --a4t-bottomnav: 62px;
+
+  --a4t-shadow: var(--elev-1);
+}
+
+/* The shadcn token layer is aliased onto the same palette. The primitives in
+   components/ui are only reachable from code that is not part of the
+   platform, and a second accent living in :root is how amber came back. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-background: var(--a4t-bg);
+  --color-foreground: var(--a4t-text);
+  --color-card: var(--a4t-surface);
+  --color-card-foreground: var(--a4t-text);
+  --color-primary: var(--a4t-accent);
+  --color-primary-foreground: var(--a4t-on-accent);
+  --color-secondary: var(--a4t-surface-2);
+  --color-secondary-foreground: var(--a4t-text);
+  --color-muted: var(--a4t-surface-2);
+  --color-muted-foreground: var(--a4t-muted);
+  --color-accent: var(--a4t-accent-wash);
+  --color-accent-foreground: var(--a4t-accent);
+  --color-destructive: var(--a4t-short);
+  --color-border: var(--a4t-line);
+  --color-input: var(--a4t-surface-2);
+  --color-ring: var(--a4t-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --animate-beam-fade: beam-fade var(--beam-dur,10s) ease-in-out var(--beam-delay,0s) infinite;
-  --animate-border-beam: border-beam calc(var(--duration)*1s) infinite linear;
 }
 
 :root {
-  --background: #03050c;
-  --foreground: #ffffff;
-  --card: #080c17;
-  --card-foreground: #ffffff;
-  --popover: #080c17;
-  --popover-foreground: #ffffff;
-  --primary: #f59e0b;
-  --primary-foreground: #000000;
-  --secondary: #0f1420;
-  --secondary-foreground: rgba(255,255,255,0.7);
-  --muted: #0d1220;
-  --muted-foreground: rgba(255,255,255,0.45);
-  --accent: rgba(245,158,11,0.08);
-  --accent-foreground: #f59e0b;
-  --destructive: #ef4444;
-  --border: rgba(255,255,255,0.08);
-  --input: rgba(255,255,255,0.06);
-  --ring: #f59e0b;
-  --radius: 12px;
+  --background: var(--a4t-bg);
+  --foreground: var(--a4t-text);
+  --card: var(--a4t-surface);
+  --card-foreground: var(--a4t-text);
+  --popover: var(--a4t-surface);
+  --popover-foreground: var(--a4t-text);
+  --primary: var(--a4t-accent);
+  --primary-foreground: var(--a4t-on-accent);
+  --secondary: var(--a4t-surface-2);
+  --secondary-foreground: var(--a4t-text);
+  --muted: var(--a4t-surface-2);
+  --muted-foreground: var(--a4t-muted);
+  --accent: var(--a4t-accent-wash);
+  --accent-foreground: var(--a4t-accent);
+  --destructive: var(--a4t-short);
+  --border: var(--a4t-line);
+  --input: var(--a4t-surface-2);
+  --ring: var(--a4t-accent);
+  --radius: var(--a4t-radius);
 }
 
-*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; color-scheme: dark; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--a4t-bg);
+  color: var(--a4t-text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  /* Tabular figures everywhere: a price column that shifts as digits change
+     is unreadable at a glance, which is the only way it gets read. */
+  font-feature-settings: "tnum" 1, "cv01" 1;
 }
 
-/* Grain */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  opacity: .025;
-  pointer-events: none;
-  z-index: 1;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-}
-
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(245,158,11,.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb {
+  background: var(--a4t-surface-3);
+  border-radius: 999px;
+  border: 3px solid var(--a4t-bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--a4t-line); }
 
-@keyframes beam-fade {
-  0%,100% { opacity:0; transform:translateY(-60%) rotate(var(--beam-r,35deg)); }
-  15% { opacity:1; }
-  85% { opacity:1; }
+::selection { background: var(--a4t-link-dim); color: var(--a4t-text); }
+
+:focus-visible {
+  outline: 2px solid var(--a4t-link);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-@keyframes ticker { from { transform:translateX(0) } to { transform:translateX(-50%) } }
+@keyframes a4t-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes a4t-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes a4t-sheen { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
-@keyframes border-beam {
-  100% { offset-distance: 100%; }
+/* ── root ──────────────────────────────────────────────────────────── */
+
+.a4t {
+  background: var(--a4t-bg);
+  color: var(--a4t-text);
+  min-height: 100dvh;
 }
 
-@keyframes shimmer-slide {
-  to { transform: translate(calc(100cqw - 100%), 0); }
+/* :where() keeps this at zero specificity, so a link styled as a control
+   takes the control's colour. This exact rule, written without :where(),
+   made every primary call to action in the product unreadable: the label
+   inherited the accent onto an accent fill at 1.00:1. */
+.a4t :where(a) { color: var(--a4t-link); text-decoration: none; }
+.a4t :where(a):hover { color: var(--a4t-link-strong); }
+
+.a4t h1, .a4t h2, .a4t h3 { letter-spacing: -0.021em; margin: 0; font-weight: 600; }
+.a4t h1 { font-size: clamp(1.35rem, 3vw, 1.6rem); line-height: 1.2; }
+.a4t h2 { font-size: .95rem; letter-spacing: .01em; }
+.a4t h3 { font-size: .8rem; }
+
+.muted { color: var(--a4t-muted); }
+.dim   { color: var(--a4t-dim); }
+.mono  { font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.num   { font-variant-numeric: tabular-nums; text-align: right; }
+
+.label-xs {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--a4t-dim); font-weight: 600;
 }
 
-@keyframes spin-around {
-  0% { transform: translateZ(0) rotate(0); }
-  15%, 35% { transform: translateZ(0) rotate(90deg); }
-  65%, 85% { transform: translateZ(0) rotate(270deg); }
-  100% { transform: translateZ(0) rotate(360deg); }
+/* ── application layout ────────────────────────────────────────────── */
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100dvh;
+}
+@media (min-width: 1024px) {
+  .app { grid-template-columns: var(--a4t-sidebar) 1fr; }
 }
 
-@keyframes fade-in {
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0); }
+/* sidebar — desktop only */
+.side {
+  display: none;
+  border-right: 1px solid var(--a4t-line);
+  background: var(--a4t-bg-2);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  flex-direction: column;
+  padding: .75rem .6rem;
+  gap: .15rem;
+}
+@media (min-width: 1024px) { .side { display: flex; } }
+
+.side-brand {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .5rem .55rem 1.1rem;
+  font-weight: 700; letter-spacing: -.03em; font-size: 1rem;
+  color: var(--a4t-text);
+}
+/* Kept as the fallback block for anything that has not moved to the
+   <BrandMark> component yet. */
+.side-mark {
+  width: 22px; height: 22px; border-radius: 6px; flex: none;
+  background: linear-gradient(145deg, var(--a4t-accent-strong), var(--a4t-accent-dim));
+}
+.side-group { margin-top: .9rem; padding: 0 .55rem .35rem; }
+
+.side-link {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .5rem .55rem; border-radius: var(--a4t-radius-sm);
+  color: var(--a4t-muted); font-size: .875rem; font-weight: 500;
+  position: relative; transition: background .12s, color .12s;
+}
+.side-link:hover { background: var(--a4t-surface); color: var(--a4t-text); }
+.side-link[data-active="true"] {
+  background: var(--a4t-surface-2); color: var(--a4t-text);
+}
+.side-link[data-active="true"]::before {
+  content: ""; position: absolute; left: -.6rem; top: 50%;
+  transform: translateY(-50%);
+  width: 2px; height: 17px; border-radius: 0 2px 2px 0;
+  background: var(--a4t-link);
+}
+.side-link .ico { width: 16px; height: 16px; flex: none; opacity: .85; }
+.side-link[data-active="true"] .ico { opacity: 1; color: var(--a4t-link); }
+.side-foot { margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--a4t-line-soft); }
+
+/* main column */
+.main-col { display: flex; flex-direction: column; min-width: 0; }
+
+/* top bar */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--a4t-topbar);
+  display: flex; align-items: center; gap: .6rem;
+  padding: 0 clamp(12px, 3vw, 22px);
+  background: color-mix(in oklab, var(--a4t-bg) 82%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+  border-bottom: 1px solid var(--a4t-line);
+}
+.topbar-brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; letter-spacing: -.03em; }
+@media (min-width: 1024px) { .topbar-brand { display: none; } }
+.topbar-title { font-size: .95rem; font-weight: 600; letter-spacing: -.01em; }
+.topbar-spacer { flex: 1; }
+
+/* status strip — the answer to "what is running, on what, right now" */
+/* The status row. It carries whether an account is connected, whether
+   automation is running, the licence state and the demo/live badge — the
+   four facts that must never be guessed at.
+
+   It used to be `overflow-x: auto` with a hidden scrollbar. Measured on a
+   390px phone: 591px of content in a 390px row, so 201px — the licence chip
+   and the demo/live badge — sat off-screen behind a scrollbar that had been
+   styled away, on the one device where somebody is most likely to be
+   checking whether their automation is running. It wraps instead. Two short
+   lines on a phone is the whole cost. */
+.statusbar {
+  position: sticky; top: var(--a4t-topbar); z-index: 25;
+  min-height: var(--a4t-statusbar);
+  display: flex; align-items: center; gap: .4rem;
+  flex-wrap: wrap;
+  padding: .3rem clamp(12px, 3vw, 22px);
+  background: var(--a4t-bg-2);
+  border-bottom: 1px solid var(--a4t-line);
 }
 
-@keyframes marquee {
-  0% { transform: translateX(0%); }
-  100% { transform: translateX(-100%); }
+.stat-chip {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .22rem .55rem; border-radius: 999px;
+  background: var(--a4t-surface);
+  border: 1px solid var(--a4t-line);
+  font-size: .75rem; white-space: nowrap; color: var(--a4t-muted);
 }
+.stat-chip strong { color: var(--a4t-text); font-weight: 600; }
+.stat-chip .dot {
+  width: 6px; height: 6px; border-radius: 999px; flex: none;
+  background: var(--a4t-neutral);
+}
+.stat-chip .dot[data-tone="long"]  { background: var(--a4t-long);  box-shadow: 0 0 8px -1px var(--a4t-long); }
+.stat-chip .dot[data-tone="short"] { background: var(--a4t-short); box-shadow: 0 0 8px -1px var(--a4t-short); }
+.stat-chip .dot[data-tone="accent"]{ background: var(--a4t-link); box-shadow: 0 0 8px -1px var(--a4t-link); }
+.stat-chip .dot[data-live="true"]  { animation: a4t-pulse 2s ease-in-out infinite; }
+
+/* page body */
+.shell {
+  flex: 1;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: clamp(14px, 2.4vw, 22px) clamp(12px, 3vw, 22px) calc(var(--a4t-bottomnav) + 28px);
+  animation: a4t-rise .18s ease-out;
+}
+@media (min-width: 1024px) { .shell { padding-bottom: 48px; } }
+
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.page-head .sub { font-size: .8rem; color: var(--a4t-dim); }
+
+/* bottom navigation — mobile */
+.bottomnav {
+  position: fixed; inset: auto 0 0 0; z-index: 40;
+  height: calc(var(--a4t-bottomnav) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: color-mix(in oklab, var(--a4t-bg-2) 92%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-top: 1px solid var(--a4t-line);
+}
+@media (min-width: 1024px) { .bottomnav { display: none; } }
+
+.bottomnav a, .bottomnav button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .18rem; font-size: .65rem; font-weight: 500;
+  color: var(--a4t-dim); background: none; border: 0; cursor: pointer;
+  position: relative; padding: 0; min-height: 44px;
+}
+.bottomnav a[data-active="true"], .bottomnav button[data-active="true"] { color: var(--a4t-link); }
+.bottomnav .ico { width: 19px; height: 19px; }
+
+/* drawer — the rest of the destinations on mobile */
+.drawer-scrim {
+  position: fixed; inset: 0; z-index: 45;
+  background: rgba(3, 5, 9, .72);
+  backdrop-filter: blur(3px);
+  border: 0; width: 100%; cursor: pointer;
+}
+.drawer {
+  position: fixed; inset: auto 0 0 0; z-index: 46;
+  background: var(--a4t-bg-2);
+  border-top: 1px solid var(--a4t-line);
+  border-radius: 16px 16px 0 0;
+  padding: .6rem .8rem calc(1rem + env(safe-area-inset-bottom));
+  animation: a4t-rise .16s ease-out;
+  max-height: 80dvh; overflow-y: auto;
+}
+.drawer-grip {
+  width: 36px; height: 4px; border-radius: 999px;
+  background: var(--a4t-surface-3); margin: .25rem auto .8rem;
+}
+.drawer-links { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+.drawer-links a {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .75rem .7rem; border-radius: var(--a4t-radius-sm);
+  background: var(--a4t-surface); border: 1px solid var(--a4t-line);
+  color: var(--a4t-text); font-size: .875rem; font-weight: 500;
+  min-height: 48px;
+}
+.drawer-links a[data-active="true"] { border-color: var(--a4t-link-dim); color: var(--a4t-link); }
+.drawer-links .ico { width: 17px; height: 17px; opacity: .8; }
+
+/* ── workspace: main column plus a responsive right inspector ────────
+   The inspector is a column on a wide screen and a stacked panel below
+   the workspace on a narrow one. It is never hidden: a panel that
+   disappears at a breakpoint takes its content with it. */
+
+.workspace { display: grid; gap: var(--sp-3); grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1180px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) var(--a4t-inspector); }
+}
+.workspace > * { min-width: 0; }
+
+.inspector { display: flex; flex-direction: column; gap: var(--sp-3); }
+@media (min-width: 1180px) {
+  .inspector { position: sticky; top: calc(var(--a4t-topbar) + var(--a4t-statusbar) + var(--sp-3)); }
+}
+
+/* ── bottom data tabs ────────────────────────────────────────────────
+   Positions / Orders / Journal under the workspace, the way a terminal
+   docks them. Tabs, not an accordion: the reader is comparing, not
+   browsing. */
+
+.dock { border: var(--a4t-border); border-radius: var(--a4t-radius); background: var(--a4t-surface); box-shadow: var(--elev-1); overflow: hidden; }
+.dock-tabs { display: flex; gap: 0; border-bottom: var(--a4t-border); background: var(--a4t-bg-2); overflow-x: auto; scrollbar-width: none; }
+.dock-tabs::-webkit-scrollbar { display: none; }
+.dock-tabs button {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--a4t-muted); padding: var(--sp-3) var(--sp-4);
+  min-height: 44px; white-space: nowrap; position: relative;
+}
+.dock-tabs button[aria-selected="true"] { color: var(--a4t-text); }
+.dock-tabs button[aria-selected="true"]::after {
+  content: ""; position: absolute; inset: auto 0 0 0; height: 2px;
+  background: var(--a4t-link);
+}
+.dock-tabs .count {
+  margin-left: var(--sp-2); font-variant-numeric: tabular-nums;
+  color: var(--a4t-dim); font-weight: 500;
+}
+.dock-body { padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+
+/* ── brand lockup ────────────────────────────────────────────────────
+   Drawn as vectors, not an image: it has to stay crisp at 20px in a
+   sidebar and at 40px on a sign-in screen, and it must inherit colour. */
+
+.brand-lockup { display: inline-flex; align-items: center; gap: .55rem; color: var(--a4t-text); }
+.brand-lockup .mark { flex: none; display: block; }
+.brand-lockup .word {
+  font-weight: 700; letter-spacing: -.028em; line-height: 1;
+  font-size: var(--fs-md); white-space: nowrap;
+}
+.brand-lockup .word b { font-weight: 700; color: var(--a4t-long); }
+
+/* user menu */
+.usermenu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50;
+  min-width: 190px; padding: var(--sp-1);
+  background: var(--a4t-surface); border: var(--a4t-border);
+  border-radius: var(--a4t-radius); box-shadow: var(--elev-2);
+  display: flex; flex-direction: column;
+}
+.usermenu a, .usermenu button {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--a4t-radius-sm);
+  font-size: var(--fs-sm); color: var(--a4t-text); text-align: left;
+  background: none; border: 0; cursor: pointer; font-family: inherit;
+  min-height: 40px;
+}
+.usermenu a:hover, .usermenu button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.usermenu button { color: var(--a4t-short); }
+
+/* ── step rail ─────────────────────────────────────────────────────
+   Navigation, not a gate. Every step is always clickable. */
+
+.steps {
+  display: flex; gap: var(--sp-1); flex-wrap: wrap;
+  margin-bottom: var(--sp-3); padding-bottom: var(--sp-2);
+  border-bottom: var(--a4t-border-soft);
+}
+.steps button {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .32rem .6rem; border-radius: 999px;
+  border: var(--a4t-border); background: var(--a4t-surface);
+  color: var(--a4t-muted); font: inherit; font-size: var(--fs-2xs);
+  font-weight: 600; cursor: pointer; min-height: 34px; white-space: nowrap;
+}
+.steps button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.steps button[aria-current="step"] {
+  background: var(--a4t-accent); border-color: var(--a4t-accent-strong);
+  color: var(--a4t-on-accent);
+}
+.steps .n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 999px; flex: none;
+  background: var(--a4t-surface-3); color: var(--a4t-muted);
+  font-size: var(--fs-3xs); font-variant-numeric: tabular-nums;
+}
+.steps button[aria-current="step"] .n {
+  background: rgba(244, 240, 232, .22); color: var(--a4t-on-accent);
+}
+
+/* ── chart ─────────────────────────────────────────────────────────── */
+
+.ohlc {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  font-size: var(--fs-2xs); color: var(--a4t-muted);
+  padding-bottom: var(--sp-2); margin-bottom: var(--sp-1);
+  border-bottom: var(--a4t-border-soft);
+}
+.ohlc .sym { font-weight: 700; color: var(--a4t-text); font-size: var(--fs-sm); letter-spacing: -.01em; }
+.ohlc i { font-style: normal; color: var(--a4t-dim); margin-right: .2rem; }
+.ohlc b { font-weight: 600; color: var(--a4t-text); }
+
+.candles {
+  width: 100%; height: auto; display: block;
+  background: var(--a4t-bg-2);
+  border: var(--a4t-border-soft); border-radius: var(--a4t-radius-sm);
+  touch-action: pan-y;
+}
+.chart-skeleton { padding: 0; }
+
+/* ── cards ─────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--a4t-surface);
+  border: 1px solid var(--a4t-line);
+  border-radius: var(--a4t-radius);
+  padding: .9rem 1rem;
+  box-shadow: var(--a4t-shadow);
+}
+.card + .card, .grid + .card, .card + .grid { margin-top: .85rem; }
+/* The sibling margin above is for a vertical stack. Inside a grid the gap
+   already spaces the cards, and the extra margin pushed every column after
+   the first down by 11px — visible as cards that do not line up. */
+.grid > .card + .card, .grid > .card { margin-top: 0; }
+.card-flat { box-shadow: none; background: var(--a4t-bg-2); }
+.card-pad-0 { padding: 0; overflow: hidden; }
+
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .7rem; flex-wrap: wrap; margin-bottom: .7rem;
+}
+.card-head h2 { color: var(--a4t-text); }
+.card-head .link-sm { font-size: .78rem; }
+
+.grid { display: grid; gap: .85rem; grid-template-columns: 1fr; }
+@media (min-width: 640px)  { .grid-2 { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 900px)  { .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1180px) { .grid-4 { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 640px) and (max-width: 1179px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
+/* Four stacked tiles push the first real content below the fold on a phone. */
+@media (max-width: 639px) { .grid-4 { grid-template-columns: 1fr 1fr; gap: .55rem; } }
+@media (max-width: 639px) { .grid-4 .stat-value { font-size: 1.05rem; } }
+.grid-main { display: grid; gap: .85rem; grid-template-columns: 1fr; }
+@media (min-width: 1100px) { .grid-main { grid-template-columns: 1.55fr 1fr; align-items: start; } }
+
+/* stat tile */
+.stat {
+  background: var(--a4t-surface);
+  border: 1px solid var(--a4t-line);
+  border-radius: var(--a4t-radius);
+  padding: .8rem .9rem;
+  display: flex; flex-direction: column; gap: .35rem;
+  position: relative; overflow: hidden;
+  box-shadow: var(--a4t-shadow);
+}
+.stat::after {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--a4t-line), transparent);
+}
+.stat-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.stat-value {
+  font-size: 1.32rem; font-weight: 650; letter-spacing: -.025em; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value-sm { font-size: 1.05rem; }
+.stat-foot { font-size: .75rem; color: var(--a4t-dim); display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.stat .ico { width: 15px; height: 15px; color: var(--a4t-dim); }
+.stat[data-tone="accent"] .stat-value { color: var(--a4t-link); }
+.stat[data-tone="long"]   .stat-value { color: var(--a4t-long); }
+.stat[data-tone="short"]  .stat-value { color: var(--a4t-short); }
+
+/* ── pills ─────────────────────────────────────────────────────────── */
+
+.pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .17rem .5rem; border-radius: 999px;
+  font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+  border: 1px solid var(--a4t-line); color: var(--a4t-muted);
+  background: var(--a4t-surface-2); white-space: nowrap;
+}
+.pill-demo { color: var(--a4t-demo); border-color: color-mix(in oklab, var(--a4t-demo) 38%, transparent); background: var(--a4t-long-wash); }
+.pill-live { color: var(--a4t-live); border-color: color-mix(in oklab, var(--a4t-live) 45%, transparent); background: var(--a4t-short-wash); }
+.pill-ok   { color: var(--a4t-long); border-color: color-mix(in oklab, var(--a4t-long) 35%, transparent); background: var(--a4t-long-wash); }
+.pill-warn { color: var(--a4t-short); border-color: color-mix(in oklab, var(--a4t-short) 35%, transparent); background: var(--a4t-short-wash); }
+.pill-accent { color: var(--a4t-link); border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
+.pill-muted { color: var(--a4t-muted); }
+
+/* ── buttons ───────────────────────────────────────────────────────── */
+
+/* `color` is declared on every variant, never inherited. An <a class="btn">
+   must not be able to pick up a link colour, which is what produced an
+   accent-on-accent label at 1.00:1 contrast. Tests assert this. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  min-height: 38px; padding: 0 .85rem;
+  border-radius: var(--a4t-radius-sm);
+  border: 1px solid var(--a4t-accent);
+  background: var(--a4t-accent);
+  color: var(--a4t-on-accent);
+  font-weight: 600; font-size: .85rem; cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+  white-space: nowrap;
+}
+.a4t a.btn, a.btn { color: var(--a4t-on-accent); }
+.btn:hover { background: var(--a4t-accent-strong); border-color: var(--a4t-accent-strong); color: var(--a4t-on-accent); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .42; cursor: not-allowed; }
+.btn .ico { width: 15px; height: 15px; }
+
+.btn-ghost { background: var(--a4t-surface-2); color: var(--a4t-text); border-color: var(--a4t-line); }
+.a4t a.btn-ghost, a.btn-ghost { color: var(--a4t-text); }
+.btn-ghost:hover { background: var(--a4t-surface-3); border-color: var(--a4t-surface-3); color: var(--a4t-text); }
+
+.btn-danger { background: var(--a4t-short-wash); color: var(--a4t-short); border-color: color-mix(in oklab, var(--a4t-short) 45%, transparent); }
+.a4t a.btn-danger, a.btn-danger { color: var(--a4t-short); }
+.btn-danger:hover { background: color-mix(in oklab, var(--a4t-short) 22%, transparent); color: var(--a4t-short); border-color: var(--a4t-short); }
+
+.btn-sm { min-height: 30px; padding: 0 .6rem; font-size: .78rem; }
+.btn-lg { min-height: 44px; padding: 0 1.15rem; font-size: .92rem; }
+.btn-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+
+/* ── forms ─────────────────────────────────────────────────────────── */
+
+.field { display: block; margin-bottom: .7rem; }
+.field > span {
+  display: block; font-size: .72rem; font-weight: 600; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--a4t-dim); margin-bottom: .3rem;
+}
+.field > span .hint { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--a4t-dim); }
+.field input, .field select, .field textarea {
+  width: 100%; min-height: 38px; padding: .45rem .6rem;
+  border-radius: var(--a4t-radius-sm);
+  background: var(--a4t-bg-2); border: 1px solid var(--a4t-line);
+  color: var(--a4t-text); font-size: .875rem; font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.field input::placeholder { color: var(--a4t-dim); }
+.field input:hover, .field select:hover { border-color: var(--a4t-surface-3); }
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none; border-color: var(--a4t-accent);
+  box-shadow: 0 0 0 3px var(--a4t-accent-wash);
+}
+.field input:read-only { color: var(--a4t-muted); background: var(--a4t-surface); }
+/* A direct child of .field, so it inherits the label's uppercase treatment
+   unless it says otherwise. It is a sentence, not a label. */
+.field > span.field-note, .field-note {
+  font-size: .74rem; color: var(--a4t-dim); margin-top: .25rem; display: block;
+  text-transform: none; letter-spacing: normal; font-weight: 400; line-height: 1.5;
+}
+.field-inline { display: flex; align-items: center; gap: .5rem; margin-bottom: .7rem; }
+.field-inline input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; accent-color: var(--a4t-link); }
+.field-inline span { font-size: .85rem; color: var(--a4t-text); }
+
+.seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--a4t-bg-2); border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius-sm); }
+.seg button {
+  border: 0; background: none; cursor: pointer; color: var(--a4t-muted);
+  padding: .32rem .7rem; border-radius: 6px; font-size: .78rem; font-weight: 600;
+  font-family: inherit; min-height: 30px;
+}
+.seg button[aria-pressed="true"] { background: var(--a4t-surface-3); color: var(--a4t-text); }
+.seg button[aria-pressed="true"][data-tone="long"]  { background: var(--a4t-long-wash);  color: var(--a4t-long); }
+.seg button[aria-pressed="true"][data-tone="short"] { background: var(--a4t-short-wash); color: var(--a4t-short); }
+
+/* ── notices ───────────────────────────────────────────────────────── */
+
+.notice {
+  border: 1px solid var(--a4t-line); background: var(--a4t-bg-2);
+  border-radius: var(--a4t-radius-sm); padding: .75rem .85rem;
+  margin: .5rem 0; font-size: .875rem;
+}
+.notice p + .btn, .notice p + .btn-row { margin-top: .6rem; }
+.notice-error { border-color: color-mix(in oklab, var(--a4t-short) 42%, transparent); background: var(--a4t-short-wash); }
+.notice-warn  { border-color: color-mix(in oklab, var(--a4t-short) 30%, transparent); }
+.notice-accent { border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
+.notice-head { font-size: .72rem; margin-bottom: .3rem; letter-spacing: .04em; text-transform: uppercase; color: var(--a4t-muted); }
+.notice-head strong { color: var(--a4t-short); }
+.problems { margin: .4rem 0 0 1.1rem; color: var(--a4t-muted); font-size: .82rem; }
+.problems li { margin-bottom: .15rem; }
+
+.empty {
+  color: var(--a4t-dim); padding: 1.4rem .5rem; text-align: center; font-size: .875rem;
+}
+
+/* ── tables ────────────────────────────────────────────────────────── */
+
+.tbl { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.tbl th {
+  text-align: left; color: var(--a4t-dim); font-weight: 600;
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+  padding: .5rem .6rem; border-bottom: 1px solid var(--a4t-line);
+  white-space: nowrap; background: var(--a4t-bg-2); position: sticky; top: 0;
+}
+.tbl td {
+  padding: .5rem .6rem; border-bottom: 1px solid var(--a4t-line-soft);
+  white-space: nowrap;
+}
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl tbody tr:hover td { background: var(--a4t-surface-2); }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl-kv th { width: 30%; text-transform: none; letter-spacing: .02em; font-size: .72rem; background: none; position: static; font-weight: 500; }
+.tbl-kv td { color: var(--a4t-text); }
+.tbl-kv td, .tbl-kv th { white-space: normal; }
+
+.tbl-wrap { border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius); overflow: hidden; }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.side-long  { color: var(--a4t-long); font-weight: 600; }
+.side-short { color: var(--a4t-short); font-weight: 600; }
+
+/* record cards — the same rows, stacked, on a phone */
+.records { display: grid; gap: .5rem; }
+.record {
+  border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius-sm);
+  background: var(--a4t-bg-2); padding: .65rem .75rem;
+}
+.record-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .45rem; }
+.record-title { font-weight: 600; font-size: .9rem; }
+.record-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem .75rem; }
+.record-grid > div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.record-grid dt, .record-grid .k { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; color: var(--a4t-dim); font-weight: 600; }
+.record-grid dd, .record-grid .v { font-size: .84rem; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+
+.only-mobile { display: block; }
+.only-desktop { display: none; }
+@media (min-width: 768px) {
+  .only-mobile { display: none; }
+  .only-desktop { display: block; }
+}
+
+/* ── decisions ─────────────────────────────────────────────────────── */
+
+.verdict { font-size: 1.5rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.verdict-buy    { color: var(--a4t-long); }
+.verdict-sell   { color: var(--a4t-short); }
+.verdict-hold   { color: var(--a4t-neutral); }
+.verdict-reject { color: var(--a4t-short); }
+.verdict-close  { color: var(--a4t-link); }
+
+.verdict-banner {
+  display: flex; align-items: center; gap: .85rem;
+  padding: .9rem 1rem; border-radius: var(--a4t-radius);
+  border: 1px solid var(--a4t-line); background: var(--a4t-bg-2);
+}
+.verdict-banner[data-kind="buy"]    { border-color: color-mix(in oklab, var(--a4t-long) 40%, transparent);  background: var(--a4t-long-wash); }
+.verdict-banner[data-kind="sell"]   { border-color: color-mix(in oklab, var(--a4t-short) 40%, transparent); background: var(--a4t-short-wash); }
+.verdict-banner[data-kind="reject"] { border-color: color-mix(in oklab, var(--a4t-short) 32%, transparent); }
+.verdict-banner[data-kind="close"]  { border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
+.verdict-banner .vb-body { min-width: 0; }
+.verdict-banner .vb-note { font-size: .82rem; color: var(--a4t-muted); margin-top: .15rem; }
+
+.cond-pass    { color: var(--a4t-long); }
+.cond-fail    { color: var(--a4t-short); }
+.cond-unknown { color: var(--a4t-neutral); }
+
+.cond-row { display: flex; align-items: flex-start; gap: .6rem; padding: .5rem .1rem; border-bottom: 1px solid var(--a4t-line-soft); }
+.cond-row:last-child { border-bottom: 0; }
+.cond-mark {
+  width: 18px; height: 18px; border-radius: 5px; flex: none; margin-top: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 700;
+  background: var(--a4t-surface-2); color: var(--a4t-neutral);
+}
+.cond-mark[data-r="pass"] { background: var(--a4t-long-wash);  color: var(--a4t-long); }
+.cond-mark[data-r="fail"] { background: var(--a4t-short-wash); color: var(--a4t-short); }
+.cond-name { font-size: .85rem; font-weight: 600; }
+.cond-detail { font-size: .78rem; color: var(--a4t-muted); }
+
+/* the rule, restated in a sentence */
+.summary-line {
+  font-size: .9rem; line-height: 1.6; color: var(--a4t-text);
+  background: var(--a4t-bg-2); border: 1px solid var(--a4t-line);
+  border-left: 2px solid var(--a4t-link);
+  border-radius: var(--a4t-radius-sm); padding: .75rem .85rem;
+}
+.summary-line b { color: var(--a4t-link); font-weight: 600; }
+
+/* ── auth pages ────────────────────────────────────────────────────── */
+
+.auth-wrap { max-width: 380px; margin: 0 auto; padding: clamp(2rem, 8vh, 4rem) 16px 3rem; }
+.auth-brand { display: flex; align-items: center; justify-content: center; gap: .55rem; margin-bottom: 1.5rem; font-weight: 700; letter-spacing: -.03em; font-size: 1.05rem; }
+
+/* ── marketing surface ─────────────────────────────────────────────── */
+
+/* legacy surfaces: neutral, so nothing reads as a second brand */
+.legacy { max-width: 700px; margin: 0 auto; padding: clamp(2rem, 6vw, 3.5rem) 16px 4rem; }
+.legacy h1 { font-size: 1.5rem; margin-bottom: 1.2rem; }
+.legacy h2 { font-size: .95rem; margin: 1.4rem 0 .35rem; color: var(--a4t-text); }
+.legacy p { color: var(--a4t-muted); font-size: .9rem; line-height: 1.7; }
+/* Every section used to be a single paragraph, so nothing separated two of
+   them and the lack showed the moment one section needed three. A paragraph
+   break the reader cannot see is not a paragraph break. */
+.legacy p + p { margin-top: .7rem; }
+.legacy-flag {
+  border: 1px solid var(--a4t-line); background: var(--a4t-bg-2);
+  border-radius: var(--a4t-radius-sm); padding: .7rem .8rem; margin-bottom: 1.5rem;
+  font-size: .78rem; color: var(--a4t-dim);
+}
+
+.skel {
+  border-radius: 6px; min-height: 1em;
+  background: linear-gradient(90deg, var(--a4t-surface-2) 25%, var(--a4t-surface-3) 50%, var(--a4t-surface-2) 75%);
+  background-size: 200% 100%;
+  animation: a4t-sheen 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE MARKETING SURFACE
+   ═══════════════════════════════════════════════════════════════════════
+
+   Scoped to `.mkt` and deliberately NOT the app's palette.
+
+   WHY IT IS SEPARATE, rather than a rebrand
+
+   Red already means something inside the product: --a4t-short is short,
+   loss, and destructive, and the trading UI leans on that being unambiguous.
+   Making red the brand colour app-wide would put the brand in competition
+   with every losing position on the screen, and the reader would have to
+   work out which red they were looking at. So the brand red lives here, on
+   the pages a stranger sees, and the trading semantics are untouched.
+
+   Every value below was computed against the WCAG formula rather than
+   chosen by eye, and contrast.test.ts asserts them the same way it asserts
+   the app's. The fill carries white at 5.88:1; the red used AS TEXT is a
+   different, brighter token at 6.69:1 on the page, because #C81228 as text
+   on near-black is 2.1:1 and unreadable — the same mistake the app's teal
+   avoids by separating fill from foreground. */
+
+.mkt {
+  --mkt-bg:        #0A0A0C;
+  --mkt-bg-2:      #0E0E11;
+  --mkt-surface:   #121216;
+  --mkt-surface-2: #17171C;
+  --mkt-line:      #24242C;
+  --mkt-line-soft: #1B1B21;
+
+  --mkt-text:   #F5F3F0;   /* 17.86:1 on the page */
+  --mkt-muted:  #A8A4AE;   /*  8.09:1 */
+  --mkt-dim:    #726E7A;   /*  3.98:1 — large text and metadata only */
+
+  --mkt-accent:      #C81228;   /* FILL. Carries #FFF at 5.88:1 */
+  --mkt-accent-deep: #9B0D1B;
+  --mkt-on-accent:   #FFFFFF;
+  --mkt-accent-text: #FF5F6B;   /* the red used AS TEXT — 6.69:1 */
+  --mkt-accent-wash: rgba(200, 18, 40, 0.14);
+  --mkt-accent-line: rgba(255, 95, 107, 0.26);
+
+  /* The brand lockup draws itself from --a4t-accent so that one file works
+     on every surface. Redefining those four here lets it wear the marketing
+     red without the component knowing this page exists — and without the
+     app's own accent moving, since this only applies inside .mkt. */
+  --a4t-accent:        var(--mkt-accent);
+  --a4t-accent-strong: var(--mkt-accent-deep);
+  --a4t-on-accent:     var(--mkt-on-accent);
+  --a4t-long:          rgba(255, 255, 255, 0.55);
+
+  background: var(--mkt-bg);
+  color: var(--mkt-text);
+  min-height: 100%;
+}
+
+.mkt-wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2rem); }
+
+/* ── nav ─────────────────────────────────────────────────────────────── */
+.mkt-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 1.25rem 0;
+  border-bottom: 1px solid var(--mkt-line-soft);
+}
+.mkt-nav-links { display: flex; align-items: center; gap: .35rem; }
+
+/* ── controls ────────────────────────────────────────────────────────── */
+.mkt-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .62rem 1.05rem; border-radius: 999px;
+  font-size: .875rem; font-weight: 600; letter-spacing: -0.01em;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+  border: 1px solid transparent; text-decoration: none;
+  transition: background .18s ease, transform .18s ease;
+}
+.mkt-btn:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); }
+.mkt-btn:active { transform: translateY(1px); }
+.mkt-btn-ghost {
+  background: transparent; color: var(--mkt-text);
+  border-color: var(--mkt-line);
+}
+.mkt-btn-ghost:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+.mkt-btn-lg { padding: .8rem 1.4rem; font-size: .95rem; }
+
+/* ── hero ────────────────────────────────────────────────────────────── */
+.mkt-hero { position: relative; padding: clamp(3.5rem, 11vw, 7rem) 0 clamp(2.5rem, 7vw, 4.5rem); }
+.mkt-hero h1 {
+  font-size: clamp(2.3rem, 6.2vw, 4.1rem);
+  line-height: 1.02; letter-spacing: -0.035em; font-weight: 700;
+  margin: 0; max-width: 17ch;
+}
+.mkt-hero h1 em { font-style: normal; color: var(--mkt-accent-text); }
+.mkt-lede {
+  font-size: clamp(1rem, 1.7vw, 1.14rem); color: var(--mkt-muted);
+  max-width: 54ch; margin-top: 1.3rem; line-height: 1.66;
+}
+/* One soft red bloom behind the headline. Pointer-events off and sized in
+   vw so it never introduces a horizontal scrollbar on a phone. */
+.mkt-glow {
+  position: absolute; pointer-events: none; z-index: 0;
+  top: -14vw; left: -10vw; width: min(62vw, 640px); height: min(62vw, 640px);
+  background: radial-gradient(circle, rgba(200,18,40,.26) 0%, transparent 68%);
+  filter: blur(42px);
+}
+/* Lift the content above the glow — but NOT the glow itself.
+   This was `.mkt-hero > *`, written when the hero was a simple stack. It set
+   position:relative on every direct child, and because it comes after
+   .mkt-glow in this file it beat that rule's position:absolute. The glow then
+   stopped being out of flow, became a GRID ITEM when the hero turned into a
+   grid, took the first column, and pushed the copy into the second and the
+   terminal onto its own row — half the hero empty on desktop. The :not() is
+   the whole fix: it stops the rule matching the one child that must stay
+   absolute. */
+.mkt-hero > *:not(.mkt-glow) { position: relative; z-index: 1; }
+
+.mkt-eyebrow {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .3rem .7rem; border-radius: 999px;
+  font-size: .76rem; font-weight: 600; letter-spacing: .02em;
+  color: var(--mkt-accent-text);
+  background: var(--mkt-accent-wash);
+  border: 1px solid var(--mkt-accent-line);
+  margin-bottom: 1.15rem;
+}
+
+/* ── waitlist form ───────────────────────────────────────────────────── */
+.mkt-cta { margin-top: 2rem; max-width: 30rem; }
+.wl-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.wl-input {
+  flex: 1 1 15rem; min-width: 0;
+  padding: .72rem .95rem; border-radius: 999px;
+  background: var(--mkt-surface); color: var(--mkt-text);
+  border: 1px solid var(--mkt-line); font-size: .92rem;
+  font-family: inherit;
+}
+.wl-input::placeholder { color: var(--mkt-dim); }
+.wl-input:focus-visible {
+  outline: 2px solid var(--mkt-accent-text); outline-offset: 1px;
+  border-color: transparent;
+}
+.wl-submit {
+  display: inline-flex; align-items: center; gap: .45rem; cursor: pointer;
+  padding: .72rem 1.25rem; border-radius: 999px; border: 1px solid transparent;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+  font-size: .9rem; font-weight: 600; font-family: inherit;
+  transition: background .18s ease;
+}
+.wl-submit:hover:not(:disabled) { background: var(--mkt-accent-deep); }
+.wl-submit:disabled { opacity: .55; cursor: not-allowed; }
+.wl-note { font-size: .78rem; color: var(--mkt-dim); margin-top: .7rem; line-height: 1.6; max-width: 44ch; }
+.wl-error { display: flex; align-items: center; gap: .4rem; font-size: .82rem; color: var(--mkt-accent-text); margin-top: .6rem; }
+.wl-done { display: flex; align-items: center; gap: .45rem; font-size: 1rem; font-weight: 600; color: var(--mkt-text); }
+.wl-spin { animation: wl-spin 1s linear infinite; }
+@keyframes wl-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wl-spin { animation: none; } }
+
+/* ── panels ──────────────────────────────────────────────────────────── */
+.mkt-section { padding: clamp(2.5rem, 7vw, 4.5rem) 0; border-top: 1px solid var(--mkt-line-soft); }
+.mkt-section h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem); letter-spacing: -0.025em;
+  font-weight: 700; margin: 0 0 .5rem;
+}
+.mkt-section > p { color: var(--mkt-muted); max-width: 58ch; line-height: 1.68; margin: 0; }
+
+.mkt-cards { display: grid; gap: 1rem; margin-top: 2rem; grid-template-columns: 1fr; }
+@media (min-width: 720px)  { .mkt-cards { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1000px) { .mkt-cards-3 { grid-template-columns: repeat(3, 1fr); } }
+
+.mkt-card {
+  background: var(--mkt-surface); border: 1px solid var(--mkt-line);
+  border-radius: 16px; padding: 1.4rem;
+}
+.mkt-card h3 {
+  font-size: 1rem; font-weight: 650; margin: .9rem 0 .4rem;
+  letter-spacing: -0.01em;
+}
+.mkt-card p { font-size: .875rem; color: var(--mkt-muted); line-height: 1.65; margin: 0; }
+.mkt-card-ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--mkt-accent-wash); border: 1px solid var(--mkt-accent-line);
+  color: var(--mkt-accent-text);
+}
+
+/* The rule, shown as the product writes it. Monospace because it is output,
+   not prose. */
+.mkt-rule {
+  margin-top: 1.6rem; padding: 1.15rem 1.3rem;
+  background: var(--mkt-bg-2); border: 1px solid var(--mkt-line);
+  border-left: 3px solid var(--mkt-accent); border-radius: 12px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .86rem; line-height: 1.8; color: var(--mkt-text);
+}
+
+.mkt-plain { font-size: .875rem; color: var(--mkt-muted); line-height: 1.7; max-width: 66ch; }
+.mkt-plain strong { color: var(--mkt-text); font-weight: 600; }
+
+.mkt-foot {
+  padding: 2.5rem 0 3rem; border-top: 1px solid var(--mkt-line);
+  font-size: .8rem; color: var(--mkt-dim);
+  display: flex; gap: .9rem; flex-wrap: wrap; justify-content: space-between;
+}
+.mkt-foot a { color: var(--mkt-muted); text-decoration: none; }
+.mkt-foot a:hover { color: var(--mkt-text); }
+
+/* The risk statement. Not a footnote in grey 10px — it is a sentence the
+   reader is meant to actually read, so it is sized like one. */
+.mkt-risk {
+  margin-top: 1.4rem; padding: 1rem 1.2rem; border-radius: 12px;
+  background: var(--mkt-surface); border: 1px solid var(--mkt-line);
+  font-size: .82rem; color: var(--mkt-muted); line-height: 1.7; max-width: 70ch;
+}
+
+/* ── premium terminal composition for the marketing page ────────────── */
+
+.mkt-hero-terminal {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(1.5rem, 5vw, 3.5rem);
+  align-items: center;
+}
+@media (min-width: 980px) {
+  .mkt-hero-terminal { grid-template-columns: minmax(0, .88fr) minmax(420px, 1fr); }
+}
+.mkt-hero-copy { min-width: 0; }
+
+.mkt-terminal {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--mkt-accent-text) 24%, var(--mkt-line));
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), transparent 32%),
+    radial-gradient(circle at 18% 0%, rgba(200,18,40,.24), transparent 34%),
+    var(--mkt-surface);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.09) inset,
+    0 38px 90px -46px rgba(200,18,40,.9),
+    0 28px 70px -48px rgba(0,0,0,1);
+  padding: .85rem;
+}
+.mkt-terminal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(180deg, black, transparent 78%);
+  pointer-events: none;
+}
+.mkt-terminal::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -42% 18%;
+  height: 220px;
+  background: radial-gradient(circle, rgba(255,95,107,.22), transparent 68%);
+  filter: blur(16px);
+  pointer-events: none;
+}
+.mkt-terminal-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .3rem .35rem .8rem;
+  color: var(--mkt-dim);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .72rem;
+}
+.mkt-terminal-top span {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--mkt-accent-text);
+  box-shadow: 0 0 18px rgba(255,95,107,.55);
+}
+.mkt-terminal-top span:nth-child(2) { opacity: .62; }
+.mkt-terminal-top span:nth-child(3) { opacity: .32; }
+.mkt-terminal-top strong { margin-left: .35rem; font-weight: 500; }
+.mkt-terminal-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .65rem;
+}
+@media (min-width: 640px) {
+  .mkt-terminal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.mkt-terminal-panel {
+  min-height: 116px;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.055), transparent),
+    rgba(10,10,12,.58);
+  padding: .95rem;
+  backdrop-filter: blur(12px);
+}
+.mkt-terminal-wide { grid-column: 1 / -1; }
+.mkt-terminal-accent {
+  border-color: color-mix(in oklab, var(--mkt-accent-text) 34%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255,95,107,.18), transparent 48%),
+    rgba(10,10,12,.62);
+}
+.mkt-terminal-panel small {
+  display: block;
+  color: var(--mkt-dim);
+  font-size: .67rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 700;
+  margin-bottom: .45rem;
+}
+.mkt-terminal-panel b {
+  display: block;
+  color: var(--mkt-text);
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  line-height: 1.05;
+  letter-spacing: -.025em;
+}
+.mkt-terminal-safe { color: rgba(255,255,255,.76) !important; }
+.mkt-terminal-panel p {
+  color: var(--mkt-muted);
+  font-size: .78rem;
+  line-height: 1.45;
+  margin: .45rem 0 0;
+}
+.mkt-terminal-rule {
+  color: var(--mkt-text);
+  font-size: .9rem;
+  line-height: 1.55;
+  border-left: 2px solid var(--mkt-accent-text);
+  padding-left: .7rem;
+}
+
+.mkt-bento {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+@media (min-width: 800px) {
+  .mkt-bento { grid-template-columns: repeat(6, 1fr); }
+  .mkt-bento .mkt-card { grid-column: span 2; min-height: 214px; }
+  .mkt-bento .mkt-bento-large { grid-column: span 3; }
+}
+.mkt-bento .mkt-card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255,255,255,.045) inset, 0 20px 50px -36px rgba(0,0,0,.95);
+}
+.mkt-bento .mkt-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -42% 18%;
+  height: 150px;
+  background: radial-gradient(circle, rgba(200,18,40,.18), transparent 70%);
+  pointer-events: none;
+}
+
+.mkt-flow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.2rem;
+}
+@media (min-width: 980px) {
+  .mkt-flow { grid-template-columns: .72fr 1.28fr; align-items: start; }
+}
+.mkt-flow h2 { max-width: 13ch; }
+.mkt-flow-steps { display: grid; gap: .6rem; }
+.mkt-flow-step {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: .15rem .75rem;
+  align-items: start;
+  border: 1px solid var(--mkt-line-soft);
+  border-radius: 14px;
+  background: rgba(255,255,255,.025);
+  padding: .8rem;
+}
+.mkt-flow-step span {
+  grid-row: span 2;
+  color: var(--mkt-accent-text);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .82rem;
+}
+.mkt-flow-step strong { font-size: .9rem; color: var(--mkt-text); }
+.mkt-flow-step p {
+  color: var(--mkt-muted);
+  font-size: .8rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* The optional question after a sign-up. Quiet on purpose: it is asked of
+   somebody who has already done the thing we wanted, and it must not read
+   like a second hurdle. */
+.wl-ask { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--mkt-line-soft); }
+.wl-ask-q { font-size: .82rem; color: var(--mkt-muted); margin: 0 0 .6rem; }
+.wl-skip {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  font-size: .82rem; color: var(--mkt-dim); padding: .72rem .6rem;
+}
+.wl-skip:hover { color: var(--mkt-text); }
+
+/* ── pricing cards ───────────────────────────────────────────────────────
+   The vendored component arrived with a tint per plan, drawn from a generic
+   palette: teal for one card, amber for the other, each with two coloured
+   blobs and a coloured orb. On a page whose whole identity is black and one
+   red, that rendered a turquoise card beside an orange one, and the lower
+   half of both inherited the APP's surface tokens, which were a blue, rather
+   than the marketing page's (#0A0A0C), so the cards sat on the page as two
+   foreign rectangles at the exact point somebody decides whether to pay.
+
+   The tints are gone. Two treatments remain, and they carry meaning instead
+   of decoration: `neutral` is the free plan, `accent` is the one that costs
+   money. Everything is a --mkt-* token, so contrast.test.ts can read the
+   numbers rather than anybody judging them by eye — which is how the teal
+   shipped in the first place. */
+.mkt {
+  --pc-card:        #121216;   /* same family as --mkt-surface */
+  --pc-card-2:      #0E0E11;
+  --pc-head:        #17171C;
+  --pc-head-accent: #2A0A10;   /* carries --mkt-text at 15.00:1 */
+  --pc-note:        #9A96A1;   /*  6.76:1 on --pc-head  */
+  --pc-note-accent: #C8C2CC;   /* 10.03:1 on --pc-head-accent */
+}
+
+.pc { display: grid; gap: 1.6rem; }
+.pc-head-row {
+  display: flex; flex-direction: column; gap: .35rem;
+}
+.pc-head-row h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem); letter-spacing: -0.025em;
+  font-weight: 700; margin: 0;
+}
+.pc-head-row p { color: var(--mkt-muted); font-size: .9rem; margin: 0; }
+
+.pc-card {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--mkt-line); border-radius: 18px;
+  background: var(--pc-card-2); padding: .3rem;
+}
+/* The paid plan is the one the page is arguing for, so it is the one that
+   wears the accent. Not a louder colour — the same red the rest of the page
+   uses, which is what makes it read as the same product. */
+.pc-card-accent { border-color: var(--mkt-accent-line); }
+
+.pc-top {
+  position: relative; overflow: hidden;
+  border-radius: 15px; padding: 1.3rem;
+  background: var(--pc-head); border: 1px solid var(--mkt-line-soft);
+}
+.pc-card-accent .pc-top {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), transparent 40%),
+    var(--pc-head-accent);
+  border-color: var(--mkt-accent-line);
+}
+.pc-card-accent .pc-top::after {
+  content: ""; position: absolute; inset: -40% -30% auto auto;
+  width: 240px; height: 240px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,18,40,.42), transparent 68%);
+  filter: blur(26px); pointer-events: none;
+}
+.pc-top > * { position: relative; z-index: 1; }
+
+.pc-badge {
+  display: inline-block; font-size: .7rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .2rem .55rem; border-radius: 999px;
+  color: var(--mkt-accent-text);
+  background: var(--mkt-accent-wash);
+  border: 1px solid var(--mkt-accent-line);
+}
+.pc-name {
+  font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em;
+  margin: .75rem 0 .25rem; color: var(--mkt-text);
+}
+.pc-desc { font-size: .84rem; line-height: 1.6; margin: 0; color: var(--pc-note); }
+.pc-card-accent .pc-desc { color: var(--pc-note-accent); }
+
+.pc-price-row { display: flex; align-items: baseline; gap: .5rem; margin-top: 1.1rem; }
+.pc-price {
+  font-size: 2.1rem; font-weight: 700; letter-spacing: -0.03em;
+  color: var(--mkt-text); line-height: 1;
+}
+.pc-was { font-size: .95rem; color: var(--pc-note); text-decoration: line-through; }
+.pc-price-note { font-size: .76rem; margin: .4rem 0 0; color: var(--pc-note); }
+.pc-card-accent .pc-price-note, .pc-card-accent .pc-was { color: var(--pc-note-accent); }
+
+.pc-cta {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; margin-top: 1.15rem; padding: .72rem 1rem;
+  border-radius: 999px; border: 1px solid transparent;
+  font: inherit; font-size: .9rem; font-weight: 600;
+  text-decoration: none; cursor: pointer;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+}
+.pc-cta:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); }
+.pc-cta-quiet {
+  background: transparent; color: var(--mkt-text);
+  border-color: var(--mkt-line);
+}
+.pc-cta-quiet:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+/* A plan that cannot be bought yet still shows its button, because hiding it
+   would read as the plan not existing. It must not look clickable. */
+.pc-cta:disabled, .pc-cta[aria-disabled="true"] {
+  background: var(--mkt-surface-2); color: var(--mkt-muted);
+  border-color: var(--mkt-line); cursor: not-allowed;
+}
+.pc-cta-note { font-size: .76rem; line-height: 1.55; margin: .6rem 0 0; color: var(--pc-note); }
+.pc-card-accent .pc-cta-note { color: var(--pc-note-accent); }
+
+.pc-body { padding: 1.2rem 1.1rem .4rem; }
+.pc-features { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.pc-features li {
+  display: flex; align-items: flex-start; gap: .55rem;
+  font-size: .86rem; line-height: 1.5; color: var(--mkt-text);
+}
+.pc-features .ico { color: var(--mkt-accent-text); flex: none; margin-top: .15rem; }
+.pc-foot {
+  margin-top: 1.1rem; padding-top: .9rem;
+  border-top: 1px solid var(--mkt-line-soft);
+}
+.pc-foot strong { display: block; font-size: .8rem; color: var(--mkt-text); }
+.pc-foot p { font-size: .78rem; line-height: 1.6; margin: .2rem 0 0; color: var(--mkt-muted); }

@@ -1,0 +1,127 @@
+name: Tests
+
+# Runs the whole suite on every push to the branches that matter, and on every
+# pull request into them. The deploy branch auto-deploys the live trading bot,
+# so a push there was previously the first time anything got verified — by
+# production.
+#
+# NO SECRETS. Nothing here needs one: the test suites became self-contained
+# when the security pass fixed five files that died on OAuthSigningSecretMissing
+# under a clean environment. Each sets a fake, test-only signing secret in its
+# own header. That is why this workflow can exist at all, and why it is safe to
+# run on a pull request from anywhere.
+#
+# It CANNOT deploy. There is no SSH step, no registry push, no cloud
+# credential, and `permissions` is read-only. The repository has exactly one
+# production trading deployment path — Render, from the branch — and this is
+# not a second one.
+
+on:
+  push:
+    branches:
+      - claude/arcads-external-api-gExX7
+      - claude/arcads-external-api-gexx7-6n4pr9
+  pull_request:
+    branches:
+      - claude/arcads-external-api-gExX7
+      - claude/arcads-external-api-gexx7-6n4pr9
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: server.js — 61 security tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci --omit=dev || npm install --omit=dev
+
+      - name: Syntax check
+        run: node --check server.js
+
+      - name: Tests
+        run: npm test
+
+      - name: Dependency audit
+        # Informational: a new advisory should be visible without turning the
+        # whole run red on someone else's disclosure schedule.
+        run: npm audit --omit=dev || true
+
+  python:
+    name: apex-forex-bot — 98 test files
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apex-forex-bot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apex-forex-bot/requirements.txt
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Compile
+        run: python -m compileall -q apex
+
+      - name: Tests
+        env:
+          # A development environment, declared explicitly. The store layer
+          # refuses to start without this rather than silently writing
+          # credentials in plaintext, and that refusal is itself under test.
+          APP_ENV: test
+          ALLOW_PLAINTEXT_DEV_STORAGE: 'true'
+          ALLOW_LOCAL_BACKEND_DEV: 'true'
+          PAPER_TRADING: 'true'
+          # Fake, and only meaningful inside this run. Production still fails
+          # closed without a real one — apex/ctrader_oauth raises
+          # OAuthSigningSecretMissing, which test_oauth_production_guard proves.
+          TELEGRAM_BOT_TOKEN: ci-only-not-a-real-token
+        run: python -m pytest -q
+
+  config-drift:
+    name: generated allowlist is current
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: pip install -r apex-forex-bot/requirements.txt
+
+      - name: Regenerate and compare
+        # config/bot-config-fields.json is generated from settings_policy and
+        # read by server.js to filter what the bot receives. If someone adds a
+        # setting and forgets to regenerate, the bot silently stops receiving
+        # it — so the check is that regenerating produces no diff.
+        run: |
+          python3 scripts/gen_bot_config_fields.py
+          if ! git diff --quiet config/bot-config-fields.json; then
+            echo "::error::config/bot-config-fields.json is stale."
+            echo "Run: python3 scripts/gen_bot_config_fields.py"
+            git diff config/bot-config-fields.json
+            exit 1
+          fi
+          echo "allowlist is current"

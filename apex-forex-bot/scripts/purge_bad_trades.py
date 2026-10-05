@@ -6,7 +6,7 @@ BEFORE that fix, it doesn't need to run again after).
 Safe by default: prints what it WOULD remove and does nothing else. Pass
 --apply to actually overwrite the journal in Redis.
 
-Run from apex-crypto-bot/ (needs the same env vars as the running bot —
+Run from apex-forex-bot/ (needs the same env vars as the running bot —
 REDIS_URL or UPSTASH_REDIS_REST_URL/TOKEN, and PRODUCT):
 
     python3 scripts/purge_bad_trades.py <user_id> [--apply] [--threshold 50000]

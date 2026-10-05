@@ -1,0 +1,603 @@
+# Apex4Traders — handoff
+
+**State at:** `94c6c0b` on `claude/apex4traders-platform-v1`
+**Date:** 2026-10-04 (body written 2026-09-30; corrected in place since)
+
+> **Where this file is NOT the authority.** `docs/RELEASE_READINESS.md` owns
+> the status of blocker X1 and of every gate. This file restated that status
+> once, went stale within two days, and a later session acted on the stale
+> copy. Status that moves lives in one place; this file links to it.
+> **What "assessed at" means here.** The commit named is the one the tree was in
+> when these numbers were produced. The commit that updates this line changes
+> only documentation, so the numbers still hold at it — that is the convention,
+> and it is the reason the SHA is a commit rather than "latest".
+
+
+Read **`docs/CODEX_CLAUDE_PROTOCOL.md`** first — it is the normative working
+agreement and it defines the contract this document has to satisfy. Then this
+file, then `docs/RELEASE_READINESS.md`. Everything else is detail.
+
+---
+
+## 1. Where this actually is
+
+A rule-driven trading automation platform, connected to cTrader, that runs on
+**demo accounts only**.
+
+**As of 2026-09-27 this platform has spoken to the real cTrader.** A real
+broker demo account (`47765456`) was authorised, its authorization code
+exchanged, its account list read, and the connection written — repeatedly,
+from a phone and a PC, against the deployed services. The sentence that stood
+here for two days, "nothing has ever run against a real broker", is no longer
+true and has been removed rather than softened.
+
+What that closes and what it does not is in §1g.
+
+| | |
+|---|---|
+| Tests | 168 backend files, 255 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
+| Private demo beta | **NOT YET**, but narrower than this line used to say. Reads, preview on real bars and the controls are all proven against the real broker; the screens were walked on 2026-10-04 with nothing connected. `docs/RELEASE_READINESS.md` gate 1 is the authority; see §2 |
+| Public beta | **NO** |
+| Taking money | **NO** — 499 USD one-time founder offer recorded, checkout still off |
+| Live trading | **NO**, and not implemented |
+
+## 1b. What phases A–E of 2026-09-25 changed
+
+Four audits were run that had never been run. Each found something real.
+
+| Audit | Finding |
+|---|---|
+| `npm audit` | **1 critical + 5 high.** Two unauthenticated RCEs in `next`, plus a middleware/proxy bypass — and this app enforces auth in middleware, so that one was an authentication bypass here. Fixed: next 16.2.7 → 16.3.6, now 0 vulnerabilities. |
+| Route audit | **`/configurator` was gated.** It is the previous checkout's return URL, kept so an old receipt does not 404, and it was redirecting those visitors to a login page for an account they do not have. Fixed. |
+| Copy-audit self-audit | **The allowlist was a hole 25 files wide.** Per-file exemptions meant `/terms` was exempt from the rule banning the old brand's support address. 14 of 25 entries needed no exemption at all. Restructured to per-rule. |
+| `pip-audit` | Advisories in `cryptography`, `protobuf`, `pyOpenSSL`, `Twisted` — **all hard-pinned by `ctrader-open-api==0.9.2`**, whose newest release is 0.9.2 (0.9.3 was yanked). **Resolved since:** the generated `_pb2` stubs were vendored (`apex/ctrader_proto/`, MIT, provenance recorded) and the SDK dependency dropped, which freed four pins, not two. `protobuf==6.33.5` clears all three advisories; measured with pip-audit rather than assumed. |
+
+And the deployment picture was read from the live Render account for the first
+time. There was no service for this platform. **There is now** — see §1c.
+
+## 1c. Deployment: this branch IS deployed, as of 2026-09-26
+
+Two services were created for the platform and deploy this branch:
+
+| Service | ID | URL |
+|---|---|---|
+| `apex4traders-api` | `srv-das11onlk1mc73dtj1fg` | <https://apex4traders-api.onrender.com> |
+| `apex4traders-web` | `srv-das11tfavr4c738irjv0` | <https://apex4traders-web.onrender.com> |
+
+Plus a Key Value store, `apex4traders-store` (`red-das1cb59fdbs73bf68g0`,
+noeviction). `autoDeploy` is **off** on both: every deploy is triggered
+deliberately, and a push is therefore not a release.
+
+`/readyz` reports all checks `ok`, shared store Redis (not the memory
+fallback), live trading off.
+
+**The legacy Telegram bot service is untouched and must stay that way.** It
+deploys a different branch. The Fernet-token masking in `apex/redact.py`
+protects that bot's logs and is still not live, because it is on the wrong
+branch for the service that runs it — that has not changed.
+
+`docs/DEPLOYMENT_READINESS.md` has the full picture: what two services would be
+needed, every variable as a name and a placeholder, and the fact that the health
+check path is empty on all three existing services so Render has no signal to
+restart on.
+
+No service was created or changed. That is an owner decision with a cost.
+
+## 1d. How to re-run the browser pass
+
+The audit harness lives in the scratchpad, not the repository, and it survives
+between sessions in this container:
+
+```
+scratchpad/audit/serve.py    real apex.platform.api.handle() + a GoTrue stand-in, port 3001
+scratchpad/audit/shoot.js    21 routes at 1440x900, 7 at 390x844
+scratchpad/audit/verify.js   signed-OUT public/protected classification
+```
+
+```bash
+export AUDIT_DATA_DIR=<scratchpad>/audit/data
+cd <scratchpad>/audit && python3 serve.py &          # 3001
+cd web && NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:3001 \
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=audit-anon-key \
+  NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3001 \
+  npm run build && PORT=3000 npm run start &
+cd <scratchpad>/audit && node shoot.js && node verify.js
+```
+
+Chromium is at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Do **not**
+run `playwright install`. Run `verify.js` too, not only `shoot.js`: `shoot.js`
+signs in first, so it cannot see a public route that has been wrongly gated —
+which is exactly the bug that was found.
+
+## 1e. Session of 2026-09-26 — deployment prepared, TLS answered, scrub done
+
+### The TLS question is settled, and it corrected me
+
+Yesterday's assessment said the pinned-dependency exposure was "the TLS session
+to cTrader". **Wrong.** `apex/brokers/ctrader.py` opens its own socket with
+`ssl.create_default_context()` — CERT_REQUIRED, check_hostname, `server_hostname`
+passed — against the SYSTEM OpenSSL, not the wheel's. pyOpenSSL and Twisted are
+not on any path this product executes; they are dragged in because the SDK's
+`__init__.py` imports its client eagerly.
+
+Separate finding: **the SDK's own `Client` is `VERIFY_NONE`** (measured —
+`trustRoot=None`, `verify=False`). We do not use it.
+`tests/test_broker_tls_posture.py` now keeps it that way, because switching to
+the SDK's client looks like a simplification and silently turns certificate
+verification off. Four mutations killed.
+
+Tested combinations are in `docs/DEPLOYMENT_READINESS.md` §6. The one that
+matters: **pyOpenSSL 26 + newest cryptography is BROKEN** (`AttributeError:
+GEN_EMAIL`), which is what "fix the advisory" would have produced if applied
+blind. Recommended minimal change is `protobuf==3.20.2`, tested, **not applied**
+because requirements.txt is the live bot's and this branch is not deployed, so
+it would take effect whenever the branches converge without anybody deciding.
+
+### Deployment prepared, not applied
+
+`docs/deploy/render-apex4traders.yaml` — `apex4traders-api` (root
+`apex-forex-bot`, `/healthz`) and `apex4traders-web` (root `web`, `npm ci`).
+Deliberately not the root `render.yaml`, which Render reads and would act on.
+Both name the platform branch with `autoDeploy: false`, so nothing here can
+restart the legacy trading loop. `tests/test_platform_blueprint.py` validates it
+against the repository — the bot's own blueprint already failed exactly this way
+by omitting `rootDir`.
+
+### The legacy identifiers are scrubbed, on the bot's own branch
+
+`claude/arcads-external-api-gexx7-6n4pr9`, commits `fd1acb491` and `f566c6629`.
+28 files, synthetic same-shape values, 142/142 bot tests still pass. That branch
+is **not** the one Render deploys (`…-gExX7` is), checked before switching.
+
+One file deliberately untouched: `nova/config/nova.json5` — `allowFrom:
+["7585109158"]` is live configuration deciding who may use the tool. Scrubbing
+it would revoke access, not scrub an identifier. Moving it to an environment
+variable is the right fix and a separate change.
+
+**History not rewritten.** Purging needs a force push over shared history.
+
+**My error, recorded:** `git add -A` on that branch swept in 113 `ui-audit/`
+screenshots (15 MB). Untracked and gitignored in `f566c6629`; the previous
+commit's history still holds them. The platform branch already gitignored
+`ui-audit/`, which is why it never happened here.
+
+## 1f. Codex review decisions — settled, do not re-open
+
+Review of handoff #2, 2026-09-26. These are decided; a next session that
+re-litigates them is wasting the review.
+
+| Question | Decision |
+|---|---|
+| `protobuf` 3.20.1 → 3.20.2 | Decided **apply**, and it turned out **not implementable** — `ctrader-open-api==0.9.2` pins `protobuf==3.20.1`, so the bump makes `pip install -r requirements.txt` fail with ResolutionImpossible. Reverted, guarded by a test, and the only real route (vendor the `_pb2` stubs) is written up in `docs/DEPLOYMENT_READINESS.md` §6. **Back to Codex.** |
+| pyOpenSSL / cryptography | **Do not raise now.** Off our execution path; the 26 + newest-cryptography pairing is broken. |
+| Render topology | **Two separate services** for the platform. Do **not** merge the platform into the Telegram bot's service. |
+| Git history rewrite for the scrubbed identifiers | **Not now.** |
+| `nova/config/nova.json5` `allowFrom` → env var | **Later**, as a separate change on the bot's branch. |
+| Empty health check path on the three existing services | **Fixed separately** on the legacy deployment, not from here. |
+
+Two required fixes came with it and are done:
+
+1. **`tests/test_broker_tls_posture.py` missed three spellings** of reaching the
+   SDK's `Client` — the submodule import, `from … import client` then
+   `client.Client`, and `import … as c` then `c.Client`. All three were
+   confirmed by mutation before the fix. It now resolves aliases rather than
+   matching names, catches nine variants including `getattr`, and is itself
+   tested against five legitimate constructs so it cannot be deleted for crying
+   wolf. Commit `495fed056`.
+2. **Stale release docs** — this file said `c95e5d7df` and
+   `RELEASE_READINESS.md` said `6f35dcd7f` with `160 / 160`. Both now name
+   `495fed056` with the current counts, and both state what "assessed at" means
+   so the next reader can tell a deliberate SHA from a forgotten one.
+
+## 1g. Session of 2026-09-27 — the OAuth flow met the real cTrader
+
+Deployed to `apex4traders-api` and `apex4traders-web` throughout. Five defects,
+each found in production, each with the evidence that found it.
+
+| # | Defect | How it was found |
+|---|---|---|
+| 1 | **cTrader's authorization code expires in ONE MINUTE.** The flow parked it at the callback and exchanged it on a second, human-timed click. Rate-limited on that button, the owner waited for the window to roll and came back to a dead code — answered `ACCESS_DENIED`, which names credentials and means nothing of the kind. A day went into suspecting a correct client secret. | cTrader's own docs, after the guess-and-check had been exhausted. The deprecated Telegram module exchanges in its callback, which is why the legacy bot works on the same application and the same credentials. |
+| 2 | `RATE_LIMITED` reported the WINDOW LENGTH (a flat 60) whichever second of the minute it was, and the message said only "wait a moment". | Reading the limiter after the owner hit it twice. |
+| 3 | **The nonce was lost at login.** The middleware put only the pathname in `next=`, and cTrader opens in a new tab whose `sessionStorage` is empty — so `?n=` was the only record of the attempt. A lapsed session during the round trip lost it. Fixing it exposed a pre-existing **open redirect**: `next` went straight into `router.push`. | Reading the middleware while implementing observability. |
+| 4 | A finished connection still showed **"Step 1 — authorise"**, because the heading was chosen from `pending`, which is cleared on success. The owner pressed Connect again five seconds after succeeding. | **The server log.** First defect in this flow found without a photograph of a phone. |
+| 5 | Finishing an **already-finished** attempt answered `NOT_READY` — "this connection has not come back from cTrader yet" — about one that had come back, been exchanged and been written. | The server log, by the diagnostic id the owner read off the screen. |
+
+**The instrument that made 4 and 5 possible:** `apex/platform/linklog.py`.
+Every step of the link now says what happened, keyed by an attempt id —
+`HMAC(nonce)[:8]`, surfaced to the client as `diagnosticId` — so a failure is
+reported by reading eight characters aloud instead of sending a screenshot of
+a page with a live session on it. `tests/test_platform_linklog.py` drives the
+real flow with sentinel credentials and greps everything the process printed;
+five deliberate leaks were planted and all five failed it.
+
+**Also shipped:** `docs/MT5_CLOUD_CONNECTOR_SPIKE.md` and
+`apex/platform/brokers/` — a platform-neutral provider contract plus
+read-only MT4 and MT5 skeletons behind env flags, wired to nothing. See §1h.
+
+**A pre-existing hole closed:** `test_platform_live_invariants.py` enumerated
+modules with `os.listdir`, so anything in a subpackage escaped every check in
+it. It now walks.
+
+### What is still open on the flow
+
+The owner reports pressing "I have approved — finish" with **no request
+reaching the server** — `ctrader/status` polls from the same page keep
+arriving, so the page is alive and authenticated. `complete()` opened with a
+bare `if (!nonce) return;`, the only path through that function that produces
+neither a request nor a message; it now reports `NO_PENDING`. Whether that was
+the cause is **not yet confirmed by evidence**, and must not be written up as
+if it were.
+
+Independently, the connect page now offers an escape route that does not go
+through that button: when an account is already connected, the step-2 card
+says so, names it, and links to `/accounts`.
+
+### Follow-up on PR #6 — connected state and smoke selection
+
+Codex could not post an inline GitHub review comment from this environment:
+the GitHub connector returned `403 Resource not accessible by integration`.
+The review finding was applied directly in two commits on this branch:
+
+| Commit | Change |
+|---|---|
+| `214fe94` | The Connect page now lets the server's `connected` verdict beat a local `pending` nonce. `sessionStorage` is a recovery aid, not the source of truth, so a stale pending attempt can no longer keep an already-linked client in the finish flow. The cTrader smoke script also accepts optional `SMOKE_SELECT_CTID` and selects that account through `ctrader_link.select_account` before read checks. |
+| `0965cfa` | `SMOKE_SELECT_CTID` now refuses unless the selected account actually becomes the selected demo account. A mismatch or live selected mode stops with exit 2 before any broker reads. |
+
+Tests run after these commits:
+
+| Command | Result |
+|---|---|
+| `python tests/test_smoke_harness.py` | Pass |
+| `python tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 28 platform modules |
+
+Web tests were not run in this environment. `npm ci` repeatedly failed or
+stalled on network package download (`ECONNRESET`), before `vitest`, `next` or
+`eslint` were installed. That is a verification gap, not a claim that web tests
+pass.
+
+### Follow-up on 2026-09-29 — missing completion nonce is no longer ambiguous
+
+Commit `d144ace` moves `NO_PENDING` into the backend as well as the browser.
+If `ctrader/complete` is reached without a nonce, it now logs
+`complete.no_pending` with only the redacted user reference and returns
+`NO_PENDING` instead of collapsing into `STATE_UNKNOWN`. That separates a
+client/page state problem from a stale, guessed, expired or lost pending record
+when reading production logs.
+
+Tests run after this commit:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_ctrader_link.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_linklog.py` | Pass, no OAuth code/token/secret/nonce/user-id leaks in link logs |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 28 platform modules |
+
+The same commit also makes `test_platform_ctrader_link.py` read the deprecated
+legacy OAuth module as UTF-8 explicitly, so the Windows test run does not fail
+on source text before it reaches the platform assertions.
+
+### Follow-up on 2026-09-30 — release identity and MT4/MT5 skeletons
+
+Commits after the real broker-read pass:
+
+| Commit | Change |
+|---|---|
+| `50eae57` | `/healthz`, `/readyz` and authenticated system diagnostics include safe release metadata when Render exposes it, so a smoke test can confirm which commit is deployed. |
+| `65ddd67` | The smoke-test and Render setup docs now require checking the deployed commit before interpreting broker smoke results. |
+| `cdbe833` | Adds an MT4 cloud-provider skeleton beside MT5. Both are read-only, hidden from routes and UI, unverified by default, and cannot place orders. |
+
+Tests run after `cdbe833`:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_provider_safety.py` | Pass, MT4/MT5 providers stay hidden and read-only |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 29 platform modules |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_http.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_entitlement.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_smoke_harness.py` | Pass |
+
+Web tests were still not runnable in this Windows worktree because
+`web/node_modules` exists without `vitest`; earlier `npm ci` attempts stalled or
+failed on network package download. Treat that as a verification gap, not a
+pass.
+
+
+### Follow-up on 2026-09-30 — browser walkthrough contract
+
+Commit after `a36e234`:
+
+| Commit | Change |
+|---|---|
+| `5fb0a1a` | Adds a static cTrader browser-walkthrough contract test. It verifies the repo still exposes UI anchors for connect diagnostics, account selection, live-account blocking, server execution verdict, chart evidence, preview, and journal no-order states. It does not replace the real browser/phone smoke pass. |
+
+Tests run after `5fb0a1a`:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_ctrader_browser_walkthrough_contract.py` | Pass |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_provider_safety.py` | Pass, MT4/MT5 providers remain hidden and read-only |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass, live execution remains unreachable across 29 platform modules |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_smoke_harness.py` | Pass |
+
+### Follow-up on 2026-09-30 — web dependency restore and verification
+
+Commit after `1fe3498`:
+
+| Commit | Change |
+|---|---|
+| `cec3771` | Removes an unused connected-account variable from the cTrader connect page, after local ESLint surfaced it. No product behavior changes. |
+
+Verification after `cec3771`:
+
+| Command | Result |
+|---|---|
+| `npm ci --prefer-offline --fetch-retries=2` in `web/` | Pass; 540 packages installed, 541 audited, 0 vulnerabilities. Warned that `unrs-resolver@1.12.2` has an install script not covered by `allowScripts`; no approval or policy change was made. |
+| `npm run build` in `web/` | Pass; Next 16.3.6 generated 24 routes. Warned that the `middleware` file convention is deprecated in favor of `proxy`. |
+| `npx eslint src --format stylish` in `web/` | Pass with 0 errors and 8 warnings: existing `<img>` warnings in `components/blocks/hero-section-{1,2}.tsx` and one `no-unused-expressions` warning in `src/test/e2e.test.ts`. |
+| `npm test` / `npx vitest run src/app/routes.test.ts --reporter=verbose` | Not verified locally. Vitest starts under Windows Node `v24.20.0` but does not report completion before manual interruption; no product test failure was produced. |
+
+### Follow-up on 2026-09-30 — one-time founder offer recorded, checkout still gated
+
+Commit after `22e4bc8`:
+
+| Commit | Change |
+|---|---|
+| `PENDING` | Records the owner decision that demo remains free and the paid offer is a one-time Founder Lifetime unlock at 499 USD. Billing defaults now describe `49900` / `usd` / `founder_lifetime` / `one_time`, but checkout still fails readiness unless both `A4T_CHECKOUT_ENABLED` and `A4T_AUTHENTICATED_CHECKOUT_ENABLED` are explicitly set. The legacy browser checkout route also refuses before creating a Stripe PaymentIntent unless the authenticated-checkout gate is set. No payment activation was performed. A follow-up also adds the authenticated `/api/v1/billing/checkout` route shape, but it returns 503 while checkout is off and 501 even when both gates are set, so it cannot charge yet. |
+
+Tests run after `PENDING`:
+
+| Command | Result |
+|---|---|
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_billing.py` | Pass; webhook remains the only grant path, the offer is one-time founder access, `/api/v1/billing/checkout` cannot charge yet, and the browser checkout route has the authenticated-checkout gate before Stripe PaymentIntent creation. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_health.py` | Pass; checkout enabled without `A4T_AUTHENTICATED_CHECKOUT_ENABLED` refuses readiness. |`r`n| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_http.py` | Pass; platform HTTP routes still behave after adding the checkout route shape. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_entitlement.py` | Pass; demo remains free and paid live still unlocks no live execution in this release. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_platform_live_invariants.py` | Pass; live execution remains unreachable across 29 platform modules. |
+| `PYTHONIOENCODING=utf-8 python apex-forex-bot/tests/test_product_copy.py` | Pass; 127 files audited, no profit promise or live-trading-available claim. |
+| `npx eslint src --format stylish` in `web/` | Pass with 0 errors and 8 existing warnings. |
+| `npm run build` in `web/` | Pass; Next generated 24 routes. |
+## 1h. MT4/MT5: the finding that decides the approach
+
+MetaTrader 4 and MetaTrader 5 have no first-party machine interface for third parties that fits this product. The only
+approach meeting "no install, works from a phone" is a cloud vendor running
+the terminals.
+
+MetaApi's provisioning documents the password field as: *"The password can be
+either investor password for read-only access or master password to enable
+trading features."* An investor password **cannot place, modify or close an
+order** — the broker refuses. So a read-only MT4/MT5 connector is read-only
+because the credential cannot trade, not because our code says so. That
+survives a bug here, a mistake in the gates, and a compromise of the vendor.
+
+The privacy cost is real and is written down rather than managed away: the
+client hands a broker credential to a third party, it cannot be revoked per
+integration, and it is **worse than cTrader's OAuth** on exactly the axis
+clients care about.
+
+## 2. The one thing to do next
+
+**Walk the eleven steps of `docs/CTRADER_DEMO_SMOKE_TEST.md` in a browser.**
+
+The read half is done. On **2026-09-30**, from the deployed instance, against
+demo account **…456**:
+
+| Step | Result |
+|---|---|
+| `capability` | `canAutomate: true`, `liveExecutionEnabled: false`, badge `DEMO` |
+| `balance` | read from the broker |
+| `positions` | read; the empty list is a fact, not a missing key |
+| `orders` | read |
+| `candles` | **199 closed EURUSD 15m bars**, OHLC and a time on each, ascending, latest `1790736300` = 02:45:00 UTC, aligned to a 15m boundary |
+
+199 of 200 is the correct answer, not a shortfall: `get_candles` asks for 200
+over a 205-period window, and the 200th bar was still forming when the run
+happened (~03:08 UTC, so 03:00's bar was open and 02:45's was the last closed
+one).
+
+`ctrader/select` has now been called in production, so the sentence that it
+never had is no longer true.
+
+> **STOP — this section was out of date and it misled a later session.**
+>
+> What follows was written on 2026-09-30 and was overtaken two days later.
+> On **2026-10-04** a session read it, believed it, told the owner the
+> controls had never run, and asked him to decide how to build a harness
+> that already existed. **`docs/RELEASE_READINESS.md` is the authority on
+> X1, not this file.** Read it first and do not restate its status here.
+>
+> What actually happened after this was written:
+>
+> | Date | What ran |
+> |---|---|
+> | 2026-10-02 | **Preview on real bars.** Rule `0b1c97f1`, live candles, answered `HOLD` with the condition that stopped it. 15/15, exit 0. |
+> | 2026-10-02 | **The controls, against the real broker.** `scripts/smoke_ctrader_controls.py`, demo …456, **16/16**. It found three real bugs, now fixed (`0d4c973`, `8583543`). Gate 1 closed in `ec54e81`. |
+> | 2026-10-04 | **The screens, in a browser.** Eleven routes at 1440px and 390px, signed in through the real login form. Three real defects found and fixed — see below. |
+
+**What is still unproven, and it is not small:**
+
+- **The screens WITH A CONNECTED ACCOUNT.** The 2026-10-04 walk-through ran
+  against a local API with no broker connection, so every screen was walked in
+  its *not-connected* state. What that proves is real — every route renders, no
+  console error, no failed request, no horizontal overflow at 390px, and it
+  found three defects no test could have (the app was still wearing the old
+  teal palette, the phone status row hid the licence chip and the demo badge
+  behind 201px of clipped overflow, and four identical filled buttons competed
+  on a first visit). What it does **not** show is a chart with real bars, a
+  populated positions table, a DEMO badge on a selected account, or the
+  activation path with a licence. Those need a session on the deployed
+  instance with a connected demo account.
+- **Nobody has watched the engine evaluate a rule and report a decision.** The
+  controls run logged no read errors underneath it, which is strong evidence
+  the engine can see the account. It is not the same statement, and the gate
+  says so.
+
+Nothing in the code is known to be missing for either. They are **unproven**,
+which is a different thing from broken, and must not be reported as the same
+thing — and, as the box above shows, a stale "unproven" is just as costly as a
+false "proven".
+
+## 3. What is blocked on the owner, not on engineering
+
+| # | Decision | Effect while unanswered |
+|---|---|---|
+| D5 | Tax handling | Checkout remains off until tax handling is decided |
+| D6 | Is paid access part of beta at all? | Demo remains free; paid founder unlock is planned but not active |
+| L1–L2 | Legal entity, address, company number, governing law | Placeholders in the product |
+| L3 | Support contact address | The old one belonged to another brand and was removed, not replaced |
+| L4 | Refund policy | The webhook already revokes on refund |
+| L6–L8 | Hosting, data region, sub-processors, retention, data-subject rights | Placeholders |
+
+`grep -rn "TO BE CONFIRMED" web/src` shows them in the product.
+`docs/LEGAL_LAUNCH_BLOCKERS.md` and `docs/PAYMENT_AND_LICENCE_DECISIONS.md`
+have the detail.
+
+## 4. Decisions already taken, that a next session must not undo
+
+**Demo access is free, and it is free in the code.** A client with no licence
+record is `free_demo` and can build, activate and run a rule on a demo
+account. A licence means `paid_live`. A **revoked** licence still blocks
+everything, including demo — that is the one lever support has, and a free
+tier that routed around it would be decorative.
+
+**A paid plan unlocks nothing in this release.** `paid_live` + a live account
+is refused exactly as `free_demo` + a live account is, because there is no
+execution path behind it. All four combinations are tested. If somebody
+"fixes" this by relaxing a check, `tests/test_platform_entitlement.py` fails.
+
+**Live trading is refused in three independent places** — the environment
+gate, the entitlement layer reading the stored link record, and the resolved
+connection's own mode. Each is tested with the other two disabled, because
+removing one of them left every test green the first time.
+
+**The server decides what a client may do.** `GET /api/v1/me` carries an
+`execution` block. The UI renders it. Do not reassemble that verdict in the
+browser from a licence state and an account mode: it is one decision, and a
+second implementation of it is one that can disagree with the server that
+actually refuses.
+
+**Nothing is invented.** No broker data, no market data, no balances, no
+positions, no performance. An empty list is a fact and says so; an
+unavailable read says which. `tests/test_product_copy.py` and
+`src/app/content.test.ts` enforce the copy side of this.
+
+## 5. Conventions this codebase actually follows
+
+- **Every material change has a test, and the test is mutated to prove it
+  fails.** 24 mutations in phases E–H, 24 killed. One survived the first
+  round and the test was strengthened rather than the mutation dropped.
+- **Refusals carry a code the UI branches on**, never English to match
+  against.
+- **Transport modules do transport.** `apex/platform/*` is tested with no
+  socket anywhere near it; `apex/bot.py` reads a request and writes a reply.
+- **Unknown is a third value.** The evaluator's three-valued logic, and
+  `account_mode`'s `unknown`, are never folded into `false` or `demo`.
+- **Fail closed.** `user_store._is_production()` treats anything
+  unrecognised as production.
+- **English in the repository**, except `AGENTS.md` and
+  `docs/CODEX_REVIEW_A_B_C.md`, which are agent-coordination and historical
+  records. `tests/test_product_copy.py` has the full allowlist with reasons.
+
+## 5b. Live execution: the claim is now structural
+
+`docs/LIVE_EXECUTION_SPECIFICATION.md` is what a live milestone must contain
+before one real order is placed. Nothing in it is implemented and it authorises
+nothing.
+
+The central fact is stronger than "live trading is disabled":
+`apex/platform/bridge.py`, the only module that can ask a broker to place an
+order, **is imported by nothing in production** — its sole importer is its own
+test. `bridge.submit` is unreachable, not gated.
+
+`tests/test_platform_live_invariants.py` proves that on the AST, including the
+transitive import closure of `automation`, the API and `preview`. It also
+asserts `live_execution_enabled` returns a literal `False` with no name
+referenced and nothing called, so it cannot quietly become configurable.
+
+**When somebody wires the bridge up, that test fails. The failure is the review
+gate — do not resolve it by relaxing the test.** The specification says the
+file must be rewritten by that milestone, not deleted.
+
+## 6. Known gaps, stated rather than hidden
+
+| Gap | Where |
+|---|---|
+| ~~**The automation CONTROLS and the SCREENS have not been run against the broker.**~~ **Overtaken.** Controls: 16/16 against demo …456 on 2026-10-02, three real bugs found and fixed, gate 1 closed. Preview on real bars: 15/15, same day. Screens: eleven routes walked in a browser on 2026-10-04, three defects found and fixed. What remains is the screens **with a connected account** — see §2 | `docs/RELEASE_READINESS.md` is the authority; §2 here has the dates |
+| ~~The real TLS handshake has not been verified~~ — **it is verified, and nobody had looked.** The deployed API logs it at every start: `[API] broker reachable: TLSv1.3 to demo.ctraderapi.com:5035, certificate verified` — seen on 2026-09-27, 2026-09-30 and 2026-10-01. It stays unverifiable from a development container, where the inspecting proxy resets raw TLS on a non-HTTP port; that is a property of the container, not of the broker path | the deployment's own startup log; `scripts/check_ctrader_tls.py` for an on-demand check |
+| ~~`/readyz` has never answered from a deployed instance~~ — **it has**, 2026-10-03: supabase, encryption, shared store (redis, 8ms), rate limit, cTrader OAuth and dev flags all ok; billing skipped because checkout is off | `docs/LAUNCH_QA_REPORT.md` |
+| An active rule cannot be edited; editing must create a version | same |
+| No volume and no indicator overlay on the chart, both for stated reasons | same, and `docs/CHART_DEPENDENCY_DECISION.md` |
+| Several rule fields are recorded but not enforced by the engine | labelled at the input in the rule builder |
+| Webhook idempotency is weaker without Redis | `docs/PRODUCTION_RUNBOOK.md` §2 |
+| Checkout creation is a Next.js route with no verified session | `web/src/app/api/create-payment-intent/route.ts` — must move behind the platform API before it is ever enabled |
+| The broker connector pins a vulnerable TLS stack and cannot be raised | `docs/DEPLOYMENT_READINESS.md` §6 — needs X1 to verify any override |
+| A POST to an `/api/` route without a session gets a 307 to `/login`, not JSON | The middleware matcher covers `/api/*`. Harmless while checkout is off; wrong contract if it is ever enabled |
+| ~~Nothing on this branch is deployed~~ — **it is.** Both services deploy this branch; `/healthz` carries the live commit and `/readyz` answers from the deployed instance with every check ok (verified 2026-10-03) | §1c |
+
+## 6b. Security concern with no fix yet: identifiers in the legacy bot
+
+A tree-wide scan on 2026-09-26 found the owner's own cTrader account number
+(`47765456`) and Telegram chat ids in tracked files. Protocol §9 forbids
+committing account numbers, so this is recorded rather than passed over.
+
+| File | What |
+|---|---|
+| `apex-forex-bot/apex/account_mode.py` | account number in a doc comment |
+| `apex-forex-bot/apex/user_loop.py` | same |
+| `apex-forex-bot/apex/copilot.py` | chat id in a doc comment |
+| `apex-forex-bot/scripts/backfill_trades.py` | chat id in a usage example |
+| `apex-forex-bot/scripts/mark_journal_artefacts.py` | chat id in a docstring |
+| `apex-forex-bot/tests/test_access_gates_loop.py` | both ids as test fixtures |
+| `HANDOFF.md` (root) | chat id in prose |
+
+**Scope:** all of these are in the **legacy Telegram bot**, added between
+2026-08-15 and 2026-09-03. The platform is clean — zero occurrences in
+`apex-forex-bot/apex/platform/` or `web/src/`, asserted by scan.
+
+**Not acted on, deliberately.** They are the owner's own identifiers rather
+than a third party's; several are load-bearing test fixtures for the other
+product; and purging them from history is a destructive rewrite that needs
+approval. Changing another work stream's tests from this branch would also
+conflict with whoever is working on it.
+
+**For Codex to rule on:** whether these are acceptable (the owner's own ids, in
+a private repository) or whether the bot's files should be scrubbed on its own
+branch. If scrubbed, the test fixtures need synthetic ids and the history
+question is separate from the working-tree question.
+
+The secret scan itself was clean: the four pattern matches were documentation
+showing regexes (`AKIA[0-9A-Z]{16}`, a Kubernetes `-----BEGIN PRIVATE KEY-----`
+example, a PGP regex in an agent definition), none of them a real credential,
+and none in the product.
+
+## 7. Hard limits
+
+- **Do not merge to `main`.** It is old and divergent.
+- **Do not deploy publicly.**
+- **Do not enable live trading**, and do not add a path towards it. It is a
+  separate milestone with its own review.
+- **Do not put a secret in a commit, a log, a document, a screenshot or a
+  test.** `apex/redact.py` masks known shapes on the way out; that is a
+  safety net, not the plan.
+- **Do not invent broker data**, and do not replace a failed integration with
+  a fixture.
+- **Do not report something as working that has not been run.** The whole
+  point of the release documents is that they distinguish *tested* from
+  *unproven*, and one sentence that blurs the two undoes all of it.
+
+## 8. Where things are
+
+```
+apex-forex-bot/apex/platform/   the platform: api, entitlement, health,
+                                ctrader_link, automation, evaluator, billing,
+                                licence, ratelimit, store
+apex-forex-bot/scripts/         operational scripts, including the smoke test
+apex-forex-bot/tests/           159 files, run with tests/run_all.py
+web/src/app/                    Next.js routes; (app)/ is the signed-in shell
+web/src/components/app/         shell, tables, rule builder, plain language
+web/src/lib/api.ts              the one way the client talks to the backend
+docs/                           decisions, runbooks, readiness
+```
+
+Read `docs/RELEASE_READINESS.md` for the gates,
+`docs/PRODUCTION_RUNBOOK.md` for operating it, `docs/BETA_CONFIGURATION.md`
+for standing up a beta, and `docs/CTRADER_DEMO_SMOKE_TEST.md` for the thing
+to do next.

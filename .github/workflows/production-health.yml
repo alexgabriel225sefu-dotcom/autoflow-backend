@@ -1,0 +1,35 @@
+name: Production health monitor
+
+# External, read-only checks for the deployed Apex4Traders surfaces. The job
+# performs only unauthenticated HTTP GETs against Render URLs. It has no
+# secrets, no deploy credentials and no permission to write to this repo or to
+# the services it checks.
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: healthz, readyz and web home
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check production endpoints
+        env:
+          A4T_EXPECTED_API_COMMIT: ${{ vars.A4T_EXPECTED_API_COMMIT }}
+        run: python apex-forex-bot/scripts/check_production_health.py

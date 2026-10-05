@@ -19,6 +19,8 @@ Env:
   RUFLO_MCP_SECRET                                    (path secret for the URL)
   PORT                                                (Render sets this)
 """
+import hashlib
+import hmac
 import json
 import os
 import time
@@ -35,22 +37,30 @@ _REDIS = {
         "url": (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/"),
         "token": os.getenv("UPSTASH_REDIS_REST_TOKEN") or "",
     },
-    "crypto": {
-        "url": (os.getenv("UPSTASH_CRYPTO_URL")
-                or os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/"),
-        "token": (os.getenv("UPSTASH_CRYPTO_TOKEN")
-                  or os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""),
-    },
 }
-_SECRET = os.getenv("RUFLO_MCP_SECRET") or "ruflo"
-_PRODUCTS = {"crypto", "forex"}
 
-# Affiliate/referral bot — its data lives in Supabase behind the website API,
-# and it's a thin Telegram front-end, so it's reached over HTTP (not the Redis
-# bus): admin-list + telegram-stats for reads, its bot token for messaging.
+# The path segment that makes this endpoint's URL unguessable. It defaulted to
+# the literal "ruflo", published in this repository — so the whole operator
+# surface sat at a URL anyone could type. Financial actions were still safe
+# (the bot refuses level 2/3 without MCP_SIGNING_SECRET), but the read tools
+# are not nothing: user_detail, trade_journal, audit_log and bot_status expose
+# client records. Production now refuses to start rather than serve them from a
+# guessable path.
+_SECRET = (os.getenv("RUFLO_MCP_SECRET") or "").strip()
+_IS_PROD = (os.getenv("APP_ENV") or "").strip().lower() not in (
+    "dev", "development", "local", "test")
+if not _SECRET:
+    if _IS_PROD:
+        raise SystemExit(
+            "[FATAL] RUFLO_MCP_SECRET is not set. It is the only thing making "
+            "this operator endpoint's URL unguessable, and the endpoint exposes "
+            "client records. Set it, or set APP_ENV=dev for local work."
+        )
+    _SECRET = "dev-only-unguessable-nothing"
+
+_PRODUCTS = {"forex"}
+
 _SITE = (os.getenv("SITE_URL") or "https://aicashsystem.space").rstrip("/")
-_AFF_SECRET = os.getenv("AFFILIATE_BOT_SECRET") or ""
-_AFF_TOKEN = os.getenv("AFFILIATE_BOT_TOKEN") or ""
 
 
 def _ns(product: str) -> str:
@@ -68,12 +78,38 @@ def _redis(product: str, *parts):
     return r.json().get("result")
 
 
+# Who this server acts as, and the secret that proves it.
+#
+# The bot refuses level 2 and level 3 commands from an operator it cannot
+# identify. A name alone is not identification — anyone who can write to the
+# command queue could type one — so when MCP_SIGNING_SECRET is set the envelope
+# is signed and the bot verifies it. The secret is shared between this server
+# and the bot, and nothing else needs it.
+OPERATOR = (os.getenv("MCP_OPERATOR_NAME") or "").strip()
+SIGNING_SECRET = (os.getenv("MCP_SIGNING_SECRET") or "").strip()
+
+
+def _sign(envelope: dict) -> str:
+    """HMAC over the canonical envelope. Empty when no secret is configured."""
+    if not SIGNING_SECRET:
+        return ""
+    payload = json.dumps({k: envelope[k] for k in ("id", "action", "args", "ts",
+                                                   "operator")},
+                         sort_keys=True, separators=(",", ":"))
+    return hmac.new(SIGNING_SECRET.encode(), payload.encode(),
+                    hashlib.sha256).hexdigest()
+
+
 def _call(product: str, action: str, args: dict = None, timeout: float = 20.0):
     """Send a command to the bot and wait for its result."""
     ns = _ns(product)
     cid = uuid.uuid4().hex[:16]
-    _redis(ns, "LPUSH", f"{ns}:commands", json.dumps(
-        {"id": cid, "action": action, "args": args or {}, "ts": int(time.time())}))
+    envelope = {"id": cid, "action": action, "args": args or {},
+                "ts": int(time.time()), "operator": OPERATOR}
+    sig = _sign(envelope)
+    if sig:
+        envelope["sig"] = sig
+    _redis(ns, "LPUSH", f"{ns}:commands", json.dumps(envelope))
     deadline = time.time() + timeout
     key = f"{ns}:cmdresult:{cid}"
     while time.time() < deadline:
@@ -116,7 +152,7 @@ mcp = FastMCP(
 # ─── Read tools ────────────────────────────────────────────
 @mcp.tool()
 def bot_alive(product: str) -> dict:
-    """Is the crypto/forex bot alive? Returns seconds since its last heartbeat."""
+    """Is the bot alive? Returns seconds since its last heartbeat."""
     ns = _ns(product)
     hb = _redis(ns, "GET", f"{ns}:mcp_heartbeat")
     if not hb:
@@ -128,7 +164,7 @@ def bot_alive(product: str) -> dict:
 @mcp.tool()
 def bot_status(product: str) -> dict:
     """Live snapshot: active users and each one's symbol, strategy, running
-    state, balance and connected cTrader account. product = crypto | forex."""
+    state, balance and connected cTrader account. product = forex."""
     return _call(product, "status")
 
 
@@ -136,6 +172,27 @@ def bot_status(product: str) -> dict:
 def user_detail(product: str, user_id: str) -> dict:
     """Full (token-redacted) settings + dashboard for one user."""
     return _call(product, "user_detail", {"user_id": user_id})
+
+
+@mcp.tool()
+def trade_journal(product: str, user_id: str, limit: int = 200,
+                  labelled_only: bool = False) -> dict:
+    """The full closed-trade journal for one user — newest first.
+
+    Use this instead of user_detail when analysing performance. The dash's
+    trade list is capped at 50 and rebuilt in memory, so after a restart it
+    holds only what has closed since; this reads the durable journal.
+
+    The reply reports `total` and `labelled` separately, and the difference
+    matters: a row without a confidence has no regime, no strategy version and
+    no entry snapshot, so it can say a trade happened but not why. Only the
+    labelled rows can answer "what works". Pass labelled_only=True to get just
+    those.
+
+    Read-only. Makes no broker call and changes nothing.
+    """
+    return _call(product, "trade_journal", {
+        "user_id": user_id, "limit": limit, "labelled_only": labelled_only})
 
 
 @mcp.tool()
@@ -169,35 +226,40 @@ def recent_commands(product: str, limit: int = 60) -> dict:
 
 # ─── Action tools (need MCP_CONTROL_ENABLED=true on the bot) ──
 @mcp.tool()
-def restart_user(product: str, user_id: str) -> dict:
+def restart_user(product: str, user_id: str, confirm: bool = False) -> dict:
     """Restart a user's trading loop (heals a stuck/desynced loop)."""
-    return _call(product, "restart_loop", {"user_id": user_id})
+    return _call(product, "restart_loop", {"user_id": user_id, "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def bot_power(product: str, user_id: str, on: bool) -> dict:
+def bot_power(product: str, user_id: str, on: bool, confirm: bool = False) -> dict:
     """Turn a user's bot ON (start trading) or OFF (pause)."""
-    return _call(product, "bot_on" if on else "bot_off", {"user_id": user_id})
+    return _call(product, "bot_on" if on else "bot_off",
+                 {"user_id": user_id, "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def refresh_ctrader_token(product: str, user_id: str) -> dict:
+def refresh_ctrader_token(product: str, user_id: str, confirm: bool = False) -> dict:
     """Force a cTrader token refresh + reconnect for a user (heals auth errors)."""
-    return _call(product, "refresh_token", {"user_id": user_id})
+    return _call(product, "refresh_token", {"user_id": user_id, "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def set_user_setting(product: str, user_id: str, key: str, value) -> dict:
+def set_user_setting(product: str, user_id: str, key: str, value,
+                     confirm: bool = False) -> dict:
     """Change one strategy/risk setting for a user (e.g. strategy, risk, symbol,
     timeframe, trailing, max_trades_day) and restart their loop. Auth/token/
     license fields are not settable."""
-    return _call(product, "set_setting", {"user_id": user_id, "key": key, "value": value})
+    return _call(product, "set_setting",
+                 {"user_id": user_id, "key": key, "value": value,
+                  "confirm": bool(confirm)})
 
 
 @mcp.tool()
-def send_telegram(product: str, user_id: str, text: str) -> dict:
+def send_telegram(product: str, user_id: str, text: str, confirm: bool = False) -> dict:
     """Send a Telegram message to a user from the bot."""
-    return _call(product, "send_message", {"user_id": user_id, "text": text})
+    return _call(product, "send_message",
+                 {"user_id": user_id, "text": text, "confirm": bool(confirm)})
 
 
 @mcp.tool()
@@ -217,50 +279,31 @@ def open_trade(product: str, user_id: str, side: str, symbol: str = None) -> dic
     return _call(product, "force_trade", args)
 
 
-# ─── Affiliate / referral bot (over the website API) ─────────
+@mcp.tool()
+def client_message(product: str, user_id: str, text: str, confirm: bool = False) -> dict:
+    """Send `text` to the bot AS THE CLIENT — the bot handles it and replies in
+    their Telegram, exactly as if they had typed it.
+
+    This drives the real command dispatch (same access checks, same handlers,
+    same replies), so it is the way to verify what a client actually gets
+    rather than reading the code and hoping. Use it for read-only and
+    configuration commands: /status, /help, /strategy, /risk, /summary,
+    /verbose, /report, /news, or plain-language questions.
+
+    REFUSED, by design: /reset, /paper, /env, /setkeys, /deploy, /purgebad,
+    /grant, /revoke, /buy, /sell, /close. Those are destructive or move real
+    money and must be sent by the account owner. Use open_trade / force_close
+    for trades — they are separately audited and demo-only."""
+    return _call(product, "client_message",
+                 {"user_id": user_id, "text": text, "confirm": bool(confirm)})
+
+
 def _site_post(path: str, body: dict, timeout: float = 15.0):
     r = requests.post(f"{_SITE}{path}", json=body, timeout=timeout)
     try:
         return r.json()
     except Exception:
         return {"error": f"HTTP {r.status_code}"}
-
-
-@mcp.tool()
-def affiliates_overview() -> dict:
-    """All affiliates with their sales totals (paid / pending / refunded) —
-    the referral program at a glance."""
-    if not _AFF_SECRET:
-        return {"error": "AFFILIATE_BOT_SECRET not set on the MCP server"}
-    d = _site_post("/api/affiliates/admin-list", {"secret": _AFF_SECRET})
-    affs = d.get("affiliates") or []
-    tot = {"affiliates": len(affs),
-           "sales": sum(a["sales"]["total"] for a in affs),
-           "paid_cents": sum(a["sales"]["paid"] for a in affs),
-           "pending_cents": sum(a["sales"]["pending"] for a in affs)}
-    return {"totals": tot, "affiliates": affs}
-
-
-@mcp.tool()
-def affiliate_stats(chat_id: str) -> dict:
-    """Live earnings/clicks/sales for one affiliate by their Telegram chat id."""
-    if not _AFF_SECRET:
-        return {"error": "AFFILIATE_BOT_SECRET not set on the MCP server"}
-    return _site_post("/api/affiliates/telegram-stats",
-                      {"chatId": chat_id, "secret": _AFF_SECRET})
-
-
-@mcp.tool()
-def message_affiliate(chat_id: str, text: str) -> dict:
-    """Send a Telegram message to an affiliate from the referral bot."""
-    if not _AFF_TOKEN:
-        return {"error": "AFFILIATE_BOT_TOKEN not set on the MCP server"}
-    r = requests.post(f"https://api.telegram.org/bot{_AFF_TOKEN}/sendMessage",
-                      json={"chat_id": chat_id, "text": text[:3500],
-                            "parse_mode": "HTML", "disable_web_page_preview": True},
-                      timeout=10)
-    return {"sent": r.ok, "status": r.status_code}
-
 
 async def _health(request):
     return PlainTextResponse("ruflo-mcp ok")

@@ -13,8 +13,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Apex Trade Bot — AI Crypto Trading Bot Source Code",
-  description: "One-time purchase. Full source code. AI-powered crypto trading bot with live signals, automated execution, and real-time PnL tracking.",
+  // The root layout titles every page, including the platform's own screens.
+  // It previously carried the old product's name and described crypto source
+  // code, so a client on /dashboard read "Apex Trade Bot" in their browser tab.
+  // A plain default, with no template: a template would append "· Apex4Traders"
+  // to pages that still carry the previous product's name, which would read
+  // worse than leaving them alone until that copy is decided on.
+  title: "Apex4Traders — rule-based trading automation",
+  description:
+    "Build trading rules from named, testable conditions, preview what they " +
+    "would decide, and run them on a cTrader account you connect yourself.",
 };
 
 export default function RootLayout({

@@ -1,34 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
-import crypto from "crypto";
+import { NextResponse } from "next/server";
 
-function getStripe() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error("STRIPE_SECRET_KEY not set");
-  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2026-05-27.dahlia" });
-}
+/**
+ * Legacy checkout creation endpoint.
+ *
+ * Payments are intentionally unavailable in this release. Checkout creation
+ * must happen behind the authenticated platform API before it can be reviewed
+ * for production, because the payment webhook grants access only from provider
+ * events that carry a platform user id written by a verified session. This
+ * Next.js route has no verified platform session, so it must never create a
+ * PaymentIntent.
+ */
+export const CHECKOUT_DISABLED =
+  "Checkout is not enabled in this release. Demo accounts are free and " +
+  "require no payment. Paid access must be created by the authenticated " +
+  "platform API after review; this browser route cannot create payments.";
 
-export async function POST(req: NextRequest) {
-  try {
-    const { amount, currency, email, name, product } = await req.json();
-
-    if (!email || !name) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
-    }
-
-    const pendingKey = crypto.randomBytes(16).toString("hex");
-    const stripe = getStripe();
-
-    const intent = await stripe.paymentIntents.create({
-      amount: amount ?? 29700,
-      currency: currency ?? "usd",
-      receipt_email: email,
-      metadata: { name, email, product: product ?? "apex-bot", pendingKey },
-      automatic_payment_methods: { enabled: true },
-    });
-
-    return NextResponse.json({ clientSecret: intent.client_secret, pendingKey });
-  } catch (err: any) {
-    console.error("PaymentIntent error:", err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    {
+      error: CHECKOUT_DISABLED,
+      checkoutEnabled: false,
+    },
+    { status: 503 },
+  );
 }
