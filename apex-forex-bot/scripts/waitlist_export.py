@@ -3,7 +3,7 @@
 
     python3 scripts/waitlist_export.py            # a count and the addresses
     python3 scripts/waitlist_export.py --count    # the number only
-    python3 scripts/waitlist_export.py --csv      # email,joinedAt,source
+    python3 scripts/waitlist_export.py --csv      # email,joinedAt,source,emailDelivery
 
 WHY A SCRIPT AND NOT AN ENDPOINT
 
@@ -53,17 +53,18 @@ def main():
     entries = dump["entries"]
 
     if args.csv:
-        print("email,joinedAt,source")
+        print("email,joinedAt,source,emailDelivery")
         for e in entries:
             # No quoting games: an address containing a comma would not have
-            # passed validation, and a source is one of three known words.
-            print(f"{e['email']},{e['joinedAt']},{e['source']}")
+            # passed validation, and a source/status are known words.
+            print(f"{e['email']},{e['joinedAt']},{e['source']},"
+                  f"{e.get('emailDelivery') or 'unknown'}")
     else:
         print(f"{len(entries)} on the early-access list\n")
         width = max((len(e["email"]) for e in entries), default=5)
         for e in entries:
             print(f"  {e['email']:<{width}}  {_when(e['joinedAt'])}  "
-                  f"{e['source']}")
+                  f"{e['source']}  {e.get('emailDelivery') or 'unknown'}")
 
     # An index entry whose record is gone is reported, never quietly dropped:
     # a list that silently loses people looks exactly like a list nobody
@@ -79,6 +80,15 @@ def main():
               f"written with — these are real sign-ups, not empty rows.",
               file=sys.stderr)
         bad = 1
+    delivery = dump.get("delivery") or {}
+    if delivery.get("failed"):
+        print(f"\n!! {len(delivery['failed'])} waitlist emails failed to send. "
+              f"Export the list and resend only those addresses after the "
+              f"provider is fixed.", file=sys.stderr)
+    if delivery.get("neverAttempted"):
+        print(f"\n!! {len(delivery['neverAttempted'])} waitlist emails were never "
+              f"attempted because the provider was not configured.",
+              file=sys.stderr)
     return bad
 
 

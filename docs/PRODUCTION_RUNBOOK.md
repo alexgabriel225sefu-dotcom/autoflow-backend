@@ -55,7 +55,9 @@ The store refuses to start if the first two are needed and `APP_ENV` is not
 | `STRIPE_SECRET_KEY` | only with billing | Server-side only; never prefixed `NEXT_PUBLIC_`. |
 | `A4T_PRICE_MINOR`, `A4T_CURRENCY`, `A4T_SKU` | only with billing | Defaults are `49900`, `usd`, `founder_lifetime`. Checkout still needs both gates below. |
 | `A4T_CHECKOUT_ENABLED`, `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | only with billing | Both must stay off until paid checkout is reviewed and created from authenticated platform API. |
-| `A4T_CHECKOUT_ENABLED` | only with billing | Must be `true`. Currently off. |
+| `RESEND_API_KEY` | only for waitlist email delivery | Server-side only. Unset means sign-ups are stored but no waitlist email is sent; `/readyz` reports `waitlist_email: skipped`. |
+| `A4T_WAITLIST_FROM_EMAIL` | only for waitlist email delivery | Verified sender used by Resend, for example `Apex4Traders <waitlist@example.com>`. |
+| `A4T_WAITLIST_REPLY_TO` | optional | Reply-to mailbox for waitlist replies. |
 
 A variable prefixed `NEXT_PUBLIC_` is compiled into the browser bundle. Anything
 secret must not carry that prefix.
@@ -153,6 +155,7 @@ the deploy's traffic gate at this one.
 | `rate_limit_store` | Counters are per process in production |
 | `ctrader_oauth` | Any of the three cTrader variables is unset — no client can connect an account |
 | `billing` | Checkout is enabled and the price, currency, SKU or webhook secret is missing. `skipped` while checkout is off |
+| `waitlist_email` | Resend waitlist email delivery is partially configured. `skipped` while no provider is configured, and sign-ups still succeed |
 | `dev_flags` | A development-only flag is set in production |
 | `live_trading` | `LIVE_TRADING_ENABLED` is set, against a release with no execution path for it |
 

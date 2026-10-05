@@ -33,6 +33,10 @@ from apex.platform import api as _API                   # noqa: E402
 from apex.platform import store as _store               # noqa: E402
 from apex.platform import waitlist as W                 # noqa: E402
 
+for _var in ("RESEND_API_KEY", "A4T_WAITLIST_FROM_EMAIL",
+             "A4T_WAITLIST_REPLY_TO"):
+    os.environ.pop(_var, None)
+
 _fails = []
 
 
@@ -93,6 +97,58 @@ check("the list counts one", W.count() == 1, str(W.count()))
 W.join("second@example.com", source="pricing")
 check("a different address is a second entry", W.count() == 2, str(W.count()))
 
+print("\n[2b] delivery is first-join-only and best-effort")
+_real_send = W.send_waitlist_email
+_calls = []
+
+def _sent(address, *, now=None):
+    _calls.append(address)
+    return {"provider": "test", "status": W.DELIVERY_SENT, "attemptedAt": int(now or 0)}
+
+W.send_waitlist_email = _sent
+try:
+    first = W.join("send-once@example.com", source="landing", now=101)
+    second = W.join("send-once@example.com", source="landing", now=102)
+    check("a first join attempts exactly one send",
+          first["status"] == "added" and _calls == ["send-once@example.com"],
+          json.dumps({"first": first, "calls": _calls}))
+    check("a repeat join sends nothing",
+          second["status"] == "already" and _calls == ["send-once@example.com"],
+          json.dumps({"second": second, "calls": _calls}))
+finally:
+    W.send_waitlist_email = _real_send
+
+_failures = []
+def _failed(address, *, now=None):
+    _failures.append(address)
+    return {"provider": "test", "status": W.DELIVERY_FAILED,
+            "attemptedAt": int(now or 0), "reason": "provider_down"}
+
+W.send_waitlist_email = _failed
+try:
+    outcome = W.join("failed-send@example.com", source="landing", now=103)
+    check("a send failure leaves the browser answer unchanged",
+          outcome == {"status": "added", "joinedAt": 103}, json.dumps(outcome))
+    failed_rec = _store._read(W._key("failed-send@example.com"))
+    check("and the failed send is recorded on the stored record",
+          failed_rec["emailDelivery"]["status"] == W.DELIVERY_FAILED,
+          json.dumps(failed_rec.get("emailDelivery")))
+finally:
+    W.send_waitlist_email = _real_send
+
+os.environ["RESEND_API_KEY"] = "test-key-not-real"
+os.environ["A4T_WAITLIST_FROM_EMAIL"] = "Apex4Traders <waitlist@example.com>"
+leaky = W.send_waitlist_email(
+    "private-leak-test@example.com", now=104,
+    post=lambda payload: (_ for _ in ()).throw(
+        RuntimeError("provider error for private-leak-test@example.com")))
+check("a provider exception is sanitised before it is recorded",
+      leaky["status"] == W.DELIVERY_FAILED
+      and "private-leak-test@example.com" not in json.dumps(leaky),
+      json.dumps(leaky))
+os.environ.pop("RESEND_API_KEY", None)
+os.environ.pop("A4T_WAITLIST_FROM_EMAIL", None)
+
 print("\n[3] what is on disk")
 raw = _store._read(W._key("trader@example.com"))
 check("the record exists under the hashed key", raw is not None)
@@ -104,8 +160,12 @@ check("and it decrypts back to what was typed",
 check("the key does not contain the address either",
       "trader" not in W._key("trader@example.com"),
       W._key("trader@example.com"))
-check("only the fields we asked for are kept, and no more",
-      set(raw) == {"email", "joinedAt", "source"}, str(sorted(raw)))
+check("only the fields we asked for are kept, plus delivery status",
+      set(raw) == {"email", "joinedAt", "source", "emailDelivery"},
+      str(sorted(raw)))
+check("with no provider configured, delivery is reported as never attempted",
+      raw["emailDelivery"]["status"] == W.DELIVERY_NOT_CONFIGURED,
+      json.dumps(raw["emailDelivery"]))
 # That record answered no question, so it carries no answer. The two optional
 # fields are written only when somebody actually answers them — see [9].
 
@@ -239,6 +299,11 @@ check("a record that will not decrypt is reported, not emitted blank",
 check("and no empty address reaches the export",
       all(e["email"] for e in _d["entries"]),
       json.dumps([e["email"] for e in _d["entries"]]))
+check("export distinguishes sent, failed and never-attempted email",
+      "send-once@example.com" in _d["delivery"]["sent"]
+      and "failed-send@example.com" in _d["delivery"]["failed"]
+      and "trader@example.com" in _d["delivery"]["neverAttempted"],
+      json.dumps(_d.get("delivery"), sort_keys=True))
 
 check("a dangling index entry shows up as unresolved",
       "forex:a4t:waitlist:ghost" in W.export()["unresolved"],
