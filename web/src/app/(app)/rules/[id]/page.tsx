@@ -1,5 +1,7 @@
 "use client";
 import { use, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Check, CircleAlert, Minus, Play, RefreshCw, ShieldCheck, Sparkles,
 } from "lucide-react";
@@ -106,6 +108,7 @@ function Verdict({ p, specs }: { p: PreviewResult; specs: Record<string, Conditi
 
 export default function RuleDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const rule = useRead<{ rule: RuleDoc }>(`rules/${id}`);
   const me = useRead<Me>("me");
   const ct = useRead<CtraderStatus>("ctrader/status");
@@ -164,7 +167,38 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
     const r = await api(`rules/${id}/activate`, { method: "POST" });
     if (!r.ok) { setActErr(r); return `${r.code}`; }
     void rule.reload();
+    invalidate("rules", "me");
     return "Activated";
+  }
+
+  /**
+   * Edit a frozen rule by opening the next version as a draft.
+   *
+   * The page has told the reader for weeks that "editing it creates a new
+   * version as a draft, and the running version keeps its terms", and there
+   * was no way to do it. `POST rules/{id}/version` has existed and been
+   * tested the whole time; nothing in web/src called it. A screen that
+   * describes an action it does not offer is worse than one that offers
+   * nothing, because the reader goes looking for the control and concludes
+   * the product is broken.
+   *
+   * What the server does, and why the copy below says what it says:
+   * `store.next_version` writes the draft over the CURRENT pointer, so this
+   * page will show the draft from here on. The frozen version stays at its
+   * own key and automation keeps running it — stopping somebody's live rule
+   * because they opened an editor would be the real damage.
+   */
+  async function newVersion() {
+    setActErr(null);
+    const r = await api<{ rule: RuleDoc }>(`rules/${id}/version`, { method: "POST" });
+    if (!r.ok) { setActErr(r); return `${r.code}`; }
+    void rule.reload();
+    invalidate("rules");
+    // Straight into the editor. Opening a draft and then leaving the reader
+    // on a read-only page is the dead end this control exists to remove,
+    // wearing a different coat.
+    router.push(`/rules/${id}/edit`);
+    return `Draft v${r.data.rule.version} opened`;
   }
 
   /**
@@ -399,18 +433,45 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
                   <a className="btn btn-sm btn-ghost" href="/license">See your licence</a>
                 </div>
               ) : (
-                <ConfirmAction
-                  label="Activate this rule"
-                  question="Activate and freeze this version?"
-                  onConfirm={activate}
-                />
+                <div className="btn-row">
+                  <ConfirmAction
+                    label="Activate this rule"
+                    question="Activate and freeze this version?"
+                    onConfirm={activate}
+                  />
+                  {/* A draft could be looked at and never changed. Editing is
+                      the quieter action here: activation is what this card is
+                      for. */}
+                  <Link className="btn btn-ghost" href={`/rules/${id}/edit`}>
+                    Edit draft
+                  </Link>
+                </div>
               )
             ) : (
-              <p className="muted" style={{ fontSize: ".85rem" }}>
-                This rule is {doc.state}. An active rule is frozen — editing it
-                creates a new version as a draft, and the running version keeps
-                its terms.
-              </p>
+              <>
+                <p className="muted" style={{ fontSize: ".85rem" }}>
+                  This rule is {doc.state}. An active rule is frozen — editing
+                  it creates a new version as a draft, and the running version
+                  keeps its terms.
+                </p>
+                {/* OFFERED ONLY WHERE THE SENTENCE ABOVE IS TRUE.
+                    An archived rule is also "not draft", and opening a new
+                    version of something the client has put away is not what
+                    that sentence describes. */}
+                {doc.state === "active" || doc.state === "paused" ? (
+                  <ConfirmAction
+                    label={`Edit as v${(doc.version ?? 1) + 1}`}
+                    question={
+                      runningThis
+                        ? `Open v${(doc.version ?? 1) + 1} as a draft? `
+                          + `v${doc.version} keeps running until you activate it.`
+                        : `Open v${(doc.version ?? 1) + 1} as a draft? `
+                          + `v${doc.version} keeps its terms.`
+                    }
+                    onConfirm={newVersion}
+                  />
+                ) : null}
+              </>
             )}
             {actErr ? <ErrorNotice error={actErr} /> : null}
           </section>

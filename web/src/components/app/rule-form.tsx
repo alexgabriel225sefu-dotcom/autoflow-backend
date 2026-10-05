@@ -116,6 +116,101 @@ export function toDoc(d: Draft): Partial<RuleDoc> {
   } as Partial<RuleDoc>;
 }
 
+/**
+ * A stored RuleDoc back into the form. The inverse of `toDoc`.
+ *
+ * WHY THIS RETURNS A REFUSAL RATHER THAN ALWAYS A DRAFT
+ *
+ * `Draft` is what the form can express, and it is narrower than `RuleDoc` in
+ * one place: the server's `schedule.windows` is a list, and the form has one
+ * From and one To. Loading a two-window rule into this form and saving it
+ * would delete the second window, silently, at the exact moment the client
+ * believed they were editing something unrelated.
+ *
+ * The form cannot CREATE such a rule, so this only happens to a document that
+ * arrived through the API. That makes it rare, not impossible, and a rare
+ * silent deletion of a trading schedule is worse than a common one, because
+ * nobody is looking for it.
+ *
+ * So the lossy case is refused by name and the caller shows the reason. Every
+ * other field round-trips, and the fields the form does not own — version,
+ * createdAt, accountId, state — are simply absent from `toDoc`, which is what
+ * the server's partial patch is for.
+ */
+export type FromDoc =
+  | { ok: true; draft: Draft }
+  | { ok: false; reason: string };
+
+export function fromDoc(doc: RuleDoc): FromDoc {
+  const sched = (doc.schedule ?? {}) as Record<string, unknown>;
+  const windows = Array.isArray(sched.windows) ? sched.windows : [];
+  if (windows.length > 1) {
+    return {
+      ok: false,
+      reason: "This rule has more than one trading window, and the builder "
+        + "shows one. Editing it here would delete the others, so it is not "
+        + "offered — change it through the API, or create a new rule.",
+    };
+  }
+  const w = (windows[0] ?? {}) as Record<string, unknown>;
+
+  const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+  const obj = (v: unknown) => (v && typeof v === "object" ? v as Record<string, unknown> : {});
+
+  const entry = obj(doc.entry);
+  const exit = obj(doc.exit);
+  const order = obj(doc.order);
+  const sizing = obj(doc.sizing);
+  const sl = obj(doc.stopLoss);
+  const tp = obj(doc.takeProfit);
+  const trail = obj(doc.trailingStop);
+  const be = obj(doc.breakEven);
+  const limits = obj(doc.limits);
+
+  return {
+    ok: true,
+    draft: {
+      name: str(doc.name),
+      symbols: (Array.isArray(doc.symbols) ? doc.symbols : []).join(", "),
+      timeframe: str(doc.timeframe) || BLANK.timeframe,
+      sides: str(doc.sides) || BLANK.sides,
+      evaluateOn: str(doc.evaluateOn) || BLANK.evaluateOn,
+      entryCombine: str(entry.combine) || BLANK.entryCombine,
+      entry: (Array.isArray(entry.conditions) ? entry.conditions : []) as ConditionValue[],
+      exitCombine: str(exit.combine) || BLANK.exitCombine,
+      exit: (Array.isArray(exit.conditions) ? exit.conditions : []) as ConditionValue[],
+      sizingMode: str(sizing.mode) || BLANK.sizingMode,
+      riskPercent: str(sizing.riskPercent),
+      fixedVolume: str(sizing.fixedVolume),
+      slMode: str(sl.mode) || BLANK.slMode,
+      slAtrMultiple: str(sl.atrMultiple),
+      slPips: str(sl.pips),
+      // `mode: null` is the server's way of saying "no take profit", and the
+      // form spells that "none". Mapping it to the default would quietly give
+      // the rule a target it did not have.
+      tpMode: tp.mode === null || tp.mode === undefined ? "none" : str(tp.mode),
+      tpRr: str(tp.rr),
+      tpPips: str(tp.pips),
+      trailEnabled: trail.enabled === true,
+      trailAtrMultiple: str(trail.atrMultiple),
+      beEnabled: be.enabled === true,
+      beAtR: str(be.atR),
+      maxOpenPositions: str(limits.maxOpenPositions),
+      maxDailyTrades: str(limits.maxDailyTrades),
+      maxExposurePercent: str(limits.maxExposurePercent),
+      maxSpreadPips: str(limits.maxSpreadPips),
+      onLimit: str(limits.onLimit) || BLANK.onLimit,
+      days: (Array.isArray(sched.days) ? sched.days : []) as number[],
+      windowFrom: str(w.from),
+      windowTo: str(w.to),
+      orderType: str(order.type) || BLANK.orderType,
+      maxSlippagePoints: str(order.maxSlippagePoints),
+      expiresAfterSec: str(order.expiresAfterSec),
+    },
+  };
+}
+
+
 function Seg({
   value, options, onChange, tones,
 }: {
