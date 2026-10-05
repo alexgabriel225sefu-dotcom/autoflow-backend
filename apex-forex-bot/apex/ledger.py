@@ -71,6 +71,133 @@ def request_id(user_id, symbol, side, units, sl=None, tp=None,
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
+def _field(obj, name, default=None):
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+def _safe_part(value):
+    text = str(value or "").strip()
+    out = []
+    for ch in text:
+        out.append(ch if ch.isalnum() or ch in ("-", "_") else "-")
+    return "".join(out).strip("-") or "unknown"
+
+
+def _symbol_part(value):
+    return str(value or "").upper().replace("_", "").replace("/", "")
+
+
+def setup_key_from_decision(decision, *, strategy_id=None, bar=None):
+    """Live idempotency key derived from the decision, never from wall time.
+
+    Shape mirrors the legacy setup key: SYMBOL:SIDE:strategy:bar. The platform
+    RuleDecision does not have a strategy id, so the default strategy component
+    is the frozen RuleDoc id and version. A future live path may pass a more
+    specific strategy id, but it still has to be a decision fact.
+    """
+    symbol = _symbol_part(_field(decision, "symbol"))
+    side = str(_field(decision, "side") or _field(decision, "verdict")
+               or "").upper()
+    if not symbol:
+        raise ValueError("decision needs a symbol for live idempotency")
+    if side not in ("BUY", "SELL"):
+        raise ValueError("decision needs BUY or SELL for live idempotency")
+
+    if strategy_id is None:
+        rid = _field(decision, "rule_doc_id", _field(decision, "ruleDocId"))
+        ver = _field(decision, "rule_doc_version",
+                     _field(decision, "ruleDocVersion"))
+        strategy_id = f"{rid}-v{ver}"
+    if bar is None:
+        bar = _field(decision, "snapshot_ts", _field(decision, "snapshotTs"))
+    if bar is None:
+        raise ValueError("decision needs a snapshot bar for live idempotency")
+    try:
+        bar = int(float(bar))
+    except (TypeError, ValueError) as e:
+        raise ValueError("decision snapshot bar must be numeric") from e
+    return f"{symbol}:{side}:{_safe_part(strategy_id)}:{bar}"
+
+
+def live_claim_key(user_id, account_id, setup_key):
+    """Shared-store key for one client's one live setup.
+
+    The setup key itself is intentionally human-readable and decision-shaped;
+    the Redis key namespaces it by user/account so two clients can take the same
+    market setup independently.
+    """
+    if not user_id:
+        raise ValueError("live order claim needs a user_id")
+    if not account_id:
+        raise ValueError("live order claim needs an account_id")
+    digest = hashlib.sha256(str(setup_key).encode()).hexdigest()[:32]
+    return f"live_order:{_safe_part(user_id)}:{_safe_part(account_id)}:{digest}"
+
+
+def _shared_backend_ready():
+    if not shared_backed():
+        return False, "SHARED_BACKEND_REQUIRED", "no shared backend configured"
+    health = user_store.redis_health()
+    if not health.get("reachable"):
+        return False, "COORDINATION_UNAVAILABLE", (
+            health.get("status") or "shared backend is not reachable")
+    return True, "OK", "shared backend reachable"
+
+
+def claim_live_order(user_id, account_id, decision, *, strategy_id=None,
+                     ttl_s=900):
+    """Claim a future live order before any broker call can be made.
+
+    This does not place an order and imports no execution primitive. It is the
+    live-only idempotency contract from the specification: a shared backend is
+    mandatory, the key is derived from the decision, and an unknown shared-store
+    answer refuses rather than falling back to process memory.
+    """
+    setup_key = setup_key_from_decision(decision, strategy_id=strategy_id)
+    claim_key = live_claim_key(user_id, account_id, setup_key)
+    ready, code, detail = _shared_backend_ready()
+    if not ready:
+        return {"ok": False, "code": code, "detail": detail,
+                "setupKey": setup_key, "claimKey": claim_key}
+
+    won = user_store.claim(claim_key, ttl_s=int(ttl_s))
+    if won is True:
+        with _local_lock:
+            _local[claim_key] = {"ts": time.time(), "result": None,
+                                 "setupKey": setup_key, "live": True}
+        return {"ok": True, "code": "CLAIMED", "setupKey": setup_key,
+                "claimKey": claim_key}
+    if won is False:
+        return {"ok": False, "code": "DUPLICATE_LIVE_ORDER",
+                "detail": "a live order for this setup is already claimed",
+                "setupKey": setup_key, "claimKey": claim_key}
+    return {"ok": False, "code": "COORDINATION_UNAVAILABLE",
+            "detail": "shared backend could not confirm the live order claim",
+            "setupKey": setup_key, "claimKey": claim_key}
+
+
+def record_live_order_outcome(claim, result, *, confirmed):
+    """Record a live claim outcome without reopening an unknown claim.
+
+    A confirmed broker answer can be recorded. An exception or timeout is not a
+    confirmed outcome, so the claim stays occupied until its shared TTL expires;
+    releasing it here would turn one uncertain order into two.
+    """
+    key = (claim or {}).get("claimKey")
+    if not key:
+        raise ValueError("live outcome needs a claimKey")
+    with _local_lock:
+        entry = _local.setdefault(key, {"ts": time.time(), "live": True})
+        entry["result"] = result
+        entry["confirmed"] = bool(confirmed)
+    if not confirmed:
+        return {"ok": False, "code": "OUTCOME_UNKNOWN_CLAIM_HELD",
+                "claimKey": key}
+    return {"ok": True, "code": "RECORDED", "claimKey": key}
+
+
 def _local_claim(rid, now):
     with _local_lock:
         hit = _local.get(rid)

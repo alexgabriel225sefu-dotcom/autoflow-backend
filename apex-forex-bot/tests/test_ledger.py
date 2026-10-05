@@ -172,6 +172,77 @@ for i in range(700):
 check("pruned below the cap", len(ledger._local) <= ledger._LOCAL_KEEP,
       str(len(ledger._local)))
 
+print("\n── live claims require a shared backend and a decision setup key ──")
+reset()
+decision = {
+    "symbol": "EUR_USD", "side": "BUY", "verdict": "BUY",
+    "ruleDocId": "rule-7", "ruleDocVersion": 3,
+    "snapshotTs": 1_758_542_400.0,
+}
+setup = ledger.setup_key_from_decision(decision)
+check("the setup key has the legacy four-part shape",
+      setup == "EURUSD:BUY:rule-7-v3:1758542400", setup)
+check("the setup key is stable and does not read wall time",
+      ledger.setup_key_from_decision(dict(decision)) == setup)
+
+_saved_live = (user_store._USE_REDIS, user_store.claim,
+               user_store.redis_health, user_store.release_claim)
+try:
+    user_store._USE_REDIS = False
+    refused = ledger.claim_live_order("u1", "acc1", decision)
+    check("live refuses when no shared backend is configured",
+          refused["ok"] is False
+          and refused["code"] == "SHARED_BACKEND_REQUIRED", str(refused))
+    check("but the legacy/demo claim still stays local-only and allowed",
+          ledger.claim("u1", "EURUSD", "BUY", 1234, now=T0)[0] is True)
+
+    user_store._USE_REDIS = True
+    user_store.redis_health = lambda: {
+        "configured": True, "reachable": False, "status": "DOWN"}
+    called = []
+    user_store.claim = lambda key, ttl_s=120: called.append(key) or True
+    down = ledger.claim_live_order("u1", "acc1", decision)
+    check("live refuses when the shared backend cannot answer",
+          down["ok"] is False
+          and down["code"] == "COORDINATION_UNAVAILABLE", str(down))
+    check("and it does not take a claim after a failed health check",
+          called == [], str(called))
+
+    user_store.redis_health = lambda: {
+        "configured": True, "reachable": True, "status": "HEALTHY"}
+    shared = {}
+
+    def live_claim(key, ttl_s=120):
+        if key in shared:
+            return False
+        shared[key] = ttl_s
+        return True
+
+    user_store.claim = live_claim
+    reset()
+    a = ledger.claim_live_order("u1", "acc1", decision)
+    reset()  # another process: no local memory of the first claim
+    b = ledger.claim_live_order("u1", "acc1", decision)
+    check("exactly one live process claims a setup",
+          [a["ok"], b["ok"]].count(True) == 1
+          and [a["ok"], b["ok"]].count(False) == 1, f"{a} / {b}")
+    check("the loser is refused as a duplicate live order",
+          b["code"] == "DUPLICATE_LIVE_ORDER", str(b))
+
+    release_calls = []
+    user_store.release_claim = lambda key, value: release_calls.append((key, value))
+    claim = ledger.claim_live_order(
+        "u1", "acc1", dict(decision, snapshotTs=1_758_542_460.0))
+    unknown = ledger.record_live_order_outcome(
+        claim, {"error": "broker timeout after submit"}, confirmed=False)
+    check("an unknown broker outcome keeps the live claim held",
+          unknown["code"] == "OUTCOME_UNKNOWN_CLAIM_HELD", str(unknown))
+    check("and no release is attempted on that unknown outcome",
+          release_calls == [], str(release_calls))
+finally:
+    (user_store._USE_REDIS, user_store.claim,
+     user_store.redis_health, user_store.release_claim) = _saved_live
+
 print("\n" + "=" * 50)
 if failures:
     print(f"❌ {len(failures)} check(s) failed: {', '.join(failures)}")
