@@ -167,6 +167,47 @@ function Conditions({
  * twenty, so the stop, the target and the risk a position would be opened
  * with were invisible.
  */
+/**
+ * WHICH OF THESE TERMS ACTUALLY DRIVE THE RUNNING LOOP.
+ *
+ * Two of them. `automation.start` writes the rule's first instrument and its
+ * timeframe into the engine's configuration and then starts the loop; the
+ * loop reads nothing else from the rule. Every other row below is recorded on
+ * the rule and does not reach the engine — it trades from the client's own
+ * stored settings for stop, target, sizing and the rest.
+ *
+ * Named here rather than written out on each row, because the same table is
+ * rendered on the rule page, in the builder's review step and in the editor,
+ * and a caveat maintained in three places is a caveat that ends up in two.
+ *
+ * `apex-forex-bot/tests/test_rule_reaches_engine.py` measures this against a
+ * real start and fails when it changes, in either direction. When a field is
+ * wired through, move it here and the sentence below stops being true of it.
+ */
+const DRIVES_THE_LOOP = ["Instruments", "Timeframe"] as const;
+
+function TermsScope() {
+  return (
+    <div className="notice" role="note" style={{ marginBottom: "var(--sp-3)" }}>
+      <p style={{ margin: 0 }}>
+        <strong style={{ color: "var(--a4t-text)" }}>
+          What runs, and what is only recorded.
+        </strong>{" "}
+        Starting this rule sets the engine to trade{" "}
+        <strong style={{ color: "var(--a4t-text)" }}>
+          {DRIVES_THE_LOOP.join(" and ").toLowerCase()}
+        </strong>{" "}
+        from the terms below. The rest — the entry and exit conditions, the
+        stop, the target, the sizing and the limits — are stored on the rule
+        and are <strong style={{ color: "var(--a4t-text)" }}>not executed
+        </strong> in this release: the engine trades them from your account
+        settings instead. Carrying every term through to the engine is the
+        next milestone, and nothing here places a real order either way.
+      </p>
+    </div>
+  );
+}
+
 export function RuleTerms({
   doc, specs,
 }: { doc: Partial<RuleDoc>; specs?: Record<string, ConditionSpec> | null }) {
@@ -176,6 +217,8 @@ export function RuleTerms({
   const be = (doc.breakEven ?? {}) as Record<string, unknown>;
 
   return (
+    <>
+      <TermsScope />
     <table className="tbl tbl-kv">
       <tbody>
         <Row k="Instruments" v={(doc.symbols as string[] | undefined)?.join(", ") || <span className="dim">none</span>} />
@@ -224,5 +267,6 @@ export function RuleTerms({
         />
       </tbody>
     </table>
+    </>
   );
 }
