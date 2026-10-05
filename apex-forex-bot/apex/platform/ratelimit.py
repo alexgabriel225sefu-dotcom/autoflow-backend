@@ -79,6 +79,17 @@ _BUCKETS = {
     "default": ("RL_A4T_DEFAULT_PER_MIN", 240, 60),
 }
 
+# Future live-order limits. Kept separate from the HTTP route buckets because
+# "a client may call the API" and "a client may send another broker order" are
+# different risks. These are intentionally conservative defaults until a broker
+# contract supplies the exact live numbers.
+_ORDER_CLIENT_ENV = "RL_A4T_ORDER_CLIENT_PER_MIN"
+_ORDER_BROKER_ENV = "RL_A4T_ORDER_BROKER_PER_SEC"
+_ORDER_CLIENT_DEFAULT = 6
+_ORDER_BROKER_DEFAULT = 2
+_ORDER_CLIENT_WINDOW_S = 60
+_ORDER_BROKER_WINDOW_S = 1
+
 
 def _mk(name):
     env, limit, window = _BUCKETS[name]
@@ -218,6 +229,16 @@ def refusal(bucket, retry_after):
     }}
 
 
+def order_refusal(code, message, *, gate, retry_after=0):
+    """The future live-order limiter's API-neutral refusal shape."""
+    return {"ok": False, "error": {
+        "code": code,
+        "message": message,
+        "gate": gate,
+        "retryAfterSec": int(retry_after or 0),
+    }}
+
+
 # ── where the counter lives ─────────────────────────────────────────────────
 
 # "auto" uses the shared backend when there is one. "memory" forces the
@@ -261,6 +282,98 @@ def _shared_check(key, limit, window_s):
     if n is None:
         return None
     return n <= limit
+
+
+def _env_int(name, default):
+    try:
+        out = int(os.getenv(name) or default)
+    except (TypeError, ValueError):
+        out = default
+    return max(1, out)
+
+
+def _order_counter_ready():
+    """A live order path must never fall back to an in-process counter."""
+    if _MODE == "memory" or not user_store._USE_REDIS:
+        return False, "ORDER_RATE_LIMIT_UNAVAILABLE", (
+            "live order rate limits require a shared counter")
+    health = user_store.redis_health()
+    if not health.get("reachable"):
+        return False, "ORDER_RATE_LIMIT_UNAVAILABLE", (
+            "live order rate limits cannot reach the shared counter")
+    return True, "OK", "shared counter reachable"
+
+
+def _order_count(key, window_s, *, now=None):
+    slot = int((time.time() if now is None else float(now)) // window_s)
+    ttl_s = max(2, int(window_s) * 2)
+    return user_store.incr(f"{_store_ns()}:order_rl:{key}:{slot}",
+                           ttl_s=ttl_s)
+
+
+def _order_retry_after(window_s, *, now=None):
+    t = time.time() if now is None else float(now)
+    remaining = window_s - (t % window_s)
+    return max(1, min(int(window_s), math.ceil(remaining)))
+
+
+def check_live_order_rate(user_id, account_id, *, provider="ctrader",
+                          connection_id=None, now=None):
+    """Fail-closed order-rate gate for the future live path.
+
+    This is not the platform API limiter. It protects broker-facing order
+    throughput, so the fallback is refusal, not a per-process memory counter.
+    Demo reads, candles and previews keep using `check()` above.
+    """
+    if not user_id:
+        raise ValueError("live order rate limit needs a user_id")
+    if not account_id:
+        raise ValueError("live order rate limit needs an account_id")
+    ready, code, message = _order_counter_ready()
+    if not ready:
+        return order_refusal(code, message, gate="order_rate_store")
+
+    client_limit = _env_int(_ORDER_CLIENT_ENV, _ORDER_CLIENT_DEFAULT)
+    broker_limit = _env_int(_ORDER_BROKER_ENV, _ORDER_BROKER_DEFAULT)
+    client_key = ("client:" + hashlib.sha256(
+        f"{user_id}:{account_id}".encode()).hexdigest()[:32])
+    broker_scope = f"{provider}:{connection_id or account_id}"
+    broker_key = ("broker:" + hashlib.sha256(
+        str(broker_scope).encode()).hexdigest()[:32])
+
+    client_n = _order_count(client_key, _ORDER_CLIENT_WINDOW_S, now=now)
+    if client_n is None:
+        return order_refusal(
+            "ORDER_RATE_LIMIT_UNAVAILABLE",
+            "live order rate limits could not count this client",
+            gate="client_order_rate")
+    if int(client_n) > client_limit:
+        return order_refusal(
+            "ORDER_RATE_LIMITED",
+            "too many live orders for this client — wait before retrying",
+            gate="client_order_rate",
+            retry_after=_order_retry_after(_ORDER_CLIENT_WINDOW_S, now=now))
+
+    broker_n = _order_count(broker_key, _ORDER_BROKER_WINDOW_S, now=now)
+    if broker_n is None:
+        return order_refusal(
+            "ORDER_RATE_LIMIT_UNAVAILABLE",
+            "live order rate limits could not count the broker connection",
+            gate="broker_order_rate")
+    if int(broker_n) > broker_limit:
+        return order_refusal(
+            "ORDER_RATE_LIMITED",
+            "too many live orders for this broker connection — wait before retrying",
+            gate="broker_order_rate",
+            retry_after=_order_retry_after(_ORDER_BROKER_WINDOW_S, now=now))
+
+    return {"ok": True, "code": "ORDER_RATE_ALLOWED",
+            "limits": {"client": {"count": int(client_n),
+                                  "limit": client_limit,
+                                  "windowSec": _ORDER_CLIENT_WINDOW_S},
+                       "broker": {"count": int(broker_n),
+                                  "limit": broker_limit,
+                                  "windowSec": _ORDER_BROKER_WINDOW_S}}}
 
 
 def reset_all():
