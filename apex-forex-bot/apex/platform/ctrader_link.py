@@ -60,6 +60,11 @@ _DOMAIN = b"apex4traders/ctrader-oauth-state/v1"
 
 DEMO = "demo"
 LIVE = "live"
+# The third value, and it lives here because this is where the mode comes
+# from. `entitlement` re-exports it rather than defining its own, so there is
+# one spelling of "the broker would not confirm it" in the product.
+UNKNOWN = "unknown"
+MODES = (DEMO, LIVE, UNKNOWN)
 
 
 class LinkError(RuntimeError):
@@ -594,6 +599,88 @@ def select_account(user_id, ctid):
     rec["selectedMode"] = match["mode"]
     _store._write(_k_conn(str(user_id)), rec)
     return public_status(user_id)
+
+
+def verify_selected_mode(user_id, *, lister=None, now=None, refresher=None):
+    """Ask the BROKER what the selected account is, right now.
+
+    §3 of docs/LIVE_EXECUTION_SPECIFICATION.md. `select_account` records the
+    mode cTrader reported when the account was linked, and for demo that is
+    enough: being wrong means refusing a practice account, which costs
+    nothing. For a live account it is not enough — a link record can be months
+    old, and the question "is this real money?" must be answered by the party
+    that knows, at the moment it matters.
+
+    Returns:
+        {"mode": demo|live|unknown, "verified": bool, "recorded": ...,
+         "changed": bool, "ctid": ..., "reason": str|None, "at": float}
+
+    `unknown` NEVER folds into demo or live. Three values, and the third means
+    "the broker did not confirm it" — which a caller must treat as a refusal,
+    not as a default. Every failure path below produces `unknown` rather than
+    falling back to the stored value, because falling back to the stored value
+    is exactly what this function exists to stop doing.
+
+    It does not write the mode. `select_account` remains the only writer, and
+    a test asserts that. What this reports is a FACT ABOUT NOW, and a fact
+    that disagrees with the record is for the caller to act on — §3.4 says
+    stop and notify, never adapt.
+    """
+    stamp = float(now if now is not None else time.time())
+    # Never raises. A function whose job is to return one of three values
+    # cannot be one a caller has to wrap in try/except to find out which —
+    # that shape is how "no account" ends up handled in the same branch as
+    # "the broker said live".
+    try:
+        rec = _read_conn(str(user_id))
+    except Exception:                                       # noqa: BLE001
+        rec = None
+    recorded = (rec or {}).get("selectedMode")
+    ctid = (rec or {}).get("selectedCtid")
+
+    def _out(mode, reason=None, verified=False):
+        return {"mode": mode, "verified": verified, "recorded": recorded,
+                "ctid": ctid, "at": stamp, "reason": reason,
+                # A change is only meaningful when the broker actually
+                # answered. An unverified read differing from the record is
+                # not a mode change, it is a failed read, and reporting it as
+                # a change would stop a loop over a network blip.
+                "changed": bool(verified and recorded
+                                and mode != recorded)}
+
+    if not rec:
+        return _out(UNKNOWN, "no cTrader account is connected")
+    if ctid is None:
+        return _out(UNKNOWN, "no account is selected")
+
+    try:
+        access = access_token_for(user_id, now=stamp, refresher=refresher)
+    except LinkError as e:
+        return _out(UNKNOWN, f"the broker session could not be used ({e.code})")
+    except Exception as e:                                  # noqa: BLE001
+        return _out(UNKNOWN, f"the broker session could not be used "
+                             f"({type(e).__name__})")
+
+    if lister is None:
+        from apex.brokers import ctrader as _ct
+        lister = _ct.list_accounts
+    try:
+        accounts = lister(access) or []
+    except Exception as e:                                  # noqa: BLE001
+        return _out(UNKNOWN, f"the broker did not answer ({type(e).__name__})")
+
+    match = next((a for a in accounts if str(a.get("ctid")) == str(ctid)), None)
+    if match is None:
+        # The account is gone from the broker's own list. Not a mode change —
+        # there is no mode to have. Anything still running against it is
+        # running against something that is not there.
+        return _out(UNKNOWN,
+                    "the selected account is no longer on the broker's list")
+    if "live" not in match:
+        # The flag is the whole answer. An account record without it tells us
+        # nothing, and nothing is `unknown`.
+        return _out(UNKNOWN, "the broker did not say whether it is live")
+    return _out(LIVE if match.get("live") else DEMO, verified=True)
 
 
 def access_token_for(user_id, *, now=None, refresher=None, skew_s=120):

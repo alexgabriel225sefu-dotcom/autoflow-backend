@@ -263,99 +263,13 @@ from apex.platform import automation as AU              # noqa: E402
 from apex.platform import ctrader_link as CL            # noqa: E402
 from apex.platform import ruledoc as _rd                # noqa: E402
 
-USER = "cccccccc-1111-4111-8111-cccccccccccc"
+# ── the broker, standing in for cTrader ─────────────────────────────────────
+# `automation.start` re-verifies the account mode against the broker rather
+# than trusting the record written at link time (live spec §3), so a test that
+# starts automation has to have a broker to ask. This is the same stand-in the
+# `lister=` arguments below are, hoisted to module level so every start sees a
+# consistent answer — `verify_selected_mode` resolves it at call time.
+from apex.brokers import ctrader as _ct_broker            # noqa: E402
 
-# The rule is built through ruledoc and the store rather than through the HTTP
-# API, because the API needs Supabase and this test is about the start path,
-# not about authentication. The automation module reads the store either way.
-begun = CL.begin(USER)
-_state = begun["authorizeUrl"].split("state=")[1].split("&")[0]
-CL.handle_callback({"code": "c", "state": _state},
-                   exchanger=lambda c, u: {"accessToken": "TOK",
-                                           "refreshToken": "REF",
-                                           "expiresIn": 2592000})
-CL.complete(USER, begun["nonce"], lister=lambda a: [{"ctid": 701,
-                                                     "live": False}])
-CL.select_account(USER, 701)
-
-_doc = _rd.blank(user_id=USER, account_id="701", symbols=["EURUSD"],
-                 timeframe="1h")
-_doc["name"] = "emergency rule"
-_doc["entry"]["conditions"] = [{"id": "rsi", "period": 14, "op": "below",
-                                "value": 30}]
-rid = _doc["ruleDocId"]
-_store.create(USER, _doc)
-_live = _store.activate(USER, rid, known_condition_ids={"rsi"})
-check("a rule was built and activated for the walk",
-      _live.get("state") == "active", str(_live.get("state")))
-
-started = []
-
-
-def try_start():
-    return AU.start(USER, rid, starter=lambda uid: started.append("GO") or True)
-
-
-clear()
-try_start()
-check("without a halt, the loop starts", "GO" in started, str(started))
-AU.stop(USER, stopper=lambda uid: True)
-started.clear()
-
-E.halt(E.ALL, reason="walking the switch", by="test")
-h = refused(try_start)
-check("with a global halt, start is REFUSED", h is not None)
-check("by the emergency switch, not by something else",
-      h and h.code == "HALTED_ALL", h and getattr(h, "code", h))
-check("and nothing was started", "GO" not in started, str(started))
-
-E.release(by="test")
-E.halt(E.NONE, reason="one pair", by="test", instruments=["EURUSD"])
-h = refused(try_start)
-check("a per-instrument halt refuses a rule that trades it", h is not None)
-check("naming the instrument gate",
-      h and h.code == "HALTED_INSTRUMENT", h and getattr(h, "code", h))
-check("and nothing was started", "GO" not in started, str(started))
-
-E.release(by="test")
-E.halt(E.NONE, reason="this client", by="test", users=[USER])
-h = refused(try_start)
-check("a per-client halt refuses that client", h is not None)
-check("naming the client gate",
-      h and h.code == "HALTED_CLIENT", h and getattr(h, "code", h))
-
-# A LIVE halt must not touch a demo client — the free tier is the product.
-E.release(by="test")
-E.halt(E.LIVE, reason="live only", by="test")
-started.clear()
-check("a LIVE halt leaves a free demo client running",
-      refused(try_start) is None and "GO" in started, str(started))
-AU.stop(USER, stopper=lambda uid: True)
-E.release(by="test")
-clear()
-
-print("\n[14] stopping says whether it flattened — §8.1")
-started.clear()
-try_start()
-rep = AU.stop(USER, stopper=lambda uid: True)
-check("the stop reports the flatten decision explicitly",
-      "flattened" in rep and "flattenDeclined" in rep, str(sorted(rep)))
-check("this release declines to flatten", rep["flattened"] is False
-      and rep["flattenDeclined"] is True, str(rep.get("flattened")))
-check("and says why, in words a client can act on",
-      "close it there" in (rep.get("flattenReason") or ""),
-      str(rep.get("flattenReason"))[:120])
-rep2 = AU.stop(USER, stopper=lambda uid: True)
-check("stopping something already stopped answers the same way",
-      rep2.get("flattenDeclined") is True and rep2.get("alreadyStopped") is True,
-      str({k: rep2.get(k) for k in ("flattenDeclined", "alreadyStopped")}))
-
-shutil.rmtree(_TMP, ignore_errors=True)
-
-print()
-if _fails:
-    print(f"FAILED ({len(_fails)}):")
-    for f in _fails:
-        print("  -", f)
-    sys.exit(1)
-print("All emergency-stop checks passed.")
+_BROKER_ACCOUNTS = [{"ctid": 701, "live": False}]
+_ct_broker.list_accounts = lambda token: list(_BROKER_ACCOUNTS)

@@ -40,8 +40,8 @@ ENTITLEMENTS = (FREE_DEMO, PAID_LIVE)
 
 DEMO = _link.DEMO
 LIVE = _link.LIVE
-UNKNOWN = "unknown"
-MODES = (DEMO, LIVE, UNKNOWN)
+UNKNOWN = _link.UNKNOWN
+MODES = _link.MODES
 
 # Badges the UI renders. Named here so the server decides what a client is
 # told, rather than the browser inferring it from a combination of fields.

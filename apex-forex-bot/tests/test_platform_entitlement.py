@@ -84,6 +84,17 @@ def select(ctid, *, allow_live=False):
         CL.live_allowed = real
 
 
+# ── the broker, standing in for cTrader ─────────────────────────────────────
+# `automation.start` re-verifies the account mode against the broker rather
+# than trusting the record written at link time (live spec §3), so a test that
+# starts automation has to have a broker to ask. This is the same stand-in the
+# `lister=` arguments below are, hoisted to module level so every start sees a
+# consistent answer — `verify_selected_mode` resolves it at call time.
+from apex.brokers import ctrader as _ct_broker            # noqa: E402
+
+_BROKER_ACCOUNTS = [{"ctid": 501, "live": False}, {"ctid": 502, "live": True}]
+_ct_broker.list_accounts = lambda token: list(_BROKER_ACCOUNTS)
+
 DEMO_ACC = {"ctid": 501, "live": False}
 LIVE_ACC = {"ctid": 502, "live": True}
 

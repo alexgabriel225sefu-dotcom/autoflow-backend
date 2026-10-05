@@ -43,6 +43,7 @@ PAUSED = "paused"
 STATES = (STOPPED, RUNNING, PAUSED)
 
 DEMO = "demo"
+LIVE = "live"
 _START_LOCK_TTL_S = 30
 
 
@@ -84,7 +85,7 @@ def status(user_id):
             "updatedAt": rec.get("updatedAt")}
 
 
-def _preflight(user_id, rule_doc_id):
+def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     """(rule, connection) or raise. Every refusal names its own cause.
 
     The order is deliberate. A client who has nothing connected and a draft
@@ -132,6 +133,36 @@ def _preflight(user_id, rule_doc_id):
     _ent.require_automation(user_id)            # raises NotEntitled
     if conn.get("mode") != DEMO:
         raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+
+    # A THIRD lock, and the only one that asks the broker instead of the
+    # record. Everything above this line is derived from what cTrader said
+    # when the account was LINKED, which can be months old. §3 of the
+    # live-execution specification: the mode has to be re-verified at start,
+    # and a mode the broker will not confirm is `unknown` and refused.
+    #
+    # `unknown` is refused rather than defaulted in either direction. For a
+    # demo client that costs a retry when the broker is briefly unreachable,
+    # which is the cheap side of this trade — the expensive side is starting a
+    # loop against an account nobody confirmed is practice money.
+    check = _link.verify_selected_mode(user_id, lister=mode_lister)
+    if check["mode"] == DEMO and check["verified"]:
+        pass
+    elif check["mode"] == LIVE:
+        raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+    else:
+        raise AutomationRefused(
+            "MODE_UNVERIFIED",
+            f"the broker did not confirm whether this is a demo or a real "
+            f"account, so nothing was started — {check['reason']}")
+    if check["changed"]:
+        # The record said one thing and the broker says another. Not adapted
+        # to, on purpose: an account that changed mode under a stored record
+        # is a situation a human has to look at.
+        raise AutomationRefused(
+            "MODE_CHANGED",
+            f"this account is {check['mode']} at the broker but was recorded "
+            f"as {check['recorded']}. Reconnect the account and select it "
+            f"again before starting anything.")
     # Asked a second time, now that the mode and the instruments are known.
     # The first call could not evaluate a LIVE-scoped halt or a per-instrument
     # one, because neither fact existed yet.
@@ -140,7 +171,8 @@ def _preflight(user_id, rule_doc_id):
     return rule, conn
 
 
-def start(user_id, rule_doc_id, *, starter=None, now=None):
+def start(user_id, rule_doc_id, *, starter=None, now=None,
+          mode_lister=None):
     """Begin automation for one rule, on a demo account. Idempotent."""
     now = time.time() if now is None else now
     user_id = str(user_id)
@@ -158,7 +190,8 @@ def start(user_id, rule_doc_id, *, starter=None, now=None):
             f"automation is already running for rule {rec.get('ruleDocId')}. "
             f"Stop it before starting another")
 
-    rule, conn = _preflight(user_id, rule_doc_id)
+    rule, conn = _preflight(user_id, rule_doc_id,
+                            mode_lister=mode_lister)
 
     # Cross-process guard. user_store.claim is SET NX, the only primitive that
     # sees another container; None means no shared backend to ask, which is
@@ -270,7 +303,7 @@ def pause(user_id, *, stopper=None):
     return dict(status(user_id), paused=True)
 
 
-def resume(user_id, *, starter=None):
+def resume(user_id, *, starter=None, mode_lister=None):
     rec = _read(user_id)
     if rec.get("state") != PAUSED:
         raise AutomationRefused(
@@ -290,7 +323,8 @@ def resume(user_id, *, starter=None):
     # something they asked to resume. start() only treats RUNNING as a reason
     # to refuse, so PAUSED passes through it untouched, and a failed resume
     # leaves the pause exactly where it was.
-    return start(user_id, rid, starter=starter)
+    return start(user_id, rid, starter=starter,
+                 mode_lister=mode_lister)
 
 
 def _flatten_answer(rec):
