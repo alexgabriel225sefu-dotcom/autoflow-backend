@@ -30,6 +30,7 @@ import uuid
 
 from apex import user_store
 from apex.platform import ctrader_link as _link
+from apex.platform import emergency as _emerg
 from apex.platform import entitlement as _ent
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
@@ -92,6 +93,19 @@ def _preflight(user_id, rule_doc_id):
     client whose access was withdrawn should not be walked through a checklist
     at all.
     """
+    # The emergency stop runs FIRST, ahead of the entitlement checklist.
+    # Everything below this line tells a client what they could do about
+    # their situation; a halt is not their situation and not theirs to act
+    # on. Walking somebody through a checklist to arrive at "we have stopped
+    # the product" is the wrong order to learn it in.
+    #
+    # Only the global and per-client levels are decidable here. The mode is
+    # not resolved yet, so this asks the question that does not need it, and
+    # the mode-dependent one is asked again below once the connection is
+    # known.
+    _emerg.check(user_id=user_id,
+                 mode=_emerg.NOT_RESOLVED)      # raises Halted
+
     # Demo automation is free. This checks only that access has not been
     # WITHDRAWN — see apex/platform/entitlement.py for why an absent licence
     # is the free tier rather than a refusal.
@@ -118,6 +132,11 @@ def _preflight(user_id, rule_doc_id):
     _ent.require_automation(user_id)            # raises NotEntitled
     if conn.get("mode") != DEMO:
         raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+    # Asked a second time, now that the mode and the instruments are known.
+    # The first call could not evaluate a LIVE-scoped halt or a per-instrument
+    # one, because neither fact existed yet.
+    for symbol in (rule.get("symbols") or [None]):
+        _emerg.check(user_id=user_id, symbol=symbol, mode=conn.get("mode"))
     return rule, conn
 
 
@@ -274,11 +293,36 @@ def resume(user_id, *, starter=None):
     return start(user_id, rid, starter=starter)
 
 
+def _flatten_answer(rec):
+    """Whether stopping also closed the open positions, and why not if not.
+
+    §8.1 of the live-execution specification: a per-client stop must flatten
+    or explicitly DECLINE to flatten, and say which. Silence is the failure
+    mode — a client who presses Stop and is told "stopped" reasonably reads
+    that as "and I am flat", and on a live account that belief is expensive.
+
+    This release declines, and the reason is not squeamishness: closing a
+    position is an ORDER, and the platform has no execution path. `bridge` is
+    imported by nothing in production. Claiming to flatten would be claiming
+    to place an order we cannot place.
+    """
+    return {
+        "flattened": False,
+        "flattenDeclined": True,
+        "flattenReason": (
+            "Stopping ends the trading loop. It does not close positions that "
+            "are already open — this release cannot place orders of any kind, "
+            "including closing ones. Any open position stays at your broker "
+            "with the stop and target it was given, and you close it there."),
+    }
+
+
 def stop(user_id, *, stopper=None):
     """Stop and forget. Idempotent — stopping something stopped is fine."""
     rec = _read(user_id)
     if rec.get("state") == STOPPED:
-        return dict(status(user_id), stopped=False, alreadyStopped=True)
+        return dict(status(user_id), stopped=False, alreadyStopped=True,
+                    **_flatten_answer(rec))
     _halt(user_id, stopper)
     _jstore.record_automation(
         _jstore._j.AUTOMATION_STOPPED, correlation_id=uuid.uuid4().hex,
@@ -286,9 +330,11 @@ def stop(user_id, *, stopper=None):
         rule_doc_id=rec.get("ruleDocId"))
     _write(user_id, {"state": STOPPED, "ruleDocId": None, "mode": None,
                      "startedAt": None})
+    ans = _flatten_answer(rec)
     _notify.notify(user_id, type=_notify.SYSTEM, title="Automation stopped",
-                   body="The trading loop has been stopped.")
-    return dict(status(user_id), stopped=True, alreadyStopped=False)
+                   body="The trading loop has been stopped. "
+                        + ans["flattenReason"])
+    return dict(status(user_id), stopped=True, alreadyStopped=False, **ans)
 
 
 def _halt(user_id, stopper):
