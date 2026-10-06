@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { apiError, methodNotAllowed, withApiJson } from "../_json";
 
 /**
  * Legacy checkout creation endpoint.
@@ -15,12 +15,21 @@ export const CHECKOUT_DISABLED =
   "require no payment. Paid access must be created by the authenticated " +
   "platform API after review; this browser route cannot create payments.";
 
+const CHECKOUT_DISABLED_RESPONSE = {
+  status: 503,
+  code: "CHECKOUT_DISABLED" as const,
+};
+
 export async function POST() {
-  return NextResponse.json(
-    {
-      error: CHECKOUT_DISABLED,
-      checkoutEnabled: false,
-    },
-    { status: 503 },
-  );
+  return withApiJson(() => apiError(
+    CHECKOUT_DISABLED_RESPONSE.status,
+    CHECKOUT_DISABLED_RESPONSE.code,
+    CHECKOUT_DISABLED,
+  ));
 }
+
+export function GET() { return methodNotAllowed("GET"); }
+export function PUT() { return methodNotAllowed("PUT"); }
+export function PATCH() { return methodNotAllowed("PATCH"); }
+export function DELETE() { return methodNotAllowed("DELETE"); }
+export function OPTIONS() { return methodNotAllowed("OPTIONS"); }

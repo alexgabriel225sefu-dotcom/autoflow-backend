@@ -100,7 +100,9 @@ print("\n2b. RuleDoc — a field that is not an object is REFUSED, not a crash")
 # {"limits": "none"} used to raise AttributeError out of `.get` instead,
 # which the API serves as a 500 — the one answer that tells the client
 # nothing and looks like our fault rather than their payload's.
-for field in ("entry", "exit", "order", "sizing", "stopLoss", "limits"):
+for field in ("entry", "exit", "order", "sizing", "stopLoss",
+              "takeProfit", "trailingStop", "breakEven", "limits",
+              "schedule"):
     for junk in ("none", 7, [], True):
         d = good_doc()
         d[field] = junk

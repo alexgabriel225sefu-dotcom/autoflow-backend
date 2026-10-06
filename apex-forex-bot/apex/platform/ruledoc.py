@@ -245,6 +245,39 @@ def validate(doc, *, known_condition_ids=None):
     elif sl.get("mode") == "pips" and not _pos_num(sl.get("pips")):
         _err(problems, "stopLoss.pips", "must be a number > 0")
 
+    tp = _as_object(problems, doc, "takeProfit")
+    tp_mode = tp.get("mode")
+    if tp_mode not in ("rr", "pips", None):
+        _err(problems, "takeProfit.mode", "must be 'rr', 'pips', or null")
+    elif tp_mode == "rr" and not _pos_num(tp.get("rr")):
+        _err(problems, "takeProfit.rr", "must be a number > 0")
+    elif tp_mode == "pips" and not _pos_num(tp.get("pips")):
+        _err(problems, "takeProfit.pips", "must be a number > 0")
+
+    trailing = _as_object(problems, doc, "trailingStop")
+    trailing_enabled = trailing.get("enabled", False)
+    if not isinstance(trailing_enabled, bool):
+        _err(problems, "trailingStop.enabled", "must be true or false")
+    elif trailing_enabled:
+        _err(problems, "trailingStop.enabled",
+             "is not implemented in this release")
+    trailing_multiple = trailing.get("atrMultiple")
+    if trailing_multiple is not None and not _pos_num(trailing_multiple):
+        _err(problems, "trailingStop.atrMultiple", "must be a number > 0")
+
+    be = _as_object(problems, doc, "breakEven")
+    be_enabled = be.get("enabled", False)
+    if not isinstance(be_enabled, bool):
+        _err(problems, "breakEven.enabled", "must be true or false")
+    elif be_enabled:
+        _err(problems, "breakEven.enabled",
+             "is not implemented in this release")
+    be_at_r = be.get("atR")
+    if be_at_r is not None and not _pos_num(be_at_r):
+        _err(problems, "breakEven.atR", "must be a number > 0")
+
+    _check_schedule(problems, _as_object(problems, doc, "schedule"))
+
     limits = _as_object(problems, doc, "limits")
     mop = limits.get("maxOpenPositions")
     if not isinstance(mop, int) or isinstance(mop, bool) or mop < 1:
@@ -266,6 +299,48 @@ def validate(doc, *, known_condition_ids=None):
 
 def _pos_num(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+
+def _minutes(value):
+    if not isinstance(value, str) or not re.match(r"^\d{2}:\d{2}$", value):
+        return None
+    hh, mm = [int(part) for part in value.split(":")]
+    if hh > 23 or mm > 59:
+        return None
+    return hh * 60 + mm
+
+
+def _check_schedule(problems, sched):
+    if sched.get("timezone") != "UTC":
+        _err(problems, "schedule.timezone", "must be UTC")
+
+    days = sched.get("days", [])
+    if not isinstance(days, list):
+        _err(problems, "schedule.days", "must be a list")
+    else:
+        for i, day in enumerate(days):
+            if (not isinstance(day, int) or isinstance(day, bool)
+                    or day < 0 or day > 6):
+                _err(problems, f"schedule.days[{i}]",
+                     "must be an integer from 0 to 6")
+
+    windows = sched.get("windows", [])
+    if not isinstance(windows, list):
+        _err(problems, "schedule.windows", "must be a list")
+        return
+    for i, window in enumerate(windows):
+        at = f"schedule.windows[{i}]"
+        if not isinstance(window, dict):
+            _err(problems, at, "must be an object")
+            continue
+        start = _minutes(window.get("from"))
+        end = _minutes(window.get("to"))
+        if start is None:
+            _err(problems, f"{at}.from", "must be HH:MM in UTC")
+        if end is None:
+            _err(problems, f"{at}.to", "must be HH:MM in UTC")
+        if start is not None and end is not None and start == end:
+            _err(problems, at, "from and to cannot be the same time")
 
 
 def is_valid(doc, *, known_condition_ids=None):
