@@ -23,19 +23,22 @@ bare, because a bare SHA-256 of an email address is reversible in practice:
 the input space is small enough to enumerate, so an unkeyed digest is a
 pseudonym and not a protection.
 
-WHAT THIS MODULE DOES NOT DO
+EMAIL DELIVERY
 
-It does not send email. There is no provider configured, and claiming a
-confirmation was sent when nothing was sent would be the same class of
-falsehood as a failed read rendering as a fact. The caller is told the
-address is recorded, which is all that is true.
+A first sign-up can send one plain transactional email through the configured
+provider. Delivery is best-effort: the address is recorded before any provider
+call, and a provider failure must never turn a recorded sign-up into a browser
+error. Repeat sign-ups never send again.
 """
 
 import hashlib
 import hmac
+import json
 import os
 import re
 import time
+import urllib.error
+import urllib.request
 
 from apex import user_store
 from apex.platform import store as _store
@@ -70,6 +73,14 @@ PLATFORMS = ("ctrader", "mt4", "mt5", "other")
 # answer is the long tail. So it is free text, bounded hard: long enough for
 # "IC Markets (Global)", short enough that the field is not storage.
 MAX_BROKER = 60
+
+# A single HTTPS call is enough; no SDK dependency for a launch-list email.
+EMAIL_PROVIDER = "resend"
+RESEND_ENDPOINT = "https://api.resend.com/emails"
+EMAIL_TIMEOUT_SEC = 3
+DELIVERY_SENT = "sent"
+DELIVERY_FAILED = "failed"
+DELIVERY_NOT_CONFIGURED = "not_configured"
 
 
 class WaitlistError(ValueError):
@@ -149,6 +160,105 @@ def _broker(value):
     return v or None
 
 
+def email_config_status():
+    """Readiness-safe status for waitlist email delivery.
+
+    The values name configuration variables but never their values. A fully
+    absent provider is acceptable during development and beta preparation, but
+    a partial configuration is a real operator error.
+    """
+    key = bool((os.getenv("RESEND_API_KEY") or "").strip())
+    sender = bool((os.getenv("A4T_WAITLIST_FROM_EMAIL") or "").strip())
+    reply_to = bool((os.getenv("A4T_WAITLIST_REPLY_TO") or "").strip())
+    missing = []
+    if not key:
+        missing.append("RESEND_API_KEY")
+    if not sender:
+        missing.append("A4T_WAITLIST_FROM_EMAIL")
+    configured = not missing
+    partial = bool(key or sender or reply_to) and not configured
+    return {
+        "provider": EMAIL_PROVIDER,
+        "configured": configured,
+        "partial": partial,
+        "missing": missing,
+    }
+
+
+def _delivery(status, *, now=None, reason=None):
+    out = {"provider": EMAIL_PROVIDER, "status": status}
+    if now is not None:
+        out["attemptedAt"] = int(now)
+    if reason:
+        out["reason"] = reason
+    return out
+
+
+def _placeholder_email(address):
+    sender = (os.getenv("A4T_WAITLIST_FROM_EMAIL") or "").strip()
+    payload = {
+        "from": sender,
+        "to": [address],
+        "subject": "Apex4Traders early access",
+        "text": (
+            "You are on the Apex4Traders early access list. "
+            "Demo access opens first. Live trading is not enabled in this "
+            "release."
+        ),
+    }
+    reply_to = (os.getenv("A4T_WAITLIST_REPLY_TO") or "").strip()
+    if reply_to:
+        payload["reply_to"] = reply_to
+    return payload
+
+
+def _post_resend(payload):
+    key = (os.getenv("RESEND_API_KEY") or "").strip()
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        RESEND_ENDPOINT, data=data, method="POST",
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": "apex4traders-waitlist/1.0",
+        })
+    with urllib.request.urlopen(req, timeout=EMAIL_TIMEOUT_SEC) as resp:  # nosec B310 - fixed HTTPS endpoint
+        body = resp.read(1024 * 64).decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            parsed = {}
+        provider_id = parsed.get("id") if isinstance(parsed, dict) else None
+        return provider_id
+
+
+def send_waitlist_email(address, *, now=None, post=None):
+    """Best-effort transactional email. Never raises with an address in it."""
+    stamp = int(now if now is not None else time.time())
+    cfg = email_config_status()
+    if not cfg["configured"]:
+        return _delivery(DELIVERY_NOT_CONFIGURED)
+    try:
+        provider_id = (post or _post_resend)(_placeholder_email(address))
+    except urllib.error.HTTPError as exc:
+        return _delivery(DELIVERY_FAILED, now=stamp, reason=f"HTTP_{exc.code}")
+    except Exception as exc:
+        return _delivery(DELIVERY_FAILED, now=stamp,
+                         reason=type(exc).__name__)
+    out = _delivery(DELIVERY_SENT, now=stamp)
+    if provider_id:
+        out["providerId"] = str(provider_id)[:80]
+    return out
+
+
+def _record_delivery(key, rec, delivery):
+    current = _store._read(key) or rec
+    updated = dict(current)
+    updated["emailDelivery"] = delivery
+    _store._write(key, updated)
+    return updated
+
+
 def join(email, *, source="direct", platform=None, broker=None, now=None):
     """Record an address. Idempotent, and says which it was.
 
@@ -211,7 +321,15 @@ def join(email, *, source="direct", platform=None, broker=None, now=None):
     # An export that misses somebody is a bug to find; an export that names
     # somebody whose record does not exist is a bug that looks like data.
     _store._set_add(_k_index(), key)
-    return {"status": "added", "joinedAt": stamp}
+
+    outcome = {"status": "added", "joinedAt": stamp}
+    # Delivery is best-effort and first-join-only. The browser answer above is
+    # already decided, so a provider outage cannot turn a recorded sign-up into
+    # a visible error. The record is updated with the result so the operator can
+    # see who was sent, who failed, and who was never attempted.
+    delivery = send_waitlist_email(address, now=stamp)
+    _record_delivery(key, rec, delivery)
+    return outcome
 
 
 def remove(email):
@@ -272,15 +390,30 @@ def export():
         if stored and not address:
             unreadable.append(key)
             continue
+        delivery = rec.get("emailDelivery") or {}
+        delivery_status = delivery.get("status") or "unknown"
         out.append({
             "email": address,
             "joinedAt": rec.get("joinedAt"),
             "source": rec.get("source"),
             "platform": rec.get("platform"),
             "broker": rec.get("broker"),
+            "emailDelivery": delivery_status,
         })
     out.sort(key=lambda r: r.get("joinedAt") or 0)
-    return {"entries": out, "unresolved": missing, "unreadable": unreadable}
+    delivery = {"sent": [], "failed": [], "neverAttempted": [], "unknown": []}
+    for entry in out:
+        status = entry.get("emailDelivery")
+        if status == DELIVERY_SENT:
+            delivery["sent"].append(entry["email"])
+        elif status == DELIVERY_FAILED:
+            delivery["failed"].append(entry["email"])
+        elif status == DELIVERY_NOT_CONFIGURED:
+            delivery["neverAttempted"].append(entry["email"])
+        else:
+            delivery["unknown"].append(entry["email"])
+    return {"entries": out, "unresolved": missing, "unreadable": unreadable,
+            "delivery": delivery}
 
 
 def tally():
@@ -307,6 +440,7 @@ def tally():
         "answered": said,
         "platforms": dict(sorted(plats.items(), key=lambda kv: -kv[1])),
         "brokers": dict(sorted(brokers.items(), key=lambda kv: -kv[1])),
+        "delivery": {k: len(v) for k, v in dump.get("delivery", {}).items()},
         "unresolved": dump["unresolved"],
         "unreadable": dump.get("unreadable", []),
     }

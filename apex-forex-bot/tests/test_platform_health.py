@@ -39,6 +39,8 @@ SECRETS = {
     "CTRADER_CLIENT_SECRET": "SENTINEL-CT-SECRET-dddd",
     "CTRADER_REDIRECT_URI": "https://SENTINEL-REDIRECT.example/cb",
     "A4T_STRIPE_WEBHOOK_SECRET": "whsec_SENTINEL-eeee",
+    "RESEND_API_KEY": "re_SENTINEL-ffff",
+    "A4T_WAITLIST_FROM_EMAIL": "Waitlist <SENTINEL-WAITLIST@example.com>",
 }
 os.environ.update(SECRETS)
 
@@ -298,6 +300,25 @@ check("enabling checkout without authenticated checkout refuses readiness",
 check("and billing is the failing check", status_of(body, "billing") == "fail")
 check("and the missing gate is named",
       "A4T_AUTHENTICATED_CHECKOUT_ENABLED" in json.dumps(body))
+
+# ── 7b. waitlist email is skipped when absent, failed when partial ──────────
+print("\n[7b] waitlist email delivery is visible in readiness")
+st, body = fresh(RESEND_API_KEY=None, A4T_WAITLIST_FROM_EMAIL=None,
+                 A4T_WAITLIST_REPLY_TO=None)
+check("waitlist email is skipped when no provider is configured",
+      status_of(body, "waitlist_email") == "skipped",
+      status_of(body, "waitlist_email"))
+check("and skipped does not refuse readiness", st == 200, str(st))
+st, body = fresh(RESEND_API_KEY="re_partial", A4T_WAITLIST_FROM_EMAIL=None)
+check("partial waitlist email config refuses readiness", st == 503, str(st))
+check("and names the missing variable, not its value",
+      status_of(body, "waitlist_email") == "fail"
+      and "A4T_WAITLIST_FROM_EMAIL" in json.dumps(body)
+      and "re_partial" not in json.dumps(body), json.dumps(body))
+st, body = fresh(RESEND_API_KEY="re_configured",
+                 A4T_WAITLIST_FROM_EMAIL="Waitlist <waitlist@example.com>")
+check("configured waitlist email is ok",
+      status_of(body, "waitlist_email") == "ok", status_of(body, "waitlist_email"))
 st, body = fresh(A4T_CHECKOUT_ENABLED="true",
                  A4T_AUTHENTICATED_CHECKOUT_ENABLED="true",
                  A4T_STRIPE_WEBHOOK_SECRET="whsec_ready")

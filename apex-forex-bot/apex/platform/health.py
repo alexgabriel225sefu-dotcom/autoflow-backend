@@ -43,6 +43,7 @@ import time
 from apex import user_store
 from apex.platform import billing as _billing
 from apex.platform import ratelimit as _rl
+from apex.platform import waitlist as _wait
 
 OK = "ok"
 DEGRADED = "degraded"
@@ -274,6 +275,24 @@ def _billing_check():
                   "approved offer", checkoutEnabled=True)
 
 
+def _waitlist_email():
+    """Launch-list delivery. Skipped is visible; partial config is not ok."""
+    status = _wait.email_config_status()
+    if status["configured"]:
+        return _check("waitlist_email", OK,
+                      "waitlist email provider is configured",
+                      provider=status["provider"])
+    if status["partial"]:
+        return _check("waitlist_email", FAIL,
+                      "waitlist email provider is partially configured: "
+                      f"missing {', '.join(status['missing'])}",
+                      provider=status["provider"], missing=status["missing"])
+    return _check("waitlist_email", SKIPPED,
+                  "waitlist email provider is not configured; sign-ups are "
+                  "stored but no email is sent",
+                  provider=status["provider"])
+
+
 def _dev_flags():
     """Development opt-ins must not be set on a deployment."""
     on = [n for n in DEV_ONLY_FLAGS if _flag_on(n)]
@@ -305,7 +324,8 @@ def _live_trading():
 
 
 CHECKS = (_supabase, _encryption, _shared_store, _rate_limit_store,
-          _ctrader, _billing_check, _dev_flags, _live_trading)
+          _ctrader, _billing_check, _waitlist_email, _dev_flags,
+          _live_trading)
 
 
 def ready(*, force=False):
