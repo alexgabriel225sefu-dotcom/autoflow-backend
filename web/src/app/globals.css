@@ -8,71 +8,102 @@
    component is how a second palette gets born.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* ── THE PALETTE INVERTED, AND WHY ────────────────────────────────────────
+   This was black-and-red: a near-black page with a red action fill. The
+   approved design is a warm off-white page with BLACK as the action colour
+   and the red kept as a small brand mark — the dot beside the product name
+   and nothing else.
+
+   That is not a repaint, it is a different decision about what red MEANS.
+   A red fill reads as "the important button"; a red dot beside a wordmark
+   reads as a brand. Using it for both made every destructive control
+   compete with the logo for the same meaning.
+
+   Every value below is measured, not chosen by eye, against the CREAM page
+   rather than white — cream is the stricter of the two backgrounds, so a
+   ratio that clears it clears a card as well. `contrast.test.ts` resolves
+   these through the real cascade and fails the build if any of it drifts.
+
+   `--a4t-accent` keeps its name even though it is now black, because
+   scripts/check_production_health.py looks for that token in the served
+   stylesheet to tell a live chunk from a stale one. Renaming it would make
+   the monitor pass against a stylesheet that no longer exists.
+   ────────────────────────────────────────────────────────────────────── */
 :root {
   /* ── surfaces ───────────────────────────────────────────────────────
-     Deep midnight plum for the page, graphite for what sits on it, then
-     three steps up so a card separates from its background without a
-     border doing all the work. */
-  --a4t-bg:        #0A0A0C;   /* the same near-black the landing page uses */
-  --a4t-bg-2:      #0E0E11;
-  --a4t-surface:   #121216;
-  --a4t-surface-2: #17171C;
-  --a4t-surface-3: #1F1F26;
-  --a4t-line:      #26262F;
-  --a4t-line-soft: #1B1B21;
+     A warm cream page with white cards on it. The two are only 1.09:1
+     apart, which is deliberate: the separation is carried by the border
+     and the shadow, and a card that fights its background for attention
+     makes a dashboard of twelve of them unreadable. */
+  --a4t-bg:        #F6F5F0;
+  --a4t-bg-2:      #FBFAF7;
+  --a4t-surface:   #FFFFFF;
+  --a4t-surface-2: #FAF9F6;
+  --a4t-surface-3: #F0EEE8;
+  --a4t-line:      #E4E1D9;
+  --a4t-line-soft: #EDEAE3;
 
   /* ── text ───────────────────────────────────────────────────────────
-     Warm off-white, then muted slate, then a dim step for metadata. */
-  --a4t-text:  #F4F0E8;   /* warm off-white — 17.40:1 */
-  --a4t-muted: #A8A4AE;   /*  8.09:1 */
-  --a4t-dim:   #75717E;   /*  4.16:1 — metadata and large text only */
+     Measured on the cream page. */
+  --a4t-text:  #111113;   /* 17.28:1 */
+  --a4t-muted: #56544E;   /*  6.94:1 */
+  --a4t-dim:   #726F67;   /*  4.60:1 — clears AA at any size, unlike the
+                              #76736B it replaced, which was 4.34 and would
+                              have shipped as "close enough" */
 
   /* ── interaction ────────────────────────────────────────────────────
-     The brand red is the action FILL, and it is the same #C81228 the
-     landing page uses. It was petrol teal until the landing page was
-     rebuilt in black and red, at which point somebody signing up walked
-     out of one product and into another — the screens are where that was
-     visible, and nothing but opening them showed it.
+     Black is the action. White on it is 18.86:1, which is the highest
+     contrast anything in the product has, and that is right for the one
+     control a screen is steering towards. */
+  --a4t-accent:        #111113;
+  --a4t-accent-strong: #000000;
+  --a4t-accent-dim:    #D7D3C9;   /* the disabled step, not a dark red */
+  --a4t-accent-wash:   rgba(17, 17, 19, 0.07);
+  --a4t-on-accent:     #FFFFFF;
+  --a4t-mark-bar:      #FFFFFF;   /* a graphic on the black fill */
 
-     Red on the page is 2.4:1 and cannot be read as text, so the
-     interactive FOREGROUND is a separate token, exactly as it was when
-     the fill was teal. That token is a cool steel rather than a red for
-     a reason that is not taste: --a4t-short is coral, and a link in a
-     near-coral red sitting beside a losing position in coral is a pair
-     a trader has to stop and decode. It is not lilac either — a violet
-     interactive colour is the house style of every generated interface,
-     and this one is meant to look like a trading desk. */
-  --a4t-accent:        #C81228;   /* brand red — fills. Carries #FFF 5.88:1 */
-  --a4t-accent-strong: #9B0D1B;
-  --a4t-accent-dim:    #4A0A13;
-  --a4t-accent-wash:   rgba(200, 18, 40, 0.22);
-  --a4t-on-accent:     #FFFFFF;   /* text ON the brand red */
+  /* The red that is left. One job: the brand dot. It is 4.19:1 on cream,
+     which is enough for a 10px graphic and NOT enough for text, so it is
+     never used for any. */
+  --a4t-brand: #D93A2B;
 
-  /* The broken crossbar inside the brand mark. Its own token because the
-     mark must not change when the link colour does — which is exactly what
-     happened when it borrowed --a4t-link-strong. Only ever drawn on the
-     accent fill, never on the page, so it is held to that pair. */
-  --a4t-mark-bar:   #FF9AA4;      /* on the red fill — 3.25:1, a graphic */
+  /* ── links ──────────────────────────────────────────────────────────
+     A link has to be distinguishable from body text by more than weight,
+     and on a light page a blue is what readers already know. */
+  --a4t-link:        #1A5FB4;   /* 5.76:1 */
+  --a4t-link-strong: #10407D;   /* 9.38:1 */
+  --a4t-link-dim:    #CBD9EC;
+  --a4t-link-wash:   rgba(26, 95, 180, 0.08);
 
-  --a4t-link:       #93B4D8;      /* cool steel — 9.19:1 */
-  --a4t-link-strong:#B8CFE8;      /*             12.37:1 */
-  --a4t-link-dim:   #26384A;
-  --a4t-link-wash:  rgba(147, 180, 216, 0.12);
+  /* ── market semantics ───────────────────────────────────────────────
+     These were a mint and a coral, which are legible on near-black and
+     wash out on cream. Both are now readable AS TEXT on the page, because
+     a P&L figure is text before it is a colour. */
+  --a4t-long:    #1A7F4B;   /* 4.60:1 */
+  --a4t-short:   #A62B19;   /* 6.45:1 — a first pass used #C2321F, which is
+                               readable on the page and only 1.11:1 from the
+                               green. Two P&L figures that clear AA against
+                               the background and not against EACH OTHER are
+                               the failure that matters on a positions table,
+                               and nothing but a direct comparison catches
+                               it. This is 1.40:1 from the green, and it also
+                               lifts the danger button off its own wash from
+                               4.41:1 to 5.99:1. */
+  --a4t-neutral: #56544E;   /* 6.94:1 */
+  --a4t-long-wash:  rgba(26, 127, 75, 0.10);
+  --a4t-short-wash: rgba(166, 43, 25, 0.10);
 
-  /* ── trading semantics, and nothing else ────────────────────────────
-     Mint means long or confirmed. Coral means short, warning or
-     destructive. Neither is ever used for emphasis. */
-  --a4t-long:    #A5E7C5;   /* seafoam mint */
-  --a4t-short:   #FF8A73;   /* coral */
-  --a4t-neutral: #A8A4AE;
-  --a4t-long-wash:  rgba(165, 231, 197, 0.13);
-  --a4t-short-wash: rgba(255, 138, 115, 0.13);
-
+  /* Demo and live stay aliases of the two above, so "which mode am I in"
+     and "is this up or down" can never drift into different greens. */
   --a4t-demo: var(--a4t-long);
   --a4t-live: var(--a4t-short);
 
   /* ── type scale ─────────────────────────────────────────────────────
-     Six steps. A scale with more than that stops being a scale. */
+     Six steps. A scale with more than that stops being a scale.
+     These, the spacing scale and the elevations were LOST when the palette
+     block was rewritten — the whole :root was replaced and only the colours
+     were carried over, so every --fs-* and --sp-* in the stylesheet resolved
+     to nothing. shell.test.tsx caught it by name. */
   --fs-3xs: .66rem;
   --fs-2xs: .72rem;
   --fs-xs:  .78rem;
@@ -92,26 +123,30 @@
   --sp-6: 2rem;
   --sp-7: 3rem;
 
-  /* ── borders and elevation ──────────────────────────────────────────── */
+  /* ── elevation ──────────────────────────────────────────────────────
+     Rewritten for a light page. The old pair opened with a near-white
+     inset highlight and closed with an 85-90% black drop — the right
+     recipe for a raised surface on near-black, and on cream it reads as a
+     grey smear under every card. A light surface is lifted by a short,
+     low-opacity shadow and nothing else. */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(17, 17, 19, .05);
+  --elev-2: 0 2px 4px rgba(17, 17, 19, .05), 0 12px 28px -14px rgba(17, 17, 19, .16);
+
+  /* ── geometry ───────────────────────────────────────────────────────── */
   --a4t-radius:    10px;
   --a4t-radius-sm: 8px;
   --a4t-radius-lg: 14px;
   --a4t-border:      1px solid var(--a4t-line);
   --a4t-border-soft: 1px solid var(--a4t-line-soft);
-
-  --elev-0: none;
-  --elev-1: 0 1px 0 rgba(244, 240, 232, .03) inset, 0 6px 18px -12px rgba(0, 0, 0, .85);
-  --elev-2: 0 1px 0 rgba(244, 240, 232, .04) inset, 0 14px 34px -18px rgba(0, 0, 0, .9);
-
-  /* ── layout ─────────────────────────────────────────────────────────── */
   --a4t-sidebar: 232px;
   --a4t-inspector: 320px;
   --a4t-topbar:  56px;
   --a4t-statusbar: 40px;
   --a4t-bottomnav: 62px;
-
   --a4t-shadow: var(--elev-1);
 }
+
 
 /* The shadcn token layer is aliased onto the same palette. The primitives in
    components/ui are only reachable from code that is not part of the
@@ -852,23 +887,38 @@ body {
    avoids by separating fill from foreground. */
 
 .mkt {
-  --mkt-bg:        #0A0A0C;
-  --mkt-bg-2:      #0E0E11;
-  --mkt-surface:   #121216;
-  --mkt-surface-2: #17171C;
-  --mkt-line:      #24242C;
-  --mkt-line-soft: #1B1B21;
+  /* The landing page and the app are one product, and contrast.test.ts
+     compares these two palettes against each other rather than holding each
+     to its own standard — which is how the app once kept a petrol teal while
+     the landing page was rebuilt in red, and nothing failed. So these track
+     the --a4t-* values above, and are written out rather than aliased only
+     where the marketing surface genuinely needs its own step. */
+  --mkt-bg:        #F6F5F0;
+  --mkt-bg-2:      #FBFAF7;
+  --mkt-surface:   #FFFFFF;
+  --mkt-surface-2: #FAF9F6;
+  --mkt-line:      #E4E1D9;
+  --mkt-line-soft: #EDEAE3;
 
-  --mkt-text:   #F5F3F0;   /* 17.86:1 on the page */
-  --mkt-muted:  #A8A4AE;   /*  8.09:1 */
-  --mkt-dim:    #726E7A;   /*  3.98:1 — large text and metadata only */
+  --mkt-text:   #111113;   /* 17.28:1 on the page */
+  --mkt-muted:  #56544E;   /*  6.94:1 */
+  --mkt-dim:    #726F67;   /*  4.60:1 */
 
-  --mkt-accent:      #C81228;   /* FILL. Carries #FFF at 5.88:1 */
-  --mkt-accent-deep: #9B0D1B;
+  /* The fill is black, as the app's is. On the old near-black page the fill
+     was a red that measured 2.4:1 and therefore could never be used as text,
+     which is why a separate --mkt-accent-text existed at all. A black fill on
+     a cream page does not have that problem — it is the text colour — but the
+     two tokens stay separate anyway, because the thing they protect against
+     is somebody later changing the fill to a colour that cannot be read. */
+  --mkt-accent:      #111113;
+  --mkt-accent-deep: #000000;
   --mkt-on-accent:   #FFFFFF;
-  --mkt-accent-text: #FF5F6B;   /* the red used AS TEXT — 6.69:1 */
-  --mkt-accent-wash: rgba(200, 18, 40, 0.14);
-  --mkt-accent-line: rgba(255, 95, 107, 0.26);
+  --mkt-accent-text: #A62B19;   /* the brand red used AS TEXT — 6.45:1, and
+                                   the same value as --a4t-short so a tick in
+                                   the feature list and a losing position are
+                                   not two different reds */
+  --mkt-accent-wash: rgba(17, 17, 19, 0.06);
+  --mkt-accent-line: rgba(17, 17, 19, 0.14);
 
   /* The brand lockup draws itself from --a4t-accent so that one file works
      on every surface. Redefining those four here lets it wear the marketing
@@ -897,7 +947,7 @@ body {
 /* ── controls ────────────────────────────────────────────────────────── */
 .mkt-btn {
   display: inline-flex; align-items: center; gap: .45rem;
-  padding: .62rem 1.05rem; border-radius: 999px;
+  padding: .62rem 1.05rem; border-radius: 10px;
   font-size: .875rem; font-weight: 600; letter-spacing: -0.01em;
   background: var(--mkt-accent); color: var(--mkt-on-accent);
   border: 1px solid transparent; text-decoration: none;
@@ -910,27 +960,78 @@ body {
   border-color: var(--mkt-line);
 }
 .mkt-btn-ghost:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
-.mkt-btn-lg { padding: .8rem 1.4rem; font-size: .95rem; }
+.mkt-btn-lg { padding: .85rem 1.5rem; font-size: .98rem; }
+/* The second call to action. White on the cream page with a real border, so
+   it reads as the quieter of the two without becoming a link. */
+.mkt-btn-outline {
+  background: var(--mkt-surface); color: var(--mkt-text);
+  border-color: var(--mkt-line); box-shadow: var(--elev-1);
+}
+.mkt-btn-outline:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+.mkt-ico { width: 1em; height: 1em; flex: none; }
+
+/* The plain text link in the nav bar, beside the filled button. */
+.mkt-navlink {
+  font-size: .875rem; font-weight: 600; color: var(--mkt-text);
+  text-decoration: none; padding: .5rem .35rem; margin-right: .35rem;
+}
+.mkt-navlink:hover { color: var(--mkt-muted); }
+
+/* The section links in the middle of the bar. Hidden below the width where
+   they would wrap onto their own line and push the logo off centre. */
+.mkt-nav-mid { display: none; gap: 1.6rem; }
+.mkt-nav-mid a {
+  font-size: .9rem; font-weight: 500; color: var(--mkt-text);
+  text-decoration: none;
+}
+.mkt-nav-mid a:hover { color: var(--mkt-muted); }
+@media (min-width: 900px) { .mkt-nav-mid { display: flex; } }
 
 /* ── hero ────────────────────────────────────────────────────────────── */
 .mkt-hero { position: relative; padding: clamp(3.5rem, 11vw, 7rem) 0 clamp(2.5rem, 7vw, 4.5rem); }
 .mkt-hero h1 {
-  font-size: clamp(2.3rem, 6.2vw, 4.1rem);
-  line-height: 1.02; letter-spacing: -0.035em; font-weight: 700;
-  margin: 0; max-width: 17ch;
+  /* Capped so the longest of the three lines, "One control panel.", fits the
+     copy column at the widest layout. It was 4.4rem, which wrapped it onto a
+     fourth line and made the deliberate break read as an accident. */
+  font-size: clamp(2.1rem, 4.6vw, 3.15rem);
+  line-height: 1.0; letter-spacing: -0.04em; font-weight: 700;
+  margin: 0;
 }
 .mkt-hero h1 em { font-style: normal; color: var(--mkt-accent-text); }
+/* The one-line statement under the headline, in body colour rather than
+   muted: it is the sentence that says what the product IS, and the grey
+   paragraph below it is the elaboration. */
+.mkt-sub {
+  font-size: clamp(1.1rem, 2.1vw, 1.32rem);
+  font-weight: 500; letter-spacing: -0.015em;
+  color: var(--mkt-text); margin: 1.4rem 0 0; max-width: 32ch;
+}
+.mkt-hero-cta {
+  display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 2.1rem;
+}
+.mkt-foot-note {
+  font-size: .85rem; color: var(--mkt-dim); margin: 1.6rem 0 0;
+}
+/* The brand red, at the only size it is used: a 9px dot. It measures
+   4.19:1 on the page, which is enough for a graphic and not enough for
+   text, so it is never used for any. */
+.mkt-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--a4t-brand); flex: none;
+}
 .mkt-lede {
   font-size: clamp(1rem, 1.7vw, 1.14rem); color: var(--mkt-muted);
   max-width: 54ch; margin-top: 1.3rem; line-height: 1.66;
 }
-/* One soft red bloom behind the headline. Pointer-events off and sized in
-   vw so it never introduces a horizontal scrollbar on a phone. */
+/* The bloom is GONE, and the element is kept rather than deleted because the
+   markup, the stacking-order fix below it and a test all reference it.
+   A 26% red radial reads as a soft halo on near-black and as a pink wash
+   across a third of the screen on cream — the approved design is a flat
+   page, and the depth comes from the card's shadow instead. */
 .mkt-glow {
   position: absolute; pointer-events: none; z-index: 0;
   top: -14vw; left: -10vw; width: min(62vw, 640px); height: min(62vw, 640px);
-  background: radial-gradient(circle, rgba(200,18,40,.26) 0%, transparent 68%);
-  filter: blur(42px);
+  background: none;
 }
 /* Lift the content above the glow — but NOT the glow itself.
    This was `.mkt-hero > *`, written when the hero was a simple stack. It set
@@ -944,13 +1045,14 @@ body {
 .mkt-hero > *:not(.mkt-glow) { position: relative; z-index: 1; }
 
 .mkt-eyebrow {
-  display: inline-flex; align-items: center; gap: .45rem;
-  padding: .3rem .7rem; border-radius: 999px;
-  font-size: .76rem; font-weight: 600; letter-spacing: .02em;
-  color: var(--mkt-accent-text);
-  background: var(--mkt-accent-wash);
-  border: 1px solid var(--mkt-accent-line);
-  margin-bottom: 1.15rem;
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .42rem .85rem; border-radius: 999px;
+  font-size: .82rem; font-weight: 500; letter-spacing: 0;
+  color: var(--mkt-text);
+  background: var(--mkt-surface);
+  border: 1px solid var(--mkt-line);
+  box-shadow: var(--elev-1);
+  margin-bottom: 1.6rem;
 }
 
 /* ── waitlist form ───────────────────────────────────────────────────── */
@@ -1050,7 +1152,7 @@ body {
   align-items: center;
 }
 @media (min-width: 980px) {
-  .mkt-hero-terminal { grid-template-columns: minmax(0, .88fr) minmax(420px, 1fr); }
+  .mkt-hero-terminal { grid-template-columns: minmax(0, 1fr) minmax(400px, .98fr); }
 }
 .mkt-hero-copy { min-width: 0; }
 
@@ -1058,16 +1160,15 @@ body {
   position: relative;
   z-index: 1;
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--mkt-accent-text) 24%, var(--mkt-line));
-  border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.07), transparent 32%),
-    radial-gradient(circle at 18% 0%, rgba(200,18,40,.24), transparent 34%),
-    var(--mkt-surface);
+  border: 1px solid var(--mkt-line);
+  border-radius: 20px;
+  background: var(--mkt-surface);
+  /* One grounded shadow rather than a coloured bloom. The card is the only
+     thing on this page that floats, which is what makes it read as a
+     screenshot of something rather than a panel of the page. */
   box-shadow:
-    0 1px 0 rgba(255,255,255,.09) inset,
-    0 38px 90px -46px rgba(200,18,40,.9),
-    0 28px 70px -48px rgba(0,0,0,1);
+    0 1px 2px rgba(17, 17, 19, .04),
+    0 24px 48px -24px rgba(17, 17, 19, .18);
   padding: .85rem;
 }
 .mkt-terminal::before {
@@ -1123,20 +1224,15 @@ body {
 }
 .mkt-terminal-panel {
   min-height: 116px;
-  border: 1px solid rgba(255,255,255,.075);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.055), transparent),
-    rgba(10,10,12,.58);
+  border: 1px solid var(--mkt-line);
+  border-radius: 14px;
+  background: var(--mkt-bg);
   padding: .95rem;
-  backdrop-filter: blur(12px);
 }
 .mkt-terminal-wide { grid-column: 1 / -1; }
 .mkt-terminal-accent {
-  border-color: color-mix(in oklab, var(--mkt-accent-text) 34%, transparent);
-  background:
-    radial-gradient(circle at 0% 0%, rgba(255,95,107,.18), transparent 48%),
-    rgba(10,10,12,.62);
+  border-color: color-mix(in oklab, var(--a4t-brand) 34%, var(--mkt-line));
+  background: var(--mkt-surface-2);
 }
 .mkt-terminal-panel small {
   display: block;
@@ -1154,7 +1250,11 @@ body {
   line-height: 1.05;
   letter-spacing: -.025em;
 }
-.mkt-terminal-safe { color: rgba(255,255,255,.76) !important; }
+/* "Demo only" — the one claim on this card a reader must not miss. It was a
+   76% white, which was right on the near-black panel and invisible on the
+   light one. The green is the same token the product uses for demo mode, so
+   the preview and the real status strip agree. */
+.mkt-terminal-safe { color: var(--a4t-demo) !important; }
 .mkt-terminal-panel p {
   color: var(--mkt-muted);
   font-size: .78rem;
@@ -1254,12 +1354,20 @@ body {
    numbers rather than anybody judging them by eye — which is how the teal
    shipped in the first place. */
 .mkt {
-  --pc-card:        #121216;   /* same family as --mkt-surface */
-  --pc-card-2:      #0E0E11;
-  --pc-head:        #17171C;
-  --pc-head-accent: #2A0A10;   /* carries --mkt-text at 15.00:1 */
-  --pc-note:        #9A96A1;   /*  6.76:1 on --pc-head  */
-  --pc-note-accent: #C8C2CC;   /* 10.03:1 on --pc-head-accent */
+  --pc-card:        #FFFFFF;   /* same family as --mkt-surface */
+  --pc-card-2:      #FAF9F6;
+  --pc-head:        #F6F5F0;
+  --pc-head-accent: #1C1A18;   /* the highlighted plan: a dark head on a
+                                  light page, which is the inverse of what it
+                                  was and the same device — one card that
+                                  reads as chosen */
+  --pc-note:        #56544E;   /*  7.57:1 on --pc-head  */
+  --pc-note-accent: #F0EDE6;   /* 14.84:1 on --pc-head-accent */
+  /* The plan name and the price on the dark head. The small print already had
+     its own token here; the HEADINGS did not, and inherited --mkt-text — which
+     was an off-white on the old dark head and is a near-black now. 1.09:1, and
+     the price is the largest thing on the card. */
+  --pc-head-accent-fg: #FFFFFF;   /* 17.63:1 on --pc-head-accent */
 }
 
 .pc { display: grid; gap: 1.6rem; }
@@ -1296,7 +1404,7 @@ body {
 .pc-card-accent .pc-top::after {
   content: ""; position: absolute; inset: -40% -30% auto auto;
   width: 240px; height: 240px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(200,18,40,.42), transparent 68%);
+  background: radial-gradient(circle, rgba(217,58,43,.30), transparent 68%);
   filter: blur(26px); pointer-events: none;
 }
 .pc-top > * { position: relative; z-index: 1; }
@@ -1312,6 +1420,12 @@ body {
 .pc-name {
   font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em;
   margin: .75rem 0 .25rem; color: var(--mkt-text);
+}
+.pc-card-accent .pc-name, .pc-card-accent .pc-price,
+.pc-card-accent .pc-badge { color: var(--pc-head-accent-fg); }
+.pc-card-accent .pc-badge {
+  background: rgba(255, 255, 255, .12);
+  border-color: rgba(255, 255, 255, .22);
 }
 .pc-desc { font-size: .84rem; line-height: 1.6; margin: 0; color: var(--pc-note); }
 .pc-card-accent .pc-desc { color: var(--pc-note-accent); }

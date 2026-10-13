@@ -278,15 +278,41 @@ describe("palette", () => {
     return worst;
   };
 
+  /**
+   * Hue is undefined for a neutral, and the action fill is now black.
+   *
+   * `hueOf` returns 0 for a pure grey and something arbitrary for a
+   * near-grey — #111113 reports 240° because it is one point bluer than it
+   * is red. Comparing those is comparing noise, and the first run after the
+   * palette was approved failed on a 163° "spread" between black, black and
+   * a warm grey, none of which is a second accent.
+   *
+   * What the guard is actually for survives unchanged: a second accent
+   * introduced by accident. So saturation decides which test applies. A
+   * family that is all neutral is coherent by construction; the moment any
+   * member carries real colour, every member must agree on the hue, which is
+   * what fails if somebody drops a red back into a black family.
+   */
+  const satOf = (hex: string) => {
+    const [r, g, b] = rgb(hex).map((n) => n / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    return max === 0 ? 0 : (max - min) / max;
+  };
+
   it.each([
     ["action fill", ["--a4t-accent", "--a4t-accent-strong", "--a4t-accent-dim"]],
     ["interactive", ["--a4t-link", "--a4t-link-strong"]],
   ])("the %s tokens are one hue family, not two", (_name, names) => {
-    const hues = (names as string[]).map((t) => hueOf(TOKENS[t]));
-    expect(
-      spread(hues),
-      (names as string[]).map((t, i) => `${t}=${TOKENS[t]} (${hues[i].toFixed(0)}°)`).join(", "),
-    ).toBeLessThanOrEqual(30);
+    const list = names as string[];
+    const detail = list
+      .map((t) => `${t}=${TOKENS[t]} (${(satOf(TOKENS[t]) * 100).toFixed(0)}% sat)`)
+      .join(", ");
+    const coloured = list.filter((t) => satOf(TOKENS[t]) >= 0.2);
+    if (coloured.length === 0) return;          // all neutral: one family
+    expect(coloured.length, `${detail} — one member carries colour and the `
+      + `others do not, which is two families`).toBe(list.length);
+    expect(spread(coloured.map((t) => hueOf(TOKENS[t]))), detail)
+      .toBeLessThanOrEqual(30);
   });
 
   it("the action fill and the interactive foreground are distinct roles", () => {
@@ -329,10 +355,15 @@ describe("the marketing palette", () => {
     expect(
       contrast(MKT["--mkt-accent-text"], MKT["--mkt-bg"]),
     ).toBeGreaterThanOrEqual(4.5);
-    expect(
-      contrast(MKT["--mkt-accent"], MKT["--mkt-bg"]),
-      "the fill would be unreadable as text — that is why it is not used as text",
-    ).toBeLessThan(4.5);
+    // This used to require the fill to be UNREADABLE as text, which was a
+    // fact about a red on near-black rather than a requirement: the separate
+    // text token existed because the fill measured 2.4:1 and could not be
+    // used. The fill is now black on a cream page and reads at 17.3:1, so
+    // asserting it is unreadable would be asserting the old palette.
+    //
+    // The requirement underneath is the one kept: the two are DIFFERENT
+    // tokens, so the day somebody changes the fill to something that cannot
+    // be read, no text follows it.
     expect(MKT["--mkt-accent-text"]).not.toBe(MKT["--mkt-accent"]);
   });
 
@@ -423,9 +454,13 @@ describe("the pricing cards", () => {
   });
 
   it("the plan name and price are readable on both card heads", () => {
-    for (const head of [MKT["--pc-head"], MKT["--pc-head-accent"]]) {
-      expect(contrast(MKT["--mkt-text"], head)).toBeGreaterThanOrEqual(4.5);
-    }
+    // One head is light and one is dark, so they cannot share a foreground.
+    // They did, and the chosen plan's price — the largest thing on the card —
+    // came out at 1.09:1.
+    expect(contrast(MKT["--mkt-text"], MKT["--pc-head"]))
+      .toBeGreaterThanOrEqual(4.5);
+    expect(contrast(MKT["--pc-head-accent-fg"], MKT["--pc-head-accent"]))
+      .toBeGreaterThanOrEqual(4.5);
   });
 
   it("the small print under the price clears AA, on both heads", () => {

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import {
+  ArrowRight,
   Eye,
   GaugeCircle,
   Link2,
   ListChecks,
+  Play,
   PlayCircle,
   ShieldCheck,
 } from "lucide-react";
@@ -33,28 +35,53 @@ export default function Landing() {
       <div className="mkt-wrap">
         <nav className="mkt-nav">
           <BrandLockup size={24} />
+          {/* The approved design puts the section links in the middle of the
+              bar. They are anchors into this page rather than routes, because
+              inventing a /product and a /features that do not exist would be
+              four dead links on the first screen an advertisement pays for. */}
+          <span className="mkt-nav-mid">
+            <a href="#product">Product</a>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#resources">Resources</a>
+          </span>
           <span className="mkt-nav-links">
-            <a className="mkt-btn mkt-btn-ghost" href="/login">Sign in</a>
-            <a className="mkt-btn" href="/signup">Create account</a>
+            <a className="mkt-navlink" href="/login">Log in</a>
+            <a className="mkt-btn" href="/signup">Get started</a>
           </span>
         </nav>
 
         <section className="mkt-hero mkt-hero-terminal">
           <span className="mkt-glow" aria-hidden />
           <div className="mkt-hero-copy">
-            <span className="mkt-eyebrow">Demo accounts first · cTrader private beta</span>
+            <span className="mkt-eyebrow">
+              <i className="mkt-dot" aria-hidden />
+              cTrader automation platform
+            </span>
+            {/* Three lines, broken deliberately rather than left to wrap. The
+                design sets them as three statements and the rhythm is the
+                point; a wrap at a different width reads as an accident. */}
             <h1>
-              Your rules. Your broker. <em>One control panel.</em>
+              Your rules.<br />
+              Your broker.<br />
+              One control panel.
             </h1>
+            <p className="mkt-sub">Build and monitor your own cTrader rules.</p>
             <p className="mkt-lede">
-              Apex4Traders lets traders connect their own cTrader account,
-              build rules from named conditions, preview decisions on demo, and
-              keep risk limits, account state and automation controls in one
-              workspace.
+              Automate your trading logic with a rule builder you drive
+              yourself. Connect your cTrader broker, set your rules, watch
+              every decision as it is made — from one place, on a demo
+              account first.
             </p>
-            <div className="mkt-cta">
-              <WaitlistForm source="landing" />
+            <div className="mkt-hero-cta">
+              <a className="mkt-btn mkt-btn-lg" href="/signup">
+                Get started <ArrowRight className="mkt-ico" aria-hidden />
+              </a>
+              <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#product">
+                <Play className="mkt-ico" aria-hidden /> See how it works
+              </a>
             </div>
+            <p className="mkt-foot-note">No signals. No profit guarantees.</p>
           </div>
 
           <div className="mkt-terminal" aria-label="Apex4Traders demo terminal preview">
