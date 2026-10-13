@@ -254,13 +254,23 @@ def validate(doc, *, known_condition_ids=None):
     elif tp_mode == "pips" and not _pos_num(tp.get("pips")):
         _err(problems, "takeProfit.pips", "must be a number > 0")
 
+    # THESE WERE REFUSED WHEN ENABLED, AND THAT STOPPED BEING TRUE.
+    #
+    # The refusal was added on the grounds that "no platform runtime path
+    # trails broker stops yet". That was right about the platform and wrong
+    # about the product: the engine the platform starts has always trailed and
+    # moved stops to break even, from the account's own settings — the
+    # STOP_MOVED lines in any day's logs are it doing so.
+    #
+    # Since `engine_config.translate`, the rule's own switches are what the
+    # engine is given (`trailing`, `breakeven_r`). Refusing them now would
+    # refuse two settings that work, so what is left is shape validation, and
+    # the distances — which the engine has no per-rule setting for — are
+    # reported to the client by `engine_config`, not refused here.
     trailing = _as_object(problems, doc, "trailingStop")
     trailing_enabled = trailing.get("enabled", False)
     if not isinstance(trailing_enabled, bool):
         _err(problems, "trailingStop.enabled", "must be true or false")
-    elif trailing_enabled:
-        _err(problems, "trailingStop.enabled",
-             "is not implemented in this release")
     trailing_multiple = trailing.get("atrMultiple")
     if trailing_multiple is not None and not _pos_num(trailing_multiple):
         _err(problems, "trailingStop.atrMultiple", "must be a number > 0")
@@ -269,12 +279,14 @@ def validate(doc, *, known_condition_ids=None):
     be_enabled = be.get("enabled", False)
     if not isinstance(be_enabled, bool):
         _err(problems, "breakEven.enabled", "must be true or false")
-    elif be_enabled:
-        _err(problems, "breakEven.enabled",
-             "is not implemented in this release")
     be_at_r = be.get("atR")
     if be_at_r is not None and not _pos_num(be_at_r):
         _err(problems, "breakEven.atR", "must be a number > 0")
+    if be_enabled and be_at_r is None:
+        # The engine expresses "off" as 0, so an enabled break-even with no R
+        # would be written as off and silently do nothing.
+        _err(problems, "breakEven.atR",
+             "is required when break even is enabled")
 
     _check_schedule(problems, _as_object(problems, doc, "schedule"))
 

@@ -369,20 +369,38 @@ check("takeProfit.rr with no positive target is refused",
 d = EV.evaluate(bad_tp, s)
 check("an invalid takeProfit refuses before any entry",
       d.refusal_code == D.RULE_INVALID, str(d.refusal_code))
+# These two were refused on the grounds that no runtime trails stops. That
+# was true of the platform and false of the product — the engine the platform
+# starts has always trailed and moved stops to break even — and since
+# engine_config.translate the rule's own switches are what it is given.
+# Refusing them would refuse two settings that work.
+from apex.platform import engine_config as ECFG            # noqa: E402
+
 trail = doc(AND(ALWAYS), trailing_stop={"enabled": True, "atrMultiple": 1.2})
-check("trailingStop is refused until the engine implements it",
-      any(p.startswith("trailingStop.enabled:") for p in R.validate(trail)),
+check("trailingStop enabled is accepted",
+      not any(p.startswith("trailingStop.enabled:") for p in R.validate(trail)),
       str(R.validate(trail)))
-d = EV.evaluate(trail, s)
-check("a trailingStop setting cannot be accepted silently",
-      d.refusal_code == D.RULE_INVALID, str(d.refusal_code))
+_app, _miss = ECFG.translate(trail)
+check("...because the switch is carried to the engine",
+      _app.get("trailing") is True, str(_app.get("trailing")))
+check("...and the distance it cannot honour is named, not refused",
+      "Trailing stop" in {m["term"] for m in _miss},
+      str(sorted(m["term"] for m in _miss)))
+
 be = doc(AND(ALWAYS), break_even={"enabled": True, "atR": 1.0})
-check("breakEven is refused until the engine implements it",
-      any(p.startswith("breakEven.enabled:") for p in R.validate(be)),
+check("breakEven enabled is accepted",
+      not any(p.startswith("breakEven.enabled:") for p in R.validate(be)),
       str(R.validate(be)))
-d = EV.evaluate(be, s)
-check("a breakEven setting cannot be accepted silently",
-      d.refusal_code == D.RULE_INVALID, str(d.refusal_code))
+_app, _ = ECFG.translate(be)
+check("...because the R multiple is carried to the engine",
+      _app.get("breakeven_r") == 1.0, str(_app.get("breakeven_r")))
+
+# Enabled with no R would be written as the engine's "off" and silently do
+# nothing, which is the defect this whole file is about.
+be_no_r = doc(AND(ALWAYS), break_even={"enabled": True, "atR": None})
+check("break even enabled with no R is refused",
+      any(p.startswith("breakEven.atR:") for p in R.validate(be_no_r)),
+      str(R.validate(be_no_r)))
 bad_sched = doc(AND(ALWAYS), schedule={
     "timezone": "Europe/London", "days": [7],
     "windows": [{"from": "09:00", "to": "09:00"}],
