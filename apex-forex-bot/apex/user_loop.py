@@ -3195,7 +3195,14 @@ def _loop(user_id, alert_fn, gen=None):
                     _frame = strategy_api.Market(
                         candles, symbol=symbol, indicators=ind,
                         strat=strat_data, open_position=open_pos, price=price,
-                        balance=paper_balance, timeframe=cfg.TIMEFRAME)
+                        balance=paper_balance, timeframe=cfg.TIMEFRAME,
+                        # Both for the rule strategy, and both ignored by
+                        # every other module. The account id is how it finds
+                        # which rule is running; without it the rule cannot
+                        # be looked up and the loop would hold forever. The
+                        # spread is how a rule's spread ceiling is answered
+                        # from a real observation rather than guessed at.
+                        user_id=user_id, spread_pips=_recent_spread())
             except Exception as e:
                 # Market() validates its inputs and can raise. A registry
                 # problem must never stop a live account from trading — fall

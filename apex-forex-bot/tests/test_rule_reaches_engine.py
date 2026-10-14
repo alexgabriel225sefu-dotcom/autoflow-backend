@@ -203,8 +203,17 @@ from apex.platform import engine_config as _ecfg          # noqa: E402
 
 _applied, _missed = _ecfg.translate(_store.get(USER, rid))
 terms = {m["term"] for m in _missed}
-for term in ("Instruments", "Entry conditions", "Sides"):
+for term in ("Instruments", "Evaluation timing", "Exit timing",
+             "Position size"):
     check(f"{term!r} is named as not applied", term in terms, str(sorted(terms)))
+# 'Entry conditions' and 'Sides' USED to be named here, and were, for as long
+# as the engine chose entries with its own strategies. They now reach the loop
+# through apex/platform/rule_strategy.py, so reporting them would tell a client
+# their terms do nothing when they do — the same defect as silence, pointed the
+# other way. tests/test_rule_drives_loop.py asserts they are acted on.
+for gone in ("Entry conditions", "Exit conditions", "Sides"):
+    check(f"{gone!r} is no longer reported, because it now reaches the loop",
+          gone not in terms, str(sorted(terms)))
 check("every reported term says WHY, in words a client can read",
       all(len(m["why"]) > 40 for m in _missed),
       str([m["term"] for m in _missed if len(m["why"]) <= 40]))

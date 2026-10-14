@@ -193,6 +193,12 @@ print("\n6. The allowlist survives an empty registry — it must not reject all"
 # Stubbing available() to [] is the only way to prove the floor is real.
 from apex import ai, strategy_api  # noqa: E402
 
+# The count, not a literal: the registry grows whenever a strategy is added
+# (platform_rule was the most recent), and a hard-coded number turns that into
+# a failure in a file about validating SETTINGS. What these two checks are for
+# is that the stub was undone.
+_REGISTERED = len(strategy_api.available())
+
 _saved_available = strategy_api.available
 strategy_api.available = lambda: []
 try:
@@ -211,8 +217,8 @@ try:
           "zscore exists only in the registry; with it empty, refusing is right")
 finally:
     strategy_api.available = _saved_available
-check("registry restored", len(strategy_api.available()) == 17,
-      str(len(strategy_api.available())))
+check("registry restored", len(strategy_api.available()) == _REGISTERED,
+      f"{len(strategy_api.available())}, expected {_REGISTERED}")
 
 # The {"auto"} term is a third floor, below the other two. With the registry
 # empty it is still covered by STRATEGY_MODES, so proving it needs BOTH other
@@ -233,7 +239,8 @@ try:
 finally:
     strategy_api.available, ai.STRATEGY_MODES = _sa, _sm
 check("both sources restored",
-      len(strategy_api.available()) == 17 and "auto" in ai.STRATEGY_MODES)
+      len(strategy_api.available()) == _REGISTERED
+      and "auto" in ai.STRATEGY_MODES)
 
 print("\n7. forex.TIMEFRAMES still mirrors the broker's map exactly")
 # The validator cannot read _period() directly: test_failure_matrix.py forbids

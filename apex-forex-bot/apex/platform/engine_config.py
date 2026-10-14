@@ -42,13 +42,26 @@ instrument and the timeframe before this file existed.
 
 from apex.platform import ruledoc as _rd
 
+# The strategy module that asks the rule. Declared here, as a plain string,
+# because `apex.platform.rule_strategy` reads it to name itself and importing
+# that module from here would close a cycle (it reaches automation, which
+# reaches this file).
+RULE_STRATEGY_ID = "platform_rule"
+
 # Every engine key this module may write. Nothing outside this set is touched,
 # and `snapshot_of` captures exactly these — the two have to be the same list
 # or a restore puts back less than the start overwrote.
+#
+# The second line is the engine's own decision-making, switched off. A rule
+# that reaches the loop is only driving it if nothing else can overrule it, so
+# those keys are owned for the same reason the trading terms are: whatever the
+# account held must come back when the rule stops.
 OWNED_KEYS = (
     "symbol", "timeframe",
     "risk", "sl_pips", "tp_pips", "tp_target_pct", "atr_stops",
     "trailing", "breakeven_r", "max_trades_day", "max_spread_pips",
+    "strategy", "ai_confirm", "min_confidence", "htf", "autopilot",
+    "watchlist", "session_filter",
 )
 
 
@@ -69,6 +82,34 @@ def translate(doc):
 
     def miss(term, value, why):
         missed.append({"term": term, "value": value, "why": why})
+
+    # ── the loop is pointed at the rule, and at nothing else ────────────────
+    # `cfg.STRATEGY` is per-account, so this is what makes one account's loop
+    # ask its running rule instead of choosing entries with the engine's own
+    # strategies. Every key beside it is a gate that would otherwise decide
+    # instead of the rule, and each is switched off for a specific reason:
+    #
+    #   ai_confirm      the loudest. With it on, the loop DISCARDS the
+    #                   strategy's BUY and calls ai.get_signal() for its own,
+    #                   which can hold or reverse it.
+    #   min_confidence  a rule fires or it does not; there is no probability
+    #                   behind it, so any threshold above zero refuses every
+    #                   entry forever.
+    #   htf             an H1-trend veto blocks entries the rule asked for.
+    #   autopilot       the engine rotates its own instruments, overriding the
+    #                   instrument the rule names.
+    #   watchlist       the basket that rotation draws from.
+    #
+    # `session_filter` is deliberately NOT written. It is the account's own
+    # setting and it is not this rule's schedule — the schedule is reported
+    # below as a term that does not reach the engine, which is the honest
+    # answer. Clearing it would widen trading past what the client chose.
+    applied["strategy"] = RULE_STRATEGY_ID
+    applied["ai_confirm"] = False
+    applied["min_confidence"] = 0
+    applied["htf"] = False
+    applied["autopilot"] = False
+    applied["watchlist"] = []
 
     # ── instrument and timeframe ────────────────────────────────────────────
     symbols = [s for s in (doc.get("symbols") or []) if s]
@@ -155,21 +196,29 @@ def translate(doc):
              "whatever the rule says.")
 
     # ── what the engine simply does not take from a rule ────────────────────
-    entry = (doc.get("entry") or {}).get("conditions") or []
-    if entry:
-        miss("Entry conditions", f"{len(entry)} condition(s)",
-             "The engine chooses entries with its own strategies. Your "
-             "conditions are recorded on the rule and are not what it looks "
-             "for — carrying them through is the next milestone.")
-    exits = (doc.get("exit") or {}).get("conditions") or []
-    if exits:
-        miss("Exit conditions", f"{len(exits)} condition(s)",
-             "The engine closes on its own exits, the stop and the target. "
-             "Your exit conditions are recorded and not acted on.")
-    if doc.get("sides") and doc["sides"] != "BOTH":
-        miss("Sides", str(doc["sides"]),
-             "The engine takes both directions when its strategy signals "
-             "them; it has no per-rule setting for one side only.")
+    # Entry conditions, exit conditions and sides USED to be reported here:
+    # the engine chose entries with its own strategies and a rule's conditions
+    # were a document the product displayed and the loop ignored. They now
+    # reach the loop through `rule_strategy`, so reporting them would tell a
+    # client their terms do nothing when they do.
+    #
+    # What is left is about TIMING and SIZE, and it is still not exact. Each of
+    # these is true of every rule, so each is reported for every rule rather
+    # than inferred from the document.
+    miss("Evaluation timing", str((doc.get("evaluateOn") or "bar_close")),
+         "Your conditions are checked on closed candles, but the loop checks "
+         "them on its own polling cycle rather than at the instant a candle "
+         "closes. A rule can therefore act a few seconds into the next "
+         "candle, at the price available then.")
+    miss("Exit timing", "when the next check runs",
+         "Your exit conditions are checked on the same cycle as entries, and "
+         "the stop and the target sit at the broker where they act "
+         "immediately. A stop or target can therefore close a position before "
+         "an exit condition is next looked at.")
+    miss("Position size", "derived from your risk percentage",
+         "The engine sizes each position from your risk percentage and then "
+         "rounds it to a volume the broker accepts, so the amount risked is "
+         "close to the percentage you set rather than exactly it.")
     sched = doc.get("schedule") or {}
     if sched.get("days") or sched.get("windows"):
         miss("Schedule", "set",

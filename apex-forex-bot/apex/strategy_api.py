@@ -85,10 +85,18 @@ class Market:
 
     def __init__(self, candles, symbol="", indicators=None, strat=None,
                  open_position=None, price=None, balance=None, timeframe="",
-                 confidence=None, criteria_score=None):
+                 confidence=None, criteria_score=None, user_id="",
+                 spread_pips=None):
         self.candles = _validate_candles(candles)
         self.symbol = str(symbol or "")
         self.timeframe = str(timeframe or "")
+        # Both optional, so every existing caller is unchanged. A strategy
+        # that needs neither never looks; `rule_strategy` needs both — the
+        # account id to find out which rule is running, and the spread to
+        # honour a rule's spread ceiling instead of guessing at it.
+        self.user_id = str(user_id or "")
+        self.spread_pips = (float(spread_pips)
+                            if _is_num(spread_pips) else None)
         self.open_position = _validate_position(open_position)
         self.balance = float(balance) if _is_num(balance) else None
         self.confidence = float(confidence) if _is_num(confidence) else None
@@ -277,8 +285,16 @@ def load_builtins():
     strategy_extra    — momentum, session breakout, quant/statistical
     strategy_specialized — grid and martingale, capped (blueprint §2 keeps
                         these separate on purpose)
+    platform.rule_strategy — the one that decides nothing itself and asks the
+                        account's running rule instead
+
+    The rule strategy has to arrive through this same call rather than being
+    imported wherever it is used: an account whose stored strategy points at
+    it would find an empty registry after any process restart, and the loop
+    would hold rather than trade the rule the client started.
     """
     from apex import strategy_modules      # noqa: F401
     from apex import strategy_extra        # noqa: F401
     from apex import strategy_specialized  # noqa: F401
+    from apex.platform import rule_strategy  # noqa: F401
     return available()
