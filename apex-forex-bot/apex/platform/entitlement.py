@@ -252,9 +252,24 @@ def capability(user_id, *, now=None):
                             "the account again")
 
     if mode == LIVE:
-        # Both entitlements land here. A paid plan does not unlock an
-        # execution path that does not exist, and pretending otherwise is the
-        # single most dangerous thing this file could do.
+        # REFUSED FOR EVERYONE, with NO reference to the entitlement.
+        #
+        # That absence is a structural invariant, asserted on this
+        # function's own SOURCE by tests/test_platform_live_invariants.py:
+        # lock 2 must not compare the entitlement against the paid tier at
+        # all. The guard is literal, and deliberately so — this very comment
+        # failed it once by quoting the forbidden comparison in prose.
+        #
+        # The reason is not that such a check would be wrong today. A version
+        # that varied only the MESSAGE behaved identically. It is that a
+        # comparison sitting here is one edit away from becoming the thing
+        # that lets a paid plan through, and this is the function guarding the
+        # path that moves real money.
+        #
+        # The commercial rule that a trial covers demo accounts only lives in
+        # `plans.may_trade_live`, which answers that question and can unlock
+        # nothing. Whoever opens this lock calls it rather than writing a
+        # comparison here.
         return dict(out, reason="LIVE_NOT_AVAILABLE",
                     badge=BADGE_LIVE_BLOCKED,
                     message=LIVE_REFUSAL)

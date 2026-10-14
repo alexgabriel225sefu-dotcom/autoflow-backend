@@ -75,13 +75,23 @@ describe("the main flow against the real backend", () => {
     who = "alice";
   });
 
-  it("reports the signed-in user and an unlicensed account honestly", async () => {
-    const r = await api<{ user: { userId: string }; licence: { state: string } }>("me");
+  it("reports the signed-in user and the free tier honestly", async () => {
+    const r = await api<{
+      user: { userId: string };
+      licence: { state: string; plan: string | null };
+      execution: { entitlement: string };
+    }>("me");
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.data.user.userId).toMatch(/^aaaaaaaa-/);
-      // Not "active" by default. An unknown entitlement is not an entitlement.
-      expect(r.data.licence.state).toBe("none");
+      // A confirmed account receives the free 14-day demo trial on its first
+      // authenticated request, so "none" is no longer the honest answer here.
+      // The guarantee that matters is unchanged and now stated directly: this
+      // client is on the FREE tier, not the paid one. An active licence is no
+      // longer evidence of having paid for anything.
+      expect(r.data.licence.state).toBe("active");
+      expect(r.data.licence.plan).toBe("demo_trial");
+      expect(r.data.execution.entitlement).toBe("free_demo");
     }
   });
 

@@ -169,6 +169,12 @@ check("free_demo + live CANNOT", by[(E.FREE_DEMO, E.LIVE)]["canAutomate"] is Fal
 check("paid_live + live CANNOT EITHER",
       by[(E.PAID_LIVE, E.LIVE)]["canAutomate"] is False,
       "a paid plan must not unlock a path that does not exist")
+# Both still refuse, with the SAME reason, and lock 2 names no tier at all —
+# tests/test_platform_live_invariants.py asserts on its source that it never
+# compares the entitlement against the paid tier, because a comparison there
+# is one edit away from letting a paid plan through. The commercial rule that
+# a trial covers demo accounts only lives in `plans.may_trade_live`, where
+# answering it can unlock nothing.
 check("and both live refusals give the same reason",
       by[(E.FREE_DEMO, E.LIVE)]["reason"]
       == by[(E.PAID_LIVE, E.LIVE)]["reason"] == "LIVE_NOT_AVAILABLE")

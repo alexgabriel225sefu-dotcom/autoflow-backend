@@ -631,6 +631,79 @@ check("and it is wired into the ONE place every request authenticates",
       "sees every client")
 
 
+print("\n[14] THE TRIAL IS DEMO-ONLY, as a rule and not as an accident")
+# The rule the owner asked for. Today a trial cannot touch a real-money
+# account because NOBODY can, so the rule is invisible in behaviour — which is
+# exactly why it is stated and tested now, before the switch flips.
+#
+# It lives in plans.may_trade_live rather than in entitlement.capability.
+# capability is lock 2 on the live path and
+# tests/test_platform_live_invariants.py asserts on its SOURCE that it never
+# compares the entitlement against the paid tier, because a comparison there
+# is one edit away from letting a paid plan through. A first attempt at this
+# section put the rule in capability and that invariant caught it, correctly:
+# the behaviour was identical and the structure was weaker.
+check("the trial does not cover real-money trading",
+      P.may_trade_live(P.DEMO_TRIAL) is False,
+      "the free tier would inherit real-money trading on the day live is "
+      "enabled")
+check("the paid plan does", P.may_trade_live(P.FOUNDER_LIVE) is True)
+check("and so does whatever billing is configured to grant",
+      P.may_trade_live(_billing.APPROVED_PLAN) is True)
+for junk in (None, "", "none", "pro", "demo_trial_extended"):
+    check(f"{junk!r} does not cover real money",
+          P.may_trade_live(junk) is False)
+
+# Answering it can unlock nothing: a plan name in, a boolean out.
+_src = open(os.path.join(ROOT, "apex", "platform", "plans.py"),
+            encoding="utf-8").read()
+_fn = _src[_src.index("def may_trade_live"):_src.index("def referred_account_allowance")]
+check("the rule touches no account, no store and no switch",
+      not any(w in _fn for w in ("user_id", "_store", "_lic.", "os.getenv")),
+      "a rule that reads state is a rule that can be wrong about a client")
+
+# And the refusal itself is still absolute, for every tier, in both locks.
+from apex.platform import automation as AU                # noqa: E402
+
+U9 = "9999aaaa-bbbb-4ccc-8ddd-9999eeeeffff"
+P.start_trial(U9)
+connect(U9)
+check("a trial client may still SELECT a real-money account",
+      sel(U9, 7001) == 7001,
+      "selecting records a choice; trading is what the rule is about")
+check("but cannot automate it",
+      E.capability(U9)["canAutomate"] is False, str(E.capability(U9)))
+L.grant(U9, plan=P.FOUNDER_LIVE, expires_at=None)
+check("and NEITHER can a paying client, because the path does not exist",
+      E.capability(U9)["canAutomate"] is False,
+      "a paid plan must not unlock an unreviewed path")
+check("both are refused with the release's own reason, which names no tier",
+      E.capability(U9)["reason"] == "LIVE_NOT_AVAILABLE",
+      str(E.capability(U9)["reason"]))
+
+# The second lock, independent of the first. Even with the entitlement layer
+# rewritten to say yes, automation refuses a non-demo connection on its own.
+_real_cap = E.capability
+
+
+def _lying_capability(user_id, **kw):
+    return dict(_real_cap(user_id, **kw), canAutomate=True, reason=None)
+
+
+E.capability = _lying_capability
+AU._ent.capability = _lying_capability
+try:
+    _e = attempt(AU.start, U9, "any-rule", starter=lambda uid: True)
+    check("automation refuses a real-money account even when the "
+          "entitlement layer says yes",
+          isinstance(_e, BaseException),
+          f"{type(_e).__name__}: {_e} — the second lock is what makes the "
+          f"first one's correctness not load-bearing")
+finally:
+    E.capability = _real_cap
+    AU._ent.capability = _real_cap
+
+
 print("\n[11] payments are still off")
 check("checkout is not enabled by any of this",
       os.getenv("ENABLE_CHECKOUT") in (None, "", "false", "0"),

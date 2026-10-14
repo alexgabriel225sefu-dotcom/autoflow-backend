@@ -129,6 +129,32 @@ def is_live_plan(plan):
     return str(plan or "") in live_plans()
 
 
+def may_trade_live(plan):
+    """Whether this plan covers REAL-MONEY trading. The commercial rule.
+
+    THE TRIAL IS DEMO-ONLY BY ITS OWN NATURE — not because live execution
+    happens to be switched off for everybody in this release. That is the
+    whole point of stating it here.
+
+    WHY IT IS IN THIS FILE AND NOT IN entitlement.capability. That function is
+    lock 2 on the live path, and `tests/test_platform_live_invariants.py`
+    asserts on its source that it never compares the entitlement against the
+    paid tier — because a comparison there is one edit away from letting a
+    paid plan through, and it guards the path that moves real money. So the
+    rule lives here, where answering it can unlock nothing: this function
+    reads a plan name and returns a boolean, touches no account, no store and
+    no switch.
+
+    It is what whoever enables live execution should CALL, instead of writing
+    a comparison inside lock 2. Today nothing calls it in production and that
+    is correct — live is refused for everyone, so there is no question to ask
+    yet. It is written and tested now because the day the switch flips is the
+    day somebody would otherwise have to remember this rule from memory, and
+    the free tier would quietly inherit real-money trading.
+    """
+    return is_live_plan(plan)
+
+
 def referred_account_allowance():
     """The allowance a confirmed referral unlocks.
 
