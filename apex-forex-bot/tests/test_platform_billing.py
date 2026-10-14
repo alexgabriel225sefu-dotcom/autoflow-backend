@@ -30,7 +30,8 @@ os.environ["SUPABASE_ANON_KEY"] = "anon"
 
 from apex.platform import api as A            # noqa: E402
 from apex.platform import billing as B        # noqa: E402
-from apex.platform import licence as L        # noqa: E402
+from apex.platform import licence as L
+from apex.platform import plans as _plans        # noqa: E402
 
 SECRET = "whsec_test_secret"
 USER = "supabase-user-1"
@@ -67,6 +68,20 @@ def paid_session(user_id=USER, **extra):
 
 def state(user_id):
     return L.status_for(user_id)["state"]
+
+
+def paid(user_id):
+    """Whether this client holds the PAID plan.
+
+    The checks below used to read `state(...) == "none"`, which stopped
+    meaning "checkout granted nothing" the moment every confirmed account
+    received a free trial on its first authenticated request. A trial makes
+    the licence ACTIVE while granting nothing anybody paid for, so the
+    guarantee worth asserting is specifically that no PAID plan appeared —
+    which is the thing a closed checkout must never produce.
+    """
+    st = L.status_for(user_id)
+    return st["state"] == L.ACTIVE and _plans.is_live_plan(st.get("plan"))
 
 
 def reset(user_id):
@@ -248,7 +263,8 @@ try:
           and offer.get("currency") == "usd"
           and offer.get("purchaseMode") == "one_time"
           and "secret" not in json.dumps(offer).lower(), json.dumps(offer))
-    check("closed checkout grants no licence", state(USER) == "none", state(USER))
+    check("closed checkout grants no PAID licence", paid(USER) is False,
+          str(L.status_for(USER)))
 
     os.environ["A4T_CHECKOUT_ENABLED"] = "true"
     os.environ["A4T_AUTHENTICATED_CHECKOUT_ENABLED"] = "true"
@@ -257,7 +273,8 @@ try:
     check("even with both gates, checkout creation is still not implemented",
           st == 501 and out["error"]["code"] == "CHECKOUT_NOT_IMPLEMENTED",
           json.dumps(out))
-    check("and still grants no licence", state(USER) == "none", state(USER))
+    check("and still grants no PAID licence", paid(USER) is False,
+          str(L.status_for(USER)))
 finally:
     A._id.verify_token = _real_verify
     for var in ["A4T_CHECKOUT_ENABLED", "A4T_AUTHENTICATED_CHECKOUT_ENABLED"]:

@@ -573,6 +573,64 @@ check("and is still held to one NEW account",
       isinstance(sel(U5, 7002), CL.LinkError), str(sel(U5, 7002)))
 
 
+print("\n[13] the trial actually REACHES clients")
+# The gap this closes was mine: plans.py granted a trial that nothing in
+# production ever called, while demo automation had started requiring an
+# active licence. The result would have been a platform where no client could
+# start anything — a shipping blocker invisible to every test that granted the
+# trial itself, which is all of the ones above.
+from apex.platform import api as API                      # noqa: E402
+
+
+class _Principal:
+    def __init__(self, uid, verified=True):
+        self.user_id = uid
+        self.email_verified = verified
+
+
+U6 = "6666eeee-7777-4888-8999-6666ffffbbbb"
+check("a confirmed account has no trial before it is seen",
+      P.trial_state(U6, now=NOW)["plan"] == P.NONE)
+API._start_trial_if_new(_Principal(U6))
+check("authenticating starts it", P.trial_state(U6)["onTrial"] is True,
+      str(P.trial_state(U6)))
+_first = P.trial_state(U6)["expiresAt"]
+API._start_trial_if_new(_Principal(U6))
+check("and signing in again does not extend it",
+      P.trial_state(U6)["expiresAt"] == _first,
+      "a trial that renews on every request is not a trial")
+
+U7 = "7777eeee-8888-4999-8aaa-7777ffffcccc"
+API._start_trial_if_new(_Principal(U7, verified=False))
+check("an UNVERIFIED address does not start the clock",
+      P.trial_state(U7, now=NOW)["plan"] == P.NONE,
+      "the fourteen days would tick while they cannot use the product, and "
+      "they would arrive to a shorter trial than they were promised")
+
+U8 = "8888eeee-9999-4aaa-8bbb-8888ffffdddd"
+L.grant(U8, plan=P.FOUNDER_LIVE, expires_at=None, now=NOW)
+API._start_trial_if_new(_Principal(U8))
+check("a PAYING client is never downgraded to a trial by signing in",
+      P.plan_of(U8, now=NOW) == P.FOUNDER_LIVE, P.plan_of(U8, now=NOW))
+
+_real_start = P.start_trial
+P.start_trial = lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("store down"))
+try:
+    API._start_trial_if_new(_Principal("9999eeee-aaaa-4bbb-8ccc-9999ffffeeee"))
+    check("a store failure here does not fail the request", True)
+except Exception as e:
+    check("a store failure here does not fail the request", False, str(e))
+finally:
+    P.start_trial = _real_start
+
+check("and it is wired into the ONE place every request authenticates",
+      "_start_trial_if_new(principal)" in open(
+          os.path.join(ROOT, "apex", "platform", "api.py"),
+          encoding="utf-8").read(),
+      "there is no sign-up hook to use; _authenticate is the only place that "
+      "sees every client")
+
+
 print("\n[11] payments are still off")
 check("checkout is not enabled by any of this",
       os.getenv("ENABLE_CHECKOUT") in (None, "", "false", "0"),

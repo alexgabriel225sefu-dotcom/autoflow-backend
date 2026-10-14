@@ -30,7 +30,8 @@ import requests  # noqa: E402
 
 from apex.platform import api as A  # noqa: E402
 from apex.platform import identity as I  # noqa: E402
-from apex.platform import licence as L  # noqa: E402
+from apex.platform import licence as L
+from apex.platform import plans as _plans  # noqa: E402
 from apex.platform import ruledoc as R  # noqa: E402
 
 failures = []
@@ -116,8 +117,18 @@ try:
     st, b = call("GET", "/api/v1/me")
     check("me returns the Supabase user id as the platform identity",
           b["user"]["userId"] == ALICE, str(b["user"]))
-    check("a client with no record is reported as unlicensed, not active",
-          b["licence"]["state"] == L.NONE, b["licence"]["state"])
+    # A confirmed account now holds the free 14-day trial from its first
+    # authenticated request — `api._start_trial_if_new`. So the thing to
+    # assert is no longer "no licence" but "the FREE tier, not the paid one":
+    # the licence is active and its plan is the trial, which is what a client
+    # who has paid nothing must look like.
+    check("a new client is reported as holding the free trial",
+          b["licence"]["state"] == L.ACTIVE
+          and b["licence"].get("plan") == _plans.DEMO_TRIAL,
+          json.dumps(b["licence"]))
+    check("and the entitlement is the free one, not the paid one",
+          b["execution"]["entitlement"] == "free_demo",
+          b["execution"]["entitlement"])
     check("no token is echoed anywhere in the response",
           "token" not in json.dumps(b).lower())
 

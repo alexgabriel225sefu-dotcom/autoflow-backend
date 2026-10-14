@@ -305,6 +305,11 @@ select(501)
 
 # With no trial on file, starting is refused — and refused HERE, by the same
 # gate the UI reads, rather than deep in the engine with ENGINE_REFUSED.
+#
+# Cleared immediately before the attempt: the A.handle calls above each
+# authenticate, and authenticating now STARTS the trial, so a wipe placed any
+# earlier would be undone by the next request.
+ST._write(f"{ST._ns()}:{ST._P}:licence:{USER}", None)
 _no_trial = None
 try:
     AU.start(USER, rid, starter=lambda uid: True)

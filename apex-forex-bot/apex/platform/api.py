@@ -41,6 +41,7 @@ from apex.platform import preview as _preview
 from apex.platform import linklog as _log
 from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
+from apex.platform import plans as _plans
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
 from apex.platform import waitlist as _wait
@@ -84,12 +85,53 @@ def _body(raw):
     return parsed
 
 
+def _start_trial_if_new(principal):
+    """Begin the free demo trial the first time a confirmed account is seen.
+
+    WHY IT IS HERE. There is no sign-up hook to hang this on — Supabase owns
+    registration and the platform first learns of an account when it presents
+    a token. `_authenticate` is the one place every authenticated request
+    resolves a principal, so it is the only place that sees every client
+    exactly once-or-more and never zero times.
+
+    Without this the trial would exist in `plans.py` and be granted to nobody,
+    and since demo automation now requires an ACTIVE licence, no client could
+    start anything at all.
+
+    Three properties make calling it on every request correct rather than
+    merely cheap:
+
+      * `plans.start_trial` is idempotent and NEVER extends an expiry, so a
+        client who signs in on day thirteen still has one day left.
+      * it refuses to write over any plan already on file, so a paying client
+        is never downgraded to a trial by signing in.
+      * UNVERIFIED addresses are skipped. Otherwise the fourteen days would
+        start ticking while somebody who has not yet clicked a confirmation
+        link cannot use the product, and they would arrive to a shorter trial
+        than they were promised.
+
+    A failure here never fails the request. The automation gate refuses later
+    with a message that names the missing trial, which is a better outcome
+    than a signed-in client seeing a 500 from a store hiccup.
+    """
+    if not getattr(principal, "email_verified", False):
+        return
+    try:
+        _plans.start_trial(principal.user_id)
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[API] could not start the demo trial for "
+              f"{principal.user_id} ({type(e).__name__}) — the automation "
+              f"gate will report it")
+
+
 def _authenticate(headers, *, fresh=False):
     token = _id.bearer_token((headers or {}).get("Authorization")
                              or (headers or {}).get("authorization"))
     if not token:
         raise _id.AuthFailed("this endpoint needs a signed-in session")
-    return _id.verify_token(token, fresh=fresh)
+    principal = _id.verify_token(token, fresh=fresh)
+    _start_trial_if_new(principal)
+    return principal
 
 
 # ── routes ──────────────────────────────────────────────────────────────────
