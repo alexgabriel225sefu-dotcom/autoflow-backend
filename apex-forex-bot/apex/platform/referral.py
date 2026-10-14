@@ -51,6 +51,31 @@ from apex.platform import store as _store
 # every arrival under a blank code.
 CODE_ENV = "A4T_REFERRAL_CODE"
 
+# Where a client opens a broker account under the operator's introducing-broker
+# code. Configuration, never hardcoded: the operator can change brokers, and a
+# URL compiled into the product is one that outlives the arrangement it
+# describes.
+SIGNUP_URL_ENV = "A4T_BROKER_SIGNUP_URL"
+
+# THE DISCLOSURE, AND WHY IT IS NOT OPTIONAL.
+#
+# An introducing-broker arrangement pays the operator from the volume the
+# client trades, while this platform decides how often to trade. That is a
+# conflict of interest, and a client sent to a signup link without being told
+# has not been given the one fact they would want. In the EU, disclosing an
+# inducement of this kind is not a courtesy.
+#
+# So `broker_signup()` returns the URL and this sentence TOGETHER and there is
+# no accessor that returns the URL alone — the disclosure cannot be dropped by
+# whoever writes the screen, because the API never hands out a bare link.
+# tests/test_platform_plans_referral.py asserts that no such accessor exists.
+REBATE_DISCLOSURE = (
+    "Opening an account through this link pays the operator of this platform "
+    "a commission from the broker, based on the volume you trade. You do not "
+    "have to use it: you can open an account with any cTrader broker and "
+    "connect it here instead, and the accounts you already use are "
+    "unaffected.")
+
 # Where an attribution came from. Recorded because "they clicked the link" and
 # "support typed it in" are different kinds of evidence and a dispute needs to
 # know which one it is looking at.
@@ -237,6 +262,30 @@ def confirm_broker_account(user_id, *, actor, broker_account, report_ref,
     return out
 
 
+def broker_signup():
+    """{"url", "disclosure"} for opening an account under the operator's IB,
+    or None when no link is configured.
+
+    Deliberately ONE accessor returning BOTH. There is no `signup_url()`,
+    because a screen built from one would show the link without the
+    disclosure, and that is the version a regulator and a client both object
+    to. See REBATE_DISCLOSURE.
+
+    A link that is not plainly an https URL is treated as absent rather than
+    passed through: a malformed value in an environment variable must not
+    become an href the product shows to a client.
+    """
+    raw = (os.getenv(SIGNUP_URL_ENV) or "").strip()
+    if not raw:
+        return None
+    if not raw.lower().startswith("https://") or len(raw) > 2000 \
+            or any(c.isspace() for c in raw):
+        print(f"[Referral] {SIGNUP_URL_ENV} is not a plain https URL — "
+              f"treating it as unset rather than showing it to a client")
+        return None
+    return {"url": raw, "disclosure": REBATE_DISCLOSURE}
+
+
 def state_of(user_id):
     """The whole referral picture for one client, safe to hand a browser.
 
@@ -244,7 +293,14 @@ def state_of(user_id):
     that their account is confirmed, not which internal document says so.
     """
     rec = _read(user_id) or {}
-    return {"attributed": bool(rec),
-            "arrivedThroughLink": arrived_through_link(user_id),
-            "brokerConfirmed": bool(rec.get("brokerConfirmed") is True),
-            "awaitingConfirmation": bool(rec) and rec.get("brokerConfirmed") is None}
+    out = {"attributed": bool(rec),
+           "arrivedThroughLink": arrived_through_link(user_id),
+           "brokerConfirmed": bool(rec.get("brokerConfirmed") is True),
+           "awaitingConfirmation": bool(rec)
+           and rec.get("brokerConfirmed") is None}
+    # The signup link only when there is something to act on: a client whose
+    # account is already confirmed has no reason to be sent to it again, and
+    # offering it anyway reads as a nudge to open accounts they do not need.
+    if not out["brokerConfirmed"]:
+        out["brokerSignup"] = broker_signup()
+    return out

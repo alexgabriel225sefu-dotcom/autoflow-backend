@@ -704,6 +704,70 @@ finally:
     AU._ent.capability = _real_cap
 
 
+print("\n[15] the signup link is never handed out without the disclosure")
+# The commercial point of the gate is that extra real-money accounts come
+# through the operator's introducing-broker link. The IB arrangement pays the
+# operator from the volume the client trades, while this platform decides how
+# often to trade — a conflict of interest, and a client sent to the link
+# without being told has not been given the one fact they would want.
+#
+# So the API returns the URL and the disclosure TOGETHER and offers no way to
+# get the URL alone. That is structural: a screen cannot drop the disclosure,
+# because there is nothing to call that would let it.
+_had_url = os.environ.get("A4T_BROKER_SIGNUP_URL")
+try:
+    os.environ["A4T_BROKER_SIGNUP_URL"] = (
+        "https://portal.example.test/register?agt=1")
+    _s = R.broker_signup()
+    check("the signup carries the url", _s and _s.get("url", "").startswith(
+        "https://portal.example.test/"), str(_s))
+    check("and the disclosure, in the same object",
+          _s.get("disclosure") == R.REBATE_DISCLOSURE, str(_s))
+    check("the disclosure says the operator is paid from traded volume",
+          "commission" in _s["disclosure"] and "volume" in _s["disclosure"],
+          _s["disclosure"])
+    check("and that the client does not have to use the link",
+          "do not have to" in _s["disclosure"], _s["disclosure"])
+
+    _bare = [n for n in dir(R)
+             if n in ("signup_url", "referral_url", "broker_url", "link")]
+    check("there is NO accessor that returns the url on its own",
+          not _bare,
+          f"{_bare} — a screen built from one would show the link without "
+          f"the disclosure, which is the version both a client and a "
+          f"regulator object to")
+
+    # A malformed environment value must not become an href.
+    for bad, why in (("http://x.test/r", "not https"),
+                     ("javascript:alert(1)", "not a url scheme"),
+                     ("https://x.test/ r", "contains whitespace"),
+                     ("portal.example.test/r", "no scheme"),
+                     ("", "unset")):
+        os.environ["A4T_BROKER_SIGNUP_URL"] = bad
+        check(f"a link that is {why} is treated as absent",
+              R.broker_signup() is None, f"{bad!r} -> {R.broker_signup()}")
+finally:
+    if _had_url is None:
+        os.environ.pop("A4T_BROKER_SIGNUP_URL", None)
+    else:
+        os.environ["A4T_BROKER_SIGNUP_URL"] = _had_url
+
+# And it is offered only where there is something to act on.
+os.environ["A4T_BROKER_SIGNUP_URL"] = "https://portal.example.test/register"
+try:
+    check("a client who is NOT confirmed is shown where to go",
+          (R.state_of(U3).get("brokerSignup") or {}).get("url"),
+          str(R.state_of(U3)))
+    check("a client already CONFIRMED is not nudged to open another account",
+          R.state_of(U1).get("brokerSignup") is None,
+          str(R.state_of(U1).get("brokerSignup")))
+    check("and the client-facing state still leaks no report or operator id",
+          "reportRef" not in R.state_of(U1)
+          and "confirmedBy" not in R.state_of(U1), str(R.state_of(U1)))
+finally:
+    os.environ.pop("A4T_BROKER_SIGNUP_URL", None)
+
+
 print("\n[11] payments are still off")
 check("checkout is not enabled by any of this",
       os.getenv("ENABLE_CHECKOUT") in (None, "", "false", "0"),
