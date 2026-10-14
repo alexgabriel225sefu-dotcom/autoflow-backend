@@ -38,6 +38,18 @@ export type ApiError = {
    * session on it.
    */
   diagnosticId?: string;
+  /**
+   * Where to open a broker account under the referral programme, present ONLY
+   * on an ACCOUNT_LIMIT refusal — the moment a client has just tried to add
+   * another real-money account and is the one client actually asking.
+   *
+   * The url and the disclosure arrive TOGETHER and must be rendered together.
+   * The server has no accessor that returns the url alone, for the same
+   * reason: the arrangement pays the operator from the volume the client
+   * trades, and a link shown without saying so is the version both a client
+   * and a regulator object to.
+   */
+  brokerSignup?: { url: string; disclosure: string };
 };
 
 export type ApiResult<T> = { ok: true; data: T } | ApiError;
@@ -59,6 +71,19 @@ export const CODES = {
 
 function fail(status: number, code: string, message: string, extra = {}): ApiError {
   return { ok: false, status, code, message, ...extra };
+}
+
+/**
+ * Both halves or neither. A payload carrying a url and no disclosure is
+ * dropped rather than rendered — the server does not produce one, so if it
+ * ever arrives something is wrong, and showing a bare referral link is the
+ * one outcome worth refusing.
+ */
+function isBrokerSignup(v: unknown): v is { url: string; disclosure: string } {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.url === "string" && o.url.startsWith("https://")
+    && typeof o.disclosure === "string" && o.disclosure.length > 0;
 }
 
 /**
@@ -149,6 +174,7 @@ async function request<T>(
         capability: err.capability as string | undefined,
         retryAfterSec: typeof err.retryAfterSec === "number" ? err.retryAfterSec : undefined,
         diagnosticId: typeof err.diagnosticId === "string" ? err.diagnosticId : undefined,
+        brokerSignup: isBrokerSignup(err.brokerSignup) ? err.brokerSignup : undefined,
       },
     );
   }

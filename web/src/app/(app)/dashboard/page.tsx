@@ -21,7 +21,9 @@ import { Activity, Plug, RefreshCw } from "lucide-react";
 import { api, type ApiError } from "@/lib/api";
 import { invalidate, useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
-import { ErrorNotice, ExecutionBadge, PlanNotice, Spinner } from "@/components/app/state";
+import {
+  AccountLimitNotice, ErrorNotice, ExecutionBadge, PlanNotice, Spinner,
+} from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { MarketPanel } from "@/components/chart/market-panel";
@@ -202,7 +204,17 @@ export default function Dashboard() {
                       account unselectable without saying so: the picker
                       snapped back, the strip still read "No account
                       selected", and nothing on screen said why. */}
-                  {selectErr ? (
+                  {/* The account-limit refusal has somewhere to go, so it
+                      renders as the notice that carries the link and its
+                      disclosure rather than as a red line with no way
+                      forward. Switching accounts is possible from here as
+                      well as from the Accounts page, and a client who hit the
+                      limit here would otherwise read a reason and be given
+                      nothing to do about it. One shared component, so the
+                      disclosure cannot drift between the two screens. */}
+                  {selectErr?.code === "ACCOUNT_LIMIT" ? (
+                    <AccountLimitNotice error={selectErr} />
+                  ) : selectErr ? (
                     <ErrorNotice error={selectErr}
                                  onRetry={selected ? undefined : () => setSelectErr(null)} />
                   ) : null}

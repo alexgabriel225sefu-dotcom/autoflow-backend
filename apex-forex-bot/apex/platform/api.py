@@ -42,6 +42,7 @@ from apex.platform import linklog as _log
 from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
 from apex.platform import plans as _plans
+from apex.platform import referral as _referral
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
 from apex.platform import waitlist as _wait
@@ -255,8 +256,22 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         # diagnosticId is a keyed reference to the attempt, safe to show and
         # safe to quote: it identifies the attempt in the logs and reveals
         # neither the nonce it derives from nor who made it.
+        #
+        # ACCOUNT_LIMIT is the ONE place the broker signup link belongs, and
+        # the reason is the client's state rather than convenience: this
+        # refusal is raised because they just tried to add another real-money
+        # account. Nobody else is asking. Putting the link on the dashboard,
+        # in onboarding, or in the general referral state would show it to
+        # every client including the ones who want one account — which reads
+        # as a nudge to open accounts they do not need, and earns nothing.
+        #
+        # It arrives with its disclosure attached, because `broker_signup()`
+        # is the only accessor and it returns the two together.
+        signup = (_referral.broker_signup()
+                  if e.code == "ACCOUNT_LIMIT" else None)
         return _err(400, e.code, e.detail,
-                    diagnosticId=getattr(e, "attempt", None))
+                    diagnosticId=getattr(e, "attempt", None),
+                    brokerSignup=signup)
     except _lic.LicenceRequired as e:
         return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
     except _ent.NotEntitled as e:

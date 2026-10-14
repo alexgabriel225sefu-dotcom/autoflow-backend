@@ -29,6 +29,7 @@ the one that gets disputed.
 
 Run: python3 tests/test_platform_plans_referral.py
 """
+import json
 import os
 import sys
 import tempfile
@@ -752,19 +753,102 @@ finally:
     else:
         os.environ["A4T_BROKER_SIGNUP_URL"] = _had_url
 
-# And it is offered only where there is something to act on.
+# AND NOT in the general referral state, for ANY client.
+#
+# An earlier version of this file asserted the opposite — that an unconfirmed
+# client is "shown where to go" here. That was wrong about the requirement:
+# every unconfirmed client reads this state, and almost all of them want one
+# account, so the link would be advertising rather than an answer. Section
+# [16] pins where it does belong.
 os.environ["A4T_BROKER_SIGNUP_URL"] = "https://portal.example.test/register"
 try:
-    check("a client who is NOT confirmed is shown where to go",
-          (R.state_of(U3).get("brokerSignup") or {}).get("url"),
-          str(R.state_of(U3)))
-    check("a client already CONFIRMED is not nudged to open another account",
-          R.state_of(U1).get("brokerSignup") is None,
-          str(R.state_of(U1).get("brokerSignup")))
+    for who, label in ((U3, "unconfirmed"), (U1, "already confirmed")):
+        check(f"the general state carries no link for an {label} client",
+              "brokerSignup" not in R.state_of(who), str(R.state_of(who)))
     check("and the client-facing state still leaks no report or operator id",
           "reportRef" not in R.state_of(U1)
           and "confirmedBy" not in R.state_of(U1), str(R.state_of(U1)))
 finally:
+    os.environ.pop("A4T_BROKER_SIGNUP_URL", None)
+
+
+print("\n[16] THE PLACEMENT: at the refusal, and nowhere else")
+# The operator's instruction: the referral link is for clients who want MORE
+# accounts, so that those clients fund the running costs without the 497
+# being touched. That makes the placement part of the requirement, not a
+# detail — a link on the dashboard or in the general referral state would be
+# shown to every client including the overwhelming majority who want one
+# account, which is a nudge to open accounts nobody needs and earns nothing.
+#
+# The refusal is the moment a client has just tried to add another real-money
+# account. That is the one client asking, so that is where it goes.
+from apex.platform import api as _API                     # noqa: E402
+from apex.platform import identity as _ID                 # noqa: E402
+
+UA = "aaaa9999-bbbb-4ccc-8ddd-eeee11112222"
+P.start_trial(UA)
+connect(UA)
+sel(UA, 7001)                       # their one real-money account
+
+check("the general referral state does NOT carry the link",
+      "brokerSignup" not in R.state_of(UA),
+      f"{R.state_of(UA)} — every unconfirmed client reads this, and most of "
+      f"them want exactly one account")
+
+os.environ["A4T_BROKER_SIGNUP_URL"] = "https://portal.example.test/register?agt=1"
+_real_verify = _API._id.verify_token
+_real_allowed = CL.live_allowed
+_API._id.verify_token = lambda tok, **kw: _ID.Principal(
+    user_id=UA, email="a@b.test", email_verified=True)
+CL.live_allowed = lambda: True
+HDR = {"Authorization": "Bearer t"}
+try:
+    _st, _body = _API.handle(
+        "POST", "/api/v1/ctrader/select", HDR,
+        json.dumps({"ctid": 7002}).encode())
+    _e = (_body or {}).get("error") or {}
+    check("asking for a second real-money account is refused",
+          _e.get("code") == "ACCOUNT_LIMIT", json.dumps(_body)[:160])
+    check("and THAT refusal carries the signup link",
+          (_e.get("brokerSignup") or {}).get("url", "").startswith("https://"),
+          json.dumps(_e)[:200])
+    check("with the disclosure in the same object, not somewhere else",
+          (_e.get("brokerSignup") or {}).get("disclosure")
+          == R.REBATE_DISCLOSURE, json.dumps(_e.get("brokerSignup"))[:200])
+
+    # Any OTHER refusal from the same endpoint must not carry it. A link
+    # attached to every link error would be back to advertising.
+    _st2, _body2 = _API.handle(
+        "POST", "/api/v1/ctrader/select", HDR,
+        json.dumps({"ctid": 424242}).encode())
+    _e2 = (_body2 or {}).get("error") or {}
+    check("a different refusal does not carry it",
+          _e2.get("code") == "NO_SUCH_ACCOUNT"
+          and "brokerSignup" not in _e2, json.dumps(_e2)[:160])
+
+    # And selecting a DEMO account is not a refusal at all, so no link.
+    _st3, _body3 = _API.handle(
+        "POST", "/api/v1/ctrader/select", HDR,
+        json.dumps({"ctid": 7000}).encode())
+    check("selecting a demo account succeeds and offers nothing",
+          _body3.get("ok") is True and "brokerSignup" not in json.dumps(_body3),
+          json.dumps(_body3)[:160])
+
+    # With no link configured the refusal still happens, and says what to do.
+    os.environ.pop("A4T_BROKER_SIGNUP_URL", None)
+    sel(UA, 7001)
+    _st4, _body4 = _API.handle(
+        "POST", "/api/v1/ctrader/select", HDR,
+        json.dumps({"ctid": 7002}).encode())
+    _e4 = (_body4 or {}).get("error") or {}
+    check("with no link configured the refusal is unchanged and carries none",
+          _e4.get("code") == "ACCOUNT_LIMIT" and "brokerSignup" not in _e4,
+          json.dumps(_e4)[:160])
+    check("and the refusal text still explains the route",
+          "referral" in _e4.get("message", "").lower(), _e4.get("message"))
+finally:
+    _API._id.verify_token = _real_verify
+    CL.live_allowed = _real_allowed
     os.environ.pop("A4T_BROKER_SIGNUP_URL", None)
 
 

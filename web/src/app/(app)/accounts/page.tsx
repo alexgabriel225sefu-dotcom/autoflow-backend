@@ -1,25 +1,35 @@
 "use client";
 import { useState } from "react";
 import { Check, Plug, RefreshCw } from "lucide-react";
-import { api, type CtraderStatus } from "@/lib/api";
+import { api, type ApiError, type CtraderStatus } from "@/lib/api";
 import { useRead, whenSynced } from "@/lib/use-api";
-import { ErrorNotice, Spinner, StatusPill } from "@/components/app/state";
+import {
+  AccountLimitNotice, ErrorNotice, Spinner, StatusPill,
+} from "@/components/app/state";
 
 export default function AccountsPage() {
   const status = useRead<CtraderStatus>("ctrader/status", 60_000);
   const [err, setErr] = useState<string | null>(null);
+  // Kept separately from `err`: the account-limit refusal is the one case with
+  // something to DO about it, and it needs a link and a disclosure rather than
+  // a line of red text. Cleared on every attempt so a stale offer cannot sit
+  // under a later, unrelated error.
+  const [limit, setLimit] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   async function select(ctid: number | string) {
-    setBusy(String(ctid)); setErr(null);
+    setBusy(String(ctid)); setErr(null); setLimit(null);
     const r = await api("ctrader/select", { method: "POST", body: { ctid } });
     setBusy(null);
-    if (!r.ok) return setErr(`${r.code}: ${r.message}`);
+    if (!r.ok) {
+      if (r.code === "ACCOUNT_LIMIT") return setLimit(r);
+      return setErr(`${r.code}: ${r.message}`);
+    }
     void status.reload();
   }
 
   async function disconnect() {
-    setBusy("disconnect"); setErr(null);
+    setBusy("disconnect"); setErr(null); setLimit(null);
     const r = await api("ctrader/disconnect", { method: "POST" });
     setBusy(null);
     if (!r.ok) return setErr(`${r.code}: ${r.message}`);
@@ -44,6 +54,8 @@ export default function AccountsPage() {
       {status.result && !status.result.ok
         ? <ErrorNotice error={status.result} onRetry={status.reload} /> : null}
       {err ? <div className="notice notice-error" role="alert">{err}</div> : null}
+
+      {limit ? <AccountLimitNotice error={limit} /> : null}
 
       {data ? (
         data.connected ? (

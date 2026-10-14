@@ -127,6 +127,60 @@ export function ReadPanel({
   );
 }
 
+/**
+ * The account-limit refusal, and the only place a referral link is rendered.
+ *
+ * ONE implementation, used by every screen that can hit the refusal. Written
+ * that way deliberately: the link must never appear without the disclosure
+ * beside it, and two copies of this markup would be two chances for a later
+ * edit to drop it from one of them.
+ *
+ * It renders only for ACCOUNT_LIMIT — the moment a client has just tried to
+ * add another real-money account, which makes them the one client asking.
+ * Every other screen and every other client never sees it, which is the
+ * difference between answering a question and nudging somebody to open
+ * accounts they do not need.
+ *
+ * The url and the disclosure arrive together from the server, which has no
+ * accessor returning the url alone; if the disclosure is somehow missing,
+ * this falls back to support rather than showing a bare link.
+ */
+export function AccountLimitNotice({ error }: { error: ApiError }) {
+  if (error.code !== "ACCOUNT_LIMIT") return null;
+  // BOTH halves, or neither. The api layer already drops a payload carrying a
+  // url without a disclosure, and this is the last line before a client sees
+  // one: checking only that the object exists rendered the anchor beside an
+  // empty paragraph, which is precisely the bare referral link this component
+  // must never produce. Found by its own test.
+  const s = error.brokerSignup;
+  const signup = s && s.url && s.disclosure.trim() ? s : undefined;
+  return (
+    <div className="notice" role="status" style={{ display: "grid", gap: ".6rem" }}>
+      <strong>{error.message}</strong>
+      {signup ? (
+        <>
+          <p className="muted" style={{ margin: 0, fontSize: ".8rem" }}>
+            {signup.disclosure}
+          </p>
+          <a
+            className="btn btn-sm"
+            href={signup.url}
+            target="_blank"
+            rel="noopener noreferrer nofollow sponsored"
+            style={{ justifySelf: "start" }}
+          >
+            Open an account with the referral broker
+          </a>
+        </>
+      ) : (
+        <p className="muted" style={{ margin: 0, fontSize: ".8rem" }}>
+          Contact support to have an additional real-money account added.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Empty({ label }: { label: string }) {
   return <p className="empty">{label}</p>;
 }

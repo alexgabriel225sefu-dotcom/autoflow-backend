@@ -298,9 +298,14 @@ def state_of(user_id):
            "brokerConfirmed": bool(rec.get("brokerConfirmed") is True),
            "awaitingConfirmation": bool(rec)
            and rec.get("brokerConfirmed") is None}
-    # The signup link only when there is something to act on: a client whose
-    # account is already confirmed has no reason to be sent to it again, and
-    # offering it anyway reads as a nudge to open accounts they do not need.
-    if not out["brokerConfirmed"]:
-        out["brokerSignup"] = broker_signup()
+    # DELIBERATELY NOT the signup link.
+    #
+    # This is the general referral state, read by any screen that wants it, so
+    # putting the link here would show it to every unconfirmed client —
+    # including the overwhelming majority who want exactly one account. That
+    # is a nudge to open accounts nobody needs, and it earns nothing.
+    #
+    # The link belongs to one moment: the ACCOUNT_LIMIT refusal, raised when a
+    # client has just tried to add another real-money account and is therefore
+    # the one client actually asking for it. `api.handle` attaches it there.
     return out
