@@ -172,8 +172,8 @@ export type Licence = {
  * a visitor not being told whether signing up costs money is worse.
  */
 export const PLAN_NOTICE =
-  "Demo accounts are free. Real-money account access will be a paid plan, " +
-  "and live execution is not enabled in this release.";
+  "Demo accounts are free for a 14-day trial. Real-money account access is " +
+  "a paid plan, and live execution is not enabled in this release.";
 
 /**
  * What the SERVER says this client may do. Not derived here.
@@ -202,12 +202,33 @@ export type Execution = {
   canActivate: boolean;
   /** Why not, when canActivate is false. The server's words. */
   activationRefusal: string | null;
+  /**
+   * The plan on file: the free trial, the paid one, or none. The server
+   * decides what these mean — `entitlement` is the answer to "has this client
+   * paid for live", and it is NOT derivable from `plan` by a component.
+   */
+  plan: string;
+  onTrial: boolean;
+  /** Days remaining on the free trial, rounded up, or null when not on one. */
+  trialDaysLeft: number | null;
+  trialExpiresAt: number | null;
+  /**
+   * How many distinct real-money accounts this client may trade here. Demo
+   * accounts are not limited. More than one requires their broker account to
+   * be confirmed under the referral programme, which only the operator can
+   * record — so a component must never offer to raise this itself.
+   */
+  accountAllowance: number;
   reason:
     | null
     | "NOT_CONNECTED"
     | "REAUTH_REQUIRED"
     | "LIVE_NOT_AVAILABLE"
-    | "LICENCE_REVOKED";
+    | "LICENCE_REVOKED"
+    /** The free trial ran out. Different next step from NO_LICENCE. */
+    | "TRIAL_EXPIRED"
+    /** No trial on file at all — never started, or cleared. */
+    | "NO_LICENCE";
   message: string;
   badge: "DEMO" | "LIVE BLOCKED" | "NOT CONNECTED" | "REAUTH REQUIRED";
 };

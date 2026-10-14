@@ -250,14 +250,49 @@ def joined(text):
     return re.sub(r"\s+", " ", out)
 
 
-SENTENCE = ("Demo accounts are free. Real-money account access will be a paid "
-            "plan, and live execution is not enabled in this release.")
-check("the backend's notice is that sentence", SENTENCE in joined(py),
-      "python copy drifted")
-check("the client's notice is that sentence too", SENTENCE in joined(ts),
+# The canonical sentence, pinned here. This file reads SOURCE and imports
+# nothing from the app on purpose — it is the fast check that runs without a
+# store, a key or an environment — so the two sides are each checked against
+# this literal rather than against each other at runtime.
+#
+# The Python side no longer holds the sentence as a literal: it assembles it
+# from plans.py, so the trial length and the price are declared once and a
+# number on a screen cannot disagree with a number in a charge. That makes the
+# check here two-part — the assembly is in entitlement.py, the numbers are in
+# plans.py — and the numbers are what a client disputes.
+SENTENCE = ("Demo accounts are free for a 14-day trial. Real-money account "
+            "access is a paid plan, and live execution is not enabled in "
+            "this release.")
+check("the client's notice is that sentence", SENTENCE in joined(ts),
       "typescript copy drifted")
+
+plans = open(os.path.join(ROOT, "apex", "platform", "plans.py"),
+             encoding="utf-8").read()
+check("the backend assembles its notice from the plan constants",
+      "_plans.TRIAL_DAYS" in joined(py),
+      "a sentence written out twice is a sentence that will disagree")
+check("and the trial length is the one in the sentence",
+      "TRIAL_DAYS = 14" in plans,
+      "the backend would tell a client a different trial length than this "
+      "sentence promises")
+# A DECLARATION, not a mention: the module explains in prose where the price
+# lives, and saying so must not trip the check. What must not exist is an
+# assignment — a second figure for offer_drift() to miss.
+_price_consts = [l for l in plans.splitlines()
+                 if re.match(r"^[A-Z_]*PRICE[A-Z_]*\s*=", l.strip())]
+check("the plan module declares no price constant of its own",
+      not _price_consts,
+      f"{_price_consts} — the price belongs to billing.APPROVED_PRICE_MINOR, "
+      f"where offer_drift() watches it; a second copy is a figure no gate "
+      f"sees")
+# The price guard stands as it was. The price IS decided now, and it still
+# does not belong in this sentence: the figure is served from billing/offer
+# where one copy is watched by offer_drift(), and a number baked into static
+# copy goes stale the day the owner changes it. That is also why the web suite
+# forbids a currency literal in any file a client can read.
 check("and it promises no price",
-      not re.search(r"[$€£]\s*\d|\b\d+\s*(usd|eur|gbp)\b", SENTENCE, re.I))
+      not re.search(r"[$€£]\s*\d|\b\d+\s*(usd|eur|gbp)\b", SENTENCE, re.I),
+      SENTENCE)
 check("and no date", not re.search(r"\b(soon|shortly|Q[1-4]|20\d\d)\b", SENTENCE, re.I))
 check("and no outcome", not re.search(r"\b(profit|return|win|earn)\b", SENTENCE, re.I))
 

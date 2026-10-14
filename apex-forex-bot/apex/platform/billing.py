@@ -19,7 +19,7 @@ Supabase user id.
 
 THE OWNER-APPROVED OFFER
 
-The owner has chosen a one-time Founder Lifetime unlock at 499 USD. Checkout
+The owner has chosen a one-time Founder Lifetime unlock at 497 USD. Checkout
 still remains disabled unless A4T_CHECKOUT_ENABLED is explicitly set and the
 authenticated checkout path has been reviewed. The defaults below exist so the
 approved offer is not retyped differently across deploys; they do not enable
@@ -54,7 +54,10 @@ REVOKING = ("charge.refunded", "charge.dispute.created",
 # reads the user id from here and from nowhere else.
 USER_META_KEY = "a4tUserId"
 
-APPROVED_PRICE_MINOR = 49900
+# 49700, not 49900. The owner set the Founder Lifetime price at 497 USD;
+# this is the ONE place it is written, which is why `offer_drift()` can
+# watch it and why no component carries a figure of its own.
+APPROVED_PRICE_MINOR = 49700
 APPROVED_CURRENCY = "usd"
 APPROVED_SKU = "founder_lifetime"
 APPROVED_PLAN = "founder_lifetime"

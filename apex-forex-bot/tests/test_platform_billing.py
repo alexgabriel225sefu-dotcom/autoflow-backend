@@ -244,7 +244,7 @@ try:
           out["error"]["code"] == "CHECKOUT_NOT_ENABLED", json.dumps(out))
     offer = out["error"].get("offer") or {}
     check("and exposes only safe offer metadata",
-          offer.get("priceMinor") == 49900
+          offer.get("priceMinor") == 49700
           and offer.get("currency") == "usd"
           and offer.get("purchaseMode") == "one_time"
           and "secret" not in json.dumps(offer).lower(), json.dumps(offer))
@@ -282,8 +282,8 @@ for var in ["A4T_PRICE_MINOR", "A4T_CURRENCY", "A4T_SKU",
             "A4T_PLAN", "A4T_PURCHASE_MODE"]:
     os.environ.pop(var, None)
 cfg = B.product_config()
-check("approved price is 499 USD",
-      cfg["priceMinor"] == 49900 and cfg["currency"] == "usd", repr(cfg))
+check("approved price is 497 USD",
+      cfg["priceMinor"] == 49700 and cfg["currency"] == "usd", repr(cfg))
 check("approved SKU is founder_lifetime",
       cfg["sku"] == "founder_lifetime", repr(cfg))
 check("approved plan is founder_lifetime",
@@ -330,8 +330,8 @@ check("a different price is drift",
       drift_with(A4T_PRICE_MINOR="19900") == ["A4T_PRICE_MINOR"],
       str(drift_with(A4T_PRICE_MINOR="19900")))
 check("the approved price stated explicitly is NOT drift",
-      drift_with(A4T_PRICE_MINOR="49900") == [],
-      str(drift_with(A4T_PRICE_MINOR="49900")))
+      drift_with(A4T_PRICE_MINOR="49700") == [],
+      str(drift_with(A4T_PRICE_MINOR="49700")))
 # The dangerous one: product_config() swallows the ValueError and hands back
 # the approved price, so a deployment would serve 499 while its environment
 # says "abc". Green everywhere, and wrong.
@@ -369,7 +369,7 @@ check("several overrides are all reported, not just the first",
       str(drift_with(A4T_PRICE_MINOR="100", A4T_CURRENCY="gbp",
                      A4T_SKU="other")))
 check("and drift names variables, never the values behind them",
-      all("499" not in n and "usd" not in n
+      all("497" not in n and "usd" not in n
           for n in drift_with(A4T_PRICE_MINOR="100", A4T_CURRENCY="gbp")),
       str(drift_with(A4T_PRICE_MINOR="100", A4T_CURRENCY="gbp")))
 

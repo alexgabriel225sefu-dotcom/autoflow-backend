@@ -52,6 +52,7 @@ import time
 
 from apex import user_store
 from apex.platform import linklog as _log
+from apex.platform import plans as _plans
 from apex.platform import store as _store
 
 STATE_TTL_S = 600          # 10 minutes to log into cTrader and approve
@@ -595,6 +596,52 @@ def select_account(user_id, ctid):
             "LIVE_BLOCKED",
             "live accounts are blocked in this environment — connect and "
             "test on a demo account")
+
+    # How many distinct REAL-MONEY accounts this client trades here.
+    #
+    # WHY LIVE ONLY. The allowance exists to govern clients who run several
+    # accounts through the platform, and the revenue behind it — introducing
+    # broker rebates — is paid on traded volume, which a demo account does not
+    # produce. Counting demo accounts would therefore charge nothing extra and
+    # would hit the most ordinary client there is: one cTrader login carrying a
+    # demo and a live account, which is what every broker hands out. A trial
+    # user switching to their demo and being told they are over a limit is a
+    # support ticket that earns nobody anything.
+    #
+    # So demo accounts are unlimited — they are the free trial — and the
+    # allowance applies where the money and the rebate both are.
+    traded = [str(c) for c in (rec.get("tradedCtids") or [])]
+    wanted = str(match["ctid"])
+    counted = match.get("mode") == LIVE
+
+    if counted:
+        # Seeded from the current selection for a connection made before this
+        # existed, so a client who already chose an account is not told they
+        # are over a limit that did not exist when they chose it.
+        #
+        # The seed happens BEFORE the membership test, not after. Seeding
+        # afterwards put the account being re-selected into the list and then
+        # measured the list as full, so the one client this seed exists to
+        # protect was the one it locked out.
+        if not traded and rec.get("selectedCtid") is not None \
+                and rec.get("selectedMode") == LIVE:
+            traded = [str(rec["selectedCtid"])]
+
+    if counted and wanted not in traded:
+        allowance = _plans.account_allowance(str(user_id))
+        if len(traded) >= allowance:
+            raise LinkError(
+                "ACCOUNT_LIMIT",
+                f"this plan covers {allowance} real-money trading account"
+                f"{'' if allowance == 1 else 's'} and {len(traded)} "
+                f"{'is' if len(traded) == 1 else 'are'} already in use. "
+                f"Demo accounts are not limited. Additional real-money "
+                f"accounts are available once your broker account is "
+                f"confirmed under the referral programme — the accounts you "
+                f"already use are unaffected.")
+        traded.append(wanted)
+
+    rec["tradedCtids"] = traded
     rec["selectedCtid"] = match["ctid"]
     rec["selectedMode"] = match["mode"]
     _store._write(_k_conn(str(user_id)), rec)

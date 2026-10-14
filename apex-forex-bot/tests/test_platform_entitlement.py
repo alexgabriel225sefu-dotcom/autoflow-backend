@@ -37,13 +37,19 @@ from cryptography.fernet import Fernet  # noqa: E402
 os.environ["TOKEN_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 
 from apex.platform import automation as AU       # noqa: E402
-from apex.platform import ctrader_link as CL     # noqa: E402
+from apex.platform import ctrader_link as CL
+from apex.platform import plans as _plans     # noqa: E402
 from apex.platform import entitlement as E       # noqa: E402
 from apex.platform import licence as L           # noqa: E402
 from apex.platform import ruledoc as RD          # noqa: E402
 from apex.platform import store as ST            # noqa: E402
 
 USER = "eeeeeeee-1111-4111-8111-eeeeeeeeeeee"
+
+# The free demo trial, as sign-up grants it in production: demo
+# automation requires an ACTIVE platform licence, which the engine
+# gate always demanded and capability() now agrees with.
+_plans.start_trial(USER)
 _fails = []
 
 
@@ -132,12 +138,21 @@ def cap(): return E.capability(USER)
 
 
 rows = []
-for lic_state, want_ent in (("none", E.FREE_DEMO), ("active", E.PAID_LIVE)):
+# free_demo now means ON THE FREE TRIAL rather than holding nothing. Both are
+# the free tier, but only one of them may automate: demo automation requires
+# an ACTIVE licence, which is what the engine gate always demanded. The
+# no-licence and lapsed cases are section [5].
+for lic_state, want_ent in (("trial", E.FREE_DEMO), ("active", E.PAID_LIVE)):
     for ctid, want_mode in ((501, E.DEMO), (502, E.LIVE)):
         if lic_state == "active":
-            L.grant(USER, plan="pro")
+            # The plan the PAYMENT PATH grants, not an invented name — see
+            # plans.FOUNDER_LIVE and the pin against billing.APPROVED_PLAN.
+            L.grant(USER, plan=_plans.FOUNDER_LIVE)
         else:
+            # Cleared first, because start_trial never overwrites a plan the
+            # client already holds — the previous loop pass left one.
             ST._write(f"{ST._ns()}:{ST._P}:licence:{USER}", None)
+            _plans.start_trial(USER)
         select(ctid, allow_live=(ctid == 502))
         c = cap()
         rows.append((want_ent, want_mode, c))
@@ -194,7 +209,7 @@ check("and it cannot automate", c["canAutomate"] is False)
 print("\n[4] a withdrawn licence outranks the free tier")
 connect([DEMO_ACC])
 select(501)
-L.grant(USER, plan="pro")
+L.grant(USER, plan=_plans.FOUNDER_LIVE)
 check("granted, the client can automate", cap()["canAutomate"] is True)
 L.revoke(USER)
 c = cap()
@@ -212,15 +227,27 @@ except E.NotEntitled as e:
 
 # ── 5. no licence, and no expired one, blocks the free tier ─────────────────
 # This is the behaviour the business decision changed: demo access is free, so
-# an absent or lapsed licence is not a refusal. The distinction is still
-# CARRIED — licenceState says which — it just no longer gates demo.
-print("\n[5] an absent or lapsed licence does not block demo automation")
+# REVERSED BY DECISION. Demo access used to be free indefinitely and an
+# absent licence did not gate it. Demo is now a free FOURTEEN-DAY TRIAL, so an
+# account with no trial and an account whose trial ran out are both refused —
+# and the engine gate, `user_loop._entitled`, always refused them anyway. What
+# changed here is that `capability` stopped claiming otherwise: it used to
+# offer a Start button that came back ENGINE_REFUSED.
+#
+# The distinction between the two is still CARRIED, and now it is carried in
+# the reason rather than only in licenceState, because they need different
+# sentences.
+print("\n[5] no trial, or a trial that ran out, refuses demo automation")
 ST._write(f"{ST._ns()}:{ST._P}:licence:{USER}", None)
-check("no licence at all still automates on demo", cap()["canAutomate"] is True)
-check("and is named as the free tier", cap()["entitlement"] == E.FREE_DEMO)
-L.grant(USER, plan="pro", expires_at=1.0)       # long past
+check("no licence at all does not automate", cap()["canAutomate"] is False)
+check("and says specifically that there is no trial on file",
+      cap()["reason"] == "NO_LICENCE", cap()["reason"])
+check("and is still named as the free tier", cap()["entitlement"] == E.FREE_DEMO)
+L.grant(USER, plan=_plans.FOUNDER_LIVE, expires_at=1.0)       # long past
 c = cap()
-check("a lapsed licence still automates on demo", c["canAutomate"] is True)
+check("a lapsed licence does not automate either", c["canAutomate"] is False)
+check("and the two cases give DIFFERENT reasons, because the next step "
+      "differs", c["reason"] == "TRIAL_EXPIRED", c["reason"])
 check("and is reported as expired, not as never having existed",
       c["licenceState"] == L.EXPIRED, c["licenceState"])
 check("and as the free tier, because the paid tier is what lapsed",
@@ -230,8 +257,9 @@ check("and as the free tier, because the paid tier is what lapsed",
 print("\n[6] one sentence about paid access, in one place")
 check("the notice is carried to the client",
       cap()["planNotice"] == E.PLAN_NOTICE)
-check("and says demo is free",
-      "Demo accounts are free." in E.PLAN_NOTICE)
+check("and says demo is free, for a stated length of time",
+      f"free for a {_plans.TRIAL_DAYS}-day trial" in E.PLAN_NOTICE,
+      E.PLAN_NOTICE)
 check("and that live is not enabled in this release",
       "live execution is not enabled in this release" in E.PLAN_NOTICE)
 check("and promises no date, price or outcome",
@@ -274,10 +302,24 @@ check("a client with NO licence can activate a rule — demo is free",
 
 connect([DEMO_ACC, LIVE_ACC])
 select(501)
+
+# With no trial on file, starting is refused — and refused HERE, by the same
+# gate the UI reads, rather than deep in the engine with ENGINE_REFUSED.
+_no_trial = None
+try:
+    AU.start(USER, rid, starter=lambda uid: True)
+except Exception as e:                                       # noqa: BLE001
+    _no_trial = e
+check("without a trial, starting automation is refused",
+      isinstance(_no_trial, E.NotEntitled) and _no_trial.code == "NO_LICENCE",
+      f"{type(_no_trial).__name__}: {_no_trial}")
+
+_plans.start_trial(USER)
 started = []
 AU.start(USER, rid, starter=lambda uid: started.append(uid) or True)
-check("a free client starts automation on a demo account", started != [],
-      "the free tier is not free if this refuses")
+check("a client on the free trial starts automation on a demo account",
+      started != [],
+      "the free trial is not free if this refuses")
 AU.stop(USER)
 
 # The dangerous environment, deliberately. With the environment lock OPEN —
@@ -329,7 +371,7 @@ check("and nothing was started", "REVOKED!" not in started, str(started))
 # means a test that only checks "it refused" cannot tell they are both still
 # there. So each is disabled in turn and the other one has to answer.
 print("\n[8] each lock on the live path refuses on its own")
-L.grant(USER, plan="pro")                # the entitlement that will not help
+L.grant(USER, plan=_plans.FOUNDER_LIVE)                # the entitlement that will not help
 connect([DEMO_ACC, LIVE_ACC])
 select(502, allow_live=True)
 _real_live_allowed = CL.live_allowed
@@ -409,7 +451,10 @@ AU.user_store.release_claim = _fake_release
 try:
     # Self-contained: earlier sections revoke the licence and archive rules, so
     # this builds its own through the real API rather than borrowing theirs.
+    # The wipe clears a REVOKED licence from section [4]; the trial that
+    # follows is the state a real client is in, and demo automation needs it.
     ST._write(f"{ST._ns()}:{ST._P}:licence:{USER}", None)
+    _plans.start_trial(USER)
     connect([DEMO_ACC, LIVE_ACC])
     select(501)
     _s, _b = A.handle("POST", "/api/v1/rules", HDR, json.dumps({
@@ -756,6 +801,14 @@ finally:
 # never start anything. The product the landing page invites people to was
 # unusable by the people it invited. The server states it now.
 print("\n[15] a free demo client can activate a rule")
+# Explicitly with NO licence, which is what this section is about:
+# `require_activation` blocks only on a REVOKED licence, deliberately weaker
+# than require_automation, because activating records terms and does not
+# trade. A client whose trial has not started — or has ended — must still be
+# able to build and activate, or the product loses everyone who was going to
+# pay after looking at it. Earlier sections leave a trial on the account, so
+# it is cleared here rather than assumed absent.
+ST._write(f"{ST._ns()}:{ST._P}:licence:{USER}", None)
 connect([DEMO_ACC, LIVE_ACC])
 select(501)
 

@@ -51,7 +51,8 @@ os.environ.pop("A4T_EMERGENCY_HALT", None)
 
 from apex import user_store                             # noqa: E402
 from apex.platform import automation as AU              # noqa: E402
-from apex.platform import ctrader_link as CL            # noqa: E402
+from apex.platform import ctrader_link as CL
+from apex.platform import plans as _plans            # noqa: E402
 from apex.platform import ruledoc as _rd                # noqa: E402
 from apex.platform import store as _store               # noqa: E402
 
@@ -127,6 +128,12 @@ CL.handle_callback({"code": "c", "state": _state},
 CL.complete(USER, begun["nonce"], lister=lambda a: [{"ctid": 901,
                                                      "live": False}])
 CL.select_account(USER, 901)
+
+# The free demo trial, as sign-up grants it in production. Demo automation
+# requires an ACTIVE platform licence — the engine gate always did, and
+# entitlement.capability now agrees with it — so a test that starts
+# automation has to put the account in the state a real client is in.
+_plans.start_trial(USER)
 
 # Engine settings that differ from the rule in every field below, so anything
 # that crossed is visible as a change and anything that did not is visible as

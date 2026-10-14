@@ -65,6 +65,7 @@ from apex.platform import ctrader_link as CL           # noqa: E402
 from apex.platform import engine_config as ECFG        # noqa: E402
 from apex.platform import evaluator as EV              # noqa: E402
 from apex.platform import ruledoc as RD                # noqa: E402
+from apex.platform import plans as _plans
 from apex.platform import store as STORE               # noqa: E402
 
 from apex.brokers import ctrader as _ct_broker         # noqa: E402
@@ -138,6 +139,12 @@ CL.handle_callback({"code": "c", "state": _state},
 CL.complete(USER, _begun["nonce"], lister=lambda a: [{"ctid": 902,
                                                       "live": False}])
 CL.select_account(USER, 902)
+
+# The free demo trial, as sign-up grants it in production. Demo automation
+# requires an ACTIVE platform licence — the engine gate always did, and
+# entitlement.capability now agrees with it — so a test that starts
+# automation has to put the account in the state a real client is in.
+_plans.start_trial(USER)
 
 user_store.save(USER, {"symbol": "GBPUSD", "timeframe": "5m", "risk": 0.07,
                        "strategy": "fibonacci", "ai_confirm": True,

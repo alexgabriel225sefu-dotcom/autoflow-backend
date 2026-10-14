@@ -289,8 +289,15 @@ describe("the UI and the backend refuse live trading in the same words", () => {
 
   it("the plan notice promises no price, date or outcome", () => {
     const notice = /PLAN_NOTICE = \(([\s\S]*?)\)\r?\n/.exec(py)?.[1] ?? "";
-    expect(notice).toContain("Demo accounts are free.");
-    expect(notice).toContain("live execution is not enabled in this release");
+    // Demo is free for a STATED length of time now — a trial, not forever.
+    // The length itself comes from plans.TRIAL_DAYS, so the sentence carries
+    // the interpolation rather than a number this test could pin.
+    expect(notice).toContain("Demo accounts are free for a");
+    expect(notice).toContain("-day trial");
+    expect(notice).toContain("live execution is not enabled in");
+    // The price stays out: it is served from billing/offer, where one figure
+    // is watched by offer_drift(), and a number baked into static copy goes
+    // stale the day the owner changes it.
     for (const word of ["soon", "guarantee", "profit", "$", "\u20ac"]) {
       expect(notice.toLowerCase()).not.toContain(word.toLowerCase());
     }

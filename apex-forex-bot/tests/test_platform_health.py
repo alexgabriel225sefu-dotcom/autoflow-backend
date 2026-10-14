@@ -364,7 +364,7 @@ check("but stating the approved currency in capitals is still ok",
 # message naming variables is enough for an operator to go and look.
 st, body = fresh(**dict(READY, A4T_PRICE_MINOR="19900"))
 check("and the failing payload names variables, not amounts",
-      "19900" not in json.dumps(body) and "49900" not in json.dumps(body),
+      "19900" not in json.dumps(body) and "49700" not in json.dumps(body),
       json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
 
 # ── 8. NOTHING secret ever reaches the response ─────────────────────────────

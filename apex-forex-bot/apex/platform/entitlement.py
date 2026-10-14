@@ -33,6 +33,7 @@ An absent licence is `free_demo`. A revoked one is not.
 
 from apex.platform import ctrader_link as _link
 from apex.platform import licence as _lic
+from apex.platform import plans as _plans
 
 FREE_DEMO = "free_demo"
 PAID_LIVE = "paid_live"
@@ -51,9 +52,22 @@ BADGE_NOT_CONNECTED = "NOT CONNECTED"
 BADGE_REAUTH = "REAUTH REQUIRED"
 
 # The one sentence this release makes about paid access. Kept here so the API,
-# the UI and the tests cannot drift into three different promises.
-PLAN_NOTICE = ("Demo accounts are free. Real-money account access will be a "
-               "paid plan, and live execution is not enabled in this release.")
+# the UI and the tests cannot drift into three different promises. The trial
+# length comes from plans.py; the PRICE is deliberately absent — it is served
+# from billing/offer, where one figure is watched by offer_drift(), and a
+# number baked into this sentence would go stale the day it changes.
+PLAN_NOTICE = (
+    f"Demo accounts are free for a {_plans.TRIAL_DAYS}-day trial. Real-money "
+    f"account access is a paid plan, and live execution is not enabled in "
+    f"this release.")
+
+# What a client is told when the free trial has run out. Names the two things
+# they can do, because a refusal that does not is a dead end.
+TRIAL_EXPIRED_MESSAGE = (
+    f"the {_plans.TRIAL_DAYS}-day free demo trial for this account has "
+    f"ended — reconnect once a plan is active, or contact support")
+NO_LICENCE_MESSAGE = (
+    "this account has no demo trial on file — contact support to start one")
 
 LIVE_REFUSAL = "live trading is not available in this release"
 
@@ -101,13 +115,22 @@ def account_mode(user_id):
 def entitlement_of(user_id, *, now=None):
     """`free_demo` or `paid_live`.
 
-    An active licence is `paid_live`. Everything else — none, expired,
-    revoked — is `free_demo`, which is the free tier and NOT a statement that
-    the client is in good standing. Revocation is carried separately, in
-    `licence_state`, and `capability()` blocks on it.
+    An active licence ON A LIVE PLAN is `paid_live`. Everything else — none,
+    expired, revoked, and an active FREE TRIAL — is `free_demo`, which is the
+    free tier and NOT a statement that the client is in good standing.
+    Revocation is carried separately, in `licence_state`, and `capability()`
+    blocks on it.
+
+    THE STATE IS NOT ENOUGH. This read the state alone, which was right while
+    there was one plan to sell and became wrong the moment a free trial was
+    also an ACTIVE licence: fourteen free days would have reported themselves
+    as the paid live entitlement. `plans.is_live_plan` is the only thing that
+    answers "does this plan pay for live".
     """
     st = _lic.status_for(user_id, now=now)
-    return PAID_LIVE if st.get("state") == _lic.ACTIVE else FREE_DEMO
+    return (PAID_LIVE
+            if st.get("state") == _lic.ACTIVE and _plans.is_live_plan(st.get("plan"))
+            else FREE_DEMO)
 
 
 def _reauth_needed(user_id, *, now=None):
@@ -148,7 +171,8 @@ def capability(user_id, *, now=None):
     badge and to know whether to offer an automation control at all.
     """
     lic = _lic.status_for(user_id, now=now)
-    ent = PAID_LIVE if lic.get("state") == _lic.ACTIVE else FREE_DEMO
+    ent = entitlement_of(user_id, now=now)
+    trial = _plans.trial_state(user_id, now=now)
     mode = account_mode(user_id)
 
     # Activation and automation are different permissions and the UI must not
@@ -167,6 +191,14 @@ def capability(user_id, *, now=None):
         "licenceState": lic.get("state"),
         "liveExecutionEnabled": live_execution_enabled(),
         "planNotice": PLAN_NOTICE,
+        "plan": trial["plan"],
+        "onTrial": trial["onTrial"],
+        "trialDaysLeft": trial["daysLeft"],
+        "trialExpiresAt": trial["expiresAt"],
+        # How many distinct accounts this client may trade through the
+        # platform. One, unless the operator has confirmed their broker
+        # account against the IB report — see plans.account_allowance.
+        "accountAllowance": _plans.account_allowance(user_id),
         "canAutomate": False,
         "canActivate": can_activate,
         "activationRefusal": ("this licence was withdrawn — contact support"
@@ -183,6 +215,28 @@ def capability(user_id, *, now=None):
                     badge=BADGE_NOT_CONNECTED if mode == UNKNOWN
                     else BADGE_LIVE_BLOCKED if mode == LIVE else BADGE_DEMO,
                     message="this licence was withdrawn — contact support")
+
+    # The demo trial, and the hole this closes.
+    #
+    # `user_loop._entitled` has always allowed an ACTIVE platform licence and
+    # refused everything else, so demo automation already required one at the
+    # ENGINE. This function claimed the opposite — canAutomate=True for a
+    # connected demo account with no licence at all — so the UI offered a
+    # Start button that came back ENGINE_REFUSED. The two gates now agree, and
+    # the message says which of the two situations it is rather than making
+    # the client guess from a generic refusal.
+    #
+    # Checked before the connection, because the licence is a property of the
+    # account: a client whose trial ran out should be told that, not told to
+    # connect something.
+    if lic.get("state") != _lic.ACTIVE:
+        badge = (BADGE_NOT_CONNECTED if mode == UNKNOWN
+                 else BADGE_LIVE_BLOCKED if mode == LIVE else BADGE_DEMO)
+        expired = lic.get("state") == _lic.EXPIRED
+        return dict(out, badge=badge,
+                    reason="TRIAL_EXPIRED" if expired else "NO_LICENCE",
+                    message=(TRIAL_EXPIRED_MESSAGE if expired
+                             else NO_LICENCE_MESSAGE))
 
     if mode == UNKNOWN:
         if _reauth_needed(user_id, now=now):
@@ -232,5 +286,7 @@ def require_activation(user_id, *, now=None):
         raise NotEntitled("LICENCE_REVOKED",
                           "this licence was withdrawn — contact support",
                           state=lic.get("state"))
-    return {"entitlement": PAID_LIVE if lic.get("state") == _lic.ACTIVE
-            else FREE_DEMO, "licenceState": lic.get("state")}
+    # Through entitlement_of, not the state, for the same reason it does: a
+    # free trial is an ACTIVE licence and is not the paid live entitlement.
+    return {"entitlement": entitlement_of(user_id, now=now),
+            "licenceState": lic.get("state")}

@@ -34,6 +34,7 @@ os.environ["TOKEN_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 os.environ.pop("A4T_EMERGENCY_HALT", None)
 
 from apex.platform import automation as AU              # noqa: E402
+from apex.platform import plans as _plans               # noqa: E402
 from apex.platform import ctrader_link as CL            # noqa: E402
 from apex.platform import ruledoc as _rd                # noqa: E402
 from apex.platform import store as _store               # noqa: E402
@@ -50,6 +51,10 @@ def check(name, cond, detail=""):
 
 
 USER = "dddddddd-1111-4111-8111-dddddddddddd"
+
+# The free demo trial, as sign-up grants it in production: demo
+# automation requires an ACTIVE platform licence.
+_plans.start_trial(USER)
 DEMO_ACC = {"ctid": 801, "live": False}
 LIVE_ACC = {"ctid": 802, "live": True}
 
