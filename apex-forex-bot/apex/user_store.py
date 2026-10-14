@@ -781,6 +781,37 @@ def set_blob(key, value_str, ttl_s=None):
     return _upstash_post(["SET", key, value_str, "EX", int(ttl_s)])
 
 
+def set_blob_nx(key, value_str):
+    """Write a raw string ONLY if the key does not exist. Never expires.
+
+    The tri-state of every other NX primitive here: True (written), False
+    (something is already there, and it was left alone), None (the store
+    could not be asked — which is NOT "already there", and a caller that
+    treats it as either outcome is guessing).
+
+    This is `claim_value` without a lease, and the absence of the lease is the
+    point. A claim is meant to expire; an audit record is meant to outlive
+    every process that could have written it, so `EX` would quietly delete the
+    evidence §7 of docs/LIVE_EXECUTION_SPECIFICATION.md calls non-negotiable.
+    Separate from `set_blob` because that one overwrites, and a record the
+    application can rewrite is not an audit record.
+    """
+    if not _USE_REDIS:
+        return None
+    try:
+        if _BACKEND == "redis":
+            return bool(_r.set(key, value_str, nx=True))
+        # POST for the same reason as _redis_set: the value must not ride in
+        # the URL, where an oversized one fails permanently.
+        res = _upstash_post(["SET", key, value_str, "NX"])
+        if res is None:
+            return None          # command failed — unknown, not "taken"
+        return str(res).upper() == "OK"
+    except Exception as e:
+        print(f"[Redis] set_blob_nx failed for {key}: {e}")
+        return None
+
+
 def _redis_sadd(key, member):
     if _BACKEND == "redis":
         try:
