@@ -23,6 +23,7 @@ import { invalidate, useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
 import {
   AccountLimitNotice, ErrorNotice, ExecutionBadge, PlanNotice, Spinner,
+  TrialNotice,
 } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
@@ -156,6 +157,12 @@ export default function Dashboard() {
             </div>
 
             {ct.result && !ct.result.ok ? <ErrorNotice error={ct.result} onRetry={ct.reload} /> : null}
+
+            {/* The trial clock, above the pricing sentence it belongs to.
+                The server has always reported the days left; until this was
+                here, nothing in the browser read them, so the free period
+                ran out without the client ever seeing it count down. */}
+            <TrialNotice execution={execution} />
 
             {/* What this release costs and what it cannot do, in the
                 server's words. It sits above the account picker because it

@@ -84,10 +84,19 @@ class NotEntitled(PermissionError):
 def live_execution_enabled():
     """Always False in this release, and stated rather than assumed.
 
-    There is no execution path for a live account: `bridge` supports MARKET
-    orders only, `automation.start` refuses a non-demo account, and nothing
-    reads a live-trading flag to decide otherwise. This function exists so
-    that fact is something a caller can ASK, and something a test can pin.
+    The live path now EXISTS — `live_execution.place` runs every gate in §1-§9
+    — and this is what keeps it shut. `place` checks this function second,
+    after the emergency stop and before anything else, so every live call
+    refuses here today. Nothing imports `live_execution` either, which
+    `test_platform_live_invariants` asserts; `automation.start` still refuses
+    a non-demo account.
+
+    Returning True is therefore a deliberate release decision, not a code
+    change, and §12 lists what has to be true first: the walk-through on a
+    real demo account, the legal rewrite, the emergency-stop drill, and a
+    security review of this path by someone who did not write it. This
+    function exists so the state is something a caller can ASK and a test
+    can pin, rather than something inferred from the absence of a feature.
     """
     return False
 

@@ -1,6 +1,8 @@
 "use client";
 import { useRead } from "@/lib/use-api";
-import { ErrorNotice, ExecutionBadge, LicencePill, PlanNotice, Spinner } from "@/components/app/state";
+import {
+  ErrorNotice, ExecutionBadge, LicencePill, PlanNotice, Spinner, TrialNotice,
+} from "@/components/app/state";
 import { formatOfferPrice, type Me, type PublicOffer } from "@/lib/api";
 
 export default function LicensePage() {
@@ -72,6 +74,12 @@ export default function LicensePage() {
               </tr>
             </tbody>
           </table>
+
+          {/* How long the free trial has left, or that it ran out. The table
+              above shows the licence's raw expiry; this is the same fact in
+              the terms a client reads it in, and it is the only place the
+              TRIAL_EXPIRED sentence is visible rather than a tooltip. */}
+          <TrialNotice execution={me.result.data.execution} />
 
           <PlanNotice execution={me.result.data.execution} />
 

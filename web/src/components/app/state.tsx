@@ -331,6 +331,76 @@ export function ExecutionBadge({ execution }: { execution?: Execution | null }) 
   );
 }
 
+/** An epoch-SECONDS timestamp as a short date, or null if it is not one. */
+function shortDate(ts?: number | null) {
+  if (typeof ts !== "number" || !Number.isFinite(ts) || ts <= 0) return null;
+  const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    day: "numeric", month: "short", year: "numeric",
+  });
+}
+
+/** Below this many days left, the countdown stops being background furniture. */
+const TRIAL_URGENT_DAYS = 3;
+
+/**
+ * The free demo trial: how long is left, or that it has ended.
+ *
+ * The server had all of this — `onTrial`, `trialDaysLeft`, `trialExpiresAt`
+ * and a `TRIAL_EXPIRED` reason distinct from `NO_LICENCE` — and no component
+ * read a single field of it. A client spent fourteen free days with no clock
+ * on screen, and on the fifteenth the only explanation was the hover text of
+ * a disabled Start button.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO
+ *
+ * It never names a price. `planNotice` is the one sentence about money, the
+ * server owns it, and `PlanNotice` renders it directly below this one — a
+ * second copy here would be a commercial claim written in a component.
+ *
+ * It also renders nothing for a withdrawn licence. `capability()` ranks
+ * revocation above the trial because it is support's decision with its own
+ * next step; a countdown beside that refusal is the product arguing with
+ * itself.
+ */
+export function TrialNotice({ execution }: { execution?: Execution | null }) {
+  if (!execution) return null;
+  if (execution.reason === "LICENCE_REVOKED") return null;
+
+  if (execution.reason === "TRIAL_EXPIRED") {
+    return (
+      <div className="notice notice-warn">
+        <p className="notice-head">Free demo trial</p>
+        {/* The server's sentence, verbatim and VISIBLE. It names the two
+            things a client can do, which is the whole reason it is not a
+            generic refusal. */}
+        <p style={{ fontSize: ".85rem", margin: 0 }}>{execution.message}</p>
+      </div>
+    );
+  }
+
+  const left = execution.trialDaysLeft;
+  if (!execution.onTrial || typeof left !== "number") return null;
+
+  const urgent = left <= TRIAL_URGENT_DAYS;
+  const until = shortDate(execution.trialExpiresAt);
+
+  return (
+    <div className={urgent ? "notice notice-warn" : "notice"}>
+      <p className="notice-head">Free demo trial</p>
+      <p style={{ fontWeight: 600, margin: 0 }}>
+        {left} day{left === 1 ? "" : "s"} left
+      </p>
+      <p className="muted" style={{ fontSize: ".82rem", marginBottom: 0 }}>
+        {until
+          ? `Demo automation is free on this account until ${until}.`
+          : "Demo automation is free on this account for the rest of the trial."}
+      </p>
+    </div>
+  );
+}
+
 /**
  * What this release charges for, in one sentence that comes from the server.
  *
