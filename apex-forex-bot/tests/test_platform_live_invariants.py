@@ -140,17 +140,92 @@ def body_src(module, fname):
         MODULES[module]["src"], node) or ""
 
 
-# ── 1. the execution boundary is not wired to anything ──────────────────────
-print("\n[1] nothing in the platform imports the module that can place orders")
+# ── 1. the execution boundary is reachable only through the gates ───────────
+# REWRITTEN, NOT DELETED — §12 of the specification asks for exactly this
+# change, from "unreachable" to "reachable only through the gates".
+#
+# The old shape asserted that NOTHING imported `bridge`. That was right while
+# the gates were built and unwired, and it stopped being the useful question
+# the moment `live_execution` assembled them: an order path that nothing can
+# reach proves only that it was never finished.
+#
+# The new shape says where the door is. `bridge` has exactly one importer,
+# that importer is the module which runs every gate, and the module itself is
+# imported by nothing — so the path is complete, auditable, and still not
+# wired into anything that runs.
+BOUNDARY = ("bridge", "execution", "live_execution")
+
+print("\n[1] the order path is reachable only through live_execution")
 importers = sorted(m for m, deps in IMPORTS.items() if "bridge" in deps)
-check("no platform module imports `bridge`", importers == [],
-      f"imported by {importers} — wiring it up is the live-execution "
-      f"milestone and needs its own review")
-check("`bridge` exists, so this is an unwired path and not a missing file",
+check("`bridge` has exactly one importer, and it is the gated path",
+      importers == ["live_execution"],
+      f"imported by {importers} — anything else is a second way to an order")
+check("`bridge` exists, so this is a wired path and not a missing file",
       "bridge" in MODULES)
-check("and `execution` is reachable only through it",
+check("and `execution` is reachable only through `bridge`",
       sorted(m for m, d in IMPORTS.items() if "execution" in d) == ["bridge"],
       str(sorted(m for m, d in IMPORTS.items() if "execution" in d)))
+check("and NOTHING imports `live_execution` itself",
+      sorted(m for m, d in IMPORTS.items() if "live_execution" in d) == [],
+      f"imported by "
+      f"{sorted(m for m, d in IMPORTS.items() if 'live_execution' in d)} — "
+      f"turning it on is the §12 milestone and needs its own review")
+
+# ── 1b. and that one path actually runs every gate ──────────────────────────
+# The half of the rewrite that matters more than the import graph.
+#
+# "Reachable only through the gates" is worth nothing if the gated path does
+# not contain the gates. Each of these modules was built with its own tests
+# and wired to nothing; the failure this section exists to catch is one of
+# them being dropped out of `place()` later, which no other test would notice
+# because every gate's own tests would still pass.
+print("\n[1b] the one path runs every gate the specification names")
+_place = body_src("live_execution", "place")
+check("live_execution.place exists", bool(_place))
+for gate, what in (
+    ("_emerg.check", "§8 the emergency stop"),
+    ("live_execution_enabled", "§1 the release switch"),
+    ("entitlement_of", "§2 the entitlement"),
+    ("mode_reader", "§3 the mode, from the broker"),
+    ("_rate.authorize", "§9 the per-client order rate"),
+    ("_gates.authorize", "§5 the thirteen risk gates"),
+    ("_ledger.claim", "§6 the duplicate-order claim"),
+    ("_audit.record_live_order", "§7 the audit record"),
+):
+    check(f"it runs {what}", gate in _place, f"`{gate}` is not in place()")
+
+# ORDER, not merely presence. A claim taken after the broker call is not a
+# claim, and a risk gate run after the order is sent is a report.
+_at = {g: _place.index(g) for g in
+       ("_emerg.check", "_rate.authorize", "_gates.authorize",
+        "_ledger.claim", "_audit.record_live_order")}
+check("the emergency stop is checked before anything else",
+      _at["_emerg.check"] < min(v for k, v in _at.items()
+                                if k != "_emerg.check"))
+check("the risk gates run before the claim is taken",
+      _at["_gates.authorize"] < _at["_ledger.claim"])
+check("the claim is taken before the audit record is written",
+      _at["_ledger.claim"] < _at["_audit.record_live_order"])
+check("and the broker is called after all of them",
+      _place.index("broker or _default_broker") > max(_at.values()),
+      "a gate that runs after the order is sent is a report, not a gate")
+
+# §6's one rule, asserted on the source: an unknown outcome keeps the claim.
+check("an unknown broker outcome abandons without releasing",
+      "_ledger.abandon_unknown" in _place,
+      "a submit that timed out may have filled; releasing there turns one "
+      "uncertain order into two certain ones")
+check("and the only release paths are the CONFIRMED ones",
+      "_ledger.confirm_filled" in _place
+      and "_ledger.confirm_rejected" in _place)
+
+# The switch is checked INSIDE the path, so the module is safe to exist.
+check("the release switch refuses before any broker work begins",
+      _at["_emerg.check"] < _place.index("live_execution_enabled")
+      < _place.index("_rate.authorize"),
+      "every call refuses here today, which is what makes this module safe "
+      "to have written before the §12 review")
+
 
 # ── 2. the automation entry point cannot reach it ───────────────────────────
 # Reachability, not a direct-call check. A module two hops away is just as
@@ -158,14 +233,17 @@ check("and `execution` is reachable only through it",
 print("\n[2] automation's transitive import closure holds no execution path")
 auto = closure("automation")
 check("automation reaches something (the closure is not empty)", bool(auto))
-for forbidden in ("bridge", "execution"):
+for forbidden in BOUNDARY:
     check(f"automation cannot reach `{forbidden}`", forbidden not in auto,
           f"closure = {sorted(auto)}")
 api_closure = closure("api")
-for forbidden in ("bridge", "execution"):
+for forbidden in BOUNDARY:
     check(f"the API cannot reach `{forbidden}` either",
-          forbidden not in api_closure)
-check("preview cannot reach either", not ({"bridge", "execution"} & closure("preview")))
+          forbidden not in api_closure,
+          f"closure = {sorted(api_closure)}")
+check("preview cannot reach any of them",
+      not (set(BOUNDARY) & closure("preview")),
+      str(sorted(set(BOUNDARY) & closure("preview"))))
 
 # ── 3. no module names an order-mutating operation ───────────────────────────
 print("\n[3] no platform module names a broker-mutating operation")
@@ -173,7 +251,7 @@ MUTATING = ("place_order", "close_position", "amend_sltp", "force_trade",
             "authorize_order", "authorize_close", "modify_position")
 for op in MUTATING:
     hits = sorted(m for m in MODULES
-                  if m not in ("bridge", "execution") and op in names_in(m))
+                  if m not in BOUNDARY and op in names_in(m))
     check(f"nothing outside the unwired boundary names `{op}`", hits == [],
           f"named in {hits}")
 

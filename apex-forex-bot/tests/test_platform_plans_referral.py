@@ -852,6 +852,51 @@ finally:
     os.environ.pop("A4T_BROKER_SIGNUP_URL", None)
 
 
+print("\n[17] the 'More accounts' section the client can find")
+# The refusal in [16] answers a client who already tried. This answers the one
+# who is LOOKING — on the Accounts screen, where somebody managing accounts
+# goes when they want another. Still not the dashboard and still not
+# onboarding: most clients want one account and a link they all see is
+# advertising.
+os.environ["A4T_BROKER_SIGNUP_URL"] = "https://portal.example.test/register"
+try:
+    _st = CL.public_status(U3)
+    _plan = _st.get("accountPlan") or {}
+    check("the accounts read carries the plan",
+          _plan.get("realMoneyAllowance") == 1, str(_plan))
+    check("and says demo accounts are not limited",
+          _plan.get("demoUnlimited") is True, str(_plan))
+    check("an unconfirmed client is shown where more come from",
+          (_plan.get("signup") or {}).get("url", "").startswith("https://"),
+          str(_plan.get("signup")))
+    check("with the disclosure in the same object",
+          (_plan.get("signup") or {}).get("disclosure") == R.REBATE_DISCLOSURE,
+          str(_plan.get("signup")))
+
+    _confirmed = (CL.public_status(U1).get("accountPlan") or {})
+    check("a CONFIRMED client is not sent back to the link",
+          _confirmed.get("signup") is None, str(_confirmed))
+    check("and their larger allowance is reported",
+          _confirmed.get("realMoneyAllowance") > 1, str(_confirmed))
+    check("the confirmed flag is carried so the screen can say so",
+          _confirmed.get("confirmed") is True, str(_confirmed))
+
+    # Unconnected clients see it too: the question "how many accounts do I
+    # get" has an answer before anything is linked.
+    _fresh = CL.public_status("0000dead-0000-4000-8000-000000000000")
+    check("an unconnected client still gets an answer about accounts",
+          (_fresh.get("accountPlan") or {}).get("realMoneyAllowance") == 1,
+          str(_fresh.get("accountPlan")))
+finally:
+    os.environ.pop("A4T_BROKER_SIGNUP_URL", None)
+
+check("with no link configured the section still states the allowance",
+      (CL.public_status(U3).get("accountPlan") or {}).get("signup") is None
+      and (CL.public_status(U3).get("accountPlan") or {})
+      .get("realMoneyAllowance") == 1,
+      str(CL.public_status(U3).get("accountPlan")))
+
+
 print("\n[11] payments are still off")
 check("checkout is not enabled by any of this",
       os.getenv("ENABLE_CHECKOUT") in (None, "", "false", "0"),

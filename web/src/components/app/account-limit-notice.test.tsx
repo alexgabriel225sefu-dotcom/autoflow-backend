@@ -23,7 +23,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup } from "@testing-library/react";
-import { AccountLimitNotice } from "./state";
+import { AccountLimitNotice, MoreAccountsSection } from "./state";
 import type { ApiError } from "@/lib/api";
 
 afterEach(() => cleanup());
@@ -111,5 +111,62 @@ describe("the account-limit notice", () => {
     // the fallback is support rather than a naked referral link.
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.getByText(/contact support/i)).toBeTruthy();
+  });
+});
+
+/**
+ * The "More accounts — free" section.
+ *
+ * Same rule as the refusal notice, for the same reason: the link and the
+ * disclosure render together or not at all. This section is the one a client
+ * FINDS rather than hits, so it is the more likely of the two to be tidied
+ * later by somebody who has not read why the paragraph is there.
+ */
+describe("the More accounts section", () => {
+  const SIGNUP = { url: "https://portal.example.test/r", disclosure: DISCLOSURE };
+  const plan = (over = {}) => ({
+    realMoneyAllowance: 1, realMoneyUsed: 1, demoUnlimited: true,
+    confirmed: false, signup: SIGNUP, ...over,
+  });
+
+  it("states the allowance and that demo is unlimited", () => {
+    render(<MoreAccountsSection plan={plan()} />);
+    expect(screen.getByText(/demo accounts are unlimited/i)).toBeTruthy();
+    expect(screen.getByText(/1 real-money account/i)).toBeTruthy();
+  });
+
+  it("renders the link only together with the disclosure", () => {
+    render(<MoreAccountsSection plan={plan()} />);
+    expect(screen.getByRole("link").getAttribute("href")).toBe(SIGNUP.url);
+    expect(screen.getByText(/pays the operator of this platform/i)).toBeTruthy();
+  });
+
+  it("marks the link as the paid arrangement it is", () => {
+    render(<MoreAccountsSection plan={plan()} />);
+    const rel = screen.getByRole("link").getAttribute("rel") ?? "";
+    for (const t of ["noopener", "noreferrer", "nofollow", "sponsored"]) {
+      expect(rel).toContain(t);
+    }
+  });
+
+  it("does not send a CONFIRMED client back to the link", () => {
+    render(<MoreAccountsSection plan={plan({ confirmed: true, signup: null })} />);
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText(/confirmed under the referral programme/i)).toBeTruthy();
+  });
+
+  it("shows no bare link when the disclosure is missing", () => {
+    render(
+      <MoreAccountsSection
+        plan={plan({ signup: { url: SIGNUP.url, disclosure: "   " } })}
+      />,
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText(/contact support/i)).toBeTruthy();
+  });
+
+  it("renders nothing at all when the server sent no plan", () => {
+    const { container } = render(<MoreAccountsSection plan={undefined} />);
+    expect(container.innerHTML).toBe("");
   });
 });

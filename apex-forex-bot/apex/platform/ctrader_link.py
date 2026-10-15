@@ -567,7 +567,8 @@ def public_status(user_id):
         rec = _read_conn(user_id)
     except LinkError:
         return {"connected": False, "accounts": [], "selected": None,
-                "liveAllowed": live_allowed()}
+                "liveAllowed": live_allowed(),
+                "accountPlan": _account_plan(user_id, [])}
     return {
         "connected": True,
         "connectedAt": rec.get("connectedAt"),
@@ -577,6 +578,37 @@ def public_status(user_id):
                       "mode": rec.get("selectedMode")}
                      if rec.get("selectedCtid") else None),
         "liveAllowed": live_allowed(),
+        "accountPlan": _account_plan(user_id, rec.get("tradedCtids") or []),
+    }
+
+
+def _account_plan(user_id, traded):
+    """How many real-money accounts this client may trade, and where more
+    come from.
+
+    Carried on the ACCOUNTS read and nowhere else. This is the screen a client
+    is on when they are managing accounts, so it is the screen where "how do I
+    add another" is a question somebody is actually asking — the dashboard and
+    onboarding are not.
+
+    `signup` arrives with its disclosure attached and never without it:
+    `referral.broker_signup()` is the only accessor and it returns the two
+    together. Demo accounts are not limited, so none of this constrains them.
+    """
+    from apex.platform import plans as _plans
+    from apex.platform import referral as _referral
+    allowance = _plans.account_allowance(str(user_id))
+    used = len([c for c in traded if c])
+    return {
+        "realMoneyAllowance": allowance,
+        "realMoneyUsed": used,
+        "demoUnlimited": True,
+        "confirmed": _referral.is_confirmed(str(user_id)),
+        # Offered while there is something to act on. A client whose broker
+        # account is already confirmed has the larger allowance and no reason
+        # to be sent to the link again.
+        "signup": (None if _referral.is_confirmed(str(user_id))
+                   else _referral.broker_signup()),
     }
 
 

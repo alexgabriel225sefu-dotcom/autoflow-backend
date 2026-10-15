@@ -154,6 +154,16 @@ def build(rule_doc, decision, snapshot, *, user_id, account_id, mode,
         supported=SUPPORTED_CONSTRAINTS)
 
 
+# The refusals `build` can raise, as one tuple.
+#
+# Exposed so a caller can catch them WITHOUT importing `execution` itself.
+# That keeps the import graph honest: `execution` is reachable only through
+# this module, which is what tests/test_platform_live_invariants.py asserts,
+# and a caller that had to import it to name an exception would have made that
+# false for a reason that has nothing to do with placing orders.
+BUILD_REFUSALS = (_exec.ExecutionRefused, BridgeRefused)
+
+
 def submit(rule_doc, decision, snapshot, *, user_id, account_id, mode,
            balance=None, decision_id=None, correlation_id=None,
            executor=None):

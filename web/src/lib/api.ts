@@ -273,6 +273,23 @@ export type CtraderStatus = {
   liveAllowed: boolean;
   connectedAt?: number;
   expiresAt?: number | null;
+  /**
+   * How many real-money accounts this client may trade here, and where more
+   * come from. Carried on the ACCOUNTS read only — that is the screen where
+   * "how do I add another" is a question somebody is actually asking.
+   *
+   * `signup` arrives with its disclosure and never without it: the server has
+   * no accessor returning the url alone, because the arrangement pays the
+   * operator from the volume the client trades and a link shown without
+   * saying so is the version both a client and a regulator object to.
+   */
+  accountPlan?: {
+    realMoneyAllowance: number;
+    realMoneyUsed: number;
+    demoUnlimited: boolean;
+    confirmed: boolean;
+    signup: { url: string; disclosure: string } | null;
+  };
 };
 
 /**

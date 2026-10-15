@@ -4,7 +4,7 @@ import { Check, Plug, RefreshCw } from "lucide-react";
 import { api, type ApiError, type CtraderStatus } from "@/lib/api";
 import { useRead, whenSynced } from "@/lib/use-api";
 import {
-  AccountLimitNotice, ErrorNotice, Spinner, StatusPill,
+  AccountLimitNotice, ErrorNotice, MoreAccountsSection, Spinner, StatusPill,
 } from "@/components/app/state";
 
 export default function AccountsPage() {
@@ -106,6 +106,8 @@ export default function AccountsPage() {
                 })}
               </div>
             </section>
+
+            <MoreAccountsSection plan={data.accountPlan} />
 
             <section className="card">
               <div className="card-head"><h2>Disconnect</h2></div>

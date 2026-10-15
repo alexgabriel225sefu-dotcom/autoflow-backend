@@ -181,6 +181,84 @@ export function AccountLimitNotice({ error }: { error: ApiError }) {
   );
 }
 
+/**
+ * "More accounts" — the referral offer, as a section a client can find.
+ *
+ * WHERE IT LIVES AND WHY. The Accounts screen, and nowhere else. That is
+ * where somebody managing accounts goes when they want another one, so it
+ * answers a question they are already asking. The dashboard and onboarding
+ * are not that, and a link shown to every client regardless would be
+ * advertising, not an answer — most clients want exactly one account.
+ *
+ * THE DISCLOSURE IS NOT OPTIONAL. The arrangement pays the operator a
+ * commission from the volume the client trades, while this platform decides
+ * how often to trade. The server returns the url and the disclosure in one
+ * object and offers no accessor for the url alone; this renders them
+ * together, and renders neither if the disclosure is missing.
+ *
+ * Nothing here is shown to a client whose broker account is already
+ * confirmed: they have the larger allowance and no reason to be sent back.
+ */
+export function MoreAccountsSection({
+  plan,
+}: {
+  plan?: {
+    realMoneyAllowance: number;
+    realMoneyUsed: number;
+    demoUnlimited: boolean;
+    confirmed: boolean;
+    signup: { url: string; disclosure: string } | null;
+  };
+}) {
+  if (!plan) return null;
+  const signup = plan.signup;
+  const usable = signup && signup.url && signup.disclosure.trim();
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2>More accounts — free</h2>
+        <span className="dim" style={{ fontSize: ".75rem" }}>
+          Demo accounts are unlimited.
+        </span>
+      </div>
+
+      <p className="muted" style={{ fontSize: ".85rem", marginTop: 0 }}>
+        This plan covers{" "}
+        <strong>
+          {plan.realMoneyAllowance} real-money account
+          {plan.realMoneyAllowance === 1 ? "" : "s"}
+        </strong>
+        {plan.realMoneyUsed > 0 ? ` — ${plan.realMoneyUsed} in use.` : "."}{" "}
+        {plan.confirmed
+          ? "Your broker account is confirmed under the referral programme."
+          : "Additional real-money accounts cost nothing extra on Apex4Traders."}
+      </p>
+
+      {plan.confirmed ? null : usable ? (
+        <>
+          <p className="muted" style={{ fontSize: ".8rem" }}>
+            {signup!.disclosure}
+          </p>
+          <a
+            className="btn btn-sm"
+            href={signup!.url}
+            target="_blank"
+            rel="noopener noreferrer nofollow sponsored"
+            style={{ marginTop: ".4rem", display: "inline-flex" }}
+          >
+            Open an account with the referral broker
+          </a>
+        </>
+      ) : (
+        <p className="muted" style={{ fontSize: ".8rem" }}>
+          Contact support to have an additional real-money account added.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function Empty({ label }: { label: string }) {
   return <p className="empty">{label}</p>;
 }
