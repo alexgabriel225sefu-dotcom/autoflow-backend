@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { api, type ApiError, type ConditionSpec, type RuleDoc } from "@/lib/api";
 import { defaultsFor } from "@/components/app/condition-editor";
+import { starterCondition } from "./starter-condition";
 import { BLANK, RuleForm, STEPS, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
 import { RuleSentence, RuleTerms } from "@/components/app/rule-summary";
 import { ErrorNotice, Spinner } from "@/components/app/state";
@@ -38,7 +39,20 @@ export default function NewRulePage() {
     void api<{ conditions: Record<string, ConditionSpec> }>("conditions").then((r) => {
       if (!r.ok) return setLoadErr(r);
       setSpecs(r.data.conditions);
-      const first = Object.keys(r.data.conditions).sort()[0];
+      // The builder opens with a condition that implies a SIDE.
+      //
+      // It used to open with the alphabetically first one, which is `atr` — a
+      // volatility filter that says when to trade and never which way. With
+      // `sides` defaulting to BOTH, the rule a new client was handed could
+      // never trade: the evaluator refuses it with DIRECTION_AMBIGUOUS even
+      // when the condition is satisfied. The summary read like a finished
+      // strategy, so the first sign of trouble was a rule that silently did
+      // nothing.
+      //
+      // `impliesDirection` comes from the server, which owns that fact. A list
+      // of directional ids written here would be a second copy of it, drifting
+      // the first time a condition is added.
+      const first = starterCondition(r.data.conditions);
       if (first) {
         setDraft((d) => ({
           ...d,

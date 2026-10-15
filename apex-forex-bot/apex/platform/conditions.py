@@ -370,11 +370,36 @@ def get(cid):
 
 
 def describe():
-    """What the UI renders a form from — ids, parameters and defaults."""
+    """What the UI renders a form from — ids, parameters and defaults.
+
+    `impliesDirection` says whether this condition, with its OWN defaults,
+    points at a side. Six of the twelve do (rsi, macd, stochastic, bollinger,
+    ma_cross, price_vs_ma); the other six are filters — volatility, session,
+    weekday, spread, position count — which say WHEN to trade and never which
+    way.
+
+    It is here because the UI needs it and must not re-derive it. A rule whose
+    `sides` is BOTH is refused with DIRECTION_AMBIGUOUS unless a satisfied
+    condition implies a side, and the builder used to open with the
+    alphabetically first condition — `atr`, a filter — so the rule a new
+    client is handed could never trade. A list of "the directional ones"
+    written into the browser would be a second copy of this fact, drifting the
+    first time a condition is added.
+    """
     out = {}
     for cid, d in _LIB.items():
+        defaults = {n: p.default for n, p in d["params"].items()}
+        try:
+            implies = bias_of(cid, defaults) is not None
+        except Exception:                                    # noqa: BLE001
+            # A condition whose bias cannot be computed is reported as not
+            # directional. Fail-closed: the cost is that the builder does not
+            # open with it, which is recoverable; claiming a direction it does
+            # not have is not.
+            implies = False
         out[cid] = {
             "id": cid, "doc": d["doc"],
+            "impliesDirection": implies,
             "params": {n: {"type": p.type.__name__, "default": p.default,
                            "choices": list(p.choices) if p.choices else None,
                            "min": p.min, "max": p.max,

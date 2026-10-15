@@ -378,7 +378,26 @@ export type ConditionParam = {
   type: string; default: unknown; choices: string[] | null;
   min: number | null; max: number | null; required: boolean;
 };
-export type ConditionSpec = { id: string; doc: string; params: Record<string, ConditionParam> };
+export type ConditionSpec = {
+  id: string;
+  doc: string;
+  params: Record<string, ConditionParam>;
+  /**
+   * Whether this condition, with its own defaults, points at a SIDE.
+   *
+   * Six of the twelve do. The rest are filters — volatility, session,
+   * weekday, spread, position count — which say WHEN to trade and never
+   * which way. A rule whose `sides` is BOTH is refused with
+   * DIRECTION_AMBIGUOUS unless a satisfied condition implies one, which is
+   * why the builder opens with a directional condition rather than the
+   * alphabetically first.
+   *
+   * Computed by the server, never re-derived here: a list of directional ids
+   * in the browser would be a second copy of that fact, drifting the first
+   * time a condition is added.
+   */
+  impliesDirection?: boolean;
+};
 
 export type ConditionResult = { id: string; passed: boolean | null; detail: string };
 export type Decision = {

@@ -478,6 +478,62 @@ check("a HOLD is not executable", not d.executable)
 check("a BUY is", EV.evaluate(doc(AND(ALWAYS)), s).executable)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+print("\n[the rule a new client is handed must be able to trade]")
+# FOUND BY USING THE PRODUCT, not by reading it.
+#
+# The rule builder opened with the alphabetically first condition — `atr`, a
+# volatility filter — while `sides` defaults to BOTH. The evaluator refuses
+# that combination with DIRECTION_AMBIGUOUS even when the condition is
+# satisfied, so the rule a new client was handed could never trade. The
+# summary line read like a finished strategy, so the first sign of trouble was
+# a rule that silently did nothing.
+#
+# The builder now opens with a condition that implies a side, and it asks the
+# SERVER which those are. These checks are what the browser relies on.
+_spec = C.describe()
+
+check("every condition says whether it implies a direction",
+      all("impliesDirection" in v for v in _spec.values()),
+      str(sorted(k for k, v in _spec.items()
+                 if "impliesDirection" not in v)))
+check("and it is a real boolean, not a string the UI would read as truthy",
+      all(isinstance(v["impliesDirection"], bool) for v in _spec.values()))
+
+_dir = {k for k, v in _spec.items() if v["impliesDirection"]}
+_filters = {k for k, v in _spec.items() if not v["impliesDirection"]}
+check("the directional ones are the six that point at a side",
+      _dir == {"rsi", "macd", "stochastic", "bollinger", "ma_cross",
+               "price_vs_ma"}, str(sorted(_dir)))
+check("and the filters are the six that say only WHEN",
+      _filters == {"atr", "session", "weekday", "spread_limit",
+                   "time_window", "max_positions"}, str(sorted(_filters)))
+
+check("the flag agrees with bias_of, so it cannot drift from the evaluator",
+      all(v["impliesDirection"]
+          == (C.bias_of(k, {n: p["default"]
+                               for n, p in v["params"].items()}) is not None)
+          for k, v in _spec.items()))
+
+# The bug itself, stated as a test: the condition the builder USED to pick,
+# with the sides it defaults to, is refused.
+# ALWAYS is `weekday` — a filter, satisfied on every day of the week — which
+# is the same shape as the `atr` the builder used to open with.
+_filter_only = doc(AND(ALWAYS), sides="BOTH")
+_v = EV.evaluate(_filter_only, s)
+check("a satisfied FILTER alone with sides BOTH is refused, not guessed",
+      _v.verdict == D.REJECT
+      and _v.refusal_code == D.DIRECTION_AMBIGUOUS,
+      f"{_v.verdict} / {_v.refusal_code}")
+
+check("while the condition the builder now picks does imply a side",
+      sorted(_dir) and C.bias_of(
+          sorted(_dir)[0],
+          {n: p["default"]
+           for n, p in _spec[sorted(_dir)[0]]["params"].items()}) is not None,
+      f"the builder opens with {sorted(_dir)[0]!r}")
+
+
 print("\n" + "=" * 62)
 if failures:
     print(f"{len(failures)} FAILED: {', '.join(failures)}")
