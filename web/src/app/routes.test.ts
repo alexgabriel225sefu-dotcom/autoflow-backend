@@ -69,6 +69,10 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/positions": "protected",
   "/rules": "protected",
   "/rules/new": "protected",
+  // The strategy picker. Protected for the same reason the rule builder is:
+  // it saves a draft against the caller's account, and the catalogue it
+  // renders comes from an authenticated endpoint.
+  "/rules/new/strategy": "protected",
   "/rules/[id]": "protected",
   "/rules/[id]/edit": "protected",
   "/settings": "protected",

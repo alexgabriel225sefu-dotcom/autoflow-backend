@@ -88,6 +88,16 @@ export function schedulePhrase(doc: Partial<RuleDoc>): string | null {
  * never as silence, because the difference decides whether the rule can run
  * at all.
  */
+/**
+ * The strategy a rule delegates its decisions to, or "".
+ *
+ * One reader of the field, so no screen writes the name "strategy" itself.
+ */
+export function presetOf(doc: Partial<RuleDoc>): string {
+  const v = (doc as Record<string, unknown>).strategy;
+  return typeof v === "string" ? v.trim() : "";
+}
+
 export function ruleSentence(
   doc: Partial<RuleDoc>, specs?: Record<string, ConditionSpec> | null,
 ): string {
@@ -96,10 +106,25 @@ export function ruleSentence(
   const syms = (doc.symbols as string[] | undefined)?.join(", ") || "no instrument";
   const entry = block(doc.entry, specs);
   const exit = block(doc.exit, specs);
+  const preset = presetOf(doc);
 
   let s = `${verb} ${syms} on ${doc.timeframe ?? "?"}`;
-  s += entry ? ` when ${entry}` : " — no entry condition set";
-  if (exit) s += `; exit when ${exit}`;
+  if (preset) {
+    // A PRESET RULE HAS NO CONDITIONS, AND THAT IS NOT A FAULT.
+    //
+    // Without this the sentence read "— no entry condition set" over a rule
+    // that is complete and activatable, which describes the one thing a
+    // client would act on (go and add a condition) as the fix for a rule
+    // that does not need one. The strategy's own id is used rather than its
+    // label: the id is what is recorded on the rule and on every trade it
+    // produces, and a label kept in this file would be a second copy of a
+    // name the engine owns.
+    s += ` using the ${preset} strategy, which decides its own entries`
+       + ` and exits`;
+  } else {
+    s += entry ? ` when ${entry}` : " — no entry condition set";
+    if (exit) s += `; exit when ${exit}`;
+  }
   s += `; ${sizingPhrase(doc)}; ${stopPhrase(doc)}`;
   const tgt = targetPhrase(doc);
   if (tgt) s += `; ${tgt}`;
@@ -243,9 +268,30 @@ export function RuleTerms({
         <Row k="Instruments" v={(doc.symbols as string[] | undefined)?.join(", ") || <span className="dim">none</span>} />
         <Row k="Timeframe" v={String(doc.timeframe ?? "—")} />
         <Row k="Evaluated" v={doc.evaluateOn === "intrabar" ? "On every tick (intrabar)" : "On bar close"} />
-        <Row k="Sides" v={String(doc.sides ?? "—")} />
-        <Row k="Entry" v={<Conditions b={doc.entry} specs={specs} fallback="no entry condition" />} />
-        <Row k="Exit" v={<Conditions b={doc.exit} specs={specs} fallback="managed by stop and target only" />} />
+        <Row
+          k="Sides"
+          v={String(doc.sides ?? "—")}
+          note={presetOf(doc)
+            ? "A strategy picks its own direction, so this is recorded and "
+              + "not acted on."
+            : undefined}
+        />
+        {/* A PRESET RULE IS DESCRIBED AS ONE, not as a rule missing its
+            conditions. "no entry condition" over a complete preset rule
+            points the client at a fix for a problem they do not have. */}
+        {presetOf(doc) ? (
+          <Row
+            k="Decided by"
+            v={<span className="mono">{presetOf(doc)}</span>}
+            note="One of the engine's own strategies. It decides the entries
+                  and the exits; the terms below decide the size and the risk."
+          />
+        ) : (
+          <>
+            <Row k="Entry" v={<Conditions b={doc.entry} specs={specs} fallback="no entry condition" />} />
+            <Row k="Exit" v={<Conditions b={doc.exit} specs={specs} fallback="managed by stop and target only" />} />
+          </>
+        )}
         <Row k="Sizing" v={sizingPhrase(doc)} />
         <Row k="Stop loss" v={stopPhrase(doc)} />
         <Row k="Take profit" v={targetPhrase(doc) ?? <span className="dim">none — the exit conditions or the stop close the trade</span>} />

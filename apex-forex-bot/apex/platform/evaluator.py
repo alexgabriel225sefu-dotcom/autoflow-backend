@@ -215,7 +215,37 @@ def evaluate(doc, snap):
         return _reject(dec.RULE_NOT_ACTIVE,
                        f"rule is {doc.get('state')!r}, not active")
 
-    # 2. Is this snapshot even addressed to this rule?
+    # 2. IS THIS RULE EVEN MINE TO JUDGE?
+    #
+    # A rule may name one of the engine's ready-made strategies instead of
+    # building its own conditions. Such a document has no conditions at all —
+    # `ruledoc.validate` refuses one that does — and the engine runs the
+    # strategy module directly, so this function is never asked about it on
+    # the live path.
+    #
+    # It is refused here anyway, and the refusal is load-bearing rather than
+    # defensive. `_eval_block` treats an empty AND block as SATISFIED —
+    # vacuously true, which is correct Kleene logic over nothing. The only
+    # thing that kept that unreachable was validate() requiring an entry
+    # condition. Allow a document with none and an entry block of nothing at
+    # all reads as "entry conditions met" on every single bar; with
+    # `sides: BOTH` the direction check catches it, and with `sides: BUY` it
+    # does not — that is a buy on every bar, forever.
+    #
+    # So the one place that decides whether a rule fires says no to a
+    # document it is not the decider for, before reaching the logic that
+    # would say yes to an empty one. Which also means the platform is safe
+    # today, before anything routes a preset to the engine at all: a preset
+    # rule started now holds, and says why.
+    preset = doc.get("strategy")
+    if isinstance(preset, str) and preset.strip():
+        return _reject(dec.PRESET_STRATEGY,
+                       f"this rule runs the {preset.strip()!r} strategy, which "
+                       f"decides its own entries and exits — there are no "
+                       f"conditions here to judge, and the rule evaluator is "
+                       f"not what runs it")
+
+    # 3. Is this snapshot even addressed to this rule?
     if not any(_same(s, snap.symbol) for s in doc.get("symbols") or []):
         return _reject(dec.SYMBOL_NOT_IN_RULE,
                        f"{snap.symbol} is not one of this rule's instruments")
@@ -225,7 +255,7 @@ def evaluate(doc, snap):
                        f"{snap.timeframe} — evaluating it would answer a "
                        f"different question than the client configured")
 
-    # 3. Managing an open position comes FIRST, and is not gated by the
+    # 4. Managing an open position comes FIRST, and is not gated by the
     #    entry limits. An exit that could be blocked by a spread spike or a
     #    schedule window is not an exit.
     if snap.positions_for():
@@ -239,7 +269,7 @@ def evaluate(doc, snap):
                 reason=_describe(results, "exit conditions met"))
         return _hold(_describe(results, "holding the open position"), results)
 
-    # 4. New entries.
+    # 5. New entries.
     sched = _schedule_problem(doc, snap)
     if sched:
         return _reject(sched[0], sched[1])

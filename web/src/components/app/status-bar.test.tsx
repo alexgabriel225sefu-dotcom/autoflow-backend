@@ -81,3 +81,64 @@ describe("the automation chip", () => {
     expect(text).not.toContain("STOPPED");
   });
 });
+
+/**
+ * RUNNING is the same word for all three engine levels, and they differ by
+ * whether a setup becomes an order. At Signals Only the loop places nothing by
+ * design — so RUNNING on its own tells a client the opposite of what is true,
+ * and this strip is where they read it.
+ */
+describe("the level chip, which says what RUNNING means", () => {
+  const RUNNING_SIGNALS = {
+    state: "running", ruleDocId: "r1", mode: "demo", startedAt: 1,
+    level: "signals", levelLabel: "Signals Only",
+    levelBlurb: "I tell you about every setup I find and place nothing.",
+    levelExecutes: false,
+  } as unknown as AutomationState;
+
+  const RUNNING_FULL = {
+    state: "running", ruleDocId: "r1", mode: "demo", startedAt: 1,
+    level: "full", levelLabel: "Full Automation",
+    levelBlurb: "I open and manage trades on my own.",
+    levelExecutes: true,
+  } as unknown as AutomationState;
+
+  it("names a running level that does not place orders", () => {
+    const text = strip({ ok: true, data: CONNECTED },
+                       { ok: true, data: RUNNING_SIGNALS }).textContent ?? "";
+    expect(text).toContain("RUNNING");
+    // The whole point: RUNNING must not be the only thing on the strip for a
+    // level that trades nothing.
+    expect(text).toContain("Signals Only");
+  });
+
+  it("stays quiet for a level that does place orders", () => {
+    // Full Automation needs no qualifier — RUNNING already means what the
+    // client expects, and a chip on every screen that says nothing new is a
+    // chip people stop reading.
+    const text = strip({ ok: true, data: CONNECTED },
+                       { ok: true, data: RUNNING_FULL }).textContent ?? "";
+    expect(text).toContain("RUNNING");
+    expect(text).not.toContain("Full Automation");
+  });
+
+  it("shows no level when nothing is running", () => {
+    const text = strip({ ok: true, data: CONNECTED },
+                       { ok: true, data: STOPPED }).textContent ?? "";
+    expect(text).not.toContain("Signals Only");
+    expect(text).not.toContain("Level");
+  });
+
+  it("does not decide for itself which levels trade", () => {
+    // `levelExecutes` absent is the old API answering, and a browser that
+    // inferred "signals does not execute" from the level NAME would be a
+    // second copy of a decision about money. Absent means unanswered, so the
+    // chip stays off rather than guessing.
+    const text = strip({ ok: true, data: CONNECTED }, {
+      ok: true,
+      data: { state: "running", ruleDocId: "r1", level: "signals",
+              levelLabel: "Signals Only" } as unknown as AutomationState,
+    }).textContent ?? "";
+    expect(text).not.toContain("Signals Only");
+  });
+});

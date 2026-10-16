@@ -66,7 +66,13 @@ OWNED_KEYS = (
     # must come back when the rule stops. It is in OWNED_KEYS so `snapshot_of`
     # captures it — the two lists have to agree or a restore puts back less
     # than the start overwrote.
-    "automation",
+    #
+    # `copilot` is the SAME setting, in the key the engine still reads first.
+    # Both are written, and both therefore have to be restored: putting back
+    # the level and leaving the boolean behind would hand the account to the
+    # resolution described in `_automation_patch` — the two disagreeing, with
+    # the boolean winning.
+    "automation", "copilot",
 )
 
 # The engine levels, by name rather than by string literal at the call site.
@@ -75,12 +81,65 @@ OWNED_KEYS = (
 LEVEL_SIGNALS = "signals"
 LEVEL_APPROVAL = "approval"
 LEVEL_FULL = "full"
-# What the PLATFORM can service today. `approval` is absent on purpose: the
-# engine's approval step proposes through `alert_fn` and waits for a tap that
-# only the Telegram bot can deliver, so offering it here would reproduce
-# exactly the silence this field was added to fix. It goes back on the list
-# when the platform has its own approve action.
-SERVICEABLE_LEVELS = (LEVEL_FULL,)
+# What the PLATFORM can service today. A level on this list is one a client
+# can be ASKED at and can ANSWER on this product; a level that is not is how
+# the loop went silent, so nothing goes on here before both halves exist.
+#
+# `approval` was absent for exactly that reason — the engine's approval step
+# proposes through `alert_fn` and then waits, and `automation.start` passed no
+# alert function while the only approve action in the codebase was a Telegram
+# tap. Both halves exist now:
+#
+#   the ask      `automation._engine_starter` starts the loop with
+#                `approvals.engine_alert`, which turns the engine's SUGGEST
+#                into a notification the client can read
+#   the answer   `approvals.approve` / `.reject`, reachable at
+#                POST approvals/approve and POST approvals/reject, with the
+#                proposal itself readable at GET approvals and rendered on
+#                the dashboard
+#
+# `approve` places the trade through `user_loop.force_trade`, the controller
+# every other order origin already converges on — there is no second
+# execution path, which is the condition under which this list may grow at
+# all. tests/test_platform_approvals.py measures the whole path, and
+# tests/test_platform_live_invariants.py pins that `approvals` is the only
+# platform module permitted to name that controller.
+#
+# `signals` is on the list for the same reason and on the same evidence. It
+# proposes nothing and places nothing, so servicing it is a matter of
+# REPORTING the setup rather than answering it:
+#
+#   the report   `automation.engine_alert` offers every alert to
+#                `signals.engine_alert`, which files a journal entry and one
+#                notification saying nothing was placed
+#   the screens  the journal filters `status=signal` and the notification
+#                list filters `type=signal`
+#
+# `automation.DELIVERED_LEVELS` is the list of levels that have a sink behind
+# that alert function, and tests/test_signals_only.py asserts the rule this
+# whole field exists for, over all three levels: a level that neither
+# executes nor is delivered must not be serviceable. Checked by running that
+# test and reading the path, not taken on report.
+#
+# HOW A RULE ASKS, AND WHAT IS STILL MISSING. `automationLevel` is not a
+# field in `ruledoc.blank` and `api._create` does not copy it, so for a while
+# this comment said no client could choose a level. That was wrong, and
+# measuring it is what settled it: `PUT /api/v1/rules/{id}` reaches
+# `store.save_draft`, which merges whatever keys the patch carries, and the
+# key then survives `activate` into the frozen version the loop is started
+# from. The whole chain runs today —
+#
+#   PUT {"automationLevel": "approval"} → activate → translate writes
+#   {"automation": "approval", "copilot": True} → apex.automation.mode reads
+#   "approval" and executes() is False
+#
+# What is missing is a CONTROL: the rule builder has no level selector, so
+# every rule it produces omits the key and runs at `full`. Whoever builds one
+# must offer only what this tuple holds — a selector showing "Signals Only"
+# while `_automation_level` returns `full` would place orders for a client who
+# asked to be told and nothing more, which is worse than no control at all.
+# Declaring the field in `ruledoc.blank` belongs with that work.
+SERVICEABLE_LEVELS = (LEVEL_SIGNALS, LEVEL_APPROVAL, LEVEL_FULL)
 
 
 def _automation_level(doc):
@@ -93,6 +152,40 @@ def _automation_level(doc):
     """
     want = str((doc or {}).get("automationLevel") or "").strip().lower()
     return want if want in SERVICEABLE_LEVELS else LEVEL_FULL
+
+
+def _automation_patch(level):
+    """EVERY key the engine reads to resolve the level, in agreement.
+
+    THERE ARE TWO OF THEM, AND WRITING ONE IS A SILENT SUBSTITUTION.
+
+    `apex.automation.mode()` reads `automation` and the legacy `copilot`
+    boolean, and when the two CONTRADICT it honours the boolean — deliberately,
+    because `/copilot` and the MCP control plane still write it and ignoring a
+    client's instruction would be worse.
+
+    An absent boolean is False. So a record carrying `automation: "approval"`
+    and no `copilot` resolves to **full**: the loop would trade UNATTENDED on
+    an account whose own record says it must ask first. Writing the level
+    alone was harmless while `full` was the only level this file could write
+    (False and False agree) and became the most expensive bug in the product
+    the moment `approval` went on SERVICEABLE_LEVELS — and an invisible one,
+    because every assertion about what `translate` WRITES still passed. It was
+    caught by asking what the ENGINE RESOLVES, which is the question commit
+    6f984dfe9 added for the same reason.
+
+    `apex.automation.patch` is the one definition of the two keys agreeing, so
+    it is called rather than restated here. It raises on a level it does not
+    know; `_automation_level` only ever returns one from SERVICEABLE_LEVELS,
+    which is a subset of its MODES.
+    """
+    # Imported inside the function rather than at the top of the file. The
+    # module one letter away in that import line — `apex.platform.automation`
+    # — reaches this file, so the cycle the header comment warns about is one
+    # mistyped import away; keeping it here keeps module import order out of
+    # it entirely.
+    from apex import automation as _engine_automation
+    return _engine_automation.patch(level)
 
 
 def _num(v):
@@ -162,7 +255,12 @@ def translate(doc):
     # channel to go back and ask on. The level a client can CHOOSE is the
     # next piece of work; what is fixed here is that the platform must never
     # leave it to a default it cannot service.
-    applied["automation"] = _automation_level(doc)
+    #
+    # BOTH keys, not just `automation`. The engine resolves the level from
+    # that key AND the legacy `copilot` boolean, and an absent boolean beats a
+    # stored "approval" — see `_automation_patch`, which is where this
+    # resolution and what it costs are written down.
+    applied.update(_automation_patch(_automation_level(doc)))
 
     # ── instrument and timeframe ────────────────────────────────────────────
     symbols = [s for s in (doc.get("symbols") or []) if s]

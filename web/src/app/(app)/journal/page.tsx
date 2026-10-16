@@ -10,11 +10,17 @@ const STATUSES = [
   "", "evaluated", "hold", "reject", "execution_requested", "order_sent",
   "order_confirmed", "order_rejected", "position_closed", "broker_error",
   "automation_started", "automation_paused", "automation_stopped",
+  // A setup found at the Signals Only level: reported to the client, never
+  // placed. It belongs in this list and not on a page of its own, because
+  // this screen is already "every evaluation, including the ones that decided
+  // to do nothing" — and because a signal needs the symbol and date filters
+  // next to it far more than it needs its own navigation entry.
+  "signal",
 ];
 const PAGE = 25;
 
 /** The statuses where the engine ran and deliberately placed nothing. */
-const QUIET = new Set(["hold", "reject"]);
+const QUIET = new Set(["hold", "reject", "signal"]);
 /** The statuses that mean something went wrong at the broker or in the rule. */
 const BAD = new Set(["order_rejected", "broker_error", "reject"]);
 
@@ -91,6 +97,22 @@ export default function JournalView() {
                     {e.error ?? e.decision?.reason ?? humanise(e.status ?? e.kind)}
                   </p>
 
+                  {/* At Signals Only the client places the trade, so the level
+                      the setup qualified at is not decoration — it is the only
+                      number they have to work from. Said as "unavailable"
+                      rather than omitted when the engine did not supply one:
+                      a missing price and a price of zero must not look alike. */}
+                  {e.status === "signal" ? (
+                    <p className="dim mono" style={{ fontSize: ".78rem" }}>
+                      {typeof e.snapshot?.price === "number"
+                        ? `entry around ${e.snapshot.price}`
+                        : "entry price unavailable"}
+                      {typeof e.decision?.confidence === "number"
+                        ? ` · confidence ${e.decision.confidence}%`
+                        : null}
+                    </p>
+                  ) : null}
+
                   {e.decision?.conditions?.length ? (
                     <div className="btn-row" style={{ marginTop: ".45rem" }}>
                       {e.decision.conditions.map((c, i) => (
@@ -109,7 +131,17 @@ export default function JournalView() {
                   ) : null}
 
                   <div className="btn-row" style={{ marginTop: ".45rem" }}>
-                    {e.status && QUIET.has(e.status) ? (
+                    {/* A signal row shows the side as its title, exactly as an
+                        executed decision does, so this pill carries the whole
+                        difference between the two. "No order placed" is true
+                        of a hold and not enough for a signal: a hold means
+                        nothing to do, a signal means something to do and
+                        nobody but the client to do it. */}
+                    {e.status === "signal" ? (
+                      <span className="pill pill-accent">
+                        Signal only — nothing placed, you trade it
+                      </span>
+                    ) : e.status && QUIET.has(e.status) ? (
                       <span className="pill pill-muted">No order placed</span>
                     ) : null}
                     {e.decision?.refusalCode ? (

@@ -25,6 +25,7 @@ import {
   AccountLimitNotice, ErrorNotice, ExecutionBadge, PlanNotice, Spinner,
   TrialNotice,
 } from "@/components/app/state";
+import { PendingApproval } from "@/components/app/pending-approval";
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { MarketPanel } from "@/components/chart/market-panel";
@@ -147,6 +148,18 @@ export default function Dashboard() {
 
       <div className="workspace">
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+
+          {/* ── 0: the one thing on this screen with a deadline ──────────
+              A setup the rule proposed at the Approval Required level opens
+              only if the client agrees, and it expires five minutes after it
+              was found. So it leads — above the account, above the running
+              state — and it renders nothing at all when none is waiting,
+              which is most of the time.
+
+              It reads `approvals` itself rather than taking a prop. Nothing
+              else on this page needs that read, and a pending proposal has
+              to be answerable from wherever it is shown. */}
+          <PendingApproval />
 
           {/* ── 1 + 2: which account, and is it running ─────────────── */}
           <section className="card">

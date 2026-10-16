@@ -123,6 +123,40 @@ describe("the natural-language summary", () => {
     const s = ruleSentence(toDoc({ ...BLANK, entry: [] }), SPECS);
     expect(s).toContain("no entry condition set");
   });
+
+  /**
+   * A rule that names one of the engine's ready-made strategies has no
+   * conditions BY CONSTRUCTION — the server refuses a preset document that
+   * carries any, because a condition on it would be a term the client can
+   * read and the engine will never consult.
+   *
+   * The sentence read "— no entry condition set" over such a rule, which is
+   * the one description that sends a client off to fix something that is not
+   * broken. It names the strategy instead.
+   */
+  it("describes a preset rule by its strategy, not as one missing its "
+     + "conditions", () => {
+    const doc = {
+      ...toDoc({ ...BLANK, entry: [], exit: [] }),
+      strategy: "trend",
+    } as never;
+    const s = ruleSentence(doc, SPECS);
+    expect(s).toContain("using the trend strategy");
+    expect(s).toContain("decides its own entries and exits");
+    expect(s).not.toContain("no entry condition set");
+    // The terms that DO govern the position are still said out loud.
+    expect(s).toContain("risk 1% per trade");
+    expect(s).toContain("stop 1.5× ATR");
+  });
+
+  it("still reads a condition-built rule the same way as before", () => {
+    // The preset branch must not have swallowed the ordinary one.
+    const s = ruleSentence(
+      toDoc({ ...BLANK, entry: [{ id: "rsi", params: { period: 14, relation: "above", value: 55 } }] }),
+      SPECS);
+    expect(s).toContain("when RSI(14, above, 55)");
+    expect(s).not.toContain("strategy");
+  });
 });
 
 describe("the step rail", () => {

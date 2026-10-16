@@ -34,7 +34,19 @@ RULE = "rule"            # a rule was activated, paused, or refused to run
 ACCOUNT = "account"      # a broker account connected, dropped, needs reauth
 RISK = "risk"            # a risk limit fired
 SYSTEM = "system"        # platform-level, e.g. a licence about to lapse
-TYPES = (ORDER, RULE, ACCOUNT, RISK, SYSTEM)
+# A setup the engine found and did NOT place, because the rule runs at the
+# `signals` automation level. Its own type rather than ORDER, which is the
+# one word it must never be confused with: no order was sent, none was
+# refused, and nothing is pending. A client filtering this list for "what did
+# my rule find" is asking a question no other type here answers, and at this
+# level it is the only thing the product does for them.
+#
+# The history does NOT live here. This store keeps 500 rows across every type,
+# so a busy week of signals would evict "your broker account was
+# disconnected"; the durable record is the journal, and this is the nudge that
+# says to go and look. See platform/signals.py.
+SIGNAL = "signal"
+TYPES = (ORDER, RULE, ACCOUNT, RISK, SYSTEM, SIGNAL)
 
 # Severity, so the UI can be loud about the right things without parsing text.
 INFO = "info"

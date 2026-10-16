@@ -99,6 +99,22 @@ RECORDED_ONLY = {
     # it in `notApplied` so the client is told per rule rather than in
     # general.
     "evaluateOn", "entry", "exit", "sides", "order", "schedule",
+    # WHICH ENGINE STRATEGY RUNS, when the client chose one of the engine's
+    # ready-made strategies instead of building conditions. It is in this set
+    # rather than the one above because `engine_config.translate` still writes
+    # `applied["strategy"] = RULE_STRATEGY_ID` for every rule there is: a
+    # client who picks Trend Following has their loop pointed at the rule
+    # strategy, which finds no conditions on a preset document and holds.
+    #
+    # That is at least honest rather than silent — `evaluator.evaluate`
+    # refuses a preset rule by name and `rule_strategy` turns the refusal into
+    # a HOLD, so nothing trades something nobody chose. But the strategy IS
+    # chosen and is NOT run, which is this set's definition.
+    #
+    # Section [7] below measures where translate() actually sends a preset and
+    # fails if this entry disagrees with it, so the field cannot be left in
+    # the wrong set once the engine hand-off lands.
+    "strategy",
 }
 
 print("\n[1] every field is accounted for")
@@ -345,6 +361,64 @@ if os.path.exists(terms) and os.path.exists(page):
 #
 # No test caught it because every test asked what `translate` WRITES. The
 # question that catches it is what the engine RESOLVES afterwards.
+print("\n[7] a chosen ready-made strategy, and where it actually goes")
+# The platform now lets a client pick one of the engine's fifteen registered
+# strategies instead of writing a rule (`apex/platform/strategy_catalog.py`).
+# The choice is a term on the RuleDoc, so everything downstream — the frozen
+# version, the journal, the risk gates, the engine snapshot — is unchanged.
+#
+# What this section measures is the last hop: does the chosen strategy reach
+# `cfg.STRATEGY`? The check is written as a PAIRING with the inventory above
+# rather than as a fixed expectation, so it is correct before and after the
+# hand-off lands and fails in the window where the two disagree.
+from apex.platform import strategy_catalog as _scat                # noqa: E402
+
+_preset_doc = _scat.apply_to(
+    _rd.blank(user_id=USER, account_id="901", symbols=["EURUSD"],
+              timeframe="1h"),
+    "trend")
+_preset_applied, _preset_missed = _ecfg.translate(_preset_doc)
+_target = _preset_applied.get("strategy")
+
+check("translate still writes a strategy for a preset rule, whatever it is",
+      bool(_target), "an account with no strategy set falls back to 'auto', "
+                     "which is a strategy the client did not choose")
+check("and it is either the rule strategy (not routed yet) or the preset "
+      "itself (routed) — never a third thing",
+      _target in (_ecfg.RULE_STRATEGY_ID, "trend"),
+      f"translate sent a preset rule to {_target!r}, which is neither the "
+      f"rule strategy nor the strategy the client picked")
+check("the inventory above agrees with where it actually goes",
+      ("strategy" in REACHES_THE_ENGINE)
+      == (_target != _ecfg.RULE_STRATEGY_ID),
+      f"translate sends a preset to {_target!r}; move 'strategy' between "
+      f"RECORDED_ONLY and REACHES_THE_ENGINE to match, and fix what the rule "
+      f"page claims about it")
+
+# Whichever side of that the product is on, a preset rule must not be able to
+# trade off an empty condition block. `_eval_block` reads an empty AND group
+# as satisfied, so this is the guard that stands between a preset rule and a
+# buy on every bar.
+from apex.platform import decision as _dec                         # noqa: E402
+from apex.platform import evaluator as _eval                       # noqa: E402
+from apex.platform import snapshot as _snapshot                    # noqa: E402
+
+_bars = [{"open": 1.1, "high": 1.102, "low": 1.098, "close": 1.1,
+          "time": 1_700_000_000 + i * 3600} for i in range(40)]
+_pre_verdict = _eval.evaluate(
+    dict(_preset_doc, ruleDocId="p", state=_rd.ACTIVE, sides="BUY"),
+    _snapshot.MarketSnapshot(symbol="EURUSD", timeframe="1h", candles=_bars,
+                             price=1.1, ts=1_700_144_000,
+                             open_positions=[], balance=10_000.0))
+check("the rule evaluator refuses a preset rule rather than reading its "
+      "empty entry block as satisfied",
+      _pre_verdict.refusal_code == _dec.PRESET_STRATEGY,
+      f"verdict {_pre_verdict.verdict} / {_pre_verdict.refusal_code}")
+check("so it never comes back as an entry",
+      _pre_verdict.verdict not in (_dec.BUY, _dec.SELL)
+      and not _pre_verdict.executable,
+      str(_pre_verdict.verdict))
+
 print("\n[automation level] the loop runs at a level the platform can service")
 import apex.automation as _eng_auto                              # noqa: E402
 

@@ -47,6 +47,10 @@ OUTSIDE_SCHEDULE = "OUTSIDE_SCHEDULE"
 SIDE_NOT_ALLOWED = "SIDE_NOT_ALLOWED"
 INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 DIRECTION_AMBIGUOUS = "DIRECTION_AMBIGUOUS"
+# This rule names one of the engine's ready-made strategies, so the condition
+# evaluator is not what decides it. Not an error and not a limit: see
+# DELEGATED_CODES below.
+PRESET_STRATEGY = "PRESET_STRATEGY"
 
 # Every code above stops the trade, but they do not mean the same thing to the
 # person reading the screen, and collapsing them would be dishonest in both
@@ -73,6 +77,18 @@ LIMIT_CODES = (SPREAD_LIMIT_EXCEEDED, MAX_POSITIONS_REACHED, OUTSIDE_SCHEDULE,
 #                       which. Filed under either of the other two it would be
 #                       either ignored forever or escalated forever.
 DATA_CODES = (INSUFFICIENT_DATA,)
+#   DELEGATED_CODES     the rule is fine, no limit fired, the inputs were
+#                       there — and this evaluator is not what decides it.
+#                       A rule that names one of the engine's ready-made
+#                       strategies has no conditions, by construction: the
+#                       strategy module decides and the engine calls it
+#                       directly. Filed as a config error it would tell the
+#                       client to fix a rule that is correct; filed as a limit
+#                       it would read as their own cap doing its job. It is
+#                       its own category because what it actually means is
+#                       "you are looking at the wrong decider", which is a
+#                       sentence about the platform and not about the rule.
+DELEGATED_CODES = (PRESET_STRATEGY,)
 
 
 def is_config_error(code):

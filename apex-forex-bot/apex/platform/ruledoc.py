@@ -113,6 +113,26 @@ def blank(*, user_id, account_id, symbols=None, timeframe="1h"):
         # intrabar evaluation can fire on a price that the bar never closes at.
         "evaluateOn": "bar_close",
 
+        # WHICH ENGINE STRATEGY DECIDES, or None for "my conditions do".
+        #
+        # The platform exposed exactly one way to trade — write a rule — while
+        # the engine ships fifteen ready-made strategies that a Telegram
+        # client could pick from a menu. Those were unreachable here, so a
+        # client who wanted Trend Following had to reproduce it in conditions,
+        # and could not.
+        #
+        # It lives in the RuleDoc rather than beside it because everything
+        # downstream of "what is running" is a RuleDoc: the frozen version the
+        # journal points at, the risk gates that read the rule's own terms,
+        # the engine snapshot Stop restores from. A preset has no conditions
+        # and every other term, so it is one more term — not a second kind of
+        # thing for all of that to learn.
+        #
+        # None, not "": None is "no preset chosen", and an empty string would
+        # have to mean the same thing while also being a value somebody could
+        # write by accident. `validate` refuses a blank string for that reason.
+        "strategy": None,
+
         "entry": {"combine": "AND", "conditions": []},
         "exit": {"combine": "OR", "conditions": []},
         "sides": "BOTH",
@@ -157,12 +177,22 @@ def _as_object(problems, doc, field):
     return value
 
 
-def validate(doc, *, known_condition_ids=None):
+def validate(doc, *, known_condition_ids=None, known_strategy_ids=None):
     """Every problem with `doc`, as a list. Empty list means valid.
 
     `known_condition_ids` is passed in rather than imported so this module
     stays free of the condition library — the library imports nothing from
     here either, and the two can be tested apart.
+
+    `known_strategy_ids` is passed in for the same reason, and there is a
+    second one: the strategy registry lives in the engine
+    (`apex/strategy_api.py`) and reaching it from here would close an import
+    cycle through `platform.rule_strategy`. Pass the ids the PLATFORM offers —
+    `strategy_catalog.ids()` — not everything the engine registers: `grid`,
+    `martingale` and `platform_rule` are registered and must not be selectable
+    as presets. Omitting it checks the field's SHAPE only, which is what the
+    evaluator does on every bar; the boundary that decides whether a rule may
+    go live (`store.activate`) passes the list.
     """
     problems = []
     if not isinstance(doc, dict):
@@ -197,6 +227,27 @@ def validate(doc, *, known_condition_ids=None):
     if not doc.get("timeframe"):
         _err(problems, "timeframe", "required")
 
+    # ── which engine strategy decides ───────────────────────────────────────
+    # A preset-backed rule and a condition-built rule are the same document
+    # with one field different, and that field changes what the CONDITION
+    # blocks are allowed to contain. Checked before the blocks, so the message
+    # about them can be the right one.
+    preset = doc.get("strategy")
+    has_preset = isinstance(preset, str) and bool(preset.strip())
+    if preset is not None and not has_preset:
+        _err(problems, "strategy",
+             "must be the id of a strategy, or null to use the entry and exit "
+             "conditions you built yourself")
+    elif has_preset and not _ID_RE.match(preset):
+        _err(problems, "strategy", "must be 1-64 chars of [A-Za-z0-9_-]")
+    elif has_preset and known_strategy_ids is not None \
+            and preset not in set(known_strategy_ids):
+        # Fail closed. An id nothing offers would be written onto the account
+        # as cfg.STRATEGY, and the loop would hold every bar naming a strategy
+        # the client cannot find on any screen.
+        _err(problems, "strategy",
+             f"unknown strategy {preset!r} — it is not one this release offers")
+
     # Kept so the condition-library check below reads the blocks this loop
     # already proved are objects, rather than reaching into `doc` again and
     # meeting the string this loop just rejected.
@@ -209,8 +260,32 @@ def validate(doc, *, known_condition_ids=None):
         halves[half] = block
         if block.get("combine") not in COMBINE:
             _err(problems, f"{half}.combine", "must be AND or OR")
-        _check_conditions(problems, f"{half}.conditions",
-                          block.get("conditions"), required=(half == "entry"))
+        if has_preset:
+            # A PRESET DECIDES ITS OWN ENTRIES AND EXITS, so a condition on
+            # the document is a term the client reads on their rule page and
+            # the engine never consults. That is the exact defect this
+            # codebase was rewritten to stop, so the document is refused
+            # rather than activated with a decoration on it.
+            #
+            # It also closes a hole. `evaluator._eval_block` treats an empty
+            # AND block as satisfied — vacuously true — and until now nothing
+            # could reach that state because this check required an entry
+            # condition. A preset document has none by construction, so the
+            # evaluator refuses a preset outright (see `evaluator.evaluate`)
+            # and this half of the pair makes sure there is nothing else in
+            # there for anything to judge.
+            conditions = block.get("conditions")
+            if not isinstance(conditions, list):
+                _err(problems, f"{half}.conditions", "must be a list")
+            elif conditions:
+                _err(problems, f"{half}.conditions",
+                     f"this rule runs the {preset!r} strategy, which decides "
+                     f"its own entries and exits — remove these conditions, "
+                     f"or clear the strategy to build the rule yourself")
+        else:
+            _check_conditions(problems, f"{half}.conditions",
+                              block.get("conditions"),
+                              required=(half == "entry"))
 
     if doc.get("sides") not in SIDES:
         _err(problems, "sides", f"must be one of {', '.join(SIDES)}")
@@ -355,18 +430,21 @@ def _check_schedule(problems, sched):
             _err(problems, at, "from and to cannot be the same time")
 
 
-def is_valid(doc, *, known_condition_ids=None):
-    return not validate(doc, known_condition_ids=known_condition_ids)
+def is_valid(doc, *, known_condition_ids=None, known_strategy_ids=None):
+    return not validate(doc, known_condition_ids=known_condition_ids,
+                        known_strategy_ids=known_strategy_ids)
 
 
-def activate(doc, *, known_condition_ids=None, now=None):
+def activate(doc, *, known_condition_ids=None, known_strategy_ids=None,
+             now=None):
     """A frozen ACTIVE copy, or RuleDocInvalid. Never mutates `doc`.
 
     Returning a copy rather than flipping the state in place is what makes the
     draft still exist afterwards: the client keeps editing their draft while a
     frozen version runs.
     """
-    problems = validate(doc, known_condition_ids=known_condition_ids)
+    problems = validate(doc, known_condition_ids=known_condition_ids,
+                        known_strategy_ids=known_strategy_ids)
     if problems:
         raise RuleDocInvalid(problems)
     if doc.get("state") not in (DRAFT, PAUSED):

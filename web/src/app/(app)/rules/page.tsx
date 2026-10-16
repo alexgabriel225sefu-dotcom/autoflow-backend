@@ -27,7 +27,18 @@ export default function RulesPage() {
             A rule is frozen once active. Editing one creates a new version.
           </span>
         </div>
-        <Link className="btn" href="/rules/new"><Plus className="ico" aria-hidden /> New rule</Link>
+        {/* TWO WAYS IN, BOTH NAMED. The engine ships fifteen ready-made
+            strategies and this screen offered neither of them — the only
+            route to trading anything was writing conditions, which is not
+            what the product promises. */}
+        <div className="btn-row">
+          <Link className="btn btn-ghost" href="/rules/new/strategy">
+            Choose a strategy
+          </Link>
+          <Link className="btn" href="/rules/new">
+            <Plus className="ico" aria-hidden /> New rule
+          </Link>
+        </div>
       </div>
 
       {running && running.state !== "stopped" ? (

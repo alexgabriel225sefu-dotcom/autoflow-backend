@@ -7,7 +7,12 @@ import { ErrorNotice, Spinner } from "@/components/app/state";
 import { When } from "@/components/app/table";
 import { humanise } from "@/components/app/rule-summary";
 
-const TYPES = ["", "order", "rule", "account", "risk", "system"];
+// `signal` last, and present at all because at the Signals Only level this is
+// the screen the product happens on: the engine finds the setup, says so here,
+// and places nothing. Without the filter those rows are mixed in with licence
+// and account notices, which is the wrong place to go looking for the only
+// thing your rule did today.
+const TYPES = ["", "order", "rule", "account", "risk", "system", "signal"];
 
 export default function NotificationsPage() {
   const [type, setType] = useState("");
@@ -80,11 +85,19 @@ export default function NotificationsPage() {
                 {n.body ? (
                   <p className="muted" style={{ fontSize: ".83rem" }}>{n.body}</p>
                 ) : null}
-                {!n.readAt ? (
-                  <button className="btn btn-ghost btn-sm" disabled={busy}
-                          style={{ marginTop: ".5rem" }}
-                          onClick={() => markOne(n.id)}>Mark read</button>
-                ) : null}
+                <span className="btn-row" style={{ marginTop: ".5rem" }}>
+                  {!n.readAt ? (
+                    <button className="btn btn-ghost btn-sm" disabled={busy}
+                            onClick={() => markOne(n.id)}>Mark read</button>
+                  ) : null}
+                  {/* The row says what happened; the link is where to act on
+                      it. A signal's link is the journal, which keeps the setup
+                      after this list — capped at 500 rows across every type —
+                      has rotated past it. */}
+                  {n.link ? (
+                    <a className="btn btn-ghost btn-sm" href={n.link}>Open</a>
+                  ) : null}
+                </span>
               </article>
             ))}
           </div>

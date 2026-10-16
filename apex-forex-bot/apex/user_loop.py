@@ -4925,8 +4925,54 @@ def _entitled(user_id):
     return False
 
 
+def _alert_fn_for(user_id, alert_fn):
+    """Where THIS user's loop events go, which is not always what the caller said.
+
+    A PLATFORM CLIENT'S ALERTS CANNOT GO TO TELEGRAM, AND TWO CALLERS SEND THEM
+    THERE ANYWAY.
+
+    `platform.automation.start` hands over the platform's own alert sink, so a
+    loop a client starts is wired correctly. The other two ways a loop starts
+    are `start_all` on boot and the watchdog every 180 seconds, and `bot.py`
+    gives both of them `telegram._user_alert` — which addresses a Telegram chat
+    id. A platform identity is a Supabase uuid and is not a chat, so every
+    event for a platform account that the watchdog revived went to a chat that
+    does not exist.
+
+    That is survivable for a heartbeat and is not survivable for a signal. At
+    the `signals` level the alert IS the product: the loop finds the setup,
+    reports it, and places nothing. A redeploy would otherwise leave a client
+    with a loop that said Running and never told them anything again — the same
+    silence 6f984dfe9 was about, arriving later and for a different reason.
+
+    So the classification is made here, where every caller passes through, from
+    the one record that answers it. `is_platform_account` is cheap and imports
+    clean, which is why `gates.py` asks it the same question in the same way.
+
+    An unclassifiable user keeps the caller's own alert function. A store that
+    cannot be read is not a reason to redirect a paying Telegram client's
+    alerts somewhere they have never been.
+    """
+    try:
+        from apex.platform import ctrader_link as _ctl
+        if not _ctl.is_platform_account(user_id):
+            return alert_fn
+    except Exception as e:                                  # noqa: BLE001
+        print(f"[UserLoop:{user_id}] could not classify this account "
+              f"({type(e).__name__}: {e}) — leaving its alerts as given")
+        return alert_fn
+    try:
+        from apex.platform import automation as _pauto
+        return _pauto.engine_alert
+    except Exception as e:                                  # noqa: BLE001
+        print(f"[UserLoop:{user_id}] the platform alert sink is unavailable "
+              f"({type(e).__name__}: {e}) — alerts as given")
+        return alert_fn
+
+
 def start(user_id, alert_fn=None):
     user_id = str(user_id)
+    alert_fn = _alert_fn_for(user_id, alert_fn)
     if not _entitled(user_id):
         # Clear `active` too, or the watchdog resurrects this every 180s.
         print(f"[UserLoop] REFUSED start for {user_id}: not entitled "

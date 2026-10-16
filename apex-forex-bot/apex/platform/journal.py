@@ -43,6 +43,14 @@ ORDER_REJECTED = "order_rejected"  # the broker or a gate refused it
 POSITION_CLOSED = "position_closed"
 BROKER_ERROR = "broker_error"
 
+# A setup the engine found and deliberately did not place, because the rule
+# runs at the `signals` automation level. Its own status rather than HOLD: a
+# HOLD is the rule deciding NOT to act, and this is the rule deciding to act
+# and the level saying a person does it. A client filtering for "my signals"
+# is asking a different question from "when did my rule hold", and one status
+# covering both would answer neither.
+SIGNAL = "signal"
+
 # Turning automation on and off is evidence too — "who started this, and
 # when" is a question an account owner asks. It is NOT filed under
 # BROKER_ERROR, which is what recording a successful start through
@@ -54,7 +62,8 @@ AUTOMATION_STOPPED = "automation_stopped"
 
 STATUSES = (EVALUATED, HOLD, REJECT, EXECUTION_REQUESTED, ORDER_SENT,
             ORDER_CONFIRMED, ORDER_REJECTED, POSITION_CLOSED, BROKER_ERROR,
-            AUTOMATION_STARTED, AUTOMATION_PAUSED, AUTOMATION_STOPPED)
+            AUTOMATION_STARTED, AUTOMATION_PAUSED, AUTOMATION_STOPPED,
+            SIGNAL)
 
 # Anything whose name looks like a credential is dropped, whatever its value.
 _SECRET_HINTS = ("token", "secret", "password", "apikey", "api_key",
@@ -226,6 +235,48 @@ def for_automation(status, *, correlation_id, user_id, account_id=None,
         user_id=user_id, account_id=account_id, rule_doc_id=rule_doc_id,
         rule_doc_version=rule_doc_version, error=None,
         position={"detail": detail} if detail else None, ts=ts)
+
+
+def for_signal(signal, *, correlation_id, user_id, account_id=None,
+               rule_doc_id=None, rule_doc_version=None, ts=None):
+    """A setup reported to the client and NOT placed.
+
+    `kind` is EVALUATION because that is what happened: the rule ran and
+    produced a side. What makes it a signal rather than an order is the level
+    the loop runs at, and the entry says so in the one field that cannot be
+    misread — `decision.executable` is False, recorded rather than inferred.
+
+    The shape of `decision` deliberately matches the one an evaluation writes,
+    so the journal screen renders a signal with the components it already has
+    for a verdict, a reason and the factors behind it, instead of growing a
+    second renderer that could disagree about what "no order placed" means.
+
+    `signal` is the already-validated dict from `platform.signals.parse` — this
+    function describes, it does not check, because a journal entry assembled
+    from unvalidated input is how a store ends up holding something no screen
+    can render.
+    """
+    return JournalEntry(
+        kind=EVALUATION, correlation_id=correlation_id, status=SIGNAL,
+        user_id=user_id, account_id=account_id, rule_doc_id=rule_doc_id,
+        rule_doc_version=rule_doc_version, symbol=signal.get("symbol"),
+        # The reading: what the market was doing when the setup qualified.
+        snapshot={"symbol": signal.get("symbol"),
+                  "price": signal.get("price")},
+        decision={
+            "verdict": signal.get("side"),
+            "reason": signal.get("reasoning") or "",
+            # Key factors are the engine's supporting observations, not
+            # conditions that were tested, so `passed` is null — neither a
+            # pass nor a failure. Claiming either would be inventing a
+            # verdict the engine never gave.
+            "conditions": [{"id": f, "passed": None, "detail": ""}
+                           for f in (signal.get("keyFactors") or [])],
+            "executable": False,
+            "refusalCode": None,
+            "confidence": signal.get("confidence"),
+        },
+        ts=ts)
 
 
 def for_position_closed(position, *, correlation_id, user_id,

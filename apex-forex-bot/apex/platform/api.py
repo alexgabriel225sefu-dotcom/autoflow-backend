@@ -27,6 +27,7 @@ import json
 import re
 
 from apex.platform import conditions as _cond
+from apex.platform import approvals as _appr
 from apex.platform import automation as _auto
 from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
@@ -493,6 +494,53 @@ def _dispatch(method, route, headers, body, query=None):
             return _ok(_auto.stop(p.user_id))
         return _err(404, "NOT_FOUND", "no such automation action")
 
+    # ── a setup waiting for the client's approval ───────────────────────
+    # The platform's half of the engine's Approval Required level. In that
+    # level the loop proposes and places nothing, and until these three
+    # routes existed the only way to answer a proposal was a Telegram tap —
+    # so a platform client's loop found setups and went silent. See
+    # apex/platform/approvals.py, and commit 6f984dfe9 for the state it left
+    # every client in.
+    #
+    # Rate limiting: every route here goes through `_rl.check` before
+    # `_dispatch` is reached, which puts these in the `default` bucket — the
+    # same one the notifications and journal polls use. `approvals` has no
+    # case of its own in `ratelimit.classify`, so approving is metered as a
+    # dashboard read rather than as a control action. That is deliberately
+    # noted rather than quietly left: the thing that stops a double tap
+    # opening two positions is the claim and the clear in `approvals.approve`
+    # plus the idempotency claim inside the order controller, not the
+    # limiter — but a tighter bucket is the right home for an order-producing
+    # POST and belongs in `classify` beside the automation controls.
+    if route == "approvals":
+        if method != "GET":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers)
+        return _ok(_appr.pending(p.user_id))
+
+    if route in ("approvals/approve", "approvals/reject"):
+        if method != "POST":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        # Both decide whether a position opens, so neither trusts a cached
+        # session — the same reasoning as the automation controls above.
+        p = _authenticate(headers, fresh=True)
+        try:
+            if route == "approvals/approve":
+                # Approving IS placing an order, so it is held to what every
+                # other order-producing action is held to. Dismissing is not:
+                # a client must always be able to say no, and refusing that
+                # would leave them with a proposal they cannot answer.
+                _id.require_verified_email(p)
+                return _ok(_appr.approve(p.user_id))
+            return _ok(_appr.reject(p.user_id))
+        except _appr.ApprovalRefused as e:
+            # 409, and translated here rather than in `_handle`'s clause list:
+            # these are the only two routes that can raise it, and the code
+            # travels to the UI so a client is told WHICH refusal — expired,
+            # already answered, not running — instead of one sentence that
+            # fits none of them.
+            return _err(409, e.code, e.detail)
+
     # ── notifications ───────────────────────────────────────────────────
     if route == "notifications":
         p = _authenticate(headers)
@@ -551,6 +599,25 @@ def _dispatch(method, route, headers, body, query=None):
         return _ok({"user": p.as_dict(),
                     "licence": _lic.status_for(p.user_id),
                     "execution": _ent.capability(p.user_id)})
+
+    # The strategy picker renders its list from this, so the UI can never
+    # offer a strategy the engine does not register — the same contract
+    # `conditions` has below, for the same reason. The catalogue intersects
+    # this release's descriptions with the live registry, so a strategy that
+    # exists only in one of the two is not on the list.
+    #
+    # Authenticated like its neighbours. It carries no secret material, but
+    # "what can be traded here" is product surface and there is no reason an
+    # unauthenticated caller needs it.
+    if route == "strategies" and method == "GET":
+        _authenticate(headers)
+        # Imported here rather than at the top of the file, which is against
+        # this module's convention and deliberate: the catalogue reads the
+        # engine's registry, and that import pulls apex.ai and
+        # apex.strategies. Every other route in this file would pay for them
+        # at process start to serve one list.
+        from apex.platform import strategy_catalog as _scat
+        return _ok(_scat.catalogue())
 
     # The Rule Builder renders its form from this, so the UI can never offer a
     # condition the evaluator does not implement.

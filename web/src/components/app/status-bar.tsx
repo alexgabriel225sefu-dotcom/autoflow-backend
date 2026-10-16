@@ -104,8 +104,25 @@ export function StatusBar({
           live={running.state === "running"}
           label="Automation"
           value={running.state.toUpperCase()}
+          title={running.levelBlurb ?? undefined}
         />
       )}
+
+      {/* WHAT "RUNNING" MEANS. The three engine levels differ by whether a
+          setup becomes an order, and this strip showed the same RUNNING for
+          all of them — so a client at Signals Only, whose loop places nothing
+          by design, read the most consequential chip on the screen as "it is
+          trading for me".
+
+          Only shown for a level that does NOT execute, because that is the
+          case where the state alone misleads. `levelExecutes` is the server's
+          answer, not a list of level names kept here: which levels place
+          orders is decided by the engine and must be read from it. */}
+      {running?.state === "running" && running.levelExecutes === false ? (
+        <Chip label="Level" value={running.levelLabel ?? running.level ?? "Unknown"}
+              title={running.levelBlurb
+                ?? "This level does not place orders — it reports setups and leaves the trade to you."} />
+      ) : null}
 
       {licence && licence !== "active" ? (
         <a className="stat-chip" href="/license" style={{ color: "var(--a4t-short)" }}>

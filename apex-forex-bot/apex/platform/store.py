@@ -369,6 +369,35 @@ def save_draft(owner_id, doc):
     return out
 
 
+def _offered_strategy_ids():
+    """The preset ids a rule may name, read at the activation boundary.
+
+    Resolved HERE rather than taken from the caller, which is a deliberate
+    exception to how `known_condition_ids` arrives. Activation is the moment a
+    document becomes capable of producing orders, and a preset id nothing
+    offers would be written onto the account as `cfg.STRATEGY`: the loop then
+    holds every bar naming a strategy that appears on no screen. There is one
+    activation path, so the check belongs on it rather than on every caller
+    remembering to pass the list.
+
+    Imported inside the function on purpose — `strategy_catalog` reaches the
+    engine registry, which reaches `platform.rule_strategy`, which reaches
+    this module. At call time that cycle is already resolved; at import time
+    it is not.
+
+    A registry that cannot be read answers with an empty tuple, so every
+    preset rule is refused rather than every preset rule being allowed.
+    """
+    try:
+        from apex.platform import strategy_catalog
+        return strategy_catalog.ids()
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[STORE] the strategy catalogue could not be read "
+              f"({type(e).__name__}) — refusing to activate any rule that "
+              f"names a preset")
+        return ()
+
+
 def activate(owner_id, rule_doc_id, *, known_condition_ids=None, now=None):
     """Validate, freeze, and make this version the live one.
 
@@ -380,6 +409,7 @@ def activate(owner_id, rule_doc_id, *, known_condition_ids=None, now=None):
     owner_id = str(owner_id)
     doc = get(owner_id, str(rule_doc_id))
     live = ruledoc.activate(doc, known_condition_ids=known_condition_ids,
+                            known_strategy_ids=_offered_strategy_ids(),
                             now=now)
     ver = int(live.get("version") or 1)
     frozen_key = _k_version(owner_id, rule_doc_id, ver)

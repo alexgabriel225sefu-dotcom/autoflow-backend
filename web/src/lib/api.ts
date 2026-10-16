@@ -403,6 +403,54 @@ export type RuleSummary = {
 };
 export type RuleDoc = RuleSummary & Record<string, unknown>;
 
+/**
+ * One of the engine's ready-made strategies, as the server describes it.
+ *
+ * `refuses` is the field that matters most on the screen, and it is a field
+ * rather than a sentence folded into `what` for that reason: the useful half
+ * of a trading strategy is the market it declines to trade, and five of
+ * these decline nothing beyond "the setup is not there". A client has to be
+ * able to read that before choosing.
+ *
+ * `label` and `version` are the strategy class's own, read from the engine's
+ * registry. Nothing in this project keeps its own name for a strategy — a
+ * second copy would drift the first time one is renamed.
+ */
+export type StrategyPreset = {
+  id: string;
+  label: string;
+  version: string;
+  family: string;
+  what: string;
+  decides: string;
+  refuses: string;
+  /** Where the description was read from, so a claim can be checked. */
+  source: string;
+};
+
+/** A strategy the engine registers and this platform does not offer. */
+export type WithheldStrategy = {
+  id: string;
+  label: string;
+  reason: string;
+  kind: "rule_builder" | "high_risk" | string;
+};
+
+export type StrategyCatalogue = {
+  strategies: StrategyPreset[];
+  withheld: WithheldStrategy[];
+  /** The rule-builder strategy id, so no component writes the string itself. */
+  ruleBuilderId: string;
+  /** The RuleDoc field a chosen preset is written to. */
+  presetField: string;
+  /**
+   * Registered strategies this release has no description for. Absent when
+   * there are none, which is the normal case — a key that is always present
+   * and almost always empty is a key the UI learns to ignore.
+   */
+  unclassified?: string[];
+};
+
 export type ConditionParam = {
   type: string; default: unknown; choices: string[] | null;
   min: number | null; max: number | null; required: boolean;
@@ -440,6 +488,10 @@ export type JournalEntry = {
   entryId: string; kind: string; status: string | null; ts: number;
   symbol: string | null; accountId: string | null; ruleDocId: string | null;
   decision?: Decision; error?: string | null; correlationId: string;
+  /** The market reading the entry was made against. A `signal` entry carries
+   *  the price the setup qualified at, which is the one number a client needs
+   *  to act on it themselves — at that level nothing else will. */
+  snapshot?: { symbol?: string | null; price?: number | null } | null;
 };
 export type JournalPage = {
   status: "ok"; entries: JournalEntry[]; total: number;
@@ -449,13 +501,82 @@ export type JournalPage = {
 export type Notification = {
   id: string; type: string; level: "info" | "warning" | "critical";
   title: string; body: string; ts: number; readAt: number | null;
+  /** Where to go to act on it, when there is somewhere. A signal points at
+   *  the journal, which keeps the setup after this list has rotated past it. */
+  link?: string | null;
 };
 export type NotificationPage = {
   status: "ok"; notifications: Notification[]; total: number;
   unread: number; hasMore: boolean;
 };
 
+/**
+ * A setup the engine proposed and will NOT place until the client answers.
+ *
+ * Every optional field here is optional because the server refuses to invent
+ * it. `price` and `reasoning` come from the engine's alert, which is a
+ * separate write from the proposal itself, so they can genuinely be unknown —
+ * `detailKnown` says which case this is, and the card shows "not recorded"
+ * rather than an empty space that reads as nothing to say.
+ *
+ * `actionable` and `refusal` are the SERVER's verdict on whether approving
+ * would be accepted. The browser disables a button from them rather than
+ * deciding for itself what the rules are: a second copy of that decision
+ * would be the one that let a client press Approve on a setup the backend
+ * then refused.
+ */
+export type PendingApproval = {
+  symbol: string;
+  side: "BUY" | "SELL";
+  price: number | null;
+  confidence: number | null;
+  reasoning: string | null;
+  keyFactors: string[];
+  detailKnown: boolean;
+  proposedAt: number;
+  ageSec: number;
+  expiresAt: number;
+  expiresInSec: number;
+  expired: boolean;
+  actionable: boolean;
+  refusal: string | null;
+};
+export type ApprovalRead = {
+  /** "ok" means we read the account. "unknown" means we could not. */
+  status: "ok" | "unknown";
+  approval?: PendingApproval | null;
+  /** A proposal is stored and could not be read. It can only be dismissed. */
+  unreadable?: boolean;
+  reason?: string;
+};
+export type ApprovalResult = {
+  status: "ok";
+  /** "placed" — the order went through. "unknown" — the broker never said. */
+  outcome?: "placed" | "unknown";
+  order?: {
+    symbol: string; side: string; price: number | null;
+    units: number | null; stopLoss: number | null; takeProfit: number | null;
+  } | null;
+  detail?: string;
+  rejected?: boolean;
+  alreadyGone?: boolean;
+};
+
 export type AutomationState = {
   state: "stopped" | "running" | "paused";
   ruleDocId: string | null; mode: "demo" | null; startedAt: number | null;
+  /** WHAT "RUNNING" MEANS, which the state on its own does not say.
+   *
+   *  The engine has three levels and they differ by whether a setup becomes
+   *  an order. The status strip showed the same RUNNING for all three, so a
+   *  client at Signals Only read it as "it is trading for me".
+   *
+   *  The label and the verdict are the SERVER's, never assembled here: which
+   *  levels place orders is a decision about money, and a second copy of it
+   *  in the browser would be free to drift from the one the loop obeys.
+   *  Null when nothing is running — there is no level to report. */
+  level?: "signals" | "approval" | "full" | null;
+  levelLabel?: string | null;
+  levelBlurb?: string | null;
+  levelExecutes?: boolean | null;
 };

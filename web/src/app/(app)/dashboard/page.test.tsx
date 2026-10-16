@@ -85,6 +85,11 @@ function base() {
     orders: { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", orders: [] } },
     journal: { ok: true, data: { status: "ok", entries: [], total: 0, limit: 8, offset: 0, hasMore: false } },
     rules: { ok: true, data: { rules: [] } },
+    // The pending-approval card reads this. Stubbed as "we asked, and none is
+    // waiting" — the ordinary case. Left out, every test here would render
+    // the card's read-failed notice instead, which is exactly what it is
+    // supposed to do with a 404 and not what these tests are about.
+    approvals: { ok: true, data: { status: "ok", approval: null } },
   } as Record<string, unknown>;
 }
 
@@ -438,5 +443,42 @@ describe("dashboard — the account picker reports a refusal", () => {
     await pick();
     expect(screen.queryByText(/RATE_LIMITED/)).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+/**
+ * A proposal waiting for an answer, on the screen that has to show it.
+ *
+ * The component has its own tests. These two are about the WIRING, which is
+ * the half that was missing in the shipped bug: in Approval Required the
+ * engine proposed setups and the only thing that could answer them was a
+ * Telegram tap, so a platform client's loop ran, found setups, and waited
+ * for ever while this dashboard said Running. A card nobody renders is the
+ * same silence with extra steps.
+ */
+describe("dashboard — a setup waiting for approval", () => {
+  it("shows it, above everything else on the page", async () => {
+    routes.approvals = { ok: true, data: { status: "ok", approval: {
+      symbol: "EURUSD", side: "BUY", price: 1.0987, confidence: 60,
+      reasoning: "RSI(14) 24.3 below 30", keyFactors: [], detailKnown: true,
+      proposedAt: 1_000, ageSec: 10, expiresAt: 1_300, expiresInSec: 290,
+      expired: false, actionable: true, refusal: null,
+    } } };
+    await renderDash();
+    await waitFor(() =>
+      expect(screen.getByText(/Waiting for your approval/)).toBeTruthy());
+    expect(screen.getByText("RSI(14) 24.3 below 30")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Approve$/ })).toBeTruthy();
+    // It leads the page: a client scrolling past the account picker to find
+    // a setup that expires in five minutes is a setup that expires.
+    const body = document.body.textContent ?? "";
+    expect(body.indexOf("Waiting for your approval"))
+      .toBeLessThan(body.indexOf("Automation"));
+  });
+
+  it("and nothing about approvals when none is waiting", async () => {
+    await renderDash();
+    expect(screen.queryByText(/Waiting for your approval/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Approve$/ })).toBeNull();
   });
 });

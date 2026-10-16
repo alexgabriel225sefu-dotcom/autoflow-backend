@@ -36,7 +36,9 @@ decide for itself.
 import time
 import uuid
 
+from apex import automation as _eng_auto
 from apex import user_store
+from apex.platform import approvals as _appr
 from apex.platform import ctrader_link as _link
 from apex.platform import emergency as _emerg
 from apex.platform import engine_config as _ecfg
@@ -44,6 +46,7 @@ from apex.platform import entitlement as _ent
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
 from apex.platform import ruledoc as _rd
+from apex.platform import signals as _signals
 from apex.platform import store as _store
 
 STOPPED = "stopped"
@@ -85,13 +88,58 @@ def _write(user_id, rec):
     return rec
 
 
+def _level_of(rec):
+    """The engine level the RUNNING loop was given, or None.
+
+    Taken from the terms this start actually applied rather than re-read from
+    the rule, for the same reason `appliedTerms` is kept on the record at all:
+    the rule can be edited into a new version while this one runs, and what a
+    client needs to see is what the loop in front of them was told to do.
+    """
+    applied = rec.get("appliedTerms")
+    if not isinstance(applied, dict):
+        return None
+    return applied.get("automation") or None
+
+
+def _plain(label):
+    """An engine label without its icon.
+
+    `automation.LABEL` is written for Telegram, where a message is plain text
+    and the emoji is the only way to make a line stand out. This platform has
+    its own iconography and a chip to put the words in, so the icon is dropped
+    HERE rather than in the browser: a frontend stripping characters out of a
+    server string would be guessing at which ones are decoration.
+    """
+    return "".join(c for c in str(label or "") if c.isascii()).strip() or None
+
+
 def status(user_id):
     """Safe to hand a browser. Carries no token and no broker credential."""
     rec = _read(user_id)
+    level = _level_of(rec)
     return {"status": "ok", "state": rec.get("state", STOPPED),
             "ruleDocId": rec.get("ruleDocId"), "mode": rec.get("mode"),
             "startedAt": rec.get("startedAt"),
             "updatedAt": rec.get("updatedAt"),
+            # WHAT "RUNNING" MEANS, which the word on its own does not say.
+            #
+            # The three levels differ by whether a setup becomes an order, and
+            # this screen used to show the same RUNNING for all of them. A
+            # client at Signals Only would read it as "it is trading for me"
+            # — which is how 6f984dfe9's silence went unnoticed for so long:
+            # the dashboard said Running and nobody could tell that meant
+            # nothing was being placed.
+            #
+            # The label and the verdict come from the server, not from a
+            # browser mapping a level string to a sentence. That mapping is a
+            # decision about what the product does with money, and a second
+            # copy of it in the frontend would be free to drift.
+            "level": level,
+            "levelLabel": _plain(_eng_auto.LABEL.get(level)) if level else None,
+            "levelBlurb": _eng_auto.BLURB.get(level) if level else None,
+            "levelExecutes": (bool(_eng_auto.EXECUTES.get(level))
+                              if level else None),
             # The terms of the running rule that this release does NOT act
             # on, each with its reason. Carried to the browser because the
             # alternative is a screen listing settings the loop ignores, with
@@ -241,8 +289,7 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
     held = token is True
 
     if starter is None:
-        from apex import user_loop
-        starter = user_loop.start
+        starter = _engine_starter
     # NOTE WHAT IS ABSENT: `paper`. Exactly one place writes the live/demo
     # flag — telegram._handle_paper, the writer that applies every activation
     # gate — and test_live_path_invariants.py enforces that there is only one.
@@ -313,6 +360,96 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
                         f"account {conn.get('ctid')}.",
                    correlation_id=corr)
     return dict(status(user_id), started=True, alreadyRunning=False)
+
+
+def _engine_starter(user_id):
+    """The real starter: the engine's loop, WITH somewhere to send alerts.
+
+    THIS ARGUMENT IS THE REASON APPROVAL WAS SILENT.
+
+    The loop was started as `user_loop.start(user_id)`. `alert_fn` therefore
+    defaulted to None, and in approval mode `_suggest_trade` writes a pending
+    proposal, calls that None, and places nothing — so every setup the loop
+    found was a proposal nobody was told about, on a screen that said Running.
+    Commit 6f984dfe9 removed that state by refusing the level; this is what
+    makes the level answerable instead.
+
+    The alert goes to `engine_alert`, which routes it to the module that
+    owns the level it belongs to. It is bound HERE rather than passed through
+    `start(starter=...)` on purpose: `starter` is the seam a test injects, and
+    its contract — asserted by tests/test_rule_reaches_engine.py — is that the
+    engine is handed the user id and nothing else, so there is no argument
+    through which a rule could arrive. Binding the alert into the default keeps
+    that true and still gives the engine a way to talk back.
+    """
+    from apex import user_loop
+    return user_loop.start(user_id, alert_fn=engine_alert)
+
+
+def engine_alert(user_id, payload):
+    """The one alert function the engine gets, and the two sinks behind it.
+
+    The engine takes a single `alert_fn`, and there are two levels that need to
+    be heard through it: `approval`, whose proposal needs an answer, and
+    `signals`, whose setup needs only to be reported. So both are offered every
+    alert and each answers for its own action — `SUGGEST` and `SIGNAL`
+    respectively — and ignores the rest of the firehose.
+
+    OFFERED TO BOTH RATHER THAN ROUTED BY A TABLE HERE, because a table in this
+    file would be a third place that has to agree with the two allowlists about
+    which module owns which action, and the first time it disagreed an alert
+    would go to the wrong screen or to none. The allowlists are the routing;
+    `tests/test_signals_only.py` asserts they do not overlap, so an action can
+    never be delivered twice.
+
+    NEITHER CALL CAN PLACE AN ORDER. An alert is a report of something the loop
+    already decided; the engine has set `entry_ok = False` before either of
+    these is reached at both non-executing levels, and neither module imports
+    an execution path. Both also swallow their own exceptions — this runs on
+    the trading thread, and an exception here abandons the rest of the tick,
+    which is where exits and trailing stops live.
+    """
+    _appr.engine_alert(user_id, payload)
+    _signals.engine_alert(user_id, payload)
+    return None
+
+
+# EVERY ENGINE LEVEL THIS PLATFORM CAN REPORT FOR, which is the list `engine_alert`
+# above has a sink for. It lives here because this is the only file that knows
+# both sinks exist.
+#
+# THE RULE IT SERVES: a level that does not place orders and has no sink is a
+# loop that runs, finds setups and tells nobody — which is the state every
+# platform client shipped in, and what 6f984dfe9 fixed by refusing to offer
+# `approval` at all. So `engine_config.SERVICEABLE_LEVELS` must hold nothing
+# that is absent from here unless `automation.EXECUTES` says it acts on its
+# own. tests/test_signals_only.py asserts that over all three levels.
+#
+# A level goes on this list when a sink answers for it, not when somebody
+# intends to write one.
+DELIVERED_LEVELS = (_ecfg.LEVEL_APPROVAL, _signals.LEVEL_SIGNALS)
+
+
+def running_context(user_id):
+    """Which rule and account this client's RUNNING loop belongs to.
+
+    Exists so a loop event arriving from the engine can be filed against the
+    rule that produced it. The engine knows a user id and nothing else — it
+    predates rules entirely — so the join has to be made from this side, and
+    reading it per event is what makes it correct for a loop the watchdog
+    restarted as well as one a client started (see `signals._running_context`).
+
+    Empty rather than raising when nothing is running: an event that arrives
+    just after a stop is late, not wrong, and it still has to be recordable.
+    """
+    rec = _read(user_id)
+    if rec.get("state") != RUNNING:
+        return {}
+    return {"ruleDocId": rec.get("ruleDocId"),
+            "accountId": (str(rec.get("accountId"))
+                          if rec.get("accountId") is not None else None),
+            "correlationId": rec.get("correlationId"),
+            "level": _level_of(rec)}
 
 
 def _run_starter(starter, user_id, lock, corr, held):
@@ -393,18 +530,27 @@ def _flatten_answer(rec):
     that as "and I am flat", and on a live account that belief is expensive.
 
     This release declines, and the reason is not squeamishness: closing a
-    position is an ORDER, and the platform has no execution path. `bridge` is
-    imported by nothing in production. Claiming to flatten would be claiming
-    to place an order we cannot place.
+    position is an ORDER, and this platform has nothing that places a closing
+    one. `bridge` is imported by nothing in production, and `approvals` —
+    which is the one thing here that can place an order at all — can only ask
+    the controller to OPEN the setup a client approved. Claiming to flatten
+    would be claiming to place an order we cannot place.
+
+    THE SENTENCE BELOW USED TO BE WIDER THAN THE TRUTH. It said this release
+    "cannot place orders of any kind", which was exactly right while nothing
+    could, and became false the moment Approval Required worked: a client who
+    approves a setup gets an opening order. The reason for declining is
+    specific to CLOSING, so the sentence now says that and no more — a
+    reassurance that overstates is still a thing a client acts on.
     """
     return {
         "flattened": False,
         "flattenDeclined": True,
         "flattenReason": (
             "Stopping ends the trading loop. It does not close positions that "
-            "are already open — this release cannot place orders of any kind, "
-            "including closing ones. Any open position stays at your broker "
-            "with the stop and target it was given, and you close it there."),
+            "are already open — this release has no way to close a position. "
+            "Any open position stays at your broker with the stop and target "
+            "it was given, and you close it there."),
     }
 
 

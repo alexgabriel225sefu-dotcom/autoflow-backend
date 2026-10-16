@@ -89,6 +89,17 @@ export default function NewRulePage() {
         <span className="pill pill-demo">Demo only</span>
       </div>
 
+      {/* The other half of the fork, stated on the screen a client lands on
+          rather than hidden in navigation. The engine ships fifteen
+          ready-made strategies and this platform used to expose none of them,
+          so somebody who only wanted Trend Following had to reproduce it in
+          conditions — and could not. */}
+      <div className="notice notice-accent">
+        Don&apos;t want to write conditions?{" "}
+        <Link href="/rules/new/strategy">Choose one of the engine&apos;s
+        strategies</Link> instead and set only your risk and limits.
+      </div>
+
       {/* The rule read back as a sentence, updating as it is built. A client
           who cannot read their own rule has not really configured it. */}
       <RuleSentence doc={toDoc(draft)} specs={specs} />

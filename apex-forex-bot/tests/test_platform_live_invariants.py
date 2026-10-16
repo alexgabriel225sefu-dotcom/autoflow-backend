@@ -334,14 +334,104 @@ check("preview cannot reach any of them",
       str(sorted(set(BOUNDARY) & closure("preview"))))
 
 # ── 3. no module names an order-mutating operation ───────────────────────────
-print("\n[3] no platform module names a broker-mutating operation")
-MUTATING = ("place_order", "close_position", "amend_sltp", "force_trade",
-            "authorize_order", "authorize_close", "modify_position")
-for op in MUTATING:
+# NARROWED, NOT RELAXED — and the one exemption is written down rather than
+# discovered.
+#
+# This used to be a flat "nothing outside the boundary names any of these".
+# That was the whole truth while the platform could not place an order at all.
+# It stopped being the truth when Approval Required was made serviceable: the
+# engine's approval level proposes a setup and waits, and somebody has to be
+# able to say yes. `approvals.approve` is that somebody, and it places the
+# trade by calling `user_loop.force_trade` — the single controller that
+# already performs ownership.may_trade, gates.authorize_order, gates.audit,
+# the ledger claim and only then broker.place_order.
+#
+# The alternative was worse in a way worth stating: re-implementing those five
+# steps inside the platform, which is exactly what `bridge.py`'s docstring
+# refuses to do, because two order paths that must both stay correct forever
+# eventually disagree and the one that places orders wins.
+#
+# So the exemption is per-operation and per-module. `approvals` may name the
+# one controller and NOTHING else on this list — no broker call, no gate, no
+# closing or amending operation — and every other module still may not name
+# any of them. The assertions below that one pin what `approvals` is allowed
+# to be: one call site, no reachable execution path, and the suggestion
+# claimed and cleared BEFORE the order is attempted.
+print("\n[3] the only order-mutating name outside the boundary is the one "
+      "controller")
+MUTATING = {
+    "place_order": (),
+    "close_position": (),
+    "amend_sltp": (),
+    # The client's own approval of a setup the engine proposed. Nothing else.
+    "force_trade": ("approvals",),
+    "authorize_order": (),
+    "authorize_close": (),
+    "modify_position": (),
+}
+for op, allowed in MUTATING.items():
     hits = sorted(m for m in MODULES
-                  if m not in BOUNDARY and op in names_in(m))
+                  if m not in BOUNDARY and m not in allowed
+                  and op in names_in(m))
     check(f"nothing outside the unwired boundary names `{op}`", hits == [],
           f"named in {hits}")
+check("and exactly one module is exempt, for exactly one operation",
+      sorted(m for ms in MUTATING.values() for m in ms) == ["approvals"]
+      and MUTATING["force_trade"] == ("approvals",),
+      f"{ {k: v for k, v in MUTATING.items() if v} } — every addition here "
+      f"is a second way to an order and needs the review this comment "
+      f"describes")
+
+
+def attr_calls(module, attr):
+    """How many times a module names `attr` as an attribute.
+
+    Attributes, not substrings: the prose above a call mentions the controller
+    by name on purpose, and an invariant that counted the name would punish
+    the explanation and pass the second call site.
+    """
+    return sum(1 for n in ast.walk(MODULES[module]["tree"])
+               if isinstance(n, ast.Attribute) and n.attr == attr)
+
+
+print("\n[3b] the exempt module has one call site and no path of its own")
+check("`approvals` exists", "approvals" in MODULES)
+check("and it names the controller exactly once",
+      attr_calls("approvals", "force_trade") == 1,
+      f"{attr_calls('approvals', 'force_trade')} references — one order path "
+      f"means one call site")
+check("and it names no broker or gate operation of its own",
+      not [op for op in MUTATING if op != "force_trade"
+           and op in names_in("approvals")],
+      str([op for op in MUTATING if op != "force_trade"
+           and op in names_in("approvals")]))
+_appr_closure = closure("approvals")
+for forbidden in BOUNDARY:
+    check(f"and it cannot reach `{forbidden}`", forbidden not in _appr_closure,
+          f"closure = {sorted(_appr_closure)}")
+check("and it is reachable from the API, so this is wired and not a "
+      "half-built module",
+      "approvals" in api_closure, f"closure = {sorted(api_closure)}")
+
+# ORDER, on the source, for the same reason `place()` is checked that way: a
+# claim taken after the order is not a claim. Two requests can both read a
+# pending suggestion before either acts, so the suggestion is claimed and then
+# CLEARED before the controller is called — a second approve then finds
+# nothing to approve even where there is no shared backend to claim against.
+_appr = body_src("approvals", "approve")
+check("approvals.approve exists", bool(_appr))
+for token, what in (("claim_value", "the cross-process claim"),
+                    ("_clear(user_id)", "dropping the suggestion"),
+                    ("executor(user_id", "handing it to the controller")):
+    check(f"approve runs {what}", token in _appr, f"`{token}` is not in it")
+check("the suggestion is claimed before it is cleared",
+      _appr.index("claim_value") < _appr.index("_clear(user_id)"))
+check("and cleared before the order is attempted",
+      _appr.index("_clear(user_id)") < _appr.index("executor(user_id"),
+      "clearing after the order means a double tap can open two positions")
+check("and an expired suggestion is refused rather than placed",
+      "EXPIRED" in _appr and _appr.index("EXPIRED") < _appr.index("executor("),
+      "a setup found five minutes ago is a price that has moved")
 
 # ── 4. live_execution_enabled returns a literal, not a decision ─────────────
 # The dangerous version of this function is one that reads an environment
