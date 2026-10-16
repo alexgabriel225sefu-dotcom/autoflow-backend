@@ -53,6 +53,7 @@ from apex import user_store                             # noqa: E402
 from apex.platform import automation as AU              # noqa: E402
 from apex.platform import ctrader_link as CL
 from apex.platform import plans as _plans            # noqa: E402
+from apex.platform import engine_config as _ecfg        # noqa: E402
 from apex.platform import ruledoc as _rd                # noqa: E402
 from apex.platform import store as _store               # noqa: E402
 
@@ -323,6 +324,58 @@ if os.path.exists(terms) and os.path.exists(page):
     check("the rule page passes it down from the rule it loaded",
           "notApplied" in open(page, encoding="utf-8").read(),
           "the component can show it and the page never supplies it")
+
+# ── the level the loop runs at, which nothing was setting ───────────────────
+#
+# THE BUG THIS EXISTS TO CATCH, STATED PLAINLY BECAUSE IT SHIPPED.
+#
+# `engine_config.translate` wrote fourteen engine keys and not `automation`.
+# A platform client's record therefore carried neither that key nor the
+# legacy `copilot` boolean, and `apex.automation.mode()` resolves THAT exact
+# state to "approval" — correctly, for a Telegram client, where it means
+# nobody chose and unattended trading is the wrong default.
+#
+# On the platform it meant the product did not work. In approval mode the
+# loop calls `_suggest_trade`, which stores a pending proposal, calls
+# `alert_fn` — None, because `automation.start` starts the loop without one
+# — and then sets entry_ok = False. Every platform client ran a loop that
+# evaluated their rule, found setups, wrote a suggestion nobody could see,
+# notified nobody, and placed nothing. The screen said Running the whole
+# time.
+#
+# No test caught it because every test asked what `translate` WRITES. The
+# question that catches it is what the engine RESOLVES afterwards.
+print("\n[automation level] the loop runs at a level the platform can service")
+import apex.automation as _eng_auto                              # noqa: E402
+
+_doc = _rd.blank(user_id=USER, account_id="901", symbols=["EURUSD"],
+                 timeframe="1h")
+_applied, _ = _ecfg.translate(_doc)
+_record = dict(_applied, active=True)       # exactly what automation.start writes
+
+check("translate writes the level explicitly",
+      "automation" in _applied,
+      "leaving it unset hands the account to a default this product cannot "
+      "answer")
+_resolved = _eng_auto.mode(_record)
+check("and the engine resolves it to that same level",
+      _resolved == _applied.get("automation"),
+      f"wrote {_applied.get('automation')!r}, engine read {_resolved!r}")
+check("which is one the platform can actually service",
+      _resolved in _ecfg.SERVICEABLE_LEVELS,
+      f"{_resolved!r} proposes through a channel this product does not have, "
+      f"so the loop would run and place nothing")
+check("and it is NOT the approval level",
+      _resolved != "approval",
+      "approval waits for a tap only the Telegram bot can deliver")
+# The level is owned, so stopping a rule puts back whatever the account had.
+check("the level is captured by snapshot_of, so Stop restores it",
+      "automation" in _ecfg.snapshot_of({"automation": "signals"}),
+      "a rule that ran once would leave its level behind for whatever runs "
+      "next")
+check("and it is declared in OWNED_KEYS",
+      "automation" in _ecfg.OWNED_KEYS,
+      "OWNED_KEYS and snapshot_of have to be the same list")
 
 shutil.rmtree(_TMP, ignore_errors=True)
 

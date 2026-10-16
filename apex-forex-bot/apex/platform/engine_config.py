@@ -62,7 +62,37 @@ OWNED_KEYS = (
     "trailing", "breakeven_r", "max_trades_day", "max_spread_pips",
     "strategy", "ai_confirm", "min_confidence", "htf", "autopilot",
     "watchlist", "session_filter",
+    # Owned for the same reason as the rest: whatever level the account held
+    # must come back when the rule stops. It is in OWNED_KEYS so `snapshot_of`
+    # captures it — the two lists have to agree or a restore puts back less
+    # than the start overwrote.
+    "automation",
 )
+
+# The engine levels, by name rather than by string literal at the call site.
+# `apex.automation` owns these; they are repeated here rather than imported
+# because importing it would close a cycle (it reaches this file).
+LEVEL_SIGNALS = "signals"
+LEVEL_APPROVAL = "approval"
+LEVEL_FULL = "full"
+# What the PLATFORM can service today. `approval` is absent on purpose: the
+# engine's approval step proposes through `alert_fn` and waits for a tap that
+# only the Telegram bot can deliver, so offering it here would reproduce
+# exactly the silence this field was added to fix. It goes back on the list
+# when the platform has its own approve action.
+SERVICEABLE_LEVELS = (LEVEL_FULL,)
+
+
+def _automation_level(doc):
+    """The engine level this rule runs at.
+
+    Reads the rule rather than assuming, so the client's choice has somewhere
+    to live the moment there is a control for it — but refuses to return a
+    level the platform cannot actually service. A level nobody here can
+    answer is how the loop went quiet in the first place.
+    """
+    want = str((doc or {}).get("automationLevel") or "").strip().lower()
+    return want if want in SERVICEABLE_LEVELS else LEVEL_FULL
 
 
 def _num(v):
@@ -110,6 +140,29 @@ def translate(doc):
     applied["htf"] = False
     applied["autopilot"] = False
     applied["watchlist"] = []
+    # ── THE ONE THAT WAS MISSING, AND IT STOPPED THE PRODUCT WORKING ───────
+    #
+    # `automation` is the engine's level: signals / approval / full. It was
+    # not written here, so a platform client's record carried neither it nor
+    # the legacy `copilot` boolean — and `automation.mode()` resolves THAT
+    # state to "approval", deliberately, because for a Telegram client it
+    # means nobody had chosen and unattended trading is the wrong default.
+    #
+    # For a platform client it meant something else entirely. In approval
+    # mode the loop calls `_suggest_trade`, which stores a pending proposal,
+    # calls `alert_fn` — None, because `automation.start` starts the loop
+    # without one — and sets entry_ok = False. So every platform client,
+    # demo and live, ran a loop that evaluated their rule, found setups,
+    # wrote a suggestion nobody could see, notified nobody, and placed
+    # NOTHING. Press Start, watch it say Running, and wait forever.
+    #
+    # Written as `full` because on this product pressing Start on a rule the
+    # client wrote, validated, activated and then confirmed IS the
+    # instruction to trade it — and unlike Telegram there is no second
+    # channel to go back and ask on. The level a client can CHOOSE is the
+    # next piece of work; what is fixed here is that the platform must never
+    # leave it to a default it cannot service.
+    applied["automation"] = _automation_level(doc)
 
     # ── instrument and timeframe ────────────────────────────────────────────
     symbols = [s for s in (doc.get("symbols") or []) if s]
