@@ -307,20 +307,49 @@ def _dev_flags():
 
 
 def _live_trading():
-    """Stated as a check so a probe can prove it, not only a comment.
+    """Whether real money can move here, stated so a probe can prove it.
 
-    Live trading is not implemented. If a future deployment ever sets the flag
-    without the implementation existing, readiness must say so loudly rather
-    than let it pass unnoticed.
+    BOTH HALVES OF THIS CHANGED WHEN LIVE EXECUTION WAS WIRED, AND THE OLD
+    WORDING WAS ACTIVELY MISLEADING BY THE END.
+
+    This used to say "live trading is not implemented ... no execution path
+    exists for it", which was true and is not any more. An operator reading
+    `/readyz` was being told the product cannot do something it can.
+
+    `LIVE_TRADING_ENABLED` is a LEGACY name and is NOT the switch. It never
+    enabled anything and still does not, which is precisely why setting it
+    fails readiness: somebody who sets it believes they have turned live
+    trading on, and they have not. Telling them loudly is the whole value of
+    this check.
+
+    The real switch is `entitlement.live_execution_enabled()`. Reported here
+    rather than re-read, so there is one answer to "is live open" and a probe
+    sees the same one every gate sees.
     """
+    from apex.platform import entitlement as _ent
+    live_open = _ent.live_execution_enabled()
     if _flag_on("LIVE_TRADING_ENABLED"):
         return _check("live_trading", FAIL,
-                      "LIVE_TRADING_ENABLED is set, but live trading is not "
-                      "implemented in this release and no execution path "
-                      "exists for it", enabled=True)
+                      "LIVE_TRADING_ENABLED is set, but it is not the live "
+                      "switch and never was — nothing reads it to permit an "
+                      "order. Whoever set it believes real-money trading is "
+                      "on and it is not; the switch is A4T_LIVE_EXECUTION",
+                      enabled=live_open)
+    if live_open:
+        # Not a failure. It is a deployment that made the decision on purpose
+        # — the variable cannot be set to this value by accident — and a
+        # readiness probe that failed on it would be refusing traffic to a
+        # correctly configured service. What it must do is SAY SO, every
+        # time anybody looks.
+        return _check("live_trading", OK,
+                      "LIVE EXECUTION IS OPEN on this deployment: a client "
+                      "holding the paid plan can place real-money orders on "
+                      "a broker-confirmed live account",
+                      enabled=True)
     return _check("live_trading", OK,
-                  "live trading is disabled, which is the only supported "
-                  "setting in this release", enabled=False)
+                  "live execution is closed on this deployment — the path "
+                  "exists and every order refuses at the release switch",
+                  enabled=False)
 
 
 CHECKS = (_supabase, _encryption, _shared_store, _rate_limit_store,

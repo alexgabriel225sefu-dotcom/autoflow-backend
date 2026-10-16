@@ -414,30 +414,78 @@ check("the value cannot be arrived at by accident",
       and _ent_mod.LIVE_SWITCH_ON not in ("1", "true", "yes", "on"),
       repr(_ent_mod.LIVE_SWITCH_ON))
 
-# ONE reader. The danger a config switch introduces is a second place that
-# decides what it means — a module that checks the variable directly and gets
-# a different answer from the function everything else asks.
-_readers = sorted(m for m in MODULES
-                  if _ent_mod.LIVE_SWITCH_ENV in MODULES[m]["src"])
-check("exactly one module names the variable",
+# ONE READER. The danger a config switch introduces is a second place that
+# decides what it means — a module that checks the variable itself and gets a
+# different answer from the function everything else asks.
+#
+# Counted as GETENV CALLS, not as occurrences of the name. The substring
+# version failed the moment health.py's refusal told an operator which
+# variable the real switch is — which is exactly the right thing for that
+# message to say. An invariant that forbids naming a thing punishes the
+# documentation and lets a second `os.getenv` in some other form through; it
+# is the READ that creates a second opinion, so the read is what to count.
+def _getenv_reads(name):
+    """Modules that pass `name` to os.getenv, by literal or by constant."""
+    out = []
+    for mod in MODULES:
+        aliases = {"LIVE_SWITCH_ENV"}          # the constant, where exported
+        for node in ast.walk(MODULES[mod]["tree"]):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            fn = node.func
+            is_getenv = ((isinstance(fn, ast.Attribute) and fn.attr == "getenv")
+                         or (isinstance(fn, ast.Name) and fn.id == "getenv"))
+            if not is_getenv:
+                continue
+            a = node.args[0]
+            if (isinstance(a, ast.Constant) and a.value == name) \
+                    or (isinstance(a, ast.Name) and a.id in aliases) \
+                    or (isinstance(a, ast.Attribute) and a.attr in aliases):
+                out.append(mod)
+                break
+    return sorted(set(out))
+
+
+_readers = _getenv_reads(_ent_mod.LIVE_SWITCH_ENV)
+check("exactly one module reads the variable",
       _readers == ["entitlement"], str(_readers))
+check("and health describes the switch by ASKING, not by re-reading it",
+      "live_execution_enabled" in body_src("health", "_live_trading")
+      and "health" not in _readers,
+      "two readers is two answers to 'is live open'")
 _fn_src = body_src("entitlement", "live_execution_enabled")
 check("and it is read through os.getenv, not a cached module global",
       "os.getenv" in _fn_src,
       "a value read at import time cannot be turned off without a redeploy")
 
 # ── 5. the live-trading flag is read in exactly one place, to refuse ────────
-print("\n[5] LIVE_TRADING_ENABLED is read once, and only to refuse")
+print("\n[5] LIVE_TRADING_ENABLED is a legacy name that enables nothing")
 readers = sorted(m for m in MODULES if "LIVE_TRADING_ENABLED" in names_in(m))
 check("exactly one module reads it", readers == ["health"], str(readers))
-if readers == ["health"]:
-    body = MODULES["health"]["src"]
-    i = body.index("LIVE_TRADING_ENABLED")
-    window = body[max(0, i - 400):i + 600]
-    check("and it is used to FAIL readiness, not to enable anything",
-          "FAIL" in window, window[:120])
-    check("and says no execution path exists for it",
-          "not" in window and "implemented" in window)
+# READ FROM THE FUNCTION, NOT A CHARACTER WINDOW.
+#
+# This used to take ±400/600 characters around the first occurrence of the
+# name in health.py. That worked until the function grew a docstring
+# mentioning it, after which the window held prose and no code — and the
+# second assertion then passed on the words "not" and "implemented" happening
+# to appear in that prose, while asserting something that had become FALSE.
+#
+# A window around a string is not a scope. The function is.
+_lt = body_src("health", "_live_trading")
+check("the readiness check exists", bool(_lt))
+check("and setting the flag FAILS readiness",
+      "FAIL" in _lt,
+      "somebody who sets it believes live trading is on; it is not")
+check("it is never used to permit anything",
+      "if _flag_on(\"LIVE_TRADING_ENABLED\")" in _lt
+      and "FAIL" in _lt.split("if _flag_on(\"LIVE_TRADING_ENABLED\")")[1][:400],
+      "the only branch it controls must be the refusing one")
+# And the check reports the REAL switch, so an operator reading /readyz is
+# told whether real money can move — which is the question they are asking.
+check("and the check reports the real switch's state",
+      "live_execution_enabled" in _lt,
+      "readyz must not describe live trading from a variable that does not "
+      "control it")
 
 # ── 6. all three locks are present, and each is its own construct ───────────
 # Each has its own test elsewhere proving it refuses with the other two
