@@ -88,6 +88,12 @@ export default function Dashboard() {
   const autoPlain = plainAutomation(running?.state, !!activeRule);
   const licPlain = plainLicence(licence);
   const isDemo = selected?.mode === "demo";
+  // A live account the SERVER has cleared, and cleared for live specifically.
+  // Both halves matter: `canAutomate` alone could be a verdict about the demo
+  // account the client just switched away from, because the picker and `me`
+  // refresh on different clocks.
+  const liveCleared =
+    execution?.accountMode === "live" && execution.canAutomate === true;
   const runningThis = running && running.state !== "stopped";
 
   /**
@@ -247,15 +253,27 @@ export default function Dashboard() {
                     <p className="muted" style={{ fontSize: ".82rem", marginTop: "var(--sp-2)" }}>
                       Choose an account above before starting.
                     </p>
-                  ) : !isDemo ? (
+                  ) : !isDemo && !liveCleared ? (
                     <div className="notice notice-warn" role="alert">
-                      {/* The account picker's state is what opens this
-                          notice, and `me` is polled on a different clock, so
-                          the sentence is a constant rather than whatever
-                          verdict happens to be in hand. It is the same
-                          sentence the server refuses with — content.test.ts
-                          asserts that against the Python source. */}
-                      Live trading is not available in this release.
+                      {/* WHY THIS IS NOT JUST `!isDemo` ANY MORE.
+                          A hardcoded refusal was right while no deployment
+                          could execute live. It stopped being right the day
+                          one could: it would have shown a paying client, on
+                          a deployment with the switch open, that live is
+                          unavailable — and hidden the Start button from them
+                          entirely. The browser would have been overruling a
+                          server that said yes.
+                          `liveCleared` requires the server's verdict to be
+                          about THIS mode. The picker and `me` poll on
+                          different clocks, so a verdict describing the demo
+                          account must not unlock controls for a live one;
+                          requiring accountMode === "live" is what rules that
+                          out. The fallback sentence is unchanged and still
+                          pinned to the Python source by content.test.ts. */}
+                      {execution && execution.accountMode === "live"
+                        && execution.message
+                        ? execution.message
+                        : "Live trading is not available in this release."}
                     </div>
                   ) : (
                     <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>

@@ -441,6 +441,106 @@ check("the release switch refuses once more",
 check("and the real entitlement module still says live is disabled",
       ENT.live_execution_enabled() is False)
 
+# ═══════════════════════════════════════════════════════════════════════════
+# THE SECOND DOOR
+#
+# `place()` above is the rule-driven path. `authorize_order` is the one the
+# ENGINE's order gate calls, for an order that already exists. It runs the
+# same gates minus the two that need a RuleDoc, and the thing worth proving is
+# that it refuses in the same places — two doors with one policy.
+print("\n[15] the engine door refuses at the switch, like the other one")
+reset()
+
+
+def auth(**over):
+    kw = dict(symbol="EURUSD", side="BUY", units=1000,
+              account_id=ACCOUNT, mode_reader=live_mode, now=NOW)
+    kw.update(over)
+    return LX.authorize_order(USER, **kw)
+
+
+v = auth()
+check("refused with the switch off", v["allowed"] is False, str(v))
+check("at the release switch", v["code"] == LX.LIVE_NOT_ENABLED, str(v["code"]))
+
+LX._ent.live_execution_enabled = lambda: True
+try:
+    print("\n[16] §8 the emergency stop outranks even the switch")
+    os.environ[EM.ENV_VAR] = "all"
+    try:
+        v = auth()
+        check("halted", v["allowed"] is False and v["code"] == LX.HALTED,
+              str(v))
+    finally:
+        os.environ.pop(EM.ENV_VAR, None)
+
+    print("\n[17] §2 an unentitled account is refused")
+    unentitle()
+    v = auth()
+    check("refused on the plan", v["code"] == LX.NOT_ENTITLED, str(v))
+    reset()
+
+    print("\n[18] §3 the mode must come from the broker, and must be live")
+    def boom():
+        raise RuntimeError("the broker did not answer")
+
+    v = auth(mode_reader=boom)
+    check("an unverified mode is not a live mode",
+          v["code"] == LX.MODE_UNVERIFIED, str(v))
+    v = auth(mode_reader=lambda: "demo")
+    check("and a demo account is not this path's business",
+          v["code"] == LX.MODE_NOT_LIVE, str(v))
+
+    print("\n[19] a fully clear order is allowed, and says so")
+    reset()
+    v = auth()
+    check("allowed", v["allowed"] is True, str(v))
+    check("with no refusal code", v["code"] is None, str(v["code"]))
+
+    print("\n[20] guard_engine_order has NO opinion on a non-platform account")
+    # The Telegram bot's users reach `gates.authorize_order` too and have no
+    # platform cTrader connection. None means "not mine to answer" — which is
+    # not the same as allowed, and the distinction is what keeps the legacy
+    # product working while a platform client is held to every gate.
+    FAKE.data.clear()                      # no connection record anywhere
+    g = LX.guard_engine_order("someone-else", symbol="EURUSD", side="BUY",
+                              units=1000, origin="telegram")
+    check("returns None rather than a verdict", g is None, str(g))
+
+    print("\n[20b] but a PLATFORM account does get a verdict")
+    # The other half, and the one that catches the mutation that matters: a
+    # guard which returned None for EVERYBODY would pass [20] perfectly while
+    # letting every platform live order through ungated.
+    from apex.platform import ctrader_link as _CTL
+    _CTL._store._write(_CTL._k_conn(USER), {
+        "userId": USER, "accessToken": "not-a-real-token",
+        "ctid": ACCOUNT, "mode": "live", "accounts": [],
+    })
+    reset()
+    _CTL._store._write(_CTL._k_conn(USER), {
+        "userId": USER, "accessToken": "not-a-real-token",
+        "ctid": ACCOUNT, "mode": "live", "accounts": [],
+    })
+    g = LX.guard_engine_order(USER, symbol="EURUSD", side="BUY",
+                              units=1000, origin="loop")
+    check("it answers rather than abstaining", g is not None, str(g))
+    # The broker cannot be reached from a test, so §3 cannot be satisfied —
+    # and that IS the expected answer. An unverified mode is not a live mode.
+    check("and an unreachable broker means refused, never allowed",
+          g.get("allowed") is False, str(g))
+    check("with the mode gate named",
+          g.get("code") in (LX.MODE_UNVERIFIED, LX.MODE_NOT_LIVE), str(g))
+finally:
+    restore_switch()
+
+print("\n[21] and with the switch back off, the engine door is shut again")
+reset()
+v = auth()
+check("refused once more", v["allowed"] is False, str(v))
+check("at the release switch", v["code"] == LX.LIVE_NOT_ENABLED, str(v))
+check("the real module still reports the switch closed",
+      ENT.live_execution_enabled() is False)
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

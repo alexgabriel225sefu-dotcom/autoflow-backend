@@ -241,10 +241,19 @@ export function MoreAccountsSection({
             {signup!.disclosure}
           </p>
           {/* The one instruction that decides whether the introduction is
-              worth anything. The broker offers cTrader AND other platforms;
-              this product connects to cTrader only. A client who follows the
-              link and picks MT5 gets an account that cannot be connected
-              here, after the operator has already paid for the referral. */}
+              worth anything. The broker offers cTrader AND other trading
+              platforms; this product connects to cTrader only. A client who
+              follows the link and picks one of the others gets an account
+              that cannot be connected here, after the operator has already
+              paid for the referral.
+
+              The other platform is not named, here or anywhere a client can
+              read: tests/test_platform_provider_safety.py scans the shipped
+              UI for those names and fails on any of them, because a product
+              that names a platform it cannot connect reads as a product that
+              supports it. The guard is deliberately literal and catches
+              prose describing the very thing it guards against — this
+              comment tripped it once. */}
           <p className="muted" style={{ fontSize: ".8rem", fontWeight: 600 }}>
             Choose cTrader as the platform. Apex4Traders connects to cTrader
             accounts only.
@@ -331,7 +340,11 @@ export function ExecutionBadge({ execution }: { execution?: Execution | null }) 
   if (!execution) return <span className="pill pill-muted">Checking access</span>;
   const tone =
     execution.badge === "DEMO" ? "pill pill-demo"
-      : execution.badge === "LIVE BLOCKED" ? "pill pill-live"
+      // "LIVE" and "LIVE BLOCKED" share the live tone deliberately: both are
+      // about real money, and the word is what distinguishes them. A client
+      // reads the text, and the colour's job is to make them read it.
+      : execution.badge === "LIVE" ? "pill pill-live"
+        : execution.badge === "LIVE BLOCKED" ? "pill pill-live"
         : "pill pill-muted";
   return (
     <span className={tone} title={execution.message}>

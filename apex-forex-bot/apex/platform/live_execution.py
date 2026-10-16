@@ -38,15 +38,31 @@ far enough to be interesting. So `_refuse` is the only way out of this
 function that is not a placed order, and it writes the record before it
 returns. A refusal nobody recorded is a refusal nobody can review.
 
-WHAT THIS MODULE STILL CANNOT DO
+TWO DOORS, NOT TWO POLICIES
 
-`entitlement.live_execution_enabled()` returns False and this checks it
-second, so every call refuses at step 2 today. That is not a placeholder — it
-is the switch, and it stays off until the manual walk-through on a real demo
-account, the legal rewrite and the security review in §12 are done. Nothing in
-production imports this module; `tests/test_platform_live_invariants.py`
-asserts that, and will keep asserting it in the shape §12 describes: reachable
-only through these gates.
+`place()` above is the rule-driven door: it has the RuleDoc, so it can build
+the order and run §5's thirteen rule-level gates against it.
+
+`authorize_order()` is the door for an order that already exists — the one
+the engine's own loop is about to send. It cannot run §5, because at that
+point there is no RuleDoc in hand, only a symbol, a side and a unit count.
+What it does run is every gate that does not need one: §8, §1, §2, §3 and §9,
+plus §7's record. It is called from `gates.authorize_order`, which is the
+single place in this codebase that every order origin converges on — the
+autonomous loop and `force_trade` both — so a live order cannot reach a
+broker without passing through here.
+
+The two share their gate order and their refusal codes, and
+`tests/test_platform_live_invariants.py` asserts the order on BOTH, because
+two doors with one policy is the design and two doors with two policies is
+the bug this module exists to prevent.
+
+THE SWITCH
+
+`entitlement.live_execution_enabled()` is §1 and both doors check it second,
+immediately after the emergency stop. It is closed unless the deployment sets
+one environment variable to one exact value, so a deployment that has not
+made that decision refuses every live order here.
 """
 
 import time
@@ -311,6 +327,164 @@ def place(rule_doc, decision, snapshot, *, user_id, account_id,
             "positionId": position_id,
             "detail": "" if ok else str((reply or {}).get("error") or
                                         "the broker refused the order")}
+
+
+def authorize_order(user_id, *, symbol, side, units, account_id=None,
+                    mode_reader, actor="system:loop", now=None):
+    """May THIS live order be sent? Every gate that does not need a RuleDoc.
+
+    This is the door for an order the engine has already built and is about to
+    send. `gates.authorize_order` calls it, and that function is the single
+    point every order origin in this codebase converges on — the autonomous
+    loop and `force_trade` both — so a live order cannot reach a broker
+    without coming through here.
+
+    THE GATE ORDER IS THE SAME AS `place()`, AND FOR THE SAME REASONS:
+
+      1 §8 emergency stop   before anything is read
+      2 §1 the switch       this deployment's release decision
+      3 §2 entitlement      the plan pays for live
+      4 §3 mode             FROM THE BROKER, read now
+      5 §9 order rate       per client, refuses when it cannot answer
+
+    §5's thirteen gates are absent and that absence is deliberate: they are
+    checks on a RULE's own terms, and there is no RuleDoc at this point —
+    only a symbol, a side and a unit count. They run in `place()`, where the
+    rule is in hand. What protects this path instead is the engine's own risk
+    layer, which `gates.authorize_order` applies around this call: the risk
+    guard, the portfolio caps, and the rule's stop/target/risk carried into
+    the engine config by `engine_config.translate`.
+
+    §6 is absent for the same kind of reason: the caller takes the ledger
+    claim itself, immediately after this returns and before it sends. Taking
+    a second claim here would be two idempotency keys for one order, which is
+    worse than one — see bridge.py on why there is no second execution path.
+
+    Returns {"allowed": bool, "code": str|None, "gate": str|None,
+             "detail": str}. Refusing is the normal outcome, so it is a
+    RETURN VALUE and the caller handles it on the happy path.
+    """
+    now = time.time() if now is None else float(now)
+    aud = {"user_id": user_id, "actor": actor, "account_id": account_id,
+           "rule_doc": None, "decision": None}
+
+    def no(code, detail, *, gate):
+        _audit_refusal(gate=gate, code=code, detail=detail, **aud)
+        return {"allowed": False, "code": code, "gate": gate,
+                "detail": detail}
+
+    # ── 1. §8 the emergency stop, before anything is read ──────────────────
+    try:
+        _emerg.check(user_id=user_id, symbol=symbol, mode=LIVE)
+    except _emerg.Halted as e:
+        return no(HALTED, str(e), gate="emergency_stop")
+
+    # ── 2. §1 the switch ───────────────────────────────────────────────────
+    if not _ent.live_execution_enabled():
+        return no(LIVE_NOT_ENABLED,
+                  "live execution is not enabled on this deployment",
+                  gate="release_switch")
+
+    # ── 3. §2 entitlement ──────────────────────────────────────────────────
+    if _ent.entitlement_of(user_id) != _ent.PAID_LIVE:
+        return no(NOT_ENTITLED,
+                  "this account does not hold the plan that covers "
+                  "real-money trading", gate="entitlement")
+
+    # ── 4. §3 the mode, from the broker, read now ──────────────────────────
+    try:
+        mode = mode_reader()
+    except Exception as e:                                   # noqa: BLE001
+        return no(MODE_UNVERIFIED,
+                  f"the account mode could not be verified with the broker "
+                  f"({type(e).__name__}) — an unverified mode is not a live "
+                  f"mode", gate="mode_verification")
+    if str(mode) != LIVE:
+        return no(MODE_NOT_LIVE,
+                  f"the broker reports this account as {mode!r}, so the live "
+                  f"path does not apply to it", gate="mode_verification")
+
+    # ── 5. §9 the per-client order rate ────────────────────────────────────
+    try:
+        _rate.authorize(user_id, now=now)
+    except _rate.OrderRateExceeded as e:
+        return no(RATE_LIMITED, str(e), gate="order_rate")
+    except _rate.OrderRateUnavailable as e:
+        return no(RATE_UNKNOWN, str(e), gate="order_rate")
+
+    # Allowed — and §7 records that too. An audit trail that holds only
+    # refusals cannot answer the question anybody actually asks after a bad
+    # day, which is what WAS permitted and on whose authority.
+    try:
+        _audit.record_refusal(
+            user_id=user_id, actor=actor, account_id=account_id,
+            gate="live_authorized", code="ALLOWED",
+            reason=f"{side} {units} {symbol} passed every live gate")
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[LiveExec] the authorization for {user_id} could not be "
+              f"audited ({type(e).__name__}) — the order was still allowed")
+    return {"allowed": True, "code": None, "gate": None, "detail": ""}
+
+
+def guard_engine_order(user_id, *, symbol, side, units, origin="unknown"):
+    """The platform's live gates for an engine order, or None if they do not apply.
+
+    `gates.authorize_order` calls this for every LIVE order, whoever asked.
+    Most of the accounts that reach it are not platform clients at all — the
+    Telegram bot has traded through that gate since long before the platform
+    existed — so the FIRST thing this establishes is whether the platform has
+    any say over this account. No platform cTrader connection means no
+    platform opinion, and it returns None: not "allowed", which would be a
+    claim, but "this is not mine to answer".
+
+    That distinction is what keeps the legacy bot working unchanged while a
+    platform client's real-money order cannot be sent without §1, §2, §3 and
+    §9 having said yes.
+
+    The mode is read through `ctrader_link.verify_selected_mode`, which asks
+    the broker. §3 is the one gate that may not be satisfied from anything
+    stored, and this is the function that does the asking.
+    """
+    from apex.platform import ctrader_link as _ctl
+    try:
+        _ctl._read_conn(str(user_id))
+    except _ctl.LinkError:
+        # NOT_CONNECTED. There is no platform cTrader account here, so the
+        # platform has no say over this order — every Telegram-bot user lands
+        # exactly here, and they traded through this gate for a long time
+        # before the platform existed.
+        #
+        # This is matched NARROWLY, on LinkError alone. An earlier version
+        # caught Exception and refused on anything at all, which read as
+        # defensive and was the opposite: `_read_conn` RAISES LinkError for a
+        # user with no connection rather than returning None, so the broad
+        # catch turned "not a platform account" into PLATFORM_LINK_UNKNOWN
+        # and would have stopped the legacy bot placing a single live order.
+        # Found by the test that asserts a non-platform account gets None.
+        return None
+    except Exception as e:                                   # noqa: BLE001
+        # A real fault — the store is unreachable, something is corrupt. For
+        # a LIVE order that is not a reason to carry on: the point of this
+        # gate is that real money does not move on an unanswered question.
+        return {"allowed": False, "gate": "platform_link",
+                "code": "PLATFORM_LINK_UNKNOWN",
+                "detail": f"could not establish whether this is a platform "
+                          f"account ({type(e).__name__}); no live order is "
+                          f"sent on an unanswered question"}
+
+    def mode_reader():
+        from apex.platform import ctrader_link as _ctl
+        v = _ctl.verify_selected_mode(str(user_id))
+        # `verified` False means the broker did not answer — a stored mode
+        # repeated back. Raising makes authorize_order refuse with
+        # MODE_UNVERIFIED, which is the correct outcome and the correct code.
+        if not v.get("verified"):
+            raise RuntimeError(v.get("reason") or "mode not verified")
+        return v.get("mode")
+
+    return authorize_order(str(user_id), symbol=symbol, side=side,
+                           units=units, mode_reader=mode_reader,
+                           actor=f"engine:{origin}")
 
 
 def _audit_outcome(aud, req, reply, *, position_id):

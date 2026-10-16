@@ -553,6 +553,27 @@ def _read_conn(user_id):
     return rec
 
 
+def is_platform_account(user_id) -> bool:
+    """Does this user trade through the PLATFORM, or only the legacy bot?
+
+    Exists to be answerable without importing anything heavy. `gates.py` asks
+    it before it imports `live_execution`, and that ordering is load-bearing:
+    `audit.py` refuses AT IMPORT on a process with no shared backend — which
+    is correct of it, §7 allows no live order without a trail — so importing
+    the live path to discover "this is not a platform account" took the whole
+    legacy engine down with it on any deployment without Redis.
+
+    Raises nothing for an ordinary absent connection, because "no" is an
+    answer. A store that cannot be read is not an answer and does raise, so
+    the caller can fail closed rather than read a fault as a no.
+    """
+    try:
+        _read_conn(str(user_id))
+        return True
+    except LinkError:
+        return False
+
+
 def public_status(user_id):
     """What may be shown in a browser. Carries no token, ever.
 

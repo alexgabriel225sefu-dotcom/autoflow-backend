@@ -11,13 +11,21 @@ been a separate place to get it wrong:
                  supplies is a value the browser can change.
   entitlement    free_demo or paid_live. Demo access is free; a paid plan is
                  intended to unlock live-account automation later.
-  capability     what this RELEASE can execute at all.
+  capability     what this DEPLOYMENT is permitted to execute at all.
 
-The third is the one that is easy to lose. Live execution is not implemented.
-No entitlement unlocks it, including a paid one, because there is nothing
-behind the flag to unlock. `paid_live` + a live account is refused exactly as
-`free_demo` + a live account is refused, and the tests assert all four
-combinations rather than the two that happen to differ.
+The third is the one that is easy to lose, and it changed meaning once. It
+used to mean "live execution is not implemented" — there was nothing behind
+the flag, so no entitlement could unlock it. The path exists now
+(`live_execution`, every gate in §1-§9, wired into `gates.authorize_order`
+so no order site can go round it), and the third fact became what it should
+always have been: a RELEASE DECISION, held in one environment variable,
+closed unless somebody opened it deliberately.
+
+Which means the two other facts now carry real weight. `paid_live` + a live
+account + the switch open is the only combination that trades real money;
+`free_demo` + a live account is refused on the plan, and every combination
+is refused while the switch is closed. The tests assert all of them, not
+only the ones that happen to differ.
 
 WHY DEMO IS FREE HERE AND NOT IN licence.py
 
@@ -31,9 +39,17 @@ it would be worthless if free demo access routed around it.
 An absent licence is `free_demo`. A revoked one is not.
 """
 
+import os
+
 from apex.platform import ctrader_link as _link
 from apex.platform import licence as _lic
 from apex.platform import plans as _plans
+
+# §1, the release switch. One variable, one value that opens it, and that
+# value is a sentence nobody sets by accident or inherits from a copied
+# config. See live_execution_enabled().
+LIVE_SWITCH_ENV = "A4T_LIVE_EXECUTION"
+LIVE_SWITCH_ON = "enabled-i-accept-real-money-risk"
 
 FREE_DEMO = "free_demo"
 PAID_LIVE = "paid_live"
@@ -47,6 +63,10 @@ MODES = _link.MODES
 # Badges the UI renders. Named here so the server decides what a client is
 # told, rather than the browser inferring it from a combination of fields.
 BADGE_DEMO = "DEMO"
+# Real money, and the screen says so in its own word rather than by the
+# ABSENCE of "LIVE BLOCKED". A client must never have to infer that they are
+# trading real money from a badge that stopped appearing.
+BADGE_LIVE = "LIVE"
 BADGE_LIVE_BLOCKED = "LIVE BLOCKED"
 BADGE_NOT_CONNECTED = "NOT CONNECTED"
 BADGE_REAUTH = "REAUTH REQUIRED"
@@ -70,6 +90,12 @@ NO_LICENCE_MESSAGE = (
     "this account has no demo trial on file — contact support to start one")
 
 LIVE_REFUSAL = "live trading is not available in this release"
+# Different from the one above, and the difference is the point: this client
+# is on a deployment where live trading IS open, and the thing in the way is
+# their own plan. It names the next step rather than leaving a dead end.
+LIVE_NOT_ENTITLED_MESSAGE = (
+    "this account is on the free demo trial, which covers demo accounts only "
+    "— real-money automation needs the paid plan")
 
 
 class NotEntitled(PermissionError):
@@ -82,23 +108,33 @@ class NotEntitled(PermissionError):
 
 
 def live_execution_enabled():
-    """Always False in this release, and stated rather than assumed.
+    """Whether THIS DEPLOYMENT may place real-money orders. Closed by default.
 
-    The live path now EXISTS — `live_execution.place` runs every gate in §1-§9
-    — and this is what keeps it shut. `place` checks this function second,
-    after the emergency stop and before anything else, so every live call
-    refuses here today. Nothing imports `live_execution` either, which
-    `test_platform_live_invariants` asserts; `automation.start` still refuses
-    a non-demo account.
+    This is §1, the release switch, and it is the first thing every live path
+    asks after the emergency stop. It is read in `live_execution.authorize`
+    and again in `capability()`, so a deployment that has not opened it
+    refuses live automation at the screen AND at the order gate.
 
-    Returning True is therefore a deliberate release decision, not a code
-    change, and §12 lists what has to be true first: the walk-through on a
-    real demo account, the legal rewrite, the emergency-stop drill, and a
-    security review of this path by someone who did not write it. This
-    function exists so the state is something a caller can ASK and a test
-    can pin, rather than something inferred from the absence of a feature.
+    WHY IT READS AN ENVIRONMENT VARIABLE NOW, HAVING DELIBERATELY NOT BEFORE
+
+    It used to `return False` with no input at all, and the invariants test
+    asserted that it read no name — no getenv, no flag. That was right for
+    exactly as long as there was no execution path: a config string that
+    enabled a feature which did not exist would have been the only thing
+    standing between a deployment and an undefined code path.
+
+    The path exists now and every gate in front of it is wired and tested, so
+    the honest shape is the ordinary one — a release decision an operator
+    makes per deployment, not a code change. What the invariants test asserts
+    instead is the part that still matters: it is CLOSED unless the variable
+    says exactly one thing, and nothing else in the codebase reads that name.
+
+    ONLY ONE VALUE OPENS IT. Not "1", not "true", not "yes" — a variable left
+    over from a copied config, or set to "false" by somebody who meant it,
+    must never open real-money trading by accident. The value is a sentence
+    that cannot be arrived at except on purpose.
     """
-    return False
+    return (os.getenv(LIVE_SWITCH_ENV) or "").strip() == LIVE_SWITCH_ON
 
 
 def account_mode(user_id):
@@ -261,27 +297,38 @@ def capability(user_id, *, now=None):
                             "the account again")
 
     if mode == LIVE:
-        # REFUSED FOR EVERYONE, with NO reference to the entitlement.
+        # LOCK 2, and it is now two questions asked in this order, because the
+        # order decides what the client is TOLD.
         #
-        # That absence is a structural invariant, asserted on this
-        # function's own SOURCE by tests/test_platform_live_invariants.py:
-        # lock 2 must not compare the entitlement against the paid tier at
-        # all. The guard is literal, and deliberately so — this very comment
-        # failed it once by quoting the forbidden comparison in prose.
+        # The switch first. While this deployment has live execution closed,
+        # nobody trades real money and the honest answer names the release —
+        # not the client's plan. Telling a paying client "your plan does not
+        # cover this" when the truth is "nothing is open yet" would be a lie
+        # about something they paid for.
+        if not live_execution_enabled():
+            return dict(out, reason="LIVE_NOT_AVAILABLE",
+                        badge=BADGE_LIVE_BLOCKED,
+                        message=LIVE_REFUSAL)
+        # Then the plan, and it is NOT a comparison written here.
         #
-        # The reason is not that such a check would be wrong today. A version
-        # that varied only the MESSAGE behaved identically. It is that a
-        # comparison sitting here is one edit away from becoming the thing
-        # that lets a paid plan through, and this is the function guarding the
-        # path that moves real money.
-        #
-        # The commercial rule that a trial covers demo accounts only lives in
-        # `plans.may_trade_live`, which answers that question and can unlock
-        # nothing. Whoever opens this lock calls it rather than writing a
-        # comparison here.
-        return dict(out, reason="LIVE_NOT_AVAILABLE",
-                    badge=BADGE_LIVE_BLOCKED,
-                    message=LIVE_REFUSAL)
+        # This is still the function guarding the path that moves real money,
+        # and a tier comparison living in it is one edit away from becoming
+        # the thing that lets the wrong plan through. The commercial rule —
+        # the free trial covers demo accounts only, the paid plan covers live
+        # — is `plans.may_trade_live`, which reads a plan name, returns a
+        # boolean, and can unlock nothing by itself. The invariants test
+        # asserts this function CALLS it rather than re-deciding it.
+        if not _plans.may_trade_live(lic.get("plan")):
+            return dict(out, reason="LIVE_NOT_ENTITLED",
+                        badge=BADGE_LIVE_BLOCKED,
+                        message=LIVE_NOT_ENTITLED_MESSAGE)
+        # Both locks open. This is the only return in this function that
+        # permits an order against real money, and it is still not the last
+        # word: `gates.authorize_order` re-asks every one of these questions
+        # at the order itself, where the broker's own answer about the account
+        # is available and this one is a screen's worth of state.
+        return dict(out, canAutomate=True, badge=BADGE_LIVE,
+                    message="live automation is available on this account")
 
     return dict(out, canAutomate=True, badge=BADGE_DEMO,
                 message="demo automation is available on this account")

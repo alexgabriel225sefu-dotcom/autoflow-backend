@@ -1,4 +1,4 @@
-"""Starting, pausing and stopping a client's automation. Demo only, for now.
+"""Starting, pausing and stopping a client's automation.
 
 CONNECTING A BROKER ACCOUNT DOES NOT START ANYTHING
 
@@ -13,16 +13,24 @@ WHAT MUST BE TRUE BEFORE A LOOP RUNS, CHECKED IN THIS ORDER
   the licence      ACTIVE; unknown is not active (see licence.py)
   the rule         exists, belongs to this client, and is ACTIVE — a draft
                    has never been validated-and-frozen, so it has no terms
-  the account      connected, selected, and DEMO. Live is refused here and
-                   again in the connection accessor
+  the account      connected, selected, and confirmed BY THE BROKER as demo
+                   or live — a mode nobody confirmed is neither
   the state        not already running, and idempotent if it is
 
-LIVE IS NOT IMPLEMENTED, NOT MERELY BLOCKED
+WHETHER LIVE MAY START IS NOT DECIDED IN THIS FILE
 
-There is no branch in this module that starts a live loop, and no flag that
-would enable one. `mode` is compared against DEMO and anything else refuses.
-When live is built it will be a deliberate piece of work with its own review,
-not a boolean somebody flips.
+It used to be, as `mode != DEMO → refuse`, which was right while live did not
+exist. It is wrong now for a duplication reason rather than a policy one:
+`entitlement.capability()` already answers "may this account automate", live
+included — it checks §1 the release switch and then the plan — and a second
+comparison here would be a second answer to the same question. The two would
+eventually disagree, and the one that let an order through would be the one
+that mattered.
+
+So this file asks `require_automation`, and asks it a second time for a LIVE
+account once the BROKER has confirmed the mode, because the first answer was
+derived from a stored record and the second is not. What it never does is
+decide for itself.
 """
 
 import time
@@ -139,8 +147,19 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # future change makes them disagree, the start is refused rather than
     # taking whichever answer came first.
     _ent.require_automation(user_id)            # raises NotEntitled
-    if conn.get("mode") != DEMO:
-        raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+    # `require_automation` has already decided whether THIS account may run,
+    # live included — it checks §1 the release switch and then the plan, and
+    # refuses a live account on either. So there is no mode comparison here
+    # any more: one that re-decided it would be a second answer to a question
+    # already answered, and the two would eventually disagree.
+    #
+    # What stays is the shape of the original rule: a mode that is neither
+    # demo nor live is not something to start on.
+    if conn.get("mode") not in (DEMO, LIVE):
+        raise AutomationRefused(
+            "MODE_UNKNOWN",
+            "this account's mode was never recorded — reconnect it and "
+            "select it again before starting anything")
 
     # A THIRD lock, and the only one that asks the broker instead of the
     # record. Everything above this line is derived from what cTrader said
@@ -153,15 +172,21 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # which is the cheap side of this trade — the expensive side is starting a
     # loop against an account nobody confirmed is practice money.
     check = _link.verify_selected_mode(user_id, lister=mode_lister)
-    if check["mode"] == DEMO and check["verified"]:
+    if check["mode"] in (DEMO, LIVE) and check["verified"]:
         pass
-    elif check["mode"] == LIVE:
-        raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
     else:
         raise AutomationRefused(
             "MODE_UNVERIFIED",
             f"the broker did not confirm whether this is a demo or a real "
             f"account, so nothing was started — {check['reason']}")
+    # A LIVE start is held to one more thing than a demo start: the broker's
+    # answer must agree with the entitlement that was granted a moment ago.
+    # `require_automation` read the mode from the stored link record; this
+    # read it from cTrader just now. Starting a real-money loop on the
+    # strength of a record, when the live answer is available and free here,
+    # would be the one place in this file worth getting wrong.
+    if check["mode"] == LIVE and not _ent.capability(user_id)["canAutomate"]:
+        raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
     if check["changed"]:
         # The record said one thing and the broker says another. Not adapted
         # to, on purpose: an account that changed mode under a stored record
@@ -258,8 +283,16 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
             "the trading engine refused to start this loop — it may already "
             "be owned by another instance")
 
+    # The mode this loop ACTUALLY runs on, not a constant. It was DEMO here
+    # while demo was the only thing that could start, and leaving it would
+    # have made the record say "demo" over a real-money loop — on the one
+    # screen a client checks to find out what is running.
+    #
+    # `conn["mode"]` is safe to use as the answer: _preflight refused unless
+    # the broker confirmed a mode, and refused again if the broker's answer
+    # differed from this record.
     out = _write(user_id, {"state": RUNNING, "ruleDocId": rule_doc_id,
-                           "mode": DEMO, "startedAt": now,
+                           "mode": conn.get("mode"), "startedAt": now,
                            "accountId": conn.get("ctid"),
                            "correlationId": corr,
                            # Kept on the automation record, not recomputed on

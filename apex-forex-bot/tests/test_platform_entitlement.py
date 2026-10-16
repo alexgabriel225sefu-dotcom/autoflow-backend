@@ -187,6 +187,65 @@ check("live execution is reported as disabled in every combination",
 check("and the module says so on its own",
       E.live_execution_enabled() is False)
 
+# ── 2b. the same four, with the release switch OPEN ─────────────────────────
+# Everything above runs on a deployment that has NOT opened live execution,
+# which is the default and will stay the default. This section is the other
+# half, and without it the four combinations above prove only that a closed
+# switch closes everything — true, and not the question anybody asks on the
+# day they open it.
+#
+# The two that must differ are the two that look alike while it is shut: the
+# TRIAL and the PAID plan on a live account both refuse today, and exactly
+# one of them must still refuse tomorrow.
+print("\n[2b] and the same four with the switch OPEN — only one may trade")
+_saved_switch = os.environ.get(E.LIVE_SWITCH_ENV)
+os.environ[E.LIVE_SWITCH_ENV] = E.LIVE_SWITCH_ON
+try:
+    open_rows = {}
+    for lic_state, want_ent in (("trial", E.FREE_DEMO), ("active", E.PAID_LIVE)):
+        for ctid, want_mode in ((501, E.DEMO), (502, E.LIVE)):
+            if lic_state == "active":
+                L.grant(USER, plan=_plans.FOUNDER_LIVE)
+            else:
+                ST._write(f"{ST._ns()}:{ST._P}:licence:{USER}", None)
+                _plans.start_trial(USER)
+            select(ctid, allow_live=(ctid == 502))
+            open_rows[(want_ent, want_mode)] = cap()
+
+    check("the switch really is open now",
+          E.live_execution_enabled() is True,
+          "the rest of this section would pass for the wrong reason")
+    check("free_demo + demo still automates",
+          open_rows[(E.FREE_DEMO, E.DEMO)]["canAutomate"] is True)
+    check("paid_live + demo still automates",
+          open_rows[(E.PAID_LIVE, E.DEMO)]["canAutomate"] is True)
+    # THE ONE THAT MATTERS, both ways round.
+    check("free_demo + live STILL CANNOT — the trial is demo-only",
+          open_rows[(E.FREE_DEMO, E.LIVE)]["canAutomate"] is False,
+          "a free trial just got real-money trading")
+    check("and it is refused on the PLAN now, not on the release",
+          open_rows[(E.FREE_DEMO, E.LIVE)]["reason"] == "LIVE_NOT_ENTITLED",
+          open_rows[(E.FREE_DEMO, E.LIVE)]["reason"])
+    check("paid_live + live CAN, and this is the only combination that may",
+          open_rows[(E.PAID_LIVE, E.LIVE)]["canAutomate"] is True,
+          "the paid plan cannot trade live on a deployment that opened it")
+    check("and it is badged LIVE, in its own word",
+          open_rows[(E.PAID_LIVE, E.LIVE)]["badge"] == "LIVE",
+          open_rows[(E.PAID_LIVE, E.LIVE)]["badge"])
+    check("the capability reports the switch as open",
+          all(c["liveExecutionEnabled"] is True for c in open_rows.values()))
+finally:
+    if _saved_switch is None:
+        os.environ.pop(E.LIVE_SWITCH_ENV, None)
+    else:
+        os.environ[E.LIVE_SWITCH_ENV] = _saved_switch
+check("and the switch is closed again afterwards",
+      E.live_execution_enabled() is False,
+      "a test must not leave real-money trading on")
+# Put the account back as section [3] expects to find it.
+L.grant(USER, plan=_plans.FOUNDER_LIVE)
+select(501)
+
 # ── 3. badges ───────────────────────────────────────────────────────────────
 print("\n[3] the server decides the badge, not the browser")
 check("a demo account is DEMO", by[(E.FREE_DEMO, E.DEMO)]["badge"] == "DEMO")

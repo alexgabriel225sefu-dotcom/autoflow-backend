@@ -153,6 +153,56 @@ describe("dashboard — account state", () => {
     expect(calls.some((c) => c.path.startsWith("automation/"))).toBe(false);
   });
 
+  it("DOES offer them when the server has cleared this live account", async () => {
+    // The other side of the test above, and the one that was missing while
+    // the refusal was hardcoded to `!isDemo`. Without it, a browser that
+    // overruled a server saying yes would have passed every test in this
+    // file — the paying client simply never sees a Start button and nobody
+    // finds out until one of them complains.
+    routes["ctrader/status"] = { ok: true, data: {
+      connected: true, accounts: [{ ctid: 902, mode: "live" }],
+      selected: { ctid: 902, mode: "live" }, liveAllowed: true,
+    } };
+    routes.me = { ok: true, data: {
+      user: { userId: "u1", email: "t@example.test", emailVerified: true },
+      licence: { state: "active", expiresAt: null, plan: "founder_lifetime" },
+      execution: execution({
+        accountMode: "live", entitlement: "paid_live", canAutomate: true,
+        liveExecutionEnabled: true, badge: "LIVE", reason: null,
+        message: "live automation is available on this account",
+      }),
+    } };
+    await renderDash();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /^Start$/ })).not.toBeNull());
+    // The word, not the absence of a word: a client must never have to infer
+    // that they are trading real money from a badge that stopped appearing.
+    expect(screen.getAllByText("LIVE").length).toBeGreaterThan(0);
+  });
+
+  it("does not unlock live controls on a verdict about the OTHER account", async () => {
+    // The picker and `me` refresh on different clocks. A client who switches
+    // from their cleared demo account to a live one briefly holds a verdict
+    // that says canAutomate — and it is a verdict about the demo account.
+    routes["ctrader/status"] = { ok: true, data: {
+      connected: true, accounts: [{ ctid: 902, mode: "live" }],
+      selected: { ctid: 902, mode: "live" }, liveAllowed: true,
+    } };
+    routes.me = { ok: true, data: {
+      user: { userId: "u1", email: "t@example.test", emailVerified: true },
+      licence: { state: "active", expiresAt: null, plan: "demo_trial" },
+      execution: execution({
+        accountMode: "demo", canAutomate: true, badge: "DEMO", reason: null,
+        message: "demo automation is available on this account",
+      }),
+    } };
+    await renderDash();
+    await waitFor(() =>
+      expect(screen.getAllByText(/Live trading is not available in this release/).length)
+        .toBeGreaterThan(0));
+    expect(screen.queryByRole("button", { name: /^Start$/ })).toBeNull();
+  });
+
   it("shows the server's badge rather than deriving one", async () => {
     routes.me = { ok: true, data: {
       user: { userId: "u1", email: "t@example.test", emailVerified: true },

@@ -254,9 +254,21 @@ export type Execution = {
     /** The free trial ran out. Different next step from NO_LICENCE. */
     | "TRIAL_EXPIRED"
     /** No trial on file at all — never started, or cleared. */
-    | "NO_LICENCE";
+    | "NO_LICENCE"
+    /**
+     * Live IS open on this deployment, and this client's plan does not cover
+     * it. Deliberately distinct from LIVE_NOT_AVAILABLE, which means nobody
+     * can trade live here yet: the two have different next steps, and telling
+     * a paying client the wrong one is a lie about what they bought.
+     */
+    | "LIVE_NOT_ENTITLED";
   message: string;
-  badge: "DEMO" | "LIVE BLOCKED" | "NOT CONNECTED" | "REAUTH REQUIRED";
+  /**
+   * "LIVE" is real money. It is its own word rather than the ABSENCE of
+   * "LIVE BLOCKED" — a client must never have to infer that they are trading
+   * real money from a badge that stopped appearing.
+   */
+  badge: "DEMO" | "LIVE" | "LIVE BLOCKED" | "NOT CONNECTED" | "REAUTH REQUIRED";
 };
 
 export type Me = {

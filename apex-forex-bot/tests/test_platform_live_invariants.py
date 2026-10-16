@@ -140,6 +140,20 @@ def body_src(module, fname):
         MODULES[module]["src"], node) or ""
 
 
+def body_src_of_tree(tree, src, fname):
+    """The same, for a file outside `apex/platform/` — `apex/gates.py`.
+
+    The wiring that permits real-money trading lives there, so an invariant
+    file that could only read the platform package was reading everything
+    except the part that matters most.
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) \
+                and node.name == fname:
+            return ast.get_source_segment(src, node) or ""
+    return ""
+
+
 # ── 1. the execution boundary is reachable only through the gates ───────────
 # REWRITTEN, NOT DELETED — §12 of the specification asks for exactly this
 # change, from "unreachable" to "reachable only through the gates".
@@ -165,11 +179,85 @@ check("`bridge` exists, so this is a wired path and not a missing file",
 check("and `execution` is reachable only through `bridge`",
       sorted(m for m, d in IMPORTS.items() if "execution" in d) == ["bridge"],
       str(sorted(m for m, d in IMPORTS.items() if "execution" in d)))
-check("and NOTHING imports `live_execution` itself",
+check("and no PLATFORM module imports `live_execution` behind the gate",
       sorted(m for m, d in IMPORTS.items() if "live_execution" in d) == [],
       f"imported by "
       f"{sorted(m for m, d in IMPORTS.items() if 'live_execution' in d)} — "
-      f"turning it on is the §12 milestone and needs its own review")
+      f"its only caller is apex/gates.py, checked in [1c]")
+
+# ── 1c. the engine gate is wired to the platform, and is the ONLY wiring ────
+# This is the §12 milestone, and the invariant had to change shape with it.
+#
+# It used to say "nothing imports live_execution", which was the right
+# question while the path was unwired and became the wrong one the moment the
+# point was to wire it. What replaces it is narrower and harder: the path is
+# reachable from EXACTLY ONE place, and that place is the single function
+# every order origin in this codebase already converges on.
+#
+# `apex/gates.py` is outside `apex/platform/`, so none of the scanning above
+# can see it. That was a real hole: the wiring that enables real-money
+# trading lives in the one file these invariants were not reading.
+GATES_SRC = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
+GATES_TREE = ast.parse(GATES_SRC, filename="apex/gates.py")
+
+print("\n[1c] the engine's order gate is the only thing that calls the path")
+
+
+def _engine_importers():
+    """Every module OUTSIDE apex/platform that names live_execution."""
+    found = []
+    for d, subs, files in os.walk(os.path.join(ROOT, "apex")):
+        subs[:] = [s for s in subs if s not in ("__pycache__", "platform")
+                   and not s.startswith(".")]
+        for fn in sorted(files):
+            if not fn.endswith(".py"):
+                continue
+            p = os.path.join(d, fn)
+            with open(p, encoding="utf-8") as fh:
+                if "live_execution" in fh.read():
+                    found.append(os.path.relpath(p, ROOT))
+    return sorted(found)
+
+
+_importers = _engine_importers()
+check("exactly one engine module reaches the live path",
+      _importers == ["apex/gates.py"],
+      f"{_importers} — every extra one is a way round the gate")
+
+_auth = body_src_of_tree(GATES_TREE, GATES_SRC, "authorize_order")
+check("gates.authorize_order exists", bool(_auth))
+check("and it calls the platform's live guard",
+      "guard_engine_order" in _auth,
+      "the one function that applies §1, §2, §3 and §9 to an engine order")
+check("and only for a live account",
+      "if live:" in _auth,
+      "a demo order must not pay for a broker round trip it does not need")
+# Placement, not merely presence: before the claim, after the local checks.
+# Same two reasons the portfolio check sits where it does.
+check("before the idempotency claim",
+      _auth.index("guard_engine_order") < _auth.index("ledger.claim"),
+      "a platform refusal must not burn an idempotency key")
+check("and it fails CLOSED",
+      "LIVE_GUARD_FAILED" in _auth,
+      "a platform outage is not permission to risk real money unexamined")
+# ORDERING, and this one was a real outage rather than a hypothetical.
+#
+# `audit.py` refuses AT IMPORT on a process with no shared backend — which is
+# §7 working — and `live_execution` imports it. So importing the live path
+# merely to discover "this is not a platform account" raised, and the
+# except-branch denied the order. Every Telegram-bot live order went through
+# that branch. The legacy engine's own safety tests caught it; this pins the
+# fix so that tidying the two steps back into one cannot land silently.
+# Matched on the IMPORT STATEMENT, not the bare module name. The comment
+# above the code explains this very hazard and so contains the name earlier
+# in the function — the third time in this project that a guard has tripped
+# on prose describing the thing it guards against.
+_IMP = "from apex.platform import live_execution"
+check("it classifies the account BEFORE importing the live path",
+      "is_platform_account" in _auth and _IMP in _auth
+      and _auth.index("is_platform_account") < _auth.index(_IMP),
+      "importing the live path to find out it does not apply takes the "
+      "legacy engine down with it wherever there is no shared backend")
 
 # ── 1b. and that one path actually runs every gate ──────────────────────────
 # The half of the rewrite that matters more than the import graph.
@@ -259,23 +347,84 @@ for op in MUTATING:
 # The dangerous version of this function is one that reads an environment
 # variable. Then a deployment enables an execution path that does not exist,
 # and the only thing that was ever stopping it was a string in a config.
-print("\n[4] live_execution_enabled is a constant, not configurable")
+print("\n[4] the release switch is closed unless opened on purpose")
+# REWRITTEN with the milestone, and the reasoning is worth keeping.
+#
+# This used to assert the function read NO name — no getenv, no flag — and
+# returned the literal False. That was exactly right while there was no
+# execution path behind it: a config string that enabled a code path which
+# did not exist would have been the only thing standing between a deployment
+# and undefined behaviour.
+#
+# The path exists now and every gate in front of it is wired and asserted, so
+# the switch takes its ordinary shape: a per-deployment release decision. The
+# question changes with it, from "can this be configured at all" to "can it
+# be opened by ACCIDENT" — which is the failure that would actually happen.
+import importlib  # noqa: E402
+
+# Every other section here reads the AST and imports nothing. This one has to
+# RUN the function: the failure it exists to catch is a sloppy truthiness
+# test — `in ("1", "true", "yes")` — and no amount of reading the source
+# proves what those return. `python -I` drops the cwd from sys.path, so the
+# repo root goes on explicitly rather than depending on how it was invoked.
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+# `user_store` refuses to load without an encryption key, which is correct of
+# it and has nothing to do with what this section tests. The dev escape is
+# the one the other platform tests use.
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
+os.environ.setdefault("APP_ENV", "dev")
+_ent_mod = importlib.import_module("apex.platform.entitlement")
 node = func("entitlement", "live_execution_enabled")
 check("the function exists", node is not None)
-returns = [n for n in ast.walk(node)
-           if isinstance(n, ast.Return)] if node else []
-check("it has exactly one return", len(returns) == 1, str(len(returns)))
-if returns:
-    val = returns[0].value
-    check("and it returns a literal", isinstance(val, ast.Constant), type(val).__name__)
-    check("and that literal is False", isinstance(val, ast.Constant)
-          and val.value is False, getattr(val, "value", "?"))
-if node:
-    inner = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
-    check("it reads no name at all — no getenv, no flag, no import",
-          not inner, str(sorted(inner)))
-    calls = [n for n in ast.walk(node) if isinstance(n, ast.Call)]
-    check("and calls nothing", not calls, str(len(calls)))
+
+_saved = os.environ.get(_ent_mod.LIVE_SWITCH_ENV)
+try:
+    # Closed by default, and closed for every value that is not THE value.
+    # These are not hypotheticals: "1", "true" and "" are what a copied
+    # config, a boolean-ish habit and a cleared variable actually look like.
+    for val in (None, "", "0", "1", "true", "TRUE", "yes", "on", "enabled",
+                "false", "off", "  ", "enabled-i-accept-real-money-ris"):
+        if val is None:
+            os.environ.pop(_ent_mod.LIVE_SWITCH_ENV, None)
+        else:
+            os.environ[_ent_mod.LIVE_SWITCH_ENV] = val
+        check(f"closed when the variable is {val!r}",
+              _ent_mod.live_execution_enabled() is False,
+              "this value opened real-money trading")
+
+    # And it does open — a switch that cannot be opened is not a switch, it
+    # is a hardcoded False with extra steps, and nobody would find that out
+    # until the day they needed it.
+    os.environ[_ent_mod.LIVE_SWITCH_ENV] = _ent_mod.LIVE_SWITCH_ON
+    check("open for the one exact value",
+          _ent_mod.live_execution_enabled() is True,
+          "the switch cannot be opened at all")
+finally:
+    if _saved is None:
+        os.environ.pop(_ent_mod.LIVE_SWITCH_ENV, None)
+    else:
+        os.environ[_ent_mod.LIVE_SWITCH_ENV] = _saved
+
+# The value is long and specific on purpose. A one-character switch is one
+# typo away from being set by somebody who meant something else.
+check("the value cannot be arrived at by accident",
+      len(_ent_mod.LIVE_SWITCH_ON) > 20
+      and _ent_mod.LIVE_SWITCH_ON not in ("1", "true", "yes", "on"),
+      repr(_ent_mod.LIVE_SWITCH_ON))
+
+# ONE reader. The danger a config switch introduces is a second place that
+# decides what it means — a module that checks the variable directly and gets
+# a different answer from the function everything else asks.
+_readers = sorted(m for m in MODULES
+                  if _ent_mod.LIVE_SWITCH_ENV in MODULES[m]["src"])
+check("exactly one module names the variable",
+      _readers == ["entitlement"], str(_readers))
+_fn_src = body_src("entitlement", "live_execution_enabled")
+check("and it is read through os.getenv, not a cached module global",
+      "os.getenv" in _fn_src,
+      "a value read at import time cannot be turned off without a redeploy")
 
 # ── 5. the live-trading flag is read in exactly one place, to refuse ────────
 print("\n[5] LIVE_TRADING_ENABLED is read once, and only to refuse")
@@ -303,18 +452,46 @@ check("lock 1 ALSO requires an explicit flag",
 
 cap = body_src("entitlement", "capability")
 check("lock 2: entitlement.capability exists", bool(cap))
-check("lock 2 refuses a LIVE account", "LIVE" in cap and "LIVE_NOT_AVAILABLE" in cap)
-check("lock 2 does not consult the entitlement when refusing live",
-      cap.index("LIVE_NOT_AVAILABLE") > 0
-      and "ent != PAID_LIVE" not in cap and "ent == PAID_LIVE" not in cap,
-      "a paid plan must not unlock a path that does not exist")
+# These two assertions USED to say "lock 2 refuses a LIVE account" and "lock 2
+# does not consult the entitlement when refusing live". Both still passed
+# after live was wired, which is the worst way for an assertion to behave:
+# the first passed because the string was still present on the switch-closed
+# branch, and the second because the forbidden text was a comparison spelled
+# a particular way and the new code calls a function instead.
+#
+# An assertion that keeps passing through the change it was written to catch
+# is not protecting anything. So they are replaced by what is actually true
+# and actually load-bearing now.
+check("lock 2 asks the release switch FIRST",
+      "live_execution_enabled" in cap
+      and cap.index("live_execution_enabled") < cap.index("may_trade_live"),
+      "a client must be told the release is closed before they are told "
+      "their plan is wrong — one of those is a lie about what they bought")
+check("lock 2 decides the plan by CALLING plans.may_trade_live",
+      "may_trade_live" in cap,
+      "the commercial rule belongs in plans.py, where answering it can "
+      "unlock nothing")
+check("lock 2 writes no tier comparison of its own",
+      "ent != PAID_LIVE" not in cap and "ent == PAID_LIVE" not in cap,
+      "a comparison here is one edit away from letting the wrong plan "
+      "through, and this function guards real money")
+check("lock 2 still has a refusal for a closed release",
+      "LIVE_NOT_AVAILABLE" in cap)
+check("and a DIFFERENT one for an unentitled plan",
+      "LIVE_NOT_ENTITLED" in cap,
+      "one code for two situations tells the client the wrong next step")
 
 pre = body_src("automation", "_preflight")
 check("lock 3: automation._preflight exists", bool(pre))
-check("lock 3 checks the resolved connection's own mode",
-      'conn.get("mode")' in pre, pre[:80])
+check("lock 3 asks the BROKER for the mode, not the record",
+      "verify_selected_mode" in pre,
+      "§3 — a stored mode is not a verified mode")
 check("lock 3 calls the entitlement layer as well",
       "require_automation" in pre, "the two locks must both be invoked")
+check("lock 3 re-asks the entitlement once the broker has answered LIVE",
+      "capability" in pre and "canAutomate" in pre,
+      "the first answer was derived from a stored record; a real-money "
+      "loop is not started on the strength of one")
 
 # ── 7. the refusal reaches the client as a code, not as English ─────────────
 print("\n[7] the refusal is a code the UI can branch on")

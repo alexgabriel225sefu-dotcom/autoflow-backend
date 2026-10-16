@@ -219,6 +219,63 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     if not own_ok:
         return Decision(False, "NOT_OWNER", own_why), None
 
+    # 5b. The PLATFORM's live gates — §1 the release switch, §2 the plan that
+    #     pays for live, §3 the mode as the broker reports it, §9 the order
+    #     rate — plus §7's record of whichever way this went.
+    #
+    #     Here, and not somewhere in the platform, because THIS function is
+    #     the single point every order origin in this codebase converges on:
+    #     the autonomous loop and force_trade both call it and nothing else
+    #     reaches a broker. A guard anywhere else would be a guard with a way
+    #     around it.
+    #
+    #     Deliberately AFTER ownership and BEFORE the ledger claim, for the
+    #     same two reasons the portfolio check sits where it does: a refusal
+    #     must not burn an idempotency claim, and the cheap local checks
+    #     should have spoken before anything asks the broker a question.
+    #
+    #     Only for live, and only for platform accounts. `guard_engine_order`
+    #     returns None when the account has no platform connection, which is
+    #     every Telegram-bot user — they traded through this gate for a long
+    #     time before the platform existed and their path is unchanged.
+    if live:
+        # WHETHER THIS IS A PLATFORM ACCOUNT IS ASKED FIRST, AND SEPARATELY.
+        #
+        # Not a tidiness choice. `apex/platform/audit.py` refuses AT IMPORT on
+        # a process with no shared backend — correctly, §7 permits no live
+        # order without a trail — and `live_execution` imports it. So merely
+        # importing the live path to find out "this is not a platform
+        # account" raised SharedBackendRequired and denied the order.
+        #
+        # Every Telegram-bot live order went through that branch. The legacy
+        # engine's own safety tests caught it, with the words
+        # "this would stop legitimate live trading", which is exactly what it
+        # did. `is_platform_account` lives in ctrader_link, which imports
+        # clean, so the cheap question is answered before the expensive
+        # import happens at all.
+        try:
+            from apex.platform import ctrader_link as _ctl
+            _is_platform = _ctl.is_platform_account(user_id)
+        except Exception as e:
+            print(f"[Gates] could not classify {user_id}: {e}")
+            return Decision(False, "LIVE_GUARD_FAILED", str(e)[:120]), None
+
+        if _is_platform:
+            try:
+                from apex.platform import live_execution as _live_exec
+                _pv = _live_exec.guard_engine_order(
+                    user_id, symbol=symbol, side=side, units=units,
+                    origin=origin)
+            except Exception as e:
+                # Fails closed, like every other branch in this function — but
+                # now only for accounts the platform actually owns. A missing
+                # audit backend denying a platform live order is §7 working.
+                print(f"[Gates] platform live guard failed for {user_id}: {e}")
+                return Decision(False, "LIVE_GUARD_FAILED", str(e)[:120]), None
+            if _pv is not None and not _pv.get("allowed"):
+                return Decision(False, _pv.get("code") or "LIVE_REFUSED",
+                                f"{_pv.get('gate')}: {_pv.get('detail')}"), None
+
     # 6. Idempotency, last — so the claim is only taken for a request that has
     #    already cleared everything else.
     ok, why, rid = ledger.claim(user_id, symbol, side, units, sl, tp,
