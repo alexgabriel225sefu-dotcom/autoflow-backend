@@ -240,6 +240,15 @@ export function MoreAccountsSection({
           <p className="muted" style={{ fontSize: ".8rem" }}>
             {signup!.disclosure}
           </p>
+          {/* The one instruction that decides whether the introduction is
+              worth anything. The broker offers cTrader AND other platforms;
+              this product connects to cTrader only. A client who follows the
+              link and picks MT5 gets an account that cannot be connected
+              here, after the operator has already paid for the referral. */}
+          <p className="muted" style={{ fontSize: ".8rem", fontWeight: 600 }}>
+            Choose cTrader as the platform. Apex4Traders connects to cTrader
+            accounts only.
+          </p>
           <a
             className="btn btn-sm"
             href={signup!.url}

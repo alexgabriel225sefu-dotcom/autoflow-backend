@@ -165,6 +165,25 @@ describe("the More accounts section", () => {
     expect(screen.getByText(/contact support/i)).toBeTruthy();
   });
 
+  it("tells the client which platform to pick at the broker", () => {
+    // The referral broker offers cTrader, and offers other platforms too.
+    // This product speaks cTrader and nothing else, so a client who takes the
+    // link and picks MT5 ends up with an account that cannot be connected
+    // here — after the operator has already paid for the introduction. One
+    // sentence next to the link is the whole fix.
+    render(<MoreAccountsSection plan={plan()} />);
+    expect(screen.getByText(/choose cTrader/i)).toBeTruthy();
+  });
+
+  it("does not repeat the platform hint when there is no link", () => {
+    render(
+      <MoreAccountsSection
+        plan={plan({ signup: { url: SIGNUP.url, disclosure: "" } })}
+      />,
+    );
+    expect(screen.queryByText(/choose cTrader/i)).toBeNull();
+  });
+
   it("renders nothing at all when the server sent no plan", () => {
     const { container } = render(<MoreAccountsSection plan={undefined} />);
     expect(container.innerHTML).toBe("");
