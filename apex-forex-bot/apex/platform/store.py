@@ -114,6 +114,42 @@ def _write(key, doc):
             f.write(raw)
 
 
+def _write_strict(key, doc):
+    """`_write`, but a store that did not take the write RAISES.
+
+    `_write` throws away `set_blob`'s result, and `_redis_set` returns False
+    on an Upstash 429 or a Redis outage rather than raising — `user_store`'s
+    own docstring says callers discarding that result made "a Redis outage
+    look exactly like a successful save".
+
+    For a cached read that trade is right. For a record the product then
+    states as a fact — a licence, above all one somebody paid for — it is
+    not. A $497 payment whose grant silently failed is answered 200 to the
+    payment provider, which then stops retrying, and the buyer is left
+    unprovisioned with no record anywhere that it happened.
+
+    Also READS THE DOCUMENT BACK. A write that reports success and a
+    document that is actually there are different claims, and this project
+    has been caught by that gap often enough to stop taking the first one on
+    trust. The legacy handler in apex/stripe_license.py has done exactly
+    this for a long time; this is the same pattern where the platform needs
+    it.
+    """
+    raw = json.dumps(doc, separators=(",", ":"))
+    if user_store._USE_REDIS:
+        if not user_store.set_blob(key, raw):
+            raise user_store.StoreUnavailable(
+                f"the shared store did not take the write for {key}")
+    else:
+        with open(_local_path(key), "w") as f:
+            f.write(raw)
+    back = _read_strict(key)
+    if not isinstance(back, dict):
+        raise user_store.StoreUnavailable(
+            f"{key} was written and did not read back as a document")
+    return back
+
+
 def namespace_prefix():
     """Everything this module and its siblings write lives under this.
 

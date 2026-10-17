@@ -82,7 +82,7 @@ Web (`web`):
 | Variable | Meaning | Default |
 |---|---|---|
 | `STRIPE_SECRET_KEY` | server-side only, never `NEXT_PUBLIC_` | **none** |
-| `A4T_PRICE_MINOR` | price in minor units | `49900` |
+| `A4T_PRICE_MINOR` | price in minor units | `49700` |
 | `A4T_CURRENCY` | ISO currency | `usd` |
 | `A4T_SKU` | product identifier | `founder_lifetime` |
 | `A4T_CHECKOUT_ENABLED` | first gate; must be `true` for the route to answer | off |
@@ -92,7 +92,7 @@ Web (`web`):
 
 | # | Decision | Current answer |
 |---|---|---|
-| **D1** | **Price and currency** | **499 USD**, represented as `49900` minor units and `usd`. |
+| **D1** | **Price and currency** | **497 USD**, represented as `49700` minor units and `usd`. Recorded here as 499 until this correction; the owner set it at 497, which is what `billing.APPROVED_PRICE_MINOR`, the live Payment Link and the sales page all carry. `billing.offer_drift()` fails readiness on any environment that says otherwise, so a deployment copying the old figure is refused rather than charging it. |
 | **D2** | **SKU** | `founder_lifetime`. `"apex-bot"` names the previous product and is not reused. |
 | **D3** | **Plan shape** | **One-time purchase**, not a subscription. `A4T_LICENCE_DAYS` stays unset for no expiry. |
 | **D4** | **Refund policy** | Still open. The webhook already revokes on refund; what a client is entitled to must be decided before paid launch. |

@@ -160,14 +160,54 @@ def offer_drift():
     return drift
 
 
+def _flag_on(name):
+    """A switch an operator set, in any of the spellings they might set it in.
+
+    `health._flag_on` has always accepted 1/true/yes/on and this module
+    accepted only the literal "true". So `A4T_CHECKOUT_ENABLED=1` made
+    /readyz report billing as enabled while the pricing page said it was
+    off — two parts of one product disagreeing about whether it is selling,
+    which is the worst possible thing to be unsure about.
+
+    Permissive on spelling, not on intent: anything that is not one of these
+    is still off.
+    """
+    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def checkout_enabled():
     """First checkout gate. Off unless explicitly enabled."""
-    return _env("A4T_CHECKOUT_ENABLED") == "true"
+    return _flag_on("A4T_CHECKOUT_ENABLED")
 
 
 def authenticated_checkout_enabled():
     """Second gate: checkout creation must be behind verified platform auth."""
-    return _env("A4T_AUTHENTICATED_CHECKOUT_ENABLED") == "true"
+    return _flag_on("A4T_AUTHENTICATED_CHECKOUT_ENABLED")
+
+
+def checkout_implemented():
+    """Whether anything in this codebase can CREATE a checkout.
+
+    Nothing can. No function here or anywhere else builds a Checkout Session
+    or a PaymentIntent for the platform, so `POST billing/checkout` answers
+    501 whatever the two flags say.
+
+    THIS EXISTS BECAUSE THE FLAGS MADE EVERY CHECK GO GREEN OVER A DEAD END.
+
+    With both flags on and a webhook secret set, /readyz reported billing
+    "OK: checkout is enabled, authenticated, and serving the approved
+    offer", the pricing page swapped its CTA to "Get Founder access", and
+    the client landed on a page whose own text says checkout is not enabled.
+    Every signal an operator has said the product was selling, and nobody
+    could buy.
+
+    A flag is a statement of intent. This is a statement of fact, which is
+    why it is a constant in code and not another environment variable: an
+    operator cannot turn on something that has not been written. Whoever
+    writes the checkout creator flips this in the same commit, and
+    `tests/test_platform_billing.py` fails until /readyz agrees.
+    """
+    return False
 
 
 def public_offer():
@@ -272,6 +312,100 @@ def _paid(obj, event_type):
     return False
 
 
+def _payment_ref(obj):
+    """The id a later refund or chargeback can be matched back to.
+
+    The PaymentIntent, because it is the one id that appears on all of the
+    shapes involved: the Checkout Session carries it, the PaymentIntent IS
+    it, and both the Charge and the Dispute that a refund or chargeback
+    arrives as carry it too. The session id does not appear on a Charge at
+    all, which is why matching on metadata alone could never work for a
+    reversal.
+    """
+    for k in ("payment_intent", "id"):
+        v = obj.get(k)
+        if isinstance(v, str) and v.startswith("pi_"):
+            return v
+    return ""
+
+
+def _k_ref(ref):
+    """Payment id → the platform user it granted to."""
+    return f"{_store._ns()}:{_store._P}:billing:ref:{ref}"
+
+
+def _amount_matches(obj, cfg):
+    """(ok, detail) — did this payment charge the approved price?
+
+    NOTHING COMPARED THE MONEY TAKEN AGAINST THE OFFER. `_paid` asked only
+    whether a payment completed, so any Payment Link on the same provider
+    account — a discounted one, a coupon, a cheaper product — granted a full
+    Founder licence. `offer_drift` does not close this: it watches whether
+    environment variables moved the PRICE WE DISPLAY off the approved one,
+    and says nothing about what was actually charged.
+
+    An object that carries no amount is NOT treated as a mismatch. Which
+    field holds the total differs by shape and some carry none at all, and
+    refusing a legitimate payment because this function did not recognise
+    its shape would be worse than the hole it closes. It says so instead, so
+    the refusal-or-not decision stays with the caller and the log records
+    which it was.
+    """
+    want_minor, want_ccy = int(cfg["priceMinor"]), str(cfg["currency"]).lower()
+    got = None
+    for k in ("amount_total", "amount_received", "amount_paid", "amount"):
+        v = obj.get(k)
+        if isinstance(v, (int, float)):
+            got = int(v)
+            break
+    ccy = str(obj.get("currency") or "").strip().lower()
+    if got is None:
+        return True, "no amount on this object; not compared"
+    if got != want_minor:
+        return False, f"charged {got}, the approved offer is {want_minor}"
+    if ccy and ccy != want_ccy:
+        return False, f"charged in {ccy}, the approved offer is {want_ccy}"
+    return True, ""
+
+
+def _fully_refunded(obj):
+    """Whether a Charge was refunded in FULL.
+
+    `charge.refunded` fires for a partial refund as well, and the handler
+    revoked everything either way — taking away access the client has still
+    paid for, over a goodwill refund of part of it.
+
+    A Charge with no amounts on it is treated as a full refund. That is the
+    cautious direction for this question: the provider said the charge was
+    refunded, and withdrawing an entitlement that should have stayed is
+    recoverable by granting it again, while leaving one in place that should
+    have gone is money.
+    """
+    amount = obj.get("amount")
+    refunded = obj.get("amount_refunded")
+    if not isinstance(amount, (int, float)) or \
+            not isinstance(refunded, (int, float)):
+        return True
+    return int(refunded) >= int(amount)
+
+
+def _livemode_ok(event):
+    """Refuse a test-mode payment in production, and say nothing otherwise.
+
+    The failure this closes: a test-mode webhook secret left configured on
+    the production service. Every $0 test purchase would then mint a real
+    founder licence, and every check in the product would be green.
+
+    Only asserted in production. Outside it both modes are legitimate and
+    insisting would break every staging deployment.
+    """
+    if (os.getenv("APP_ENV") or "").strip().lower() != "production":
+        return True, ""
+    if event.get("livemode") is False:
+        return False, "a test-mode event reached the production endpoint"
+    return True, ""
+
+
 def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
     """(status, payload) for a webhook delivery.
 
@@ -315,39 +449,127 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         # A duplicate is a success: the provider retried, the work is done.
         return 200, {"ok": True, "duplicate": True, "type": etype}
 
+    ref = _payment_ref(obj)
     user_id = _user_id_of(obj)
+    if not user_id and ref:
+        # A REFUND OR CHARGEBACK ARRIVES ON AN OBJECT THAT CARRIES NEITHER
+        # THE METADATA NOR THE REFERENCE WE WROTE AT CHECKOUT.
+        #
+        # `charge.refunded` is a Charge and `charge.dispute.created` is a
+        # Dispute. Neither has `client_reference_id`, and a Dispute carries
+        # no metadata of ours at all. So every reversal resolved to "no
+        # platform user", was marked done, and the client kept the licence
+        # they had been refunded for. The billing tests did not catch it
+        # because they built those events as a metadata dict, which the
+        # provider never sends.
+        #
+        # So the grant writes down which payment it was for, and a reversal
+        # is matched through that. The PaymentIntent id is the one id all
+        # four shapes share.
+        try:
+            _rec = _store._read(_k_ref(ref))
+            user_id = str((_rec or {}).get("userId") or "") or None
+        except Exception as e:                               # noqa: BLE001
+            print(f"[Billing] could not resolve payment {ref} to a user: "
+                  f"{type(e).__name__}")
+            _release(event_id)
+            return 500, {"ok": False, "error": {
+                "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
+
     if not user_id:
+        # Marked done so the provider stops retrying, and LOGGED, because
+        # money was taken and nobody is being provisioned for it. This file
+        # used to print nothing at all, from any branch.
+        print(f"[Billing] {etype} {event_id} carries no platform user "
+              f"(payment={ref or 'unknown'}) — nothing granted or revoked")
         _mark_done(event_id, "no-user")
         return 200, {"ok": True, "handled": False, "reason": "no platform user on this payment"}
 
+    notice = None
     try:
         if etype in GRANTING:
             if not _paid(obj, etype):
                 _mark_done(event_id, "not-paid")
                 return 200, {"ok": True, "handled": False, "reason": "payment not completed"}
             cfg = product_config()
+            ok_live, why_live = _livemode_ok(event)
+            if not ok_live:
+                print(f"[Billing] REFUSED {event_id}: {why_live}")
+                _mark_done(event_id, "livemode-mismatch")
+                return 200, {"ok": True, "handled": False,
+                             "reason": "this payment is not for this environment"}
+            ok_amt, why_amt = _amount_matches(obj, cfg)
+            if not ok_amt:
+                # Not an error to retry: the payment is real and is for
+                # something other than the approved offer. Granting the full
+                # plan for it would be the product giving itself away.
+                print(f"[Billing] REFUSED {event_id} for {user_id}: {why_amt}")
+                _mark_done(event_id, "amount-mismatch")
+                return 200, {"ok": True, "handled": False,
+                             "reason": "this payment does not match the "
+                                       "approved offer"}
             expires = None
             if cfg["periodDays"]:
                 expires = (time.time() if now is None else now) + cfg["periodDays"] * 86400
             _lic.grant(user_id, plan=cfg["plan"], expires_at=expires,
-                       masked_key=None, now=now)
-            _notify.notify(user_id, type="system", level=_notify.INFO,
-                           title="Licence activated",
-                           body="Your payment was confirmed and your licence is active.")
+                       masked_key=None, now=now, payment_ref=ref)
+            if ref:
+                # Best effort, and deliberately NOT strict: the licence is
+                # written and the buyer is provisioned. Failing the delivery
+                # here would make the provider retry a grant that already
+                # worked. A missing reverse index costs a manual lookup on a
+                # refund; a retried grant costs the buyer their entitlement
+                # when the retry races the first one.
+                try:
+                    _store._write(_k_ref(ref), {"userId": str(user_id),
+                                                "at": time.time()})
+                except Exception as e:                       # noqa: BLE001
+                    print(f"[Billing] granted {user_id} but could not index "
+                          f"payment {ref} ({type(e).__name__}) — a refund on "
+                          f"it will need a manual lookup")
+            notice = ("Licence activated", _notify.INFO,
+                      "Your payment was confirmed and your licence is active.")
             outcome = "granted"
         else:
+            if etype == "charge.refunded" and not _fully_refunded(obj):
+                # `charge.refunded` fires on PARTIAL refunds too, and
+                # revoking everything for a partial one takes away access
+                # the client has still paid for.
+                print(f"[Billing] {event_id}: partial refund on {ref} for "
+                      f"{user_id} — licence left in place")
+                _mark_done(event_id, "partial-refund")
+                return 200, {"ok": True, "handled": False,
+                             "reason": "a partial refund does not withdraw "
+                                       "the licence"}
             _lic.revoke(user_id)
-            _notify.notify(user_id, type="system", level=_notify.CRITICAL,
-                           title="Licence suspended",
-                           body="A payment was refunded, disputed or failed, so "
-                                "the licence on this account was suspended.")
+            notice = ("Licence suspended", _notify.CRITICAL,
+                      "A payment was refunded, disputed or failed, so "
+                      "the licence on this account was suspended.")
             outcome = "revoked"
     except Exception as e:
         # The claim must not outlive a delivery that failed, or the retry is
         # refused as a duplicate and the buyer is never provisioned.
+        print(f"[Billing] {etype} {event_id} FAILED for {user_id}: "
+              f"{type(e).__name__}: {e}")
         _release(event_id)
         return 500, {"ok": False, "error": {
             "code": "BILLING_FAILED", "message": f"{type(e).__name__}"}}
 
+    # THE NOTIFICATION IS SENT AFTER THE WORK IS RECORDED, AND OUTSIDE THE
+    # TRY, because a failure to notify is not a failure to provision.
+    #
+    # It used to sit beside the grant inside that block. A notification store
+    # having a bad moment therefore answered 500 for a payment that had
+    # already been granted — so the provider retried a delivery that had
+    # worked, and a provider that keeps getting 500s disables the endpoint.
+    # The buyer has their licence either way; what they would lose is the
+    # message saying so.
     _mark_done(event_id, outcome)
+    if notice:
+        try:
+            _notify.notify(user_id, type="system", title=notice[0],
+                           level=notice[1], body=notice[2])
+        except Exception as e:                               # noqa: BLE001
+            print(f"[Billing] {outcome} for {user_id} but the notification "
+                  f"could not be delivered ({type(e).__name__})")
     return 200, {"ok": True, "handled": True, "type": etype, "outcome": outcome}

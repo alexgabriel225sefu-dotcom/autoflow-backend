@@ -37,7 +37,7 @@ beta-specific part is what is **off**:
 
 ```
 A4T_CHECKOUT_ENABLED        # unset. Checkout answers 503 and the UI says so
-A4T_PRICE_MINOR=49900      # owner-approved founder price; do not enable checkout yet
+A4T_PRICE_MINOR=49700      # owner-approved founder price; do not enable checkout yet
 A4T_CURRENCY=usd
 A4T_SKU=founder_lifetime
 A4T_STRIPE_WEBHOOK_SECRET   # unset unless a payment test is deliberately being run

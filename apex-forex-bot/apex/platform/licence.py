@@ -73,19 +73,47 @@ def require(user_id, *, now=None):
     return st
 
 
-def grant(user_id, *, plan, expires_at=None, masked_key=None, now=None):
+def grant(user_id, *, plan, expires_at=None, masked_key=None, now=None,
+          payment_ref=None):
     """Record an entitlement. Called by the activation path, never by a
-    request from the client's own browser."""
+    request from the client's own browser.
+
+    WRITES STRICTLY, AND THAT IS THE WHOLE POINT OF THIS FUNCTION.
+
+    It used to use `_store._write`, which discards the result of the
+    underlying SET — and `_redis_set` returns False on an Upstash 429 or a
+    Redis outage instead of raising. So a grant could fail completely and
+    this function returned the record it had MEANT to write, the webhook
+    answered the payment provider 200 "granted", the provider stopped
+    retrying, and the buyer was left with no licence and no trace.
+
+    Raising is the correct direction for every caller. The webhook turns it
+    into a 5xx so the provider retries. `plans.start_trial` turns it into a
+    503, which is the honest answer — "we could not check" and "you have
+    nothing" are different, and only one of them was true.
+
+    `payment_ref` is kept so a refund or chargeback can be matched back to
+    the grant it reverses. Nothing else is stored about the payment: no
+    customer object, no card, no amount.
+    """
     rec = {"state": ACTIVE, "plan": plan, "expiresAt": expires_at,
            "maskedKey": masked_key,
            "grantedAt": time.time() if now is None else now}
-    _store._write(_key(str(user_id)), rec)
+    if payment_ref:
+        rec["paymentRef"] = str(payment_ref)
+    _store._write_strict(_key(str(user_id)), rec)
     return rec
 
 
 def revoke(user_id):
+    """Withdraw an entitlement. Strict, for the mirror-image reason.
+
+    A revoke that silently failed left a refunded or charged-back client
+    holding everything they had paid for, with the operator believing it had
+    been taken away.
+    """
     rec = _read(str(user_id)) or {}
     rec["state"] = REVOKED
     rec["revokedAt"] = time.time()
-    _store._write(_key(str(user_id)), rec)
+    _store._write_strict(_key(str(user_id)), rec)
     return rec

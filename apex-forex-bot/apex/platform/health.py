@@ -270,6 +270,24 @@ def _billing_check():
                       f"values in billing.py should say so, or it is a mistake "
                       f"— and it would have charged.",
                       checkoutEnabled=True, offerDrift=drift)
+    # THE FALSE GREEN. Everything above asks whether checkout is CONFIGURED,
+    # and nothing asked whether it exists. No code in this codebase creates a
+    # Checkout Session or a PaymentIntent, so with both flags on and a
+    # webhook secret set this check reported OK, the pricing page swapped its
+    # CTA to "Get Founder access", and the client arrived at a page whose own
+    # text says checkout is not enabled. Every signal an operator has said
+    # the product was selling, and nobody could buy.
+    #
+    # FAIL and not WARN: the two flags are the operator saying "sell", and a
+    # deployment that has been told to sell and cannot is not ready.
+    if not _billing.checkout_implemented():
+        return _check("billing", FAIL,
+                      "checkout is enabled and configured, but this build "
+                      "has no way to create one — POST billing/checkout "
+                      "answers 501, so the pricing page invites a purchase "
+                      "that cannot be completed. Turn the flags off until "
+                      "the checkout path exists.",
+                      checkoutEnabled=True, checkoutImplemented=False)
     return _check("billing", OK,
                   "checkout is enabled, authenticated, and serving the "
                   "approved offer", checkoutEnabled=True)

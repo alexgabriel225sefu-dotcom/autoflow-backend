@@ -46,6 +46,7 @@ os.environ.update(SECRETS)
 
 from apex import user_store                      # noqa: E402
 from apex.platform import api as A               # noqa: E402
+from apex.platform import billing as _billing_mod  # noqa: E402
 from apex.platform import health as H            # noqa: E402
 from apex.platform import ratelimit as RL        # noqa: E402
 
@@ -322,9 +323,34 @@ check("configured waitlist email is ok",
 st, body = fresh(A4T_CHECKOUT_ENABLED="true",
                  A4T_AUTHENTICATED_CHECKOUT_ENABLED="true",
                  A4T_STRIPE_WEBHOOK_SECRET="whsec_ready")
-check("a fully configured authenticated checkout is ok",
-      status_of(body, "billing") == "ok",
+# THIS ASSERTION USED TO ENSHRINE A FALSE GREEN, which is worse than no
+# assertion: it made the gap permanent and tested.
+#
+# Everything the billing check asks is about CONFIGURATION. Nothing asked
+# whether checkout exists — and nothing in this codebase creates a Checkout
+# Session or a PaymentIntent, so `POST billing/checkout` answers 501
+# whatever the flags say. With both flags on, this check reported "ok", the
+# pricing page swapped its CTA to "Get Founder access", and the client
+# landed on a page whose own text says checkout is not enabled. Every
+# signal an operator has said the product was selling, and nobody could buy.
+#
+# So a fully configured checkout that cannot be created must FAIL
+# readiness. The flags are the operator saying "sell"; a deployment told to
+# sell and unable to is not ready.
+check("a configured checkout that cannot be CREATED refuses readiness",
+      status_of(body, "billing") == "fail" and st == 503,
       json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
+check("and says so in words an operator can act on",
+      "501" in json.dumps(body) and "flags off" in json.dumps(body),
+      json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
+# AND THE PAIRING THAT MAKES THIS SURVIVE THE CHECKOUT BEING WRITTEN. When
+# somebody implements it, they flip `checkout_implemented` and this flips
+# with it — rather than a stale FAIL that the next person deletes.
+check("the readiness answer agrees with whether checkout exists",
+      (status_of(body, "billing") == "ok")
+      == _billing_mod.checkout_implemented(),
+      f"implemented={_billing_mod.checkout_implemented()}, "
+      f"readyz={status_of(body, 'billing')}")
 
 # ── the billing gate must be able to fail on the offer itself ───────────────
 # It used to ask whether price, currency and SKU were SET. Once billing.py
@@ -356,9 +382,16 @@ check("turning a one-time purchase into a subscription refuses readiness",
       status_of(body, "billing") == "fail", status_of(body, "billing"))
 
 st, body = fresh(**dict(READY, A4T_CURRENCY="USD"))
-check("but stating the approved currency in capitals is still ok",
-      status_of(body, "billing") == "ok",
-      json.dumps([c for c in body["checks"] if c["name"] == "billing"]))
+# ASSERTED ON THE DRIFT LIST, not on the overall status. Failing readiness
+# over capitalisation would teach operators to ignore this check, which is
+# how a real drift gets waved through — and that is still what is being
+# tested here. The overall answer is now FAIL for an unrelated reason
+# (nothing can create a checkout), so reading the status would test the
+# wrong thing and would have quietly stopped testing this one.
+_bill = [c for c in body["checks"] if c["name"] == "billing"][0]
+check("stating the approved currency in capitals is not drift",
+      "A4T_CURRENCY" not in (_bill.get("offerDrift") or []),
+      json.dumps(_bill))
 
 # The amount must not be in the payload. /readyz is unauthenticated, and a
 # message naming variables is enough for an operator to go and look.
