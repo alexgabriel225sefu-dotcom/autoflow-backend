@@ -1103,13 +1103,37 @@ def _make_broker(user, user_id=None):
         if _conn:
             ct_token = _conn["accessToken"]
             ct_account = _conn["ctid"]
-            # The mode is DERIVED from the account we are actually connected
-            # to, not written into the user record. telegram._handle_paper
-            # stays the only writer of the live/demo flag (an invariant
-            # test_live_path_invariants.py enforces), and deriving it here is
-            # also simply more truthful: a stored boolean can drift from the
-            # account, the connection cannot.
-            paper = _conn["mode"] != "live"
+            # `paper` AND `ctrader_env` ARE DIFFERENT AXES, AND THIS CONFLATED
+            # THEM. The bug it caused is the worst kind: it reported success.
+            #
+            # This read `paper = _conn["mode"] != "live"`, so every platform
+            # client on a DEMO account got PAPER_TRADING=True — and
+            # `brokers/ctrader.place_order` answers that by printing a line
+            # and returning {"orderId": "CT_PAPER_...", "status": "FILLED"}
+            # without contacting cTrader at all. The platform would show a
+            # filled order and an open position; the broker would show
+            # nothing. Nobody would have found it by looking at our screens,
+            # which is exactly how it survived.
+            #
+            # `_mode_of` in this same file warns about this in prose, naming
+            # the very account it broke: "`paper` distinguishes simulated
+            # fills from broker-executed ones; it says nothing about whether
+            # the broker account is real money. Account 47765456 runs
+            # paper=false against a cTrader DEMO account."
+            #
+            # So: a PLATFORM connection always executes for real. The client
+            # linked an account on purpose and a cTrader demo account fills
+            # orders on cTrader's demo server — simulating on top of it would
+            # be a second, invisible simulation of something already safe.
+            # Paper mode is for a client with no broker, and the platform
+            # refuses to start without one.
+            #
+            # The demo/live distinction lives in `ctrader_env`, which is the
+            # right axis and is what selects demo.ctraderapi.com. The user
+            # record is still not written here — telegram._handle_paper
+            # remains the only writer of the stored flag, which
+            # test_live_path_invariants.py enforces.
+            paper = False
             user = dict(user, ctrader_env=_conn["mode"])
     fake_cfg = types.SimpleNamespace(
         CTRADER_ACCESS_TOKEN  = ct_token,
