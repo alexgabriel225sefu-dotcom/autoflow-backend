@@ -165,6 +165,44 @@ export function plainRead(status: string, reason?: string): Plain | null {
   }
 }
 
+/* ── the outcome of a control ─────────────────────────────────────────── */
+
+/**
+ * What to tell the client after Start, Pause, Resume or Stop.
+ *
+ * WHY THIS EXISTS RATHER THAN `Automation is now ${state}`
+ *
+ * Both control sites said exactly that, and for Stop it was the most
+ * expensive sentence in the product. The server's stop answer carries
+ * `flattened: false`, `flattenDeclined: true` and a sentence explaining that
+ * open positions stay at the broker with the stop and target they were
+ * given — §8.1 of the live-execution specification requires a stop to
+ * flatten or explicitly decline and SAY WHICH. The browser dropped all three
+ * fields and reported "stopped".
+ *
+ * So a client with a losing position pressed Stop, read "stopped",
+ * reasonably understood "and I am flat", and closed the tab. The position
+ * was still open. The only place the truth appeared was a notification on a
+ * page they were never sent to.
+ *
+ * The explanation is the SERVER's sentence, verbatim. What a stop does to
+ * real exposure is not something to keep a second copy of in a browser,
+ * where it would be free to drift from what actually happened.
+ */
+export function outcomeOf(a: {
+  state: string;
+  flattened?: boolean;
+  flattenDeclined?: boolean;
+  flattenReason?: string | null;
+}): string {
+  const base = `Automation is now ${a.state}`;
+  // Only when the server actually declined. A release that later closes
+  // positions will send `flattened: true`, and this must then say nothing
+  // extra rather than keep repeating a warning that has stopped being true.
+  if (a.flattenDeclined && a.flattenReason) return `${base}. ${a.flattenReason}`;
+  return base;
+}
+
 /* ── licence ──────────────────────────────────────────────────────────── */
 
 export function plainLicence(state: string | null | undefined): Plain {

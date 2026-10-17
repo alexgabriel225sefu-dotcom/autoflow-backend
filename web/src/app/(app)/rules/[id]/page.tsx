@@ -14,6 +14,7 @@ import { ErrorNotice, LicencePill, ReadPanel, Spinner, StatusPill } from "@/comp
 import {
   RuleSentence, RuleTerms, humanise, type NotApplied,
 } from "@/components/app/rule-summary";
+import { outcomeOf } from "@/components/app/plain";
 import { TIMEFRAMES } from "@/components/app/rule-form";
 import { CandleChart, type ChartMarker } from "@/components/chart/candles";
 
@@ -253,7 +254,7 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
     // local one left it saying STOPPED over a loop that had started.
     invalidate("automation", "journal?limit=8", "me");
     if (!r.ok) return `${r.code}: ${r.message}`;
-    return `Automation is now ${r.data.state}`;
+    return outcomeOf(r.data);
   }
 
   if (rule.result && !rule.result.ok) {
@@ -535,16 +536,25 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
                       onConfirm={() => control("start")}
                     />
                   ) : null}
+                  {/* Same sentence as the dashboard's Pause. A pause ends
+                      the loop, so an open position keeps only the stop-loss
+                      the broker already holds. */}
                   {runningThis && running?.state === "running" ? (
-                    <ConfirmAction label="Pause" question="Pause automation?"
+                    <ConfirmAction label="Pause"
+                                   question="Pause automation? Anything already open stops being managed too — it keeps only the stop-loss your broker holds."
                                    onConfirm={() => control("pause")} />
                   ) : null}
                   {runningThis && running?.state === "paused" ? (
                     <ConfirmAction label="Resume" question="Resume automation?"
                                    onConfirm={() => control("resume")} />
                   ) : null}
+                  {/* Same sentence as the dashboard's Stop, and for the same
+                      reason: a client must know what a control does not do
+                      before they press it, not from the outcome line
+                      afterwards. */}
                   {runningThis && running?.state !== "stopped" ? (
-                    <ConfirmAction label="Stop" danger question="Stop automation?"
+                    <ConfirmAction label="Stop" danger
+                                   question="Stop automation? Anything already open stays at your broker — this closes nothing."
                                    onConfirm={() => control("stop")} />
                   ) : null}
                 </div>

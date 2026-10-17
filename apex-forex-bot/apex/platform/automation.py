@@ -436,7 +436,84 @@ def engine_alert(user_id, payload):
     """
     _appr.engine_alert(user_id, payload)
     _signals.engine_alert(user_id, payload)
+    _safety_alert(user_id, payload)
     return None
+
+
+# THE THIRD SINK, AND WITHOUT IT A CLIENT NEVER LEARNED THEIR MONEY WAS
+# EXPOSED.
+#
+# The two sinks above allowlist for good reasons and neither should widen:
+# burying the one alert that needs an answer under heartbeats is exactly what
+# `notifications.py` exists to prevent. But between them they deliver SUGGEST
+# and SIGNAL and nothing else, so every alert the engine raises about a
+# POSITION went nowhere for a platform client.
+#
+# Two of them are not reports. They are the engine saying it has lost control
+# of real exposure and only the client can act:
+#
+#   UNPROTECTED  the position is open at the broker with no stop-loss, and
+#                the safety close did not go through either. `user_loop`'s own
+#                comment on raising it reads: "Nothing here can fix it
+#                remotely — the client has to be told, now, and told exactly
+#                what to do." For a platform client, nobody was told.
+#   EXIT_FAILED  the rule asked to close and the broker refused. The position
+#                stays open. The loop retries, and if it never clears, the
+#                client is holding a trade their rule tried to exit.
+#
+# Deliberately a THIRD allowlist rather than a route table here. The design
+# note above is right that a table in this file would be a third thing that
+# has to agree with the allowlists; three allowlists that do not overlap is
+# the same pattern, not a new one, and `tests/test_safety_alerts.py` asserts
+# the non-overlap in all three directions.
+#
+# Not in the journal. The journal is where a client goes to read what
+# happened; this is something they must act on before the next bar.
+SAFETY_ACTIONS = ("UNPROTECTED", "EXIT_FAILED")
+
+# Deliberately NOT included: OWNERSHIP_LOST and BROKER_HEALTH are platform
+# faults with no client action, and WEEKEND_CLOSE and STOP/CLOSE are the
+# engine doing what it was asked. Alerting on those trains a client to
+# dismiss the two above, which is worse than not alerting at all.
+
+
+def _safety_alert(user_id, payload):
+    """Tell the client when the engine has lost control of real exposure.
+
+    NEVER RAISES, for the same reason the other two sinks do not: this runs
+    on the trading thread inside the tick, and an exception here abandons the
+    rest of that tick — which is where trailing stops, exits and position
+    management live. A notification store having a bad moment must not cost a
+    client their stop management.
+    """
+    try:
+        if not isinstance(payload, dict):
+            return None
+        action = str(payload.get("action") or "").strip().upper()
+        if action not in SAFETY_ACTIONS:
+            return None
+        sym = str(payload.get("symbol") or "your position").strip()
+        if action == "UNPROTECTED":
+            title = f"{sym}: open with NO stop-loss"
+            body = (f"A {sym} position is open at your broker and we could "
+                    f"not attach a stop-loss to it. The attempt to close it "
+                    f"again also failed, so it is live with no protection "
+                    f"and nothing here can fix that remotely. Open cTrader "
+                    f"and either set a stop on it or close it.")
+        else:
+            title = f"{sym}: the broker would not close it"
+            body = (f"Your rule asked to close {sym} and the broker did not "
+                    f"accept it, so the position is still open. Any "
+                    f"stop-loss already set on it is still in force at the "
+                    f"broker. The automation retries on every bar — if it "
+                    f"stays open, close it in cTrader.")
+        return _notify.notify(user_id, type=_notify.ORDER,
+                              level=_notify.CRITICAL, title=title, body=body)
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[Automation] the safety alert for {user_id} could not be "
+              f"delivered ({type(e).__name__}: {e}) — the engine's own log "
+              f"line is the only remaining record")
+        return None
 
 
 # EVERY ENGINE LEVEL THIS PLATFORM CAN REPORT FOR, which is the list `engine_alert`
@@ -517,8 +594,28 @@ def pause(user_id, *, stopper=None):
         _jstore._j.AUTOMATION_PAUSED, correlation_id=uuid.uuid4().hex,
         user_id=user_id, account_id=str(rec.get("accountId") or ""),
         rule_doc_id=rec.get("ruleDocId"))
-    _notify.notify(user_id, type=_notify.SYSTEM, title="Automation paused",
-                   body="No new positions will be opened until you resume.")
+    # SAYS WHAT A PAUSE ALSO STOPS, which the old sentence did not.
+    #
+    # "No new positions will be opened until you resume" is true and is less
+    # than half the truth. `pause` calls `user_loop.stop`, which ENDS THE
+    # THREAD — so while paused there is no trailing stop, no break-even, no
+    # rule exit condition, no news exit and no weekend flatten. An open
+    # position keeps only what the broker already holds: the stop and target
+    # attached when it was opened.
+    #
+    # This module's own docstring argues that a paused-but-ticking loop would
+    # be the most dangerous word on the screen. The inverse was equally
+    # unsaid, and it is the one a client acts on: they pause with a position
+    # open, believing it is still being managed to its target.
+    #
+    # Telegram's equivalent screen has always said this plainly.
+    _notify.notify(
+        user_id, type=_notify.SYSTEM, title="Automation paused",
+        body="No new positions will be opened until you resume. Anything "
+             "already open is also no longer being managed — the trailing "
+             "stop, break-even and exit conditions all stop with the "
+             "automation. It keeps the stop-loss and target your broker "
+             "already holds for it.")
     return dict(status(user_id), paused=True)
 
 

@@ -579,4 +579,23 @@ export type AutomationState = {
   levelLabel?: string | null;
   levelBlurb?: string | null;
   levelExecutes?: boolean | null;
+  /** WHETHER STOPPING ALSO CLOSED WHAT WAS OPEN, which it does not.
+   *
+   *  §8.1 of the live-execution specification requires a stop to flatten or
+   *  explicitly DECLINE to flatten, and say which. The server has always
+   *  answered correctly — `flattened: false`, `flattenDeclined: true`, and a
+   *  sentence saying the position stays at the broker with its stop and
+   *  target — and this type did not carry the fields, so the browser threw
+   *  the whole answer away and said "Automation is now stopped".
+   *
+   *  That is the most expensive silence in the product. A client with a
+   *  losing position presses Stop, reads "stopped", and closes the tab. The
+   *  position is still open at their broker. The only place the truth
+   *  appeared was a notification on a page they were never sent to.
+   *
+   *  The sentence is the SERVER's. What a stop does to real exposure is not
+   *  a thing to keep a second copy of in a browser. */
+  flattened?: boolean;
+  flattenDeclined?: boolean;
+  flattenReason?: string | null;
 };

@@ -27,7 +27,7 @@ import {
 } from "@/components/app/state";
 import { PendingApproval } from "@/components/app/pending-approval";
 import { DataTable, Num, Side, When } from "@/components/app/table";
-import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
+import { outcomeOf, plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -131,7 +131,7 @@ export default function Dashboard() {
     // read left the strip claiming STOPPED while this panel said running.
     invalidate("automation", "journal?limit=8", "me");
     if (!r.ok) return `${r.code}: ${r.message}`;
-    return `Automation is now ${r.data.state}`;
+    return outcomeOf(r.data);
   }
 
   return (
@@ -304,14 +304,27 @@ export default function Dashboard() {
                           onConfirm={() => control("start")}
                         />
                       ) : null}
+                      {/* A PAUSE STOPS THE WHOLE LOOP, not just new entries.
+                          While paused there is no trailing stop, no
+                          break-even and no exit condition — an open position
+                          keeps only what the broker already holds. */}
                       {running?.state === "running" ? (
-                        <ConfirmAction label="Pause" question="Pause automation?" onConfirm={() => control("pause")} />
+                        <ConfirmAction label="Pause"
+                                       question="Pause automation? Anything already open stops being managed too — it keeps only the stop-loss your broker holds."
+                                       onConfirm={() => control("pause")} />
                       ) : null}
                       {running?.state === "paused" ? (
                         <ConfirmAction label="Resume" question="Resume automation?" onConfirm={() => control("resume")} />
                       ) : null}
+                      {/* SAYS WHAT STOP DOES NOT DO, BEFORE IT IS PRESSED.
+                          "Stop automation?" invited the reading that it also
+                          closes what is open, which it does not — and finding
+                          that out afterwards, from a sentence under a button,
+                          is finding it out too late. */}
                       {runningThis ? (
-                        <ConfirmAction label="Stop" danger question="Stop automation?" onConfirm={() => control("stop")} />
+                        <ConfirmAction label="Stop" danger
+                                       question="Stop automation? Anything already open stays at your broker — this closes nothing."
+                                       onConfirm={() => control("stop")} />
                       ) : null}
                     </div>
                   )}
