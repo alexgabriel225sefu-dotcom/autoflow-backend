@@ -253,17 +253,31 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
 
 
 def start(user_id, rule_doc_id, *, starter=None, now=None,
-          mode_lister=None):
-    """Begin automation for one rule, on a demo account. Idempotent."""
+          mode_lister=None, revive=False):
+    """Begin automation for one rule. Idempotent unless `revive`.
+
+    `revive` is for `supervise` alone — see the guard below and the note on
+    that function. It skips ONE early return and nothing else: the licence,
+    the rule, the account, the broker-confirmed mode and the emergency stop
+    are all re-checked exactly as they are for a client pressing Start.
+    """
     now = time.time() if now is None else now
     user_id = str(user_id)
     corr = uuid.uuid4().hex
 
     rec = _read(user_id)
-    if rec.get("state") == RUNNING and rec.get("ruleDocId") == rule_doc_id:
+    if (rec.get("state") == RUNNING and rec.get("ruleDocId") == rule_doc_id
+            and not revive):
         # Idempotent on purpose: a double-tapped button, a retried request or
         # a second browser tab must not produce a second loop against one
         # account. Answering "already running" is the truth, not a failure.
+        #
+        # `revive` is the one caller for whom it is NOT the truth. The record
+        # says RUNNING and the engine's thread is gone — the process that held
+        # it was restarted — so `supervise` has already established that this
+        # record is lying, and answering "already running" would leave the
+        # client exactly as stuck as the bug it is there to fix. Only this
+        # guard is skipped; every check below still runs.
         return dict(status(user_id), started=False, alreadyRunning=True)
     if rec.get("state") == RUNNING:
         raise AutomationRefused(
@@ -495,6 +509,81 @@ def pause(user_id, *, stopper=None):
     _notify.notify(user_id, type=_notify.SYSTEM, title="Automation paused",
                    body="No new positions will be opened until you resume.")
     return dict(status(user_id), paused=True)
+
+
+def supervise(*, starter=None, mode_lister=None):
+    """Restart platform loops whose thread died. Returns (alive, revived).
+
+    THE BUG THIS EXISTS TO FIX, AND IT WAS LIVE
+
+    `start` runs the engine loop as a DAEMON THREAD inside the API process.
+    The process dies, the thread dies — and the automation record still says
+    RUNNING, so the dashboard goes on reporting RUNNING over a loop that no
+    longer exists. A client pressed Start, saw RUNNING, and stopped trading at
+    the next deploy or instance recycle without being told.
+
+    The engine has always had `start_all` and `start_watchdog` for this, and
+    both are called only from `apex/bot.py` — the Telegram entry point, which
+    is not deployed. Nothing in production revived a platform loop.
+
+    WHY THE REVIVAL IS HERE AND NOT IN THE SERVER
+
+    The first version of this fix had `platform_server.py` call
+    `user_loop.start` directly in a supervisor thread, and
+    `tests/test_platform_server.py` refused it — correctly, and for a better
+    reason than style. Going straight to the engine skips `_preflight`, which
+    is where the licence, the rule's state, the connection and the mode the
+    BROKER confirms are checked. A weekend is long enough for a trial to
+    lapse, a rule to be archived or an account to change hands; reviving a
+    loop without re-asking would be the one place in this product where a
+    trading loop starts on nobody's authority.
+
+    So the revival runs the same preflight a client pressing Start runs, and
+    refuses for the same reasons. A refusal is recorded and the next cycle
+    tries again — a lapsed licence simply never revives, which is right.
+
+    `user_loop.is_running` is read from the engine's in-process registry, so
+    after a restart it is empty and reports every loop as dead, which is the
+    truth this function needs. A healthy loop is left untouched.
+    """
+    from apex import user_loop, user_store
+    alive = revived = 0
+    for uid in (user_store.all_active() or []):
+        uid = str(uid)
+        try:
+            if not _link.is_platform_account(uid):
+                # The bot's account, not ours. This process has no Telegram
+                # alert sink and no business starting loops for chats.
+                continue
+        except Exception as e:                               # noqa: BLE001
+            print(f"[Automation] could not classify {uid} "
+                  f"({type(e).__name__}) — leaving it alone")
+            continue
+        rec = _read(uid)
+        if rec.get("state") != RUNNING:
+            continue                    # stopped or paused on purpose
+        if user_loop.is_running(uid):
+            alive += 1
+            continue
+        rid = rec.get("ruleDocId")
+        if not rid:
+            print(f"[Automation] {uid} is RUNNING with no rule recorded — "
+                  f"not revived, a human should look at it")
+            continue
+        try:
+            start(uid, rid, starter=starter, mode_lister=mode_lister,
+                  revive=True)
+            revived += 1
+            print(f"[Automation] revived the loop for {uid} on rule {rid}")
+        except AutomationRefused as e:
+            # Expected and useful: the licence lapsed, the rule was archived,
+            # the broker cannot confirm the mode. Say which, and leave the
+            # record alone so the client still sees what they asked for.
+            print(f"[Automation] not reviving {uid}: {e.code} — {e.detail}")
+        except Exception as e:                               # noqa: BLE001
+            print(f"[Automation] reviving {uid} failed: "
+                  f"{type(e).__name__}: {e}")
+    return alive, revived
 
 
 def resume(user_id, *, starter=None, mode_lister=None):

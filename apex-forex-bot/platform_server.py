@@ -54,6 +54,7 @@ import os
 import signal
 import sys
 import threading
+import time
 from urllib.parse import quote
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -454,6 +455,61 @@ def _start_broker_probe():
     threading.Thread(target=run, name="broker-probe", daemon=True).start()
 
 
+# How often the supervisor re-checks that every loop which should be running
+# actually is. The engine's own watchdog uses 180s and the reasoning is the
+# same: long enough to cost nothing, short enough that a client does not sit
+# through a long outage they cannot see.
+_SUPERVISE_INTERVAL_S = int(os.getenv("A4T_SUPERVISE_INTERVAL_S") or 180)
+
+
+def _supervise_platform_loops():
+    """Keep platform automation running across restarts. Nothing did this.
+
+    `automation.start` runs the engine loop as a DAEMON THREAD in this
+    process. The process dies, the thread dies — and the record still says
+    RUNNING, so the dashboard reports RUNNING over a loop that is gone. A
+    client pressed Start and stopped trading at the next deploy, untold.
+
+    The engine's own cure, `start_all` + `start_watchdog`, is called only from
+    `apex/bot.py`, which is not deployed. This server called neither.
+
+    THE REVIVAL IS NOT DONE HERE, AND THAT IS THE POINT
+
+    The first version of this called `user_loop.start` directly from a thread
+    in this file, and `tests/test_platform_server.py` refused it. That guard
+    was right for a better reason than style: going straight to the engine
+    skips `automation._preflight`, which is where the licence, the rule, the
+    connection and the mode the BROKER confirms are checked. A weekend is
+    long enough for a trial to lapse or an account to change; a loop revived
+    without re-asking would be the one trading loop in this product running on
+    nobody's authority.
+
+    So this file owns the SCHEDULE and `apex.platform.automation` owns the
+    DECISION — which is the same split every other control in the platform
+    already has.
+    """
+    def _run():
+        from apex.platform import automation as _auto
+        # On boot first: the restart that killed the loops is the event this
+        # is here for.
+        try:
+            alive, revived = _auto.supervise()
+            print(f"[API] automation supervisor: {alive} alive, "
+                  f"{revived} revived")
+        except Exception as e:                               # noqa: BLE001
+            print(f"[API] supervisor failed on boot: {type(e).__name__}: {e}")
+        while True:
+            time.sleep(_SUPERVISE_INTERVAL_S)
+            try:
+                _auto.supervise()
+            except Exception as e:                           # noqa: BLE001
+                # A supervisor that dies is worse than none, because the thing
+                # it watched looks supervised.
+                print(f"[API] supervisor cycle failed: {type(e).__name__}: {e}")
+
+    threading.Thread(target=_run, name="loop-supervisor", daemon=True).start()
+
+
 def main():
     origins = allowed_origins()
     print(f"[API] Apex4Traders platform API starting on :{PORT}")
@@ -469,6 +525,7 @@ def main():
     print(f"[API] live execution enabled: {_ent.live_execution_enabled()}")
 
     _start_broker_probe()
+    _supervise_platform_loops()
 
     server = build_server()
 
