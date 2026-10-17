@@ -498,10 +498,25 @@ def _supervise_platform_loops():
                   f"{revived} revived")
         except Exception as e:                               # noqa: BLE001
             print(f"[API] supervisor failed on boot: {type(e).__name__}: {e}")
+        # A HEARTBEAT, BECAUSE SILENCE WAS AMBIGUOUS AND THAT IS THE BUG
+        # THIS WHOLE FILE KEEPS RE-LEARNING.
+        #
+        # The first version printed only on boot and when it revived
+        # something, so a healthy cycle said nothing — and from the logs a
+        # supervisor quietly working looked exactly like a supervisor that had
+        # died, which is the ambiguity it exists to remove. Every
+        # `_HEARTBEAT_EVERY` cycles it states what it found even when that is
+        # "everything is fine", so the absence of the line means something.
+        _HEARTBEAT_EVERY = 10          # ~30 min at the default interval
+        _cycle = 0
         while True:
             time.sleep(_SUPERVISE_INTERVAL_S)
+            _cycle += 1
             try:
-                _auto.supervise()
+                alive, revived = _auto.supervise()
+                if revived or _cycle % _HEARTBEAT_EVERY == 0:
+                    print(f"[API] automation supervisor: {alive} alive, "
+                          f"{revived} revived")
             except Exception as e:                           # noqa: BLE001
                 # A supervisor that dies is worse than none, because the thing
                 # it watched looks supervised.

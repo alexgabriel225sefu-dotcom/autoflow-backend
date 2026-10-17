@@ -131,6 +131,36 @@ check("with PAPER_TRADING on, place_order returns a FAKE filled order",
       str(res))
 check("so the guard in [1] is load-bearing, not decorative", True)
 
+# ── 5. the blast radius was wider than orders ───────────────────────────────
+# PAPER_TRADING does not only fake the fill. Every READ is faked too, and the
+# consequences were on screens the client trusts:
+#
+#   get_all_positions() -> []                 "no positions", always
+#   get_balance()       -> PAPER_BALANCE      an invented number
+#
+# and the invented balance is what RISK SIZING is computed from, so even an
+# order that had gone out would have been sized off a fiction. Asserted here
+# so the next person to touch `paper` sees the whole cost, not just the one
+# symptom that happened to be noticed first.
+print("\n[5] and the reads were faked too, which is how sizing was wrong")
+paper_cfg = types.SimpleNamespace(PAPER_TRADING=True, SYMBOL="EURUSD",
+                                  PAPER_BALANCE=10_000.0)
+pb = CT.CtraderBroker.__new__(CT.CtraderBroker)
+pb._c = paper_cfg
+check("a paper broker reports NO positions whatever the account holds",
+      CT.CtraderBroker.get_all_positions(pb) == [],
+      "the Positions screen showed this, not cTrader's answer")
+check("and an invented balance, which sizing then trusts",
+      CT.CtraderBroker.get_balance(pb) == 10_000.0,
+      "risk percent was computed from a number the broker never gave")
+# And the platform's own read path builds its broker through the same
+# constructor, so the fix covers the screens as well as the orders.
+rb = open(os.path.join(ROOT, "apex", "platform", "broker_read.py"),
+          encoding="utf-8").read()
+check("the platform's read path uses the same constructor",
+      "_make_broker" in rb,
+      "if it built its own broker, fixing one would not fix the other")
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

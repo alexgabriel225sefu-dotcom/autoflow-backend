@@ -179,6 +179,24 @@ finally:
     AUTO._read = _real_read
     user_loop.is_running = _real_is_running
 
+# ── 6. the supervisor is not silent when healthy ────────────────────────────
+# The first version printed only on boot and on a revival, so a healthy cycle
+# said nothing — and a supervisor quietly working looked, from the logs,
+# exactly like one that had died. That is the ambiguity this whole mechanism
+# exists to remove, reintroduced one level up.
+print("\n[6] a healthy supervisor still says so, periodically")
+check("it has a heartbeat interval",
+      "_HEARTBEAT_EVERY" in src,
+      "silence must not be the only evidence of health")
+_body = src.split("def _supervise_platform_loops(")[1]
+check("and the periodic cycle can print without a revival",
+      "revived or _cycle % _HEARTBEAT_EVERY" in _body,
+      "printing only on a revival leaves a dead supervisor indistinguishable "
+      "from a quiet one")
+check("while a revival is still reported immediately",
+      _body.index("if revived") < _body.index("_HEARTBEAT_EVERY == 0"),
+      "a revival must not wait for the next heartbeat to be visible")
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")
