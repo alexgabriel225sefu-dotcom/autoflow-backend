@@ -154,6 +154,38 @@ def _automation_level(doc):
     return want if want in SERVICEABLE_LEVELS else LEVEL_FULL
 
 
+def _preset_strategy(doc):
+    """The engine strategy id this rule should be run BY, or "".
+
+    "" means a rule built from conditions, which `rule_strategy` runs.
+
+    Only ever returns an id the platform both describes and the engine has
+    registered — `strategy_catalog.ids()` is that intersection. An id outside
+    it would be written onto the account as `cfg.STRATEGY` and the loop would
+    hold every bar with "no strategy module is loaded for ...", which is the
+    quiet failure this whole module exists to stop.
+
+    Imported inside the function for the same reason `store._offered_strategy_ids`
+    does it: `strategy_catalog` reaches the engine registry, which reaches
+    `platform.rule_strategy`, which reaches this module. The cycle is resolved
+    at call time and not at import time.
+
+    A catalogue that cannot be read answers "" — the rule then runs as a
+    condition rule and `translate` reports the preset as a term that is not
+    being applied. Fail-closed, and visibly so.
+    """
+    named = str((doc or {}).get("strategy") or "").strip()
+    if not named:
+        return ""
+    try:
+        from apex.platform import strategy_catalog
+        return named if named in strategy_catalog.ids() else ""
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[ENGINE_CONFIG] the strategy catalogue could not be read "
+              f"({type(e).__name__}) — not pointing the loop at {named!r}")
+        return ""
+
+
 def _automation_patch(level):
     """EVERY key the engine reads to resolve the level, in agreement.
 
@@ -227,7 +259,47 @@ def translate(doc):
     # setting and it is not this rule's schedule — the schedule is reported
     # below as a term that does not reach the engine, which is the honest
     # answer. Clearing it would widen trading past what the client chose.
-    applied["strategy"] = RULE_STRATEGY_ID
+    # A PRESET RULE IS POINTED AT ITS PRESET. THIS WAS THE MISSING HAND-OFF,
+    # AND WITHOUT IT THE WHOLE STRATEGY PICKER PLACED NOTHING, FOREVER.
+    #
+    # `strategy_catalog.preset_of` says the field is judged "at the
+    # boundaries that care — activation, and the engine hand-off". Activation
+    # was wired. The hand-off was not: this line wrote RULE_STRATEGY_ID
+    # unconditionally and never read the document's preset.
+    #
+    # So a client who chose "Choose a strategy", picked a preset, activated
+    # and pressed Start got a loop pointed at `platform_rule`, which asks the
+    # rule evaluator — and the evaluator refuses a preset document with
+    # PRESET_STRATEGY on every bar, because a preset carries no conditions to
+    # judge. The dashboard said "Watching market". The journal filled with
+    # holds. Nothing ever traded, and no screen said why.
+    #
+    # That refusal was correct as a safety net while nothing routed presets.
+    # It is not a substitute for routing them.
+    #
+    # The ids are the ENGINE's own registered strategies — `_registry` reads
+    # `strategy_api.describe()` and `describe()` returns only the
+    # intersection — so this points the loop at strategy modules that have
+    # run in this engine for a long time, with the client's own risk terms
+    # applied below. It is a route, not a new trading mechanism.
+    _preset = _preset_strategy(doc)
+    if _preset:
+        applied["strategy"] = _preset
+    else:
+        applied["strategy"] = RULE_STRATEGY_ID
+        # A document naming a preset the platform no longer offers must not
+        # be pointed at it — the loop would hold every bar naming a strategy
+        # no module is loaded for. Activation already refuses an unoffered
+        # id, so this is the withdrawn-after-activation case, and it is
+        # REPORTED rather than swallowed: falling back silently is what
+        # produced the bug above.
+        _named = str(doc.get("strategy") or "").strip()
+        if _named:
+            miss("Strategy", _named,
+                 "this strategy is no longer offered on the platform, so the "
+                 "rule is not being run by it. Open the rule and choose a "
+                 "strategy that is still available, or rebuild it from "
+                 "conditions.")
     applied["ai_confirm"] = False
     applied["min_confidence"] = 0
     applied["htf"] = False

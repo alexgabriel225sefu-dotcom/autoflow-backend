@@ -90,6 +90,21 @@ REACHES_THE_ENGINE = {
     "trailingStop",  # on/off; the distance is the engine's
     "breakEven",     # at R, or 0 for off
     "limits",        # daily trades and spread cap; max positions is reported
+    # WHICH ENGINE STRATEGY RUNS, when the client chose one of the engine's
+    # ready-made strategies instead of building conditions.
+    #
+    # MOVED UP FROM RECORDED_ONLY, and the note it used to carry is worth
+    # keeping as history: `translate` wrote `RULE_STRATEGY_ID` for every rule
+    # there was, so a client who picked Trend Following had their loop
+    # pointed at the rule evaluator, which refuses a preset document — it
+    # carries no conditions to judge — and held on every single bar. The
+    # dashboard said "Watching market". Nothing ever traded.
+    #
+    # That refusal was a correct safety net while nothing routed presets. It
+    # was never a substitute for routing them. Section [7] measures the hop
+    # and this set is its pair, which is why the field could not be left
+    # here once the hand-off landed.
+    "strategy",
 }
 
 RECORDED_ONLY = {
@@ -99,22 +114,6 @@ RECORDED_ONLY = {
     # it in `notApplied` so the client is told per rule rather than in
     # general.
     "evaluateOn", "entry", "exit", "sides", "order", "schedule",
-    # WHICH ENGINE STRATEGY RUNS, when the client chose one of the engine's
-    # ready-made strategies instead of building conditions. It is in this set
-    # rather than the one above because `engine_config.translate` still writes
-    # `applied["strategy"] = RULE_STRATEGY_ID` for every rule there is: a
-    # client who picks Trend Following has their loop pointed at the rule
-    # strategy, which finds no conditions on a preset document and holds.
-    #
-    # That is at least honest rather than silent — `evaluator.evaluate`
-    # refuses a preset rule by name and `rule_strategy` turns the refusal into
-    # a HOLD, so nothing trades something nobody chose. But the strategy IS
-    # chosen and is NOT run, which is this set's definition.
-    #
-    # Section [7] below measures where translate() actually sends a preset and
-    # fails if this entry disagrees with it, so the field cannot be left in
-    # the wrong set once the engine hand-off lands.
-    "strategy",
 }
 
 print("\n[1] every field is accounted for")

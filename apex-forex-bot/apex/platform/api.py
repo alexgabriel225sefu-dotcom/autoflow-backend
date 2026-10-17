@@ -700,6 +700,41 @@ def _dispatch(method, route, headers, body, query=None):
         if method == "PUT":
             doc = dict(_body(body))
             doc["ruleDocId"] = rid
+            # AN ACCOUNTLESS RULE COULD NEVER GET AN ACCOUNT, AND THE
+            # REFUSAL TOLD THE CLIENT TO DO THE ONE THING THAT WOULD NOT
+            # HELP.
+            #
+            # `_create` derives accountId from the client's selection, but
+            # only at creation. The dashboard's own "Create a rule" button
+            # and the builder's "what happens next" list both invite
+            # building a rule BEFORE connecting a broker, and nothing on
+            # that path says otherwise. Such a rule stores accountId "" and
+            # stays that way: `save_draft` never derives it and the edit
+            # form never sends it.
+            #
+            # So validation refused it with "connect and select an account,
+            # then save the rule again" — and saving again changed nothing.
+            # A brand-new client's only escape was to guess that the rule
+            # was unfixable and start a second one. That is a dead end
+            # reached after eleven steps, with instructions that cannot
+            # work.
+            #
+            # Derived server-side, not read from the body: the selection
+            # lives in the link record, and the browser has no business
+            # naming which account a rule binds to. Only ever FILLS a gap —
+            # a rule that already names an account keeps it, because
+            # re-pointing a rule at a different account on an unrelated
+            # save is not an edit the client asked for.
+            try:
+                if not str((_store.get(p.user_id, rid) or {})
+                           .get("accountId") or ""):
+                    _sel = _selected_ctid(p.user_id)
+                    if _sel:
+                        doc["accountId"] = _sel
+            except Exception:                            # noqa: BLE001
+                # save_draft re-reads and will raise properly for a missing
+                # or unreadable rule. This is a convenience, not a gate.
+                pass
             return _ok({"rule": _store.save_draft(p.user_id, doc)})
         return _err(405, "METHOD_NOT_ALLOWED", f"{method} is not allowed here")
 
