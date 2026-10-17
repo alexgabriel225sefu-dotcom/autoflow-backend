@@ -5497,8 +5497,8 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         return {"ok": False, "error": _claim_why or "ORDER_REFUSED",
                 "side": side, "symbol": sym}
     try:
-        ledger.record(_rid, broker.place_order(side, units, sym,
-                                               sl=sl_price, tp=tp_price))
+        _res = broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
+        ledger.record(_rid, _res)
     except Exception as e:
         # The idempotency claim STANDS. It was taken before the broker was
         # called, so an identical retry is refused by the ledger rather than
@@ -5506,6 +5506,70 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         # claim is taken first.
         return {"ok": False, "error": str(e), "side": side, "symbol": sym,
                 "ambiguous": broker_result_ambiguous(e)}
+
+    # WHAT THE BROKER ACTUALLY DID, WHICH THIS FUNCTION USED TO THROW AWAY.
+    #
+    # The result went straight into the ledger and was never read. Two of
+    # `place_order`'s outcomes are not a placed order, and both were then
+    # reported as one, with the stop the client asked for:
+    #
+    #   UNPROTECTED    the position IS open at the broker and has NO
+    #                  stop-loss; the attach failed and so did the safety
+    #                  close. This function persisted `stopLoss: sl_price`
+    #                  for it, so the loop's own management believed a stop
+    #                  was in force at the broker, and the client was told
+    #                  "placed, with your stop".
+    #   SAFETY_CLOSED  the position opened and was immediately closed again.
+    #                  This function persisted it as OPEN. The client was
+    #                  told they held a trade that no longer existed, and
+    #                  the next tick would manage a position that was gone.
+    #
+    # The autonomous loop has handled both for a long time (see the
+    # UNPROTECTED and SAFETY_CLOSED branches in `_loop`). `force_trade` is
+    # what Approve and the bot's own /buy go through, and it handled
+    # neither — so the one path where a human explicitly said "do this" was
+    # the one that lied about the outcome.
+    _status = str((_res or {}).get("status") or "").strip().upper()
+    if _status == "UNPROTECTED":
+        # Persisted so the loop keeps managing it — it is a real position
+        # and abandoning it is worse — but with NO stop recorded, because
+        # there is none. `None` is what makes the loop's own UNPROTECTED
+        # handling and the trailing logic treat it correctly.
+        _persist_open_position(user_id, cfg, {
+            "side": side, "entryPrice": (_res.get("fillPrice") or price),
+            "symbol": sym, "units": units,
+            "stopLoss": None, "takeProfit": tp_price, "initialStop": None,
+            "entrySpreadPips": spread,
+            "openedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        # `force_trade` takes no alert function — Approve and /buy both call
+        # it without one — so the sink is resolved the same way a loop's is.
+        # For a platform client that reaches the safety notification; for a
+        # legacy chat with nothing supplied it stays None, exactly as before.
+        try:
+            _alert = _alert_fn_for(user_id, None)
+            if _alert:
+                _alert(user_id, {"action": "UNPROTECTED", "symbol": sym,
+                                 "price": _res.get("fillPrice")})
+        except Exception as _ae:                             # noqa: BLE001
+            print(f"[UserLoop:{user_id}] could not alert on the unprotected "
+                  f"{sym} position ({type(_ae).__name__}) — the refusal below "
+                  f"is the client's only notice")
+        return {"ok": False, "error": "OPEN_WITHOUT_STOP", "side": side,
+                "symbol": sym, "units": units,
+                "entryPrice": _res.get("fillPrice") or price,
+                "detail": (_res.get("reason") or
+                           "the broker would not accept a stop-loss and the "
+                           "position could not be closed again")}
+    if _status == "SAFETY_CLOSED":
+        # NOT persisted as open: it is not. Reported as refused rather than
+        # placed, so the client is not told they hold something they do not.
+        return {"ok": False, "error": "OPENED_AND_CLOSED", "side": side,
+                "symbol": sym, "units": units,
+                "entryPrice": _res.get("fillPrice"),
+                "exitPrice": _res.get("exitFillPrice"),
+                "detail": (_res.get("reason") or
+                           "the broker would not accept a stop-loss, so the "
+                           "position was closed again immediately")}
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     open_pos = {"side": side, "entryPrice": price, "symbol": sym,

@@ -551,14 +551,46 @@ def _refusal(user_id, corr, symbol, side, result):
     side by side in `approve`, where the one thing a reader needs to check is
     that placed, unknown and refused are three different answers.
     """
-    why = str(result.get("error") or "the order was refused")
+    code = str(result.get("error") or "")
+    # THE SENTENCE, NOT JUST THE CODE. `force_trade` returns a gate reason in
+    # `error` and the explanation in `detail`, and this used to drop the
+    # second — so the client read `ORDER_REFUSED: RISK_HALTED`, or
+    # `ORDER_REFUSED: not the owning instance (...)`, for about fifteen
+    # situations with fifteen different next steps.
+    detail = str(result.get("detail") or "")
+    why = f"{code} — {detail}" if code and detail else (
+        detail or code or "the order was refused")
+
+    # TWO OUTCOMES HERE ARE NOT "NOTHING HAPPENED", and the difference is the
+    # client's money. `force_trade` refuses with these after the broker has
+    # already opened something.
+    if code == "OPEN_WITHOUT_STOP":
+        title = f"{side} {symbol} is OPEN with no stop-loss"
+        body = (f"You approved it, the broker opened it, and it would not "
+                f"accept the stop-loss — and it could not be closed again "
+                f"either. The position is live with no protection. Open "
+                f"cTrader and either set a stop on it or close it.")
+        level = _notify.CRITICAL
+    elif code == "OPENED_AND_CLOSED":
+        title = f"{side} {symbol} opened and was closed again"
+        body = (f"You approved it and the broker opened it, then would not "
+                f"accept the stop-loss, so it was closed again immediately "
+                f"for safety. You are not holding this position. Nothing "
+                f"needs doing, and the automation will look for the next "
+                f"setup.")
+        level = _notify.WARNING
+    else:
+        title = f"{side} {symbol} was not opened"
+        body = f"You approved it and it was not placed: {why}"
+        level = _notify.WARNING
+
     _quietly(_jstore.record_error, f"approval {side} {symbol}: {why}",
              correlation_id=corr, user_id=user_id, symbol=symbol)
-    _quietly(_notify.notify, user_id, type=_notify.ORDER,
-             level=_notify.WARNING, title=f"{side} {symbol} was not opened",
-             body=f"You approved it and it was not placed: {why}",
-             correlation_id=corr)
-    return ApprovalRefused(ORDER_REFUSED, why)
+    _quietly(_notify.notify, user_id, type=_notify.ORDER, level=level,
+             title=title, body=body, correlation_id=corr,
+             link="/positions" if code == "OPEN_WITHOUT_STOP" else None)
+    return ApprovalRefused(ORDER_REFUSED, body if code in
+                           ("OPEN_WITHOUT_STOP", "OPENED_AND_CLOSED") else why)
 
 
 def reject(user_id, *, now=None):
