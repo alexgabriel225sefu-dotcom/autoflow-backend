@@ -574,6 +574,39 @@ def is_platform_account(user_id) -> bool:
         return False
 
 
+def selected_mode(user_id):
+    """Which environment this client's SELECTED account trades in, or None.
+
+    None means "not a platform account" — there is no connection to read a
+    mode from. Every other answer is one of MODES.
+
+    WHY THE ORDER GATE NEEDS THIS, AND WHY IT IS HERE
+
+    `gates._live` answers "is real money at stake?" from the user record's
+    `paper` flag, which only the legacy Telegram path ever writes. A platform
+    client's record has no such flag, so that question answered "no" for
+    every platform account — including one trading a LIVE cTrader account.
+    Every gate behind it (the release switch, the paid plan, the mode the
+    broker confirms, the order rate limit, the audit trail) was therefore
+    unreachable for exactly the accounts it was written to protect.
+
+    Like `is_platform_account`, this must be answerable WITHOUT importing the
+    live path: `audit.py` refuses at import without a shared backend, so the
+    gate has to learn what kind of account this is before it may import
+    anything that could refuse. That ordering is load-bearing, not tidiness.
+
+    A missing `selectedMode` reads as UNKNOWN rather than DEMO. An account
+    nobody has confirmed the environment of is not evidence of safety, and
+    the caller treats anything that is not DEMO as real money.
+    """
+    try:
+        rec = _read_conn(str(user_id))
+    except LinkError:
+        return None
+    mode = str(rec.get("selectedMode") or "").strip().lower()
+    return mode if mode in MODES else UNKNOWN
+
+
 def public_status(user_id):
     """What may be shown in a browser. Carries no token, ever.
 

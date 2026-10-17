@@ -67,6 +67,37 @@ def _live(user):
     return not (user or {}).get("paper", True)
 
 
+def _platform_mode(user_id):
+    """"demo" / "live" / "unknown" for a platform account, None otherwise.
+
+    THE HOLE THIS CLOSES, AND IT MADE EVERY LIVE GATE DECORATIVE
+
+    `_live` reads the user record's `paper` flag. Nothing in apex/platform
+    writes that flag — only `telegram._handle_paper` does — so for every
+    platform client `_live` returned False, whatever account they had
+    selected at the broker. `live` being False is what skips the broker
+    environment check, the ownership live lease, the ledger's fail-closed
+    claim and the whole of step 5b: the release switch, the paid plan, the
+    broker-confirmed mode and the audit trail.
+
+    So the platform's live safety was unreachable for platform accounts. It
+    reads as working because no platform client can select a live account
+    yet — `ctrader_link.select_account` refuses while the release switch is
+    closed — which means today's blast radius is nil and the day the switch
+    opens it would have been total. Same shape as every other bug this week:
+    a mechanism that cannot fire looks exactly like one that passes.
+
+    Imports ctrader_link ONLY, which imports clean. See the note in step 5b:
+    importing the live path to ask this question takes the legacy engine down
+    on a deployment with no shared backend.
+
+    Raises on a store it could not read, so the caller fails closed. "We
+    cannot tell" is not "no real money here".
+    """
+    from apex.platform import ctrader_link as _ctl
+    return _ctl.selected_mode(user_id)
+
+
 def live_entitlement(user_id, user=None):
     """May this account open NEW live positions? allowed / denied / unknown.
 
@@ -120,6 +151,52 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
         return Decision(False, "STORE_UNREACHABLE", str(e)[:120]), None
     live = _live(u)
 
+    # 0. WHOSE ACCOUNT IS THIS, and is real money at stake? Asked once, here,
+    #    because every check below branches on the answer and two of them
+    #    answer it differently if left to themselves.
+    #
+    #    `_live` above is the LEGACY answer: the stored paper flag, which only
+    #    the Telegram path writes. For a platform client it is always False.
+    #    See _platform_mode for what that cost.
+    #
+    #    THE DISTINCTION THAT MAKES THIS SAFE TO ASK AT ALL
+    #
+    #    `_live` cannot tell "paper is stored as True" from "there is no
+    #    paper key", because `.get("paper", True)` collapses them. They are
+    #    completely different statements:
+    #
+    #      * stored True  — the Telegram path positively marked this order as
+    #        simulated. There is no real money, whatever any other system
+    #        thinks, and nothing needs asking.
+    #      * key absent   — nobody has said anything. Every platform record
+    #        is in this state, including one trading a live account.
+    #
+    #    Separating them is what keeps `tests/test_final_hardening.py`
+    #    honest: it installs a DOWN store and requires that a demo order
+    #    still runs. That invariant is right and deliberate — refusing to
+    #    simulate because a store blipped is a cost with no matching danger,
+    #    the same reasoning step 2 gives for not holding DEMO to broker
+    #    confirmation. A blanket fail-closed here broke it.
+    #
+    #    It also keeps the legacy hot path free: an explicitly-paper order
+    #    pays for no extra store read.
+    is_platform = False
+    if u.get("paper") is not True:
+        try:
+            _pmode = _platform_mode(user_id)
+        except Exception as e:
+            # Fails closed, and ONLY for an account nobody has declared
+            # simulated. A store that cannot be read cannot rule out a live
+            # platform account, and "we could not tell" must never be spent
+            # as "no real money here".
+            print(f"[Gates] could not classify {user_id}: {e}")
+            return Decision(False, "LIVE_CLASSIFY_FAILED", str(e)[:120]), None
+        is_platform = _pmode is not None
+        if is_platform and _pmode != "demo":
+            # live, or a mode the broker would not confirm. Both are real
+            # money until proven otherwise, and step 5b §3 is what proves it.
+            live = True
+
     # 1. Entitlement. UNKNOWN denies for live money, allows for a simulation.
     ent, why = live_entitlement(user_id, u)
     if ent == "denied":
@@ -138,7 +215,15 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     #    this check, because an existing position must keep being managed
     #    exactly when verification is degraded — refusing to close is the one
     #    outcome worse than refusing to open.
-    if live:
+    #
+    #    LEGACY ACCOUNTS ONLY. `account_mode.resolve` reads broker fields off
+    #    the user record, and a platform client's record has none of them, so
+    #    for them it can only ever answer UNVERIFIED. The platform asks the
+    #    same question properly in step 5b §3 — the mode as the BROKER
+    #    reports it — and routing a platform order through this check instead
+    #    would deny it with a reason that is about the legacy record rather
+    #    than about the account.
+    if live and not is_platform:
         try:
             mode, _src = account_mode.resolve(u)
         except Exception as e:
@@ -238,43 +323,35 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     #     returns None when the account has no platform connection, which is
     #     every Telegram-bot user — they traded through this gate for a long
     #     time before the platform existed and their path is unchanged.
-    if live:
-        # WHETHER THIS IS A PLATFORM ACCOUNT IS ASKED FIRST, AND SEPARATELY.
-        #
-        # Not a tidiness choice. `apex/platform/audit.py` refuses AT IMPORT on
-        # a process with no shared backend — correctly, §7 permits no live
-        # order without a trail — and `live_execution` imports it. So merely
-        # importing the live path to find out "this is not a platform
-        # account" raised SharedBackendRequired and denied the order.
-        #
-        # Every Telegram-bot live order went through that branch. The legacy
-        # engine's own safety tests caught it, with the words
-        # "this would stop legitimate live trading", which is exactly what it
-        # did. `is_platform_account` lives in ctrader_link, which imports
-        # clean, so the cheap question is answered before the expensive
-        # import happens at all.
+    #     WHETHER THIS IS A PLATFORM ACCOUNT WAS ASKED IN STEP 0, AND
+    #     SEPARATELY FROM IMPORTING ANY OF THIS.
+    #
+    #     Not a tidiness choice. `apex/platform/audit.py` refuses AT IMPORT on
+    #     a process with no shared backend — correctly, §7 permits no live
+    #     order without a trail — and `live_execution` imports it. So merely
+    #     importing the live path to find out "this is not a platform
+    #     account" raised SharedBackendRequired and denied the order.
+    #
+    #     Every Telegram-bot live order went through that branch. The legacy
+    #     engine's own safety tests caught it, with the words
+    #     "this would stop legitimate live trading", which is exactly what it
+    #     did. Step 0 asks ctrader_link, which imports clean, so the cheap
+    #     question is answered before the expensive import happens at all.
+    if live and is_platform:
         try:
-            from apex.platform import ctrader_link as _ctl
-            _is_platform = _ctl.is_platform_account(user_id)
+            from apex.platform import live_execution as _live_exec
+            _pv = _live_exec.guard_engine_order(
+                user_id, symbol=symbol, side=side, units=units,
+                origin=origin)
         except Exception as e:
-            print(f"[Gates] could not classify {user_id}: {e}")
+            # Fails closed, like every other branch in this function — but
+            # only for accounts the platform actually owns. A missing audit
+            # backend denying a platform live order is §7 working.
+            print(f"[Gates] platform live guard failed for {user_id}: {e}")
             return Decision(False, "LIVE_GUARD_FAILED", str(e)[:120]), None
-
-        if _is_platform:
-            try:
-                from apex.platform import live_execution as _live_exec
-                _pv = _live_exec.guard_engine_order(
-                    user_id, symbol=symbol, side=side, units=units,
-                    origin=origin)
-            except Exception as e:
-                # Fails closed, like every other branch in this function — but
-                # now only for accounts the platform actually owns. A missing
-                # audit backend denying a platform live order is §7 working.
-                print(f"[Gates] platform live guard failed for {user_id}: {e}")
-                return Decision(False, "LIVE_GUARD_FAILED", str(e)[:120]), None
-            if _pv is not None and not _pv.get("allowed"):
-                return Decision(False, _pv.get("code") or "LIVE_REFUSED",
-                                f"{_pv.get('gate')}: {_pv.get('detail')}"), None
+        if _pv is not None and not _pv.get("allowed"):
+            return Decision(False, _pv.get("code") or "LIVE_REFUSED",
+                            f"{_pv.get('gate')}: {_pv.get('detail')}"), None
 
     # 6. Idempotency, last — so the claim is only taken for a request that has
     #    already cleared everything else.

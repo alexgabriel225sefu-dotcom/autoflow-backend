@@ -32,6 +32,7 @@ from apex.platform import automation as _auto
 from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
 from apex.platform import ctrader_link as _link
+from apex.platform import emergency as _emerg
 from apex.platform import engine_config as _ecfg
 from apex.platform import entitlement as _ent
 from apex.platform import health as _health
@@ -186,8 +187,39 @@ def handle(method, path, headers=None, body=None, *, client_key=None):
     an access log for the platform, and logging every route would bury the
     handful of lines that answer "what happened to this connection attempt".
     """
-    result = _handle(method, path, headers=headers, body=body,
-                     client_key=client_key)
+    # LAST RESORT, SO NO EXCEPTION CAN EVER PRODUCE A DEAD SOCKET.
+    #
+    # `_handle`'s clause list is long and still finite: it ended at
+    # ValueError, and `emergency.Halted` — a RuntimeError — walked straight
+    # past it. Neither transport guards the call either, so the failure mode
+    # was not a 500 but NO RESPONSE: the connection closed with no status
+    # line and every client read it as "Failed to fetch".
+    #
+    # A 500 is a bad answer. No answer is a worse one, because it is
+    # indistinguishable from the network being down and tells the client to
+    # go and check their wifi. This turns the whole class into one honest
+    # refusal, and prints the real cause where an operator can find it.
+    #
+    # Deliberately does NOT swallow the None that means "this path is not
+    # ours": that return value is how this module mounts inside another
+    # server, and turning it into a 500 would answer for routes it does not
+    # own.
+    try:
+        result = _handle(method, path, headers=headers, body=body,
+                         client_key=client_key)
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[API] unhandled {type(e).__name__} on "
+              f"{(method or 'GET').upper()} {path}: {e}")
+        # Says nothing about whether the request took effect, because this
+        # branch cannot know: the exception may have been raised after a
+        # partial write. Claiming "nothing was changed" would be the exact
+        # habit this codebase keeps paying for — a screen asserting a state
+        # it has not verified. So it names what to check instead.
+        return _err(500, "INTERNAL_ERROR",
+                    "something went wrong on our side handling this "
+                    "request, and we cannot tell whether it took effect. "
+                    "Check the screen again before retrying. The fault is "
+                    "ours and has been logged.")
     try:
         route = (path or "")[len(PREFIX):].split("?", 1)[0].strip("/") \
             if (path or "").startswith(PREFIX) else ""
@@ -287,6 +319,22 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         return _err(409, e.code, str(e))
     except _auto.AutomationRefused as e:
         return _err(409, e.code, e.detail)
+    except _emerg.Halted as e:
+        # THE ONE REFUSAL THE CLIENT COULD NOT READ, AND IT IS THE MOST
+        # IMPORTANT ONE IN THE PRODUCT.
+        #
+        # `Halted` is a RuntimeError and the clause list below ended at
+        # ValueError, so a start refused by the emergency switch escaped
+        # `_handle` entirely. Nothing above caught it either: `handle` called
+        # `_handle` unguarded and both transports call `handle` unguarded, so
+        # the socket closed with no status line and the browser showed
+        # "Failed to fetch". An operator pulls the emergency stop and every
+        # client sees a network error.
+        #
+        # 503, not 409. A halt is not a conflict with the request — the
+        # request was fine and the service is deliberately stopped. That
+        # distinction is what tells a client this is not theirs to fix.
+        return _err(503, e.code, str(e), scope=e.scope)
     except _preview.PreviewRefused as e:
         # INSUFFICIENT_DATA is a 422: the request was understood and the data
         # to answer it was not there. A 400 would say the client malformed it.

@@ -229,8 +229,8 @@ check("gates.authorize_order exists", bool(_auth))
 check("and it calls the platform's live guard",
       "guard_engine_order" in _auth,
       "the one function that applies §1, §2, §3 and §9 to an engine order")
-check("and only for a live account",
-      "if live:" in _auth,
+check("and only for a live PLATFORM account",
+      "if live and is_platform:" in _auth,
       "a demo order must not pay for a broker round trip it does not need")
 # Placement, not merely presence: before the claim, after the local checks.
 # Same two reasons the portfolio check sits where it does.
@@ -254,10 +254,25 @@ check("and it fails CLOSED",
 # on prose describing the thing it guards against.
 _IMP = "from apex.platform import live_execution"
 check("it classifies the account BEFORE importing the live path",
-      "is_platform_account" in _auth and _IMP in _auth
-      and _auth.index("is_platform_account") < _auth.index(_IMP),
+      "_platform_mode(user_id)" in _auth and _IMP in _auth
+      and _auth.index("_platform_mode(user_id)") < _auth.index(_IMP),
       "importing the live path to find out it does not apply takes the "
       "legacy engine down with it wherever there is no shared backend")
+# AND THE CLASSIFIER ITSELF MUST STAY CHEAP, which the original check could
+# not see. The ordering above is worth nothing if the function that answers
+# "is this a platform account, and is it live?" reaches the heavy path to do
+# it — the import would simply move one frame down and take the engine with
+# it exactly as before. `ctrader_link` imports clean; `live_execution` and
+# `audit` do not.
+_pm = body_src_of_tree(GATES_TREE, GATES_SRC, "_platform_mode")
+check("the classifier exists", bool(_pm))
+check("and it does not reach the live path to answer",
+      "live_execution" not in _pm and "import audit" not in _pm,
+      "the cheap question must stay cheap, or the ordering above is a fiction")
+check("it reads the mode the BROKER confirmed, not a local flag",
+      "selected_mode" in _pm,
+      "`paper` is only ever written by the Telegram path, so reading it "
+      "answered 'no real money' for every platform account that existed")
 
 # ── 1b. and that one path actually runs every gate ──────────────────────────
 # The half of the rewrite that matters more than the import graph.
