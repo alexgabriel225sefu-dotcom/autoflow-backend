@@ -8,6 +8,12 @@ import time
 from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Tests are a development environment and say so explicitly: user_store now
+# REFUSES to start without TOKEN_ENCRYPTION_KEY rather than falling back to
+# plaintext, and that refusal is the behaviour under test elsewhere.
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 from apex import strategies  # noqa: E402
 
@@ -87,7 +93,10 @@ weak = {"breakoutStr": "NONE"}
 bull = {"strength": 0.85}
 flat_lv = {"strength": 0.2}
 m = strategies.druckenmiller_multiplier(90, 5, bull, strong)
-check("high conviction → capped at 2.0", m == 2.0, m)
+# Cap was walked down 2.0 → 1.5 → 1.2 (a1c08bfd, "ATR stops widened + caps
+# tightened"). This is a sizing multiplier: conviction may add 20% to a
+# position, never double it. Raising it again is a real risk decision.
+check("high conviction → capped at 1.2", m == 1.2, m)
 m = strategies.druckenmiller_multiplier(60, 1, flat_lv, weak)
 check("low conviction → floored at 0.4+", 0.4 <= m <= 0.6, m)
 m = strategies.druckenmiller_multiplier(78, 3, flat_lv, weak)
@@ -98,18 +107,37 @@ fresh_session()
 r = strategies.should_stop(1000, 1000)
 check("clean session → no stop", r["stop"] is False, r)
 
+# The Seykota "3 losses in a row" stand-aside was REMOVED at the owner's
+# instruction. A streak of red results no longer halts anything — what stops
+# the account is how much money is gone, not how many outcomes in a row were
+# losses. These checks pin the removal, and pin that the money limits below
+# were not weakened along with it.
 fresh_session()
 strategies.session["consecutiveLosses"] = 3
-strategies.session["lastLossAt"] = time.time()  # just lost — still inside cooldown
+strategies.session["lastLossAt"] = time.time()      # just lost, no cooldown now
 r = strategies.should_stop(1000, 1000)
-check("3 consecutive losses → stop (Seykota)", r["stop"] and any("consecutive" in x for x in r["reasons"]), r)
+check("3 consecutive losses no longer stop trading", r["stop"] is False, r)
+check("and no Seykota reason is produced",
+      not any("Seykota" in x or "consecutive" in x for x in r["reasons"]), r)
 
 fresh_session()
-strategies.session["consecutiveLosses"] = 3
-strategies.session["lastLossAt"] = time.time() - 61 * 60  # cooldown elapsed
+strategies.session["consecutiveLosses"] = 12         # a long run of red
 r = strategies.should_stop(1000, 1000)
-check("Seykota cooldown expires → streak clears, no stop",
-      r["stop"] is False and strategies.session["consecutiveLosses"] == 0, r)
+check("nor does a much longer streak", r["stop"] is False, r)
+
+# Still COUNTED, so the journal and dashboard keep telling the truth — it
+# just no longer gates anything.
+check("the streak is still recorded",
+      strategies.session["consecutiveLosses"] == 12,
+      "removing the gate must not stop the bot knowing what happened")
+
+# The protections that remain must still bite, and they are about money.
+fresh_session()
+strategies.session["consecutiveLosses"] = 3
+strategies.session["dailyPnL"] = -50.0
+r = strategies.should_stop(950, 1000)
+check("a losing streak plus a real daily loss still stops",
+      r["stop"] and any("Daily loss" in x for x in r["reasons"]), r)
 
 fresh_session()
 strategies.session["dailyPnL"] = -50.0
@@ -124,7 +152,15 @@ check("drawdown > 20% from peak → stop", r["stop"] and any("Drawdown" in x for
 fresh_session()
 strategies.session["dailyTrades"] = 10
 r = strategies.should_stop(1000, 1000)
-check("10 trades/day → stop (Turtle)", r["stop"] and any("10 trades" in x for x in r["reasons"]), r)
+# The trades/day cap was removed on purpose (6a0bc7af) — a good setup is a
+# good setup regardless of how many came before it. Asserted as a REQUIREMENT,
+# not an omission: re-adding a silent cap here would stop a live account
+# mid-session with no other circuit breaker having fired.
+check("trade count alone never stops trading (cap removed by design)",
+      r["stop"] is False and not r["reasons"], r)
+strategies.session["dailyTrades"] = 999
+check("still no stop at an absurd trade count",
+      strategies.should_stop(1000, 1000)["stop"] is False)
 
 fresh_session()
 r = strategies.should_stop(0.5, 1000)
@@ -157,6 +193,67 @@ fresh_session()
 out = strategies.analyze(make_candles([100 + i for i in range(30)]))
 keys = {"turtle", "livermore", "soros", "meanReversion", "session"}
 check("contains all strategy blocks", keys.issubset(out.keys()), sorted(out.keys()))
+
+print("\n10. Capital-base changes must never brick an account")
+# The client journey that used to kill the bot: grow a small deposit, withdraw
+# the profit, start again. peakBalance only ratchets upward, so the fresh
+# deposit reads as a near-total drawdown, should_stop() halts every tick, no
+# trade can run to recover it and no setting reaches the peak.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 100.0
+strategies.should_stop(100.0, 100.0, max_dd_pct=20)          # peak = 100
+check("withdrawal to 10 would halt the account outright",
+      strategies.should_stop(10.0, 10.0, max_dd_pct=20)["stop"] is True)
+
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 100.0
+strategies.rescale_peak(100.0, 10.0)                          # withdrew 90
+r = strategies.should_stop(10.0, 10.0, max_dd_pct=20)
+check("after rescale it trades again on the smaller base", r["stop"] is False, r)
+check("peak follows the capital base (100 -> 10)",
+      abs(strategies.get_session(None)["peakBalance"] - 10.0) < 1e-9,
+      strategies.get_session(None)["peakBalance"])
+
+# Proportional, not by cash delta: shifting by the delta strands the peak far
+# above the new base whenever the account was already below its peak.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 6309.44
+strategies.rescale_peak(6256.97, 10.74)                       # the real case
+_p = strategies.get_session(None)["peakBalance"]
+check("a real -0.83% drawdown is preserved across the withdrawal",
+      abs((10.74 - _p) / _p * 100 + 0.83) < 0.05, (10.74 - _p) / _p * 100)
+check("delta-shifting would have left it at 63.21 and still halted",
+      _p < 11.0, _p)
+
+# A deposit is the same event in reverse.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 120.0
+strategies.rescale_peak(100.0, 200.0)                         # doubled the account
+check("deposit scales the peak up too",
+      abs(strategies.get_session(None)["peakBalance"] - 240.0) < 1e-9,
+      strategies.get_session(None)["peakBalance"])
+
+print("\n11. A REAL drawdown is still protected")
+# The whole point of the breaker. Losing money by trading must keep halting,
+# including across the restarts Render performs on every deploy.
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 100.0
+check("-25% from peak still stops (limit 20%)",
+      strategies.should_stop(75.0, 100.0, max_dd_pct=20)["stop"] is True)
+check("peak is NOT quietly lowered by the stop check",
+      strategies.get_session(None)["peakBalance"] == 100.0,
+      strategies.get_session(None)["peakBalance"])
+check("-15% from peak keeps trading (inside the limit)",
+      strategies.should_stop(85.0, 100.0, max_dd_pct=20)["stop"] is False)
+
+print("\n12. reset_peak is the manual escape hatch (/resetstats)")
+fresh_session()
+strategies.get_session(None)["peakBalance"] = 6309.44
+check("stale peak halts", strategies.should_stop(10.74, 10.74, max_dd_pct=90)["stop"] is True)
+strategies.reset_peak(10.74)
+check("after /resetstats it trades",
+      strategies.should_stop(10.74, 10.74, max_dd_pct=90)["stop"] is False)
+
 
 # ─── Result ───────────────────────────────────────────────
 print("\n" + "=" * 50)
