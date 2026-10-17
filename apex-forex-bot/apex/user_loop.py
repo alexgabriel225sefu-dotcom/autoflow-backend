@@ -1250,6 +1250,51 @@ def _looks_like_auth_error(msg: str) -> bool:
         "invalid_request", "access", "unauthor"))
 
 
+def _refresh_platform_token(user_id, cfg) -> bool:
+    """Refresh a PLATFORM client's cTrader token, or False if not one.
+
+    Delegates rather than reimplementing: `get_ctrader_connection` runs
+    `access_token_for`, which refreshes a token near expiry and persists the
+    result to the platform namespace — the only store that owns it.
+
+    Returns False for a Telegram account so the caller falls through to the
+    legacy path unchanged, and False when the refresh genuinely failed, which
+    the caller reports the same way it always has.
+    """
+    try:
+        from apex.platform import ctrader_link as _link
+        if not _link.is_platform_account(user_id):
+            return False
+    except Exception:                                        # noqa: BLE001
+        return False
+    try:
+        conn = _link.get_ctrader_connection(user_id)
+    except Exception as e:                                   # noqa: BLE001
+        # LinkError here means the connection exists and could not be made
+        # usable — an expired token whose refresh failed. The client has to
+        # reconnect, and the platform's own screens already say so.
+        print(f"[UserLoop:{user_id}] platform token refresh failed: "
+              f"{type(e).__name__}: {e}")
+        return False
+    if not conn or not conn.get("accessToken"):
+        return False
+    if conn["accessToken"] == getattr(cfg, "CTRADER_ACCESS_TOKEN", None):
+        # Nothing changed, so nothing is fixed. Saying True here would make
+        # the caller report a successful self-heal and retry the same dead
+        # connection forever.
+        return False
+    cfg.CTRADER_ACCESS_TOKEN = conn["accessToken"]
+    try:
+        from apex.brokers import ctrader as _ct
+        _ct._drop_conn(getattr(cfg, "CTRADER_ENV", "demo"),
+                       cfg.CTRADER_ACCOUNT_ID)
+    except Exception:                                        # noqa: BLE001
+        pass
+    print(f"[UserLoop:{user_id}] platform cTrader token refreshed + "
+          f"reconnected")
+    return True
+
+
 def _refresh_ctrader_token(user_id, cfg) -> bool:
     """Self-heal a cTrader connection: swap the expired access token for a fresh
     one using the stored refresh token, persist it, and drop the pooled
@@ -1258,6 +1303,26 @@ def _refresh_ctrader_token(user_id, cfg) -> bool:
     keep retrying.)"""
     try:
         from apex.brokers import ctrader as _ct
+        # A PLATFORM CLIENT HAS NO REFRESH TOKEN HERE, AND NEVER WILL.
+        #
+        # Their credentials live in the platform namespace keyed by Supabase
+        # id; `ctrader_link` is deliberate that nothing copies them onto the
+        # user record, because one secret in two namespaces is two places to
+        # rotate, revoke and leak. So both reads below came back empty and
+        # this returned False — the loop could never refresh, and when the
+        # access token expired it simply went blind against the broker.
+        # Silently, for however long the client left it running.
+        #
+        # Worse, the legacy branch below PERSISTS the new tokens to the user
+        # record. Even if a platform client had somehow had one, the refreshed
+        # token would have been written where the platform does not read.
+        #
+        # So the platform's own canonical path does the work:
+        # `get_ctrader_connection` calls `access_token_for`, which refreshes
+        # when the token is near expiry and writes the result back to the one
+        # store that owns it. One refresh path, not two that must agree.
+        if _refresh_platform_token(user_id, cfg):
+            return True
         refresh = (getattr(cfg, "CTRADER_REFRESH_TOKEN", "")
                    or user_store.load(user_id).get("ctrader_refresh_token", ""))
         if not refresh:
