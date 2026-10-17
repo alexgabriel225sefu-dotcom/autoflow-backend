@@ -18,6 +18,8 @@ import re
 import time
 import uuid
 
+from apex import forex as _forex
+
 # ── states ──────────────────────────────────────────────────────────────────
 DRAFT = "draft"
 ACTIVE = "active"
@@ -53,6 +55,48 @@ class RuleDocInvalid(ValueError):
 
 def new_id():
     return uuid.uuid4().hex
+
+
+def normalise_symbols(doc):
+    """The doc with its instruments in ONE canonical spelling.
+
+    THE PROBLEM THIS SOLVES, SEEN ON A PHONE
+
+    The instruments field is free text and was stored exactly as typed. An
+    autocorrect produced `EURUSd` and the rule saved with it; `eurusd`,
+    `EUR_USD` and `eur/usd` would each have stored differently too. Same
+    instrument, four documents that do not compare equal — and the rule
+    summary, the journal and the engine config all print back whatever was
+    typed, so the client sees their own typo quoted as if it were a product
+    term.
+
+    `forex._norm` is the form the rest of this codebase already compares on:
+    uppercase, separators removed. Normalising HERE rather than at each
+    reader means there is one spelling in the store, which is the only way
+    two rules on the same instrument can ever be recognised as such.
+
+    Returns a new dict; the input is not mutated. Anything that is not a
+    list of strings is left exactly as it was, so validation still reports
+    the real problem instead of this function hiding it behind a TypeError.
+    """
+    syms = (doc or {}).get("symbols")
+    if not isinstance(syms, list):
+        return dict(doc or {})
+    out, seen = [], set()
+    for s in syms:
+        if not isinstance(s, str):
+            return dict(doc)            # let validate() report it properly
+        # Stripped first: a phone keyboard adds a trailing space and
+        #  does not remove whitespace, so " EURUSD " survived as its
+        # own spelling. Found by the test that asserts all forms collapse.
+        norm = _forex._norm(s.strip())
+        if not norm or norm in seen:
+            # A duplicate after normalising — `EURUSD, eurusd` — is one
+            # instrument written twice, not two.
+            continue
+        seen.add(norm)
+        out.append(norm)
+    return dict(doc, symbols=out or syms)
 
 
 def _err(problems, field, msg):
@@ -223,6 +267,25 @@ def validate(doc, *, known_condition_ids=None, known_strategy_ids=None):
         _err(problems, "symbols", "at least one instrument is required")
     elif not all(isinstance(s, str) and s.strip() for s in syms):
         _err(problems, "symbols", "every entry must be a non-empty string")
+    else:
+        # WHICH INSTRUMENT, ASKED HERE RATHER THAN DISCOVERED AT THE ORDER.
+        #
+        # This accepted any non-empty string. A client could save, activate
+        # and start a rule naming something this product does not trade, and
+        # the first sign would be automation that ran and never did anything
+        # — the engine refuses it far downstream, where no screen is looking.
+        # Saying so at the point the rule is written is the whole difference.
+        #
+        # `is_tradeable` is a positive allowlist (FX with a USD leg, plus
+        # metals), so the refusal names what IS accepted instead of listing
+        # what is not.
+        bad = [s for s in syms if not _forex.is_tradeable(s)]
+        if bad:
+            _err(problems, "symbols",
+                 f"this platform trades forex majors with a USD leg and "
+                 f"metals — {', '.join(sorted(set(bad)))} "
+                 f"{'is' if len(set(bad)) == 1 else 'are'} outside that. "
+                 f"Try EURUSD, USDJPY or XAUUSD")
 
     if not doc.get("timeframe"):
         _err(problems, "timeframe", "required")

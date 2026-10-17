@@ -99,6 +99,26 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     };
   }, [intervalMs, path, load]);
 
+  // RECOVER WHEN THE NETWORK COMES BACK, which nothing did.
+  //
+  // Seen on a phone during the first walk-through: the device moved from
+  // WiFi to 5G, the in-flight reads failed, and the status bar fell to
+  // "Account Unknown / Automation Unknown". Showing "unknown" rather than
+  // repeating stale data is right — the UI must not claim a demo account it
+  // could not verify — but nothing then tried again. The client had to know
+  // to reload the page, and a client who does not know that reads a working
+  // product as a broken one.
+  //
+  // Deliberately OUTSIDE the interval effect above: a hook created without
+  // `intervalMs` returns early there and so never retried at all, which is
+  // the case the status bar is. Recovery must not depend on polling.
+  useEffect(() => {
+    if (!path) return;
+    const onBack = () => { void load(); };
+    window.addEventListener("online", onBack);
+    return () => window.removeEventListener("online", onBack);
+  }, [path, load]);
+
   return { result, loading, lastSync, reload: load };
 }
 

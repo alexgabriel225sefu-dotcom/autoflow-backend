@@ -282,6 +282,9 @@ def create(owner_id, doc):
     if _read(_k_current(owner_id, rid)) is not None:
         raise ValueError(f"rule {rid} already exists")
     doc.setdefault("state", ruledoc.DRAFT)
+    # Same canonical spelling as save_draft applies. A rule created in one
+    # form and edited in another would otherwise change instrument silently.
+    doc = ruledoc.normalise_symbols(doc)
     doc["updatedAt"] = time.time()
     _write(_k_current(owner_id, rid), doc)
     _index_add(owner_id, rid)
@@ -357,6 +360,13 @@ def save_draft(owner_id, doc):
     ruledoc.assert_editable(current)
 
     out = _merge_patch(current, incoming)
+    # ONE SPELLING PER INSTRUMENT, decided at the write rather than at each
+    # read. The field is free text and was stored exactly as typed, so an
+    # autocorrect that produced `EURUSd` stayed in the document and was quoted
+    # back to the client in the rule summary, the journal and the engine
+    # config as though it were a product term. `eurusd` and `EUR_USD` stored
+    # differently again — same instrument, documents that never compare equal.
+    out = ruledoc.normalise_symbols(out)
 
     out["userId"] = owner_id              # never movable by the request body
     out["ruleDocId"] = rid

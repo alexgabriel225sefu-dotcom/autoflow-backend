@@ -231,4 +231,49 @@ describe("invalidate reaches every reader of a path", () => {
     // longer exists, and React would warn on the state it tried to set.
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  it("reloads when the network comes back", async () => {
+    // SEEN ON A PHONE during the first production walk-through: the device
+    // moved from WiFi to 5G, the in-flight reads failed, and the status bar
+    // fell to "Account Unknown". Saying "unknown" rather than repeating
+    // stale data is correct — the UI must not claim an account it could not
+    // verify — but nothing retried, so the client had to know to reload the
+    // page. A client who does not know that reads a working product as a
+    // broken one.
+    const spy = vi.spyOn(apiModule, "api")
+      .mockResolvedValue({ ok: true, data: {} } as never);
+    const h = renderHook(() => useRead("ctrader/status"));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+    h.unmount();
+  });
+
+  it("recovers even for a reader with no polling interval", async () => {
+    // The recovery listener sits OUTSIDE the interval effect on purpose: a
+    // hook created without intervalMs returns early there and so never
+    // retried at all. The status bar is exactly that case, which is why it
+    // stayed "Unknown" until a manual reload.
+    const spy = vi.spyOn(apiModule, "api")
+      .mockResolvedValue({ ok: true, data: {} } as never);
+    // No interval at all — the status-bar case.
+    const h = renderHook(() => useRead("me"));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+    h.unmount();
+  });
+
+  it("stops listening once the reader unmounts", async () => {
+    const spy = vi.spyOn(apiModule, "api")
+      .mockResolvedValue({ ok: true, data: {} } as never);
+    const gone = renderHook(() => useRead("orders"));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    gone.unmount();
+
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
 });
