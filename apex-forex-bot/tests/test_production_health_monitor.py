@@ -87,6 +87,107 @@ r = M.check_web_stylesheet()
 check("it stands aside when the home page is already alerting",
       r.ok is True and r.detail.get("skipped") is True, r.message)
 
+print("\n[4c] a paused auth backend is caught, because it was not")
+# THE OUTAGE THIS COVERS, AND IT HAPPENED.
+#
+# The Supabase project the platform authenticates against was paused
+# automatically for inactivity. Nobody could log in or create an account —
+# and every check above passed, because authentication goes from the BROWSER
+# straight to Supabase and never touches our API. No failed request on our
+# services, nothing in our logs, and a monitor reporting green on a product
+# that could not be used at all. That is worse than no monitor: it is a
+# reason not to look.
+_PROJ = "https://abcdefghijklmnopqrst.supabase.co"
+_KEY = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIn0."
+        "not-a-real-signature")
+_PAGE = (f'<html><title>Apex4Traders</title>'
+         f'<script src="/_next/static/chunks/auth.js"></script></html>')
+_CHUNK = f'const u="{_PROJ}",k="{_KEY}";'
+
+
+def _serve_login(chunk=_CHUNK, page=_PAGE, page_status=200):
+    def fetch(url):
+        if url.endswith(".js"):
+            return (200, chunk, None)
+        return (page_status, page, None)
+    return fetch
+
+
+class _Resp:
+    """Just enough of an HTTP response for urlopen's context manager."""
+
+    def __init__(self, status, body):
+        self.status, self._b = status, body.encode()
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+_seen_headers = {}
+
+
+def _urlopen(ok_body='{"name":"GoTrue","version":"v2"}', status=200, raise_=None):
+    def opener(req, timeout=None):
+        _seen_headers.clear()
+        _seen_headers.update({k.lower(): v for k, v in req.headers.items()})
+        if raise_ is not None:
+            raise raise_
+        return _Resp(status, ok_body)
+    return opener
+
+
+_real_urlopen = M.urllib.request.urlopen
+try:
+    M.fetch = _serve_login()
+    M.urllib.request.urlopen = _urlopen()
+    r = M.check_auth()
+    check("a reachable sign-in backend passes", r.ok is True, r.message)
+    # THE BUG I WROTE MYSELF while diagnosing the outage: /auth/v1/health
+    # answers 401 without this header, and a probe that omits it reads a
+    # perfectly healthy project as "still down" forever.
+    check("and the probe sends the apikey header",
+          _seen_headers.get("Apikey".lower()) == _KEY,
+          str(sorted(_seen_headers)))
+
+    # A PAUSED project answers 503. The message has to name the remedy,
+    # because it is a restore of something we do not deploy.
+    M.urllib.request.urlopen = _urlopen(
+        raise_=M.urllib.error.HTTPError(_PROJ, 503, "paused", None, None))
+    r = M.check_auth()
+    check("a PAUSED project FAILS the monitor", r.ok is False, r.message)
+    check("and the alert says to restore it",
+          "restore" in r.message.lower(), r.message)
+    check("and says nobody can sign in",
+          "sign in" in r.message.lower(), r.message)
+
+    # The other way sign-in dies: a build that carries no project at all.
+    M.urllib.request.urlopen = _urlopen()
+    M.fetch = _serve_login(chunk="const nothing=1;")
+    r = M.check_auth()
+    check("a build with no Supabase project FAILS", r.ok is False, r.message)
+
+    # And a sign-in backend that answers but is not GoTrue is not a pass.
+    M.fetch = _serve_login()
+    M.urllib.request.urlopen = _urlopen(ok_body="<html>maintenance</html>")
+    r = M.check_auth()
+    check("an unidentified auth response FAILS", r.ok is False, r.message)
+finally:
+    M.urllib.request.urlopen = _real_urlopen
+
+print("\n[4d] the auth check is in the list that actually runs")
+# Writing the check and not calling it would reproduce the outage exactly.
+M.fetch = lambda url: (200, '<html><title>Apex4Traders</title></html>', None)
+check("run() includes the auth check",
+      "check_auth" in open(SCRIPT, encoding="utf-8").read().split("def run(")[1],
+      "a check nothing calls is a check that does not exist")
+
 print("\n[5] the script has no service write verbs")
 src = open(SCRIPT, encoding="utf-8").read().lower()
 check("no POST/PUT/PATCH/DELETE request method is configured",

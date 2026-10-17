@@ -189,9 +189,94 @@ def check_web_stylesheet() -> Result:
                   {"bytes": len(css)})
 
 
+_LOGIN_PAGE = WEB_HOME.rstrip("/") + "/login"
+_SUPABASE_URL = re.compile(r"https://[a-z]{20}\.supabase\.co")
+_ANON_KEY = re.compile(r"eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}")
+_JS_HREF = re.compile(r'"(/_next/static/[^"]+\.js)"')
+
+
+def check_auth() -> Result:
+    """Can anybody actually sign in? The check that was missing.
+
+    WHY THIS EXISTS, WRITTEN THE DAY IT WAS NEEDED
+
+    Every other check here passed — healthz, readyz, the home page, the
+    stylesheet — while NOBODY COULD LOG IN OR CREATE AN ACCOUNT. The Supabase
+    project the platform authenticates against had been paused automatically
+    for inactivity, which is what the free tier does.
+
+    Authentication goes from the BROWSER straight to Supabase; it does not
+    pass through our API. So a paused auth backend produces no error in our
+    logs, no failed request on our services, and no symptom any check here
+    was looking for. The monitor reported green on a product that could not
+    be used at all — which is worse than no monitor, because it is a reason
+    not to look.
+
+    The project reference and the public key are read from the SERVED BUNDLE
+    rather than from configuration, deliberately: that is the pair the
+    client's browser will actually use, and a monitor that checked a value
+    from somewhere else would keep passing after a deploy pointed the web app
+    at a different project.
+
+    `/auth/v1/health` needs the apikey header. Without it the endpoint answers
+    401 and a naive probe reads that as "not up yet" forever — which is how
+    the first version of this check wasted fifteen minutes waiting on a
+    project that had already come back.
+    """
+    status, page, error = fetch(_LOGIN_PAGE)
+    if error:
+        return Result("auth", False, f"login page transport failure: {error}",
+                      {"url": _LOGIN_PAGE})
+    if status != 200:
+        return Result("auth", False, f"login page HTTP {status}",
+                      {"url": _LOGIN_PAGE})
+
+    base = _SUPABASE_URL.search(page)
+    key = _ANON_KEY.search(page)
+    # Next.js puts them in a chunk rather than the HTML, so follow the scripts
+    # the page itself loads. Bounded, because a monitor must not crawl.
+    for href in list(dict.fromkeys(_JS_HREF.findall(page)))[:8]:
+        if base and key:
+            break
+        _s, js, _e = fetch(WEB_HOME.rstrip("/") + href)
+        if _s != 200:
+            continue
+        base = base or _SUPABASE_URL.search(js)
+        key = key or _ANON_KEY.search(js)
+    if not base or not key:
+        return Result("auth", False,
+                      "the served app does not carry a Supabase project and "
+                      "key — sign-in cannot work and nothing else here "
+                      "would notice", {"url": _LOGIN_PAGE})
+
+    url = f"{base.group(0)}/auth/v1/health"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "apex4traders-monitor/1.0", "apikey": key.group(0)})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_SEC) as resp:
+            body = resp.read().decode("utf-8", "replace")
+            code = resp.status
+    except urllib.error.HTTPError as e:
+        # 503 is what a PAUSED project answers. Name it, because the remedy
+        # is a restore and not a redeploy of anything we own.
+        detail = ("the Supabase project is paused or unavailable — restore it; "
+                  "nobody can sign in or create an account"
+                  if e.code in (503, 540) else f"auth returned HTTP {e.code}")
+        return Result("auth", False, detail, {"url": url, "status": e.code})
+    except Exception as e:  # noqa: BLE001
+        return Result("auth", False, f"auth transport failure: {e}",
+                      {"url": url})
+    if code != 200 or "GoTrue" not in body:
+        return Result("auth", False,
+                      f"auth did not identify itself (HTTP {code})",
+                      {"url": url, "body": body[:200]})
+    return Result("auth", True, "sign-in backend is reachable",
+                  {"project": base.group(0)})
+
+
 def run() -> list[Result]:
     return [check_healthz(), check_readyz(), check_web(),
-            check_web_stylesheet()]
+            check_web_stylesheet(), check_auth()]
 
 
 def main() -> int:
