@@ -126,6 +126,42 @@ try:
     check("a stopped automation stays stopped", revived == 0 and not calls,
           "the client stopped it on purpose")
 
+    print("\n[4b] revive actually gets PAST the idempotency guards")
+    # THE BUG THIS SECTION EXISTS FOR, AND IT SHIPPED FOR TWO MINUTES.
+    #
+    # Everything above mocks `AUTO.start` and asserts only that supervise
+    # CALLS it with revive=True. That is a claim about a call, not about
+    # behaviour — and the real `start` has TWO idempotency guards. The first
+    # fix exempted one. The second still raised ALREADY_RUNNING, so the
+    # supervisor refused every account it was built to rescue, and production
+    # logged "0 alive, 0 revived" beside the refusal.
+    #
+    # So this drives the REAL function far enough to prove the guards let a
+    # revival through. It fails at the first check that needs a store, which
+    # is already past both guards — reaching NO_RULE or any later refusal
+    # means the guards did not stop it. ALREADY_RUNNING means they did.
+    AUTO.start = _real_start
+    AUTO._read = lambda uid: {"state": AUTO.RUNNING, "ruleDocId": "rule-1"}
+    got = None
+    try:
+        AUTO.start(PLATFORM_USER, "rule-1", revive=True)
+    except AUTO.AutomationRefused as e:
+        got = e.code
+    except Exception as e:                                   # noqa: BLE001
+        got = type(e).__name__
+    check("a revival is not refused as ALREADY_RUNNING",
+          got != "ALREADY_RUNNING",
+          "revive=True must clear BOTH idempotency guards")
+    # And the guard still protects the case it is actually for: a client
+    # starting a second rule while one runs.
+    got2 = None
+    try:
+        AUTO.start(PLATFORM_USER, "a-different-rule")
+    except AUTO.AutomationRefused as e:
+        got2 = e.code
+    check("but a normal start of a second rule still IS refused",
+          got2 == "ALREADY_RUNNING", str(got2))
+
     print("\n[5] a refusal is survivable and does not stop the sweep")
     # A lapsed trial is the expected case over a weekend. It must refuse, say
     # why, and leave the record alone — not crash the supervisor.

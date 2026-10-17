@@ -279,7 +279,18 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
         # client exactly as stuck as the bug it is there to fix. Only this
         # guard is skipped; every check below still runs.
         return dict(status(user_id), started=False, alreadyRunning=True)
-    if rec.get("state") == RUNNING:
+    if rec.get("state") == RUNNING and not revive:
+        # The SECOND idempotency guard, and it needs the same exemption as the
+        # first. It catches starting a DIFFERENT rule while one runs, which is
+        # a real refusal for a client — and it caught `supervise` too, so the
+        # first version of the revival refused every account it was built to
+        # rescue. Found in production logs two minutes after deploying it:
+        # "0 alive, 0 revived" with ALREADY_RUNNING beside it.
+        #
+        # The test did not catch it because it mocked `start` and asserted
+        # only that supervise CALLED it with revive=True. Asserting the call
+        # and not the behaviour is how a guard that refuses everything looks
+        # exactly like a guard that works.
         raise AutomationRefused(
             "ALREADY_RUNNING",
             f"automation is already running for rule {rec.get('ruleDocId')}. "
