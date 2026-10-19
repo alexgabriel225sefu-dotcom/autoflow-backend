@@ -32,6 +32,9 @@ string is the one place a credential escapes without anyone deciding to put it
 there.
 """
 
+import time
+
+from apex import forex
 from apex.platform import ctrader_link as _link
 
 # Bounded so a hung broker cannot hold an HTTP worker open indefinitely.
@@ -61,6 +64,10 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
     getter = connection_fn or _link.get_ctrader_connection
     try:
         conn = getter(user_id, ctid=ctid)
+    except _link.LinkConfigError:
+        # A failed token persistence step is an infrastructure failure, not
+        # evidence that the client has no account. Let the API return 503.
+        raise
     except _link.LinkError as e:
         if e.code in ("NO_SUCH_ACCOUNT", "LIVE_BLOCKED"):
             raise
@@ -110,8 +117,103 @@ def _read(user_id, key, call, *, ctid=None, connection_fn=None,
             "mode": conn.get("mode"), key: data}
 
 
+def _quote(broker, symbol):
+    """Return bid, ask, received timestamp from a read-only broker quote."""
+    getter = getattr(broker, "get_quote", None)
+    if callable(getter):
+        quote = getter(symbol)
+        if isinstance(quote, dict):
+            return (quote["bid"], quote["ask"],
+                    quote.get("receivedAt", quote.get("timestamp", time.time())))
+        if len(quote) == 3:
+            return quote
+        bid, ask = quote
+        return bid, ask, time.time()
+    bid, ask = broker.get_bid_ask(symbol)
+    return bid, ask, time.time()
+
+
+def _enrich_positions(broker):
+    rows = broker.get_all_positions()
+    out = []
+    for original in rows:
+        row = dict(original)
+        symbol = row.get("symbol")
+        bid, ask, received_at = _quote(broker, symbol)
+        side = str(row.get("side") or "").upper()
+        current = bid if side == "BUY" else ask if side == "SELL" else None
+        age = max(0.0, time.time() - float(received_at))
+        row["currentPrice"] = current
+        row["quoteAgeSec"] = round(age, 1)
+        row["quoteStale"] = age > 30.0
+
+        stop = row.get("stopLoss")
+        target = row.get("takeProfit")
+        row["hasStop"] = stop is not None
+        if stop is None:
+            row["warning"] = "UNPROTECTED: no stop-loss is attached"
+        row["stopDistancePips"] = (
+            abs(forex.to_pips(current - stop, symbol, current))
+            if current is not None and stop is not None else None)
+        row["targetDistancePips"] = (
+            abs(forex.to_pips(current - target, symbol, current))
+            if current is not None and target is not None else None)
+
+        entry = row.get("entryPrice")
+        units = row.get("units")
+        if (current is not None and not row["quoteStale"] and entry is not None
+                and units is not None and side in ("BUY", "SELL")):
+            direction = 1 if side == "BUY" else -1
+            row["pnlPips"] = round(
+                forex.to_pips((current - entry) * direction, symbol, current), 1)
+            row["pnlAccount"] = round(
+                forex.pnl_usd(side, entry, current, units, symbol), 2)
+            row["pnlIsEstimate"] = not (
+                original.get("pnlPips") is not None
+                and original.get("pnlAccount") is not None)
+        else:
+            row["pnlPips"] = None
+            row["pnlAccount"] = None
+            row["pnlIsEstimate"] = True
+        out.append(row)
+    return out
+
+
 def positions(user_id, **kw):
-    return _read(user_id, "positions", lambda b: b.get_all_positions(), **kw)
+    return _read(user_id, "positions", _enrich_positions, **kw)
+
+
+def _deal_rows(broker, days):
+    if days is None:
+        days = 7
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        raise ValueError("days must be a whole number")
+    if days < 1 or days > 30:
+        raise ValueError("days must be between 1 and 30")
+    end = int(time.time())
+    history = broker.get_deal_history(end - days * 86400, end)
+    if not isinstance(history, dict) or not history.get("ok"):
+        reason = (history or {}).get("error", "the broker did not return deal history")
+        raise RuntimeError(reason)
+    raw = history.get("deals")
+    if not isinstance(raw, dict):
+        raise RuntimeError("the broker returned an invalid deal history")
+    return [{
+        "symbol": row.get("symbol"),
+        "side": row.get("side"),
+        "units": row.get("units"),
+        "entry": row.get("entryPrice"),
+        "exit": row.get("exitPrice"),
+        "net": row.get("netPnl"),
+        "closedAt": row.get("closedAt"),
+        "positionId": row.get("positionId"),
+    } for row in raw.values()]
+
+
+def deals(user_id, *, days=7, **kw):
+    return _read(user_id, "deals", lambda b: _deal_rows(b, days), **kw)
 
 
 def orders(user_id, **kw):

@@ -380,10 +380,20 @@ export type PositionsRead = {
   positions?: Position[];
 };
 export type OrdersRead = Omit<PositionsRead, "positions"> & { orders?: Order[] };
+export type DealsRead = Omit<PositionsRead, "positions"> & { deals?: ClosedTrade[] };
 export type Position = {
   symbol: string; side: "BUY" | "SELL"; units: number;
   entryPrice: number | null; stopLoss: number | null; takeProfit: number | null;
   positionId: number | string;
+  currentPrice?: number | null; quoteAgeSec?: number | null; quoteStale?: boolean;
+  pnlPips?: number | null; pnlAccount?: number | null; pnlIsEstimate?: boolean;
+  stopDistancePips?: number | null; targetDistancePips?: number | null;
+  hasStop?: boolean; warning?: string; openTime?: number | null;
+};
+export type ClosedTrade = {
+  symbol: string | null; side: "BUY" | "SELL" | null; units: number | null;
+  entry: number | null; exit: number | null; net: number | null;
+  closedAt: number | null; positionId?: number | string;
 };
 export type Order = {
   orderId: number | string; symbol: string; side: "BUY" | "SELL"; units: number;

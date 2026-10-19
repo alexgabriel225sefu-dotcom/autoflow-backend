@@ -141,7 +141,7 @@ def _authenticate(headers, *, fresh=False):
 _NOTIFY_RE = re.compile(r"^notifications/([A-Za-z0-9_-]{1,64})/read$")
 _JOURNAL_RE = re.compile(r"^journal/([A-Za-z0-9_-]{1,64})$")
 _ACCOUNT_RE = re.compile(
-    r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders|candles))?$")
+    r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders|deals|candles))?$")
 _RULE_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})$")
 _RULE_ACTION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/(validate|activate|pause|resume|archive"
@@ -500,6 +500,9 @@ def _dispatch(method, route, headers, body, query=None):
             return _ok(_read.positions(p.user_id, ctid=ctid))
         if sub_route == "orders":
             return _ok(_read.orders(p.user_id, ctid=ctid))
+        if sub_route == "deals":
+            days = (query or {}).get("days", 7)
+            return _ok(_read.deals(p.user_id, ctid=ctid, days=days))
         if sub_route == "candles":
             # Market data for a preview. Read-only: broker_read imports no
             # gate, no ledger and no order function, and a test asserts it.

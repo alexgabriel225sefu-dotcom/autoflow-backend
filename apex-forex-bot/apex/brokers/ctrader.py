@@ -649,13 +649,19 @@ class CtraderBroker:
         return 100000.0
 
     # -- market data ----------------------------------------------------------
-    def get_bid_ask(self, instrument=None):
+    def get_quote(self, instrument=None):
+        """Return the broker quote and the timestamp at which it was received.
+
+        Position screens need the timestamp as well as bid/ask so an old spot
+        cannot be presented as current.  Keep ``get_bid_ask`` as the public
+        compatibility method used by the trading loop.
+        """
         sym = _to_ct_symbol(instrument or self._c.SYMBOL)
         sid = self._symbol_id(instrument)
         now = time.time()
         cached = self._spot_cache.get(sid)
         if cached and now - cached[2] < 3:
-            return cached[0], cached[1]
+            return cached
         conn = self._conn()
         with conn._lock:
             req = ProtoOASubscribeSpotsReq()
@@ -681,7 +687,12 @@ class CtraderBroker:
                     continue
         if not bid or not ask:
             raise RuntimeError(f"cTrader: no spot price for {sym}")
-        self._spot_cache[sid] = (bid, ask, time.time())
+        received_at = time.time()
+        self._spot_cache[sid] = (bid, ask, received_at)
+        return bid, ask, received_at
+
+    def get_bid_ask(self, instrument=None):
+        bid, ask, _received_at = self.get_quote(instrument)
         return bid, ask
 
     def get_price(self, instrument=None):
@@ -931,6 +942,11 @@ class CtraderBroker:
                     out[str(d.positionId)] = {
                         "positionId": str(d.positionId),
                         "symbol": id2name.get(d.symbolId, str(d.symbolId)),
+                        # A close can be partial. Prefer the broker's explicit
+                        # closed volume and fall back to the deal volume for
+                        # older protobuf replies that omit it.
+                        "units": round((getattr(cpd, "closedVolume", 0)
+                                         or getattr(d, "volume", 0)) / 100.0, 8),
                         "netPnl": round(gross + swap - comm, 2),
                         "grossPnl": round(gross, 2),
                         "swap": round(swap, 2),
@@ -1007,7 +1023,7 @@ class CtraderBroker:
         out = []
         for p in res.position:
             td = p.tradeData
-            out.append({
+            row = {
                 "symbol": id2name.get(td.symbolId, str(td.symbolId)),
                 "side": "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL",
                 "units": round(td.volume / 100.0, 8),  # fractional allowed
@@ -1015,7 +1031,24 @@ class CtraderBroker:
                 "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
                 "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
                 "positionId": p.positionId,
-            })
+            }
+            # These fields are present in the vendored ProtoOAPosition schema
+            # (and openTimestamp in its ProtoOATradeData). Read only fields the
+            # wire message actually defines; do not infer broker state.
+            if td.HasField("openTimestamp"):
+                row["openTime"] = td.openTimestamp
+            if p.HasField("swap"):
+                digits = getattr(p, "moneyDigits", 0) or 2
+                row["swap"] = p.swap / (10 ** digits)
+            if p.HasField("commission"):
+                digits = getattr(p, "moneyDigits", 0) or 2
+                row["commission"] = p.commission / (10 ** digits)
+            if p.HasField("usedMargin"):
+                digits = getattr(p, "moneyDigits", 0) or 2
+                row["usedMargin"] = p.usedMargin / (10 ** digits)
+            if p.HasField("utcLastUpdateTimestamp"):
+                row["lastUpdateTime"] = p.utcLastUpdateTimestamp
+            out.append(row)
         return out
 
     def get_pending_orders(self):
