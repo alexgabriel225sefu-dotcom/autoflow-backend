@@ -12,6 +12,9 @@ os.environ.setdefault("APP_ENV", "dev")
 
 from apex.platform import broker_read  # noqa: E402
 from apex.brokers import ctrader  # noqa: E402
+from apex.ctrader_proto.OpenApiModelMessages_pb2 import (  # noqa: E402
+    ProtoOAPosition, ProtoOATradeSide,
+)
 
 
 class _Conn(dict):
@@ -27,6 +30,7 @@ class _Broker:
         self._quote_ts = quote_ts if quote_ts is not None else time.time()
         self._quote_error = quote_error
         self._history = history if history is not None else {"ok": True, "deals": {}}
+        self.history_calls = 0
 
     def get_all_positions(self):
         return self._positions
@@ -38,6 +42,7 @@ class _Broker:
         return bid, ask, self._quote_ts
 
     def get_deal_history(self, start, end):
+        self.history_calls += 1
         return self._history
 
 
@@ -108,12 +113,20 @@ def test_failed_deal_list_is_an_error_not_empty_success():
     assert "deals" not in result
 
 
+def test_closed_deals_are_cached_for_sixty_seconds():
+    broker = _Broker([], history={"ok": True, "deals": {}})
+    first = read_deals(broker)
+    second = read_deals(broker)
+    assert first["status"] == second["status"] == "ok"
+    assert broker.history_calls == 1
+
+
 def test_ctrader_position_reads_only_schema_fields():
-    p = ctrader.ProtoOAPosition()
+    p = ProtoOAPosition()
     p.positionId = 7
     p.tradeData.symbolId = 1
     p.tradeData.volume = 100_000
-    p.tradeData.tradeSide = ctrader.ProtoOATradeSide.BUY
+    p.tradeData.tradeSide = ProtoOATradeSide.BUY
     p.tradeData.openTimestamp = 1_700_000_000
     p.price = 1.1
     p.swap = -125
@@ -142,6 +155,8 @@ if __name__ == "__main__":
         test_stale_quote_is_marked_and_pnl_is_withheld,
         test_pnl_sign_is_correct_for_buy_and_sell,
         test_failed_deal_list_is_an_error_not_empty_success,
+        test_closed_deals_are_cached_for_sixty_seconds,
+        test_ctrader_position_reads_only_schema_fields,
     ):
         _test()
     print("OK: position tracking tests")

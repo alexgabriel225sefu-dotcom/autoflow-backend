@@ -32,6 +32,8 @@ string is the one place a credential escapes without anyone deciding to put it
 there.
 """
 
+import copy
+import threading
 import time
 
 from apex import forex
@@ -44,6 +46,16 @@ NOT_CONNECTED = "not_connected"
 REAUTH_REQUIRED = "reauth_required"
 UNAVAILABLE = "unavailable"
 OK = "ok"
+
+# Deal history is expensive: cTrader may walk as many as forty pages for one
+# seven-day read, and the historical request budget is shared by every reader
+# on a connection. A successful result is a read-only snapshot, so keeping it
+# for one minute is honest and prevents dashboard polling from becoming a
+# broker-history loop. Failures are never cached; the next request must be able
+# to recover as soon as the broker does.
+DEALS_CACHE_TTL_S = 60.0
+_deals_cache = {}
+_deals_cache_lock = threading.Lock()
 
 
 def _scrub(text, *secrets):
@@ -213,7 +225,38 @@ def _deal_rows(broker, days):
 
 
 def deals(user_id, *, days=7, **kw):
-    return _read(user_id, "deals", lambda b: _deal_rows(b, days), **kw)
+    broker, other = _open(user_id, ctid=kw.get("ctid"),
+                          connection_fn=kw.get("connection_fn"),
+                          broker_fn=kw.get("broker_fn"))
+    if broker is None:
+        return other
+    conn = other
+    try:
+        parsed_days = int(days if days is not None else 7)
+    except (TypeError, ValueError):
+        # Keep the same honest validation/error envelope as the uncached path.
+        return {"connected": True, "status": UNAVAILABLE,
+                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                "reason": "days must be a whole number"}
+    key = (str(user_id), str(conn.get("ctid")), parsed_days)
+    now = time.monotonic()
+    with _deals_cache_lock:
+        cached = _deals_cache.get(key)
+        if cached and now - cached[0] < DEALS_CACHE_TTL_S:
+            return {"connected": True, "status": OK,
+                    "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                    "deals": copy.deepcopy(cached[1])}
+    try:
+        rows = _deal_rows(broker, parsed_days)
+    except Exception as e:  # noqa: BLE001
+        return {"connected": True, "status": UNAVAILABLE,
+                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                "reason": _scrub(e, conn.get("accessToken"))}
+    with _deals_cache_lock:
+        _deals_cache[key] = (now, copy.deepcopy(rows))
+    return {"connected": True, "status": OK,
+            "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+            "deals": rows}
 
 
 def orders(user_id, **kw):

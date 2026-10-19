@@ -1,9 +1,10 @@
 "use client";
+import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
-import type { ClosedTrade, DealsRead, Position, PositionsRead } from "@/lib/api";
+import { api, type ApiResult, type ClosePositionRead, type ClosedTrade, type DealsRead, type Position, type PositionsRead } from "@/lib/api";
 
 function currentCell(p: Position) {
   if (p.quoteStale) return <><Num value={null} /> <span className="dim">stale</span></>;
@@ -15,7 +16,7 @@ function distanceCell(value: number | null | undefined) {
 }
 
 function stopCell(p: Position) {
-  if (p.hasStop === false) return <span className="pill pill-warn">None</span>;
+  if (p.hasStop === false) return <div><span className="pill pill-warn">None</span>{p.warning ? <span className="dim"> {p.warning}</span> : null}</div>;
   return <div><Num value={p.stopLoss} />{distanceCell(p.stopDistancePips)}</div>;
 }
 
@@ -27,7 +28,8 @@ function pnlCell(value: number | null | undefined, estimated?: boolean) {
   return <span><Num value={value} />{estimated ? <span className="dim"> est.</span> : null}</span>;
 }
 
-const positionColumns = [
+function positionColumns(onDetails: (p: Position) => void) {
+ return [
   { key: "symbol", header: "Symbol", cell: (p: Position) => p.symbol },
   { key: "side", header: "Side", cell: (p: Position) => <Side side={p.side} />, hideOnCard: true },
   { key: "units", header: "Volume", num: true, cell: (p: Position) => <Num value={p.units} /> },
@@ -39,7 +41,9 @@ const positionColumns = [
   { key: "pnl-account", header: "P&L (account)", num: true, cell: (p: Position) => pnlCell(p.pnlAccount, p.pnlIsEstimate) },
   { key: "opened", header: "Opened", cell: (p: Position) => p.openTime == null ? <Num value={null} /> : <When ts={p.openTime} /> },
   { key: "id", header: "Position ID", cell: (p: Position) => <span className="dim">{p.positionId}</span> },
-];
+  { key: "details", header: "Details", cell: (p: Position) => <button className="btn btn-ghost btn-sm" onClick={() => onDetails(p)}>View details</button> },
+ ];
+}
 
 const dealColumns = [
   { key: "symbol", header: "Symbol", cell: (d: ClosedTrade) => d.symbol ?? <Num value={null} /> },
@@ -52,16 +56,34 @@ const dealColumns = [
 ];
 
 export default function PositionsPage() {
+  const [selected, setSelected] = useState<Position | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [closeResult, setCloseResult] = useState<ApiResult<ClosePositionRead> | null>(null);
   const r = useRead<PositionsRead>("positions", 5_000);
   const accountId = r.result?.ok ? r.result.data.accountId : undefined;
   const dealsPath = accountId ? `accounts/${accountId}/deals?days=7` : null;
-  const deals = useRead<DealsRead>(dealsPath, 5_000);
+  const deals = useRead<DealsRead>(dealsPath, 60_000);
   const rows = r.result?.ok ? (r.result.data.positions ?? []) : [];
   const knownPnl = rows.map((p) => p.pnlAccount).filter((v): v is number => v !== null && v !== undefined);
-  const totalPnl = knownPnl.length ? knownPnl.reduce((sum, value) => sum + value, 0) : null;
+  const unknownPnl = rows.length - knownPnl.length;
+  const totalPnl = unknownPnl === 0 ? knownPnl.reduce((sum, value) => sum + value, 0) : null;
   const summary = r.result?.ok
-    ? `${rows.length} positions · Total estimated P&L ${totalPnl === null ? "—" : totalPnl.toFixed(2)}`
+    ? `${rows.length} positions · ${unknownPnl > 0 ? `${unknownPnl} positions without a current price` : `Total estimated P&L ${totalPnl!.toFixed(2)}`}`
     : "Positions — · Total estimated P&L —";
+
+  async function closeSelected() {
+    const mode = r.result?.ok ? r.result.data.mode : undefined;
+    if (!selected || !accountId || mode !== "demo") return;
+    if (!window.confirm(`Close ${selected.symbol} position ${selected.positionId}?`)) return;
+    setClosing(true);
+    const result = await api<ClosePositionRead>(
+      `accounts/${accountId}/positions/${selected.positionId}/close`,
+      { method: "POST" },
+    );
+    setCloseResult(result);
+    setClosing(false);
+    if (result.ok) void r.reload();
+  }
 
   return (
     <main>
@@ -79,9 +101,16 @@ export default function PositionsPage() {
       {r.loading && !r.result ? <Spinner /> : null}
       {r.result && !r.result.ok ? <ErrorNotice error={r.result} onRetry={r.reload} /> : null}
       {r.result?.ok ? <section className="card"><ReadPanel read={r.result.data}>
-        <DataTable<Position> rows={rows} rowKey={(p) => String(p.positionId)} empty="No open positions." cardTitle={(p) => p.symbol} cardBadge={(p) => <Side side={p.side} />} columns={positionColumns} />
-        <p className="sub">Closing from here is not available yet. Close it in cTrader.</p>
+        <DataTable<Position> rows={rows} rowKey={(p) => String(p.positionId)} empty="No open positions." cardTitle={(p) => p.symbol} cardBadge={(p) => <Side side={p.side} />} columns={positionColumns(setSelected)} />
       </ReadPanel></section> : null}
+
+      {selected ? <section className="card">
+        <div className="card-head"><h2>{selected.symbol} · Position {selected.positionId}</h2><button className="btn btn-ghost btn-sm" onClick={() => { setSelected(null); setCloseResult(null); }}>Back</button></div>
+        <p className="sub">{selected.side} · <Num value={selected.units} /> units · Entry <Num value={selected.entryPrice} /></p>
+        {r.result?.ok && r.result.data.mode === "demo" ? <button className="btn btn-danger" onClick={() => void closeSelected()} disabled={closing}>{closing ? "Closing…" : "Close position"}</button> : <p className="sub">Position close is available only for demo accounts.</p>}
+        {closeResult?.ok ? <p className="sub">{closeResult.data.sentence}</p> : null}
+        {closeResult && !closeResult.ok ? <ErrorNotice error={closeResult} /> : null}
+      </section> : null}
 
       {deals.result?.ok ? <section className="card"><div className="card-head"><h2>Closed trades · last 7 days</h2></div><ReadPanel read={deals.result.data}>
         <DataTable<ClosedTrade> rows={deals.result.data.deals ?? []} rowKey={(d) => String(d.positionId ?? `${d.symbol}-${d.closedAt}`)} empty="No closed trades in the last 7 days." cardTitle={(d) => d.symbol ?? "—"} cardBadge={(d) => d.side ? <Side side={d.side} /> : null} columns={dealColumns} />

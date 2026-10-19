@@ -31,6 +31,7 @@ from apex.platform import approvals as _appr
 from apex.platform import automation as _auto
 from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
+from apex.platform import position_close as _close
 from apex.platform import ctrader_link as _link
 from apex.platform import emergency as _emerg
 from apex.platform import engine_config as _ecfg
@@ -142,6 +143,8 @@ _NOTIFY_RE = re.compile(r"^notifications/([A-Za-z0-9_-]{1,64})/read$")
 _JOURNAL_RE = re.compile(r"^journal/([A-Za-z0-9_-]{1,64})$")
 _ACCOUNT_RE = re.compile(
     r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders|deals|candles))?$")
+_POSITION_CLOSE_RE = re.compile(
+    r"^accounts/([A-Za-z0-9_-]{1,64})/positions/([A-Za-z0-9_-]{1,64})/close$")
 _RULE_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})$")
 _RULE_ACTION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/(validate|activate|pause|resume|archive"
@@ -340,6 +343,10 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         # to answer it was not there. A 400 would say the client malformed it.
         return _err(422 if e.code == "INSUFFICIENT_DATA" else 400,
                     e.code, e.detail)
+    except _close.CloseRefused as e:
+        return _err(e.status, e.code, e.detail)
+    except _close.CloseUnknown as e:
+        return _err(503, "CLOSE_UNKNOWN", str(e))
     except _notify.NotificationNotFound:
         return _err(404, "NOT_FOUND", "no such notification")
     except _jstore.JournalNotFound:
@@ -485,6 +492,19 @@ def _dispatch(method, route, headers, body, query=None):
     if route == "accounts" and method == "GET":
         p = _authenticate(headers)
         return _ok(_link.public_status(p.user_id))
+
+    # A manual close is deliberately a separate route from the read-only
+    # account views. It authenticates first, verifies the linked account is a
+    # DEMO account, and then delegates to the shared close gate.
+    close_match = _POSITION_CLOSE_RE.match(route)
+    if close_match:
+        if method != "POST":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers)
+        ctid, position_id = close_match.groups()
+        result = _close.close_demo(p.user_id, ctid=ctid,
+                                   position_id=position_id)
+        return _ok({"close": result, "sentence": result.get("sentence")})
 
     # ── read-only broker views ──────────────────────────────────────────
     # Every one of these answers {connected, status, ...} and omits its data

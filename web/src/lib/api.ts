@@ -390,6 +390,11 @@ export type Position = {
   stopDistancePips?: number | null; targetDistancePips?: number | null;
   hasStop?: boolean; warning?: string; openTime?: number | null;
 };
+export type ClosePositionRead = {
+  close: { status: "FILLED" | "PARTIAL" | "ALREADY_CLOSED"; sentence: string;
+    remainingVolume?: number | null; positionId?: number | string };
+  sentence: string;
+};
 export type ClosedTrade = {
   symbol: string | null; side: "BUY" | "SELL" | null; units: number | null;
   entry: number | null; exit: number | null; net: number | null;

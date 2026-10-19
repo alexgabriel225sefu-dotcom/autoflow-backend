@@ -1,8 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const reads: { path: string | null; interval: number }[] = [];
 let dealsFailure = false;
+
+vi.mock("@/lib/api", () => ({
+  api: vi.fn(async () => ({ ok: true, data: { status: "FILLED", sentence: "Position closed." } })),
+}));
 
 vi.mock("@/lib/use-api", () => ({
   useRead: (path: string | null, interval = 0) => {
@@ -41,12 +45,14 @@ describe("positions read", () => {
     render(<PositionsPage />);
     expect(screen.getAllByText("stale").length).toBeGreaterThan(0);
     expect(screen.getAllByText("None").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("UNPROTECTED: no stop-loss is attached").length).toBeGreaterThan(0);
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
-    expect(screen.getByText(
-      "Closing from here is not available yet. Close it in cTrader.",
-    )).toBeDefined();
-    expect(screen.queryByRole("button", { name: /close/i })).toBeNull();
+    expect(screen.getByText(/1 positions · 1 positions without a current price/)).toBeDefined();
+    expect(screen.queryByRole("button", { name: /Close position/i })).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "View details" })[0]);
+    expect(screen.getByRole("button", { name: "Close position" })).toBeDefined();
     expect(reads.some((r) => r.path === "positions" && r.interval === 5_000)).toBe(true);
+    expect(reads.some((r) => r.path === "accounts/501/deals?days=7" && r.interval === 60_000)).toBe(true);
   });
 
   it("shows a broker error when closed trades cannot be read", () => {

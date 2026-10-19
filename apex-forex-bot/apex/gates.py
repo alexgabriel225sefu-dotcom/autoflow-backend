@@ -426,6 +426,18 @@ def authorize_close(user_id, *, position_id=None, symbol=None, origin="unknown",
                     f"origin={origin}{' emergency' if emergency else ''}"), rid
 
 
+def authorize_platform_demo_close(user_id, *, position_id, origin="platform",
+                                  user=None):
+    """Platform adapter for the same close gate used by every other origin.
+
+    The platform checks the broker account is DEMO before calling this
+    adapter. Keeping the adapter here makes that policy explicit while the
+    platform package remains outside the legacy execution import graph.
+    """
+    return authorize_close(user_id, position_id=position_id, origin=origin,
+                           user=user)
+
+
 def _dash(user_id):
     try:
         from apex import user_loop

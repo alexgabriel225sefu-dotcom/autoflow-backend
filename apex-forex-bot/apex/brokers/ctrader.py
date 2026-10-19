@@ -1436,6 +1436,100 @@ class CtraderBroker:
                 "status": "FILLED", "fillPrice": fill,
                 "commissionUsd": _extract_commission(res)}
 
+    def close_position_by_id(self, position_id, volume=None):
+        """Close one cTrader position by its broker position id.
+
+        The platform deliberately does not resolve a symbol here. Symbols are
+        not unique in hedged accounts, while the position id is the broker's
+        identity for the exact exposure the client selected. The result keeps
+        partial fills and already-flat responses explicit so callers never
+        book a full P&L for a broker response that did not close the whole
+        position.
+        """
+        try:
+            pid = int(position_id)
+        except (TypeError, ValueError) as e:
+            raise ValueError("positionId must be an integer") from e
+
+        position = None
+        if volume is None:
+            for candidate in self.get_all_positions() or []:
+                if str(candidate.get("positionId")) == str(pid):
+                    position = candidate
+                    break
+            if position is None:
+                return {"status": "ALREADY_CLOSED", "positionId": pid,
+                        "sentence": "Position already closed."}
+            try:
+                volume = int(round(float(position.get("units")) * 100))
+            except (TypeError, ValueError) as e:
+                raise RuntimeError("the broker position has no usable volume") from e
+        volume = int(volume)
+        if volume <= 0:
+            raise ValueError("close volume must be positive")
+
+        if getattr(self._c, "PAPER_TRADING", True):
+            return {"status": "FILLED", "positionId": pid,
+                    "executedVolume": volume,
+                    "sentence": "Position closed."}
+
+        req = ProtoOAClosePositionReq()
+        req.ctidTraderAccountId = self._ctid()
+        req.positionId = pid
+        req.volume = volume
+        try:
+            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
+                                        accept=_is_terminal_execution)
+        except Exception as e:
+            text = str(e).upper()
+            if any(marker in text for marker in
+                   ("POSITION_NOT_FOUND", "POSITION_CLOSED", "NO_SUCH_POSITION")):
+                return {"status": "ALREADY_CLOSED", "positionId": pid,
+                        "sentence": "Position already closed."}
+            raise
+
+        execution_error = str(getattr(res, "errorCode", "") or "").strip()
+        if execution_error:
+            upper = execution_error.upper()
+            if any(marker in upper for marker in
+                   ("POSITION_NOT_FOUND", "POSITION_CLOSED", "NO_SUCH_POSITION")):
+                return {"status": "ALREADY_CLOSED", "positionId": pid,
+                        "sentence": "Position already closed."}
+            return {"status": "REJECTED", "positionId": pid,
+                    "code": execution_error,
+                    "sentence": "The broker rejected the close request."}
+
+        execution_type = _exec_name(getattr(res, "executionType", None))
+        if execution_type in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
+            return {"status": "REJECTED", "positionId": pid,
+                    "code": execution_type,
+                    "sentence": "The broker rejected the close request."}
+
+        executed = None
+        if res.HasField("order"):
+            executed = int(getattr(res.order, "executedVolume", 0) or 0) or None
+        remaining = None
+        if res.HasField("position"):
+            remaining = int(getattr(res.position.tradeData, "volume", 0) or 0) or None
+        if execution_type == "ORDER_PARTIAL_FILL" or (
+                remaining is not None and remaining > 0):
+            remaining_units = (round(remaining / 100.0, 8)
+                               if remaining is not None else None)
+            return {"status": "PARTIAL", "positionId": pid,
+                    "executedVolume": executed,
+                    "remainingVolume": remaining_units,
+                    "sentence": ("Position partially closed; remaining volume: "
+                                 f"{remaining_units if remaining_units is not None else 'unknown' }.")}
+
+        fill = None
+        if res.HasField("order") and res.order.HasField("executionPrice"):
+            fill = res.order.executionPrice
+        return {"status": "FILLED", "positionId": pid,
+                "executedVolume": executed or volume,
+                "fillPrice": fill,
+                "commissionUsd": _extract_commission(res),
+                "sentence": "Position closed."}
+
 
 # ── Module-level helpers (parity with other connectors) ──────────────────────
 
