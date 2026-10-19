@@ -178,6 +178,21 @@ export function MarketPanel({
                   ) : null}
                 </p>
               </>
+            ) : !symbol ? (
+              /* THE BROKER WAS NEVER ASKED, so it cannot have answered.
+                 `load` returns early without a request when there is no
+                 instrument, and the render fell through to "The broker
+                 answered with no bars for  1h" — with a gap where the
+                 instrument should be.
+                 This is the normal state for a new client who has just
+                 picked an account: the dashboard passes the ACTIVE rule's
+                 instruments, and they have no active rule yet. So the first
+                 thing the product told them about their broker was a
+                 failure that had not happened. */
+              <p className="empty">
+                No instrument to chart yet. Activate a rule and start it, and
+                its instrument appears here.
+              </p>
             ) : (
               <p className="empty">
                 The broker answered with no bars for {symbol} {tf}.
