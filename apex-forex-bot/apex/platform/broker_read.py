@@ -54,8 +54,10 @@ OK = "ok"
 # broker-history loop. Failures are never cached; the next request must be able
 # to recover as soon as the broker does.
 DEALS_CACHE_TTL_S = 60.0
+DEALS_CACHE_MAX = 256
 _deals_cache = {}
 _deals_cache_lock = threading.Lock()
+_deals_fetch_locks = {}
 
 
 def _scrub(text, *secrets):
@@ -102,7 +104,8 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         except Exception as e:  # noqa: BLE001
             return None, {"connected": True, "status": UNAVAILABLE,
                           "reason": _scrub(e, conn.get("accessToken"))}
-        broker_fn = lambda: user_loop._make_broker(user, user_id)[0]
+        broker_fn = lambda: user_loop._make_broker(
+            user, user_id, ctid=ctid)[0]
     try:
         return broker_fn(), conn
     except Exception as e:  # noqa: BLE001
@@ -239,21 +242,33 @@ def deals(user_id, *, days=7, **kw):
                 "accountId": conn.get("ctid"), "mode": conn.get("mode"),
                 "reason": "days must be a whole number"}
     key = (str(user_id), str(conn.get("ctid")), parsed_days)
-    now = time.monotonic()
     with _deals_cache_lock:
-        cached = _deals_cache.get(key)
-        if cached and now - cached[0] < DEALS_CACHE_TTL_S:
-            return {"connected": True, "status": OK,
+        fetch_lock = _deals_fetch_locks.setdefault(key, threading.Lock())
+    # Serialize misses for one account so concurrent dashboard requests do
+    # not each walk forty pages of broker history after the TTL expires.
+    with fetch_lock:
+        now = time.monotonic()
+        with _deals_cache_lock:
+            cached = _deals_cache.get(key)
+            if cached and now - cached[0] < DEALS_CACHE_TTL_S:
+                return {"connected": True, "status": OK,
+                        "accountId": conn.get("ctid"),
+                        "mode": conn.get("mode"),
+                        "deals": copy.deepcopy(cached[1])}
+        try:
+            rows = _deal_rows(broker, parsed_days)
+        except Exception as e:  # noqa: BLE001
+            return {"connected": True, "status": UNAVAILABLE,
                     "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                    "deals": copy.deepcopy(cached[1])}
-    try:
-        rows = _deal_rows(broker, parsed_days)
-    except Exception as e:  # noqa: BLE001
-        return {"connected": True, "status": UNAVAILABLE,
-                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                "reason": _scrub(e, conn.get("accessToken"))}
-    with _deals_cache_lock:
-        _deals_cache[key] = (now, copy.deepcopy(rows))
+                    "reason": _scrub(e, conn.get("accessToken"))}
+        stored_at = time.monotonic()
+        with _deals_cache_lock:
+            _deals_cache[key] = (stored_at, copy.deepcopy(rows))
+            if len(_deals_cache) > DEALS_CACHE_MAX:
+                oldest = sorted(_deals_cache,
+                                key=lambda item: _deals_cache[item][0])
+                for old_key in oldest[:len(_deals_cache) - DEALS_CACHE_MAX]:
+                    _deals_cache.pop(old_key, None)
     return {"connected": True, "status": OK,
             "accountId": conn.get("ctid"), "mode": conn.get("mode"),
             "deals": rows}

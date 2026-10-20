@@ -222,6 +222,19 @@ def _is_terminal_execution(evt):
     return name in _TERMINAL_EXEC
 
 
+def _is_close_terminal_execution(evt):
+    """Only accept a known terminal close result.
+
+    The general order path deliberately accepts an unknown event and performs
+    a follow-up position read. A manual close has no such safe fallback in the
+    request boundary, so an unrecognised event must remain UNKNOWN rather than
+    becoming a false "Position closed" response.
+    """
+    if str(getattr(evt, "errorCode", "") or "").strip():
+        return True
+    return _exec_name(getattr(evt, "executionType", None)) in _TERMINAL_EXEC
+
+
 # ── Synchronous protobuf client ──────────────────────────────────────────────
 
 # cTrader rates every request against one of two budgets, and both are counted
@@ -1238,8 +1251,9 @@ class CtraderBroker:
         # is amended with ABSOLUTE prices (rounded to the symbol's digits)
         # immediately after the fill, then verified — see below.
         try:
-            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
-                                        accept=_is_terminal_execution)
+            res = self._conn()._request(
+                req, ProtoOAExecutionEvent, timeout=20,
+                accept=_is_terminal_execution)
         except Exception as e:
             print(f"[cTrader] order failed {side} {units} {sym}: {e}")
             raise
@@ -1385,8 +1399,9 @@ class CtraderBroker:
         req.positionId = pos["positionId"]
         req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 oz → 34)
         try:
-            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
-                                        accept=_is_terminal_execution)
+            res = self._conn()._request(
+                req, ProtoOAExecutionEvent, timeout=20,
+                accept=_is_terminal_execution)
         except Exception as e:
             print(f"[cTrader] close failed {sym}: {e}")
             raise
@@ -1478,8 +1493,9 @@ class CtraderBroker:
         req.positionId = pid
         req.volume = volume
         try:
-            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
-                                        accept=_is_terminal_execution)
+            res = self._conn()._request(
+                req, ProtoOAExecutionEvent, timeout=20,
+                accept=_is_close_terminal_execution)
         except Exception as e:
             text = str(e).upper()
             if any(marker in text for marker in

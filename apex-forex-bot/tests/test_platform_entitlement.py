@@ -655,7 +655,7 @@ check("and it does build them with one, so the check is not vacuous",
 _br = open(os.path.join(ROOT, "apex", "platform", "broker_read.py"),
            encoding="utf-8").read()
 check("broker_read still passes the user id too",
-      "_make_broker(user, user_id)" in _br)
+      "_make_broker(\n            user, user_id, ctid=ctid)" in _br)
 
 # And the behaviour the argument buys: with the id, the ctid comes from the
 # link record; without it, it cannot.

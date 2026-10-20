@@ -500,7 +500,7 @@ def _dispatch(method, route, headers, body, query=None):
     if close_match:
         if method != "POST":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
-        p = _authenticate(headers)
+        p = _authenticate(headers, fresh=True)
         ctid, position_id = close_match.groups()
         result = _close.close_demo(p.user_id, ctid=ctid,
                                    position_id=position_id)

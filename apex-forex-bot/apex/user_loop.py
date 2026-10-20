@@ -1076,8 +1076,11 @@ def _persist_open_position(user_id, cfg, pos):
         print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
 
 
-def _make_broker(user, user_id=None):
+def _make_broker(user, user_id=None, ctid=None):
     """Create the per-user broker with isolated config — cTrader exclusively.
+
+    ``ctid`` is explicit for platform reads and close actions. When omitted,
+    the selected account remains the legacy/default behaviour.
 
     ONE construction path, TWO places credentials can come from, and never
     both for the same client.
@@ -1099,7 +1102,7 @@ def _make_broker(user, user_id=None):
     ct_account = user.get("ctrader_account_id", "")
     if not ct_token and user_id:
         from apex.platform import ctrader_link as _link
-        _conn = _link.get_ctrader_connection(user_id)
+        _conn = _link.get_ctrader_connection(user_id, ctid=ctid)
         if _conn:
             ct_token = _conn["accessToken"]
             ct_account = _conn["ctid"]

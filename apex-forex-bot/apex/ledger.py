@@ -109,9 +109,12 @@ def claim(user_id, symbol, side, units, sl=None, tp=None,
                       now - window_s)
 
     taken = []
+    shared_taken = []
     for candidate in (prev, rid):
-        shared = user_store.claim(f"order:{candidate}", ttl_s=int(window_s * 2))
+        shared = user_store.claim_value(
+            f"order:{candidate}", candidate, ttl_s=int(window_s * 2))
         if shared is False:
+            _release_keys(taken + shared_taken)
             return False, "DUPLICATE_ORDER", rid
         if shared is None:
             # No shared backend, or it errored. The in-process ledger still
@@ -123,17 +126,22 @@ def claim(user_id, symbol, side, units, sl=None, tp=None,
                 # position on trust. (A backend that is not configured at all
                 # is a different case: nothing to be unreachable, and the
                 # single-instance setup it implies has no second writer.)
+                _release_keys(taken + shared_taken)
                 return False, "COORDINATION_UNAVAILABLE", rid
             if not _local_claim(candidate, now):
+                _release_keys(taken + shared_taken)
                 return False, "DUPLICATE_ORDER_LOCAL", rid
             taken.append(candidate)
+        else:
+            shared_taken.append(candidate)
 
     # A claim occupies BOTH bucket keys, so release() has to know about both.
     # Recording only the returned id left the previous-bucket key held, and a
     # legitimate retry after an explicit release was refused by the half nobody
     # remembered.
     with _local_lock:
-        _local.setdefault(rid, {"ts": now, "result": None})["keys"] = taken
+        _local.setdefault(rid, {"ts": now, "result": None})["keys"] = (
+            taken + shared_taken)
     return True, "CLAIMED", rid
 
 
@@ -150,14 +158,24 @@ def result_for(rid):
         return (_local.get(rid) or {}).get("result")
 
 
+def _release_keys(keys):
+    """Release local and owned shared claim keys without deleting a rival."""
+    keys = tuple(keys or ())
+    with _local_lock:
+        for k in keys:
+            _local.pop(k, None)
+    if user_store._USE_REDIS:
+        for k in keys:
+            user_store.release_claim(f"order:{k}", k)
+
+
 def release(rid):
     """Drop a claim that never became an order (a broker rejection before the
-    request left). Only the local half — the shared key expires on its own,
-    and deleting it would reopen the window for a genuine duplicate."""
+    request left), including its owned shared leases."""
     with _local_lock:
         entry = _local.pop(rid, None) or {}
-        for k in entry.get("keys") or ():
-            _local.pop(k, None)
+        keys = entry.get("keys") or ()
+    _release_keys(keys)
 
 
 def shared_backed():

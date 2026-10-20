@@ -137,7 +137,8 @@ def test_refresh_failure_releases_claim(monkeypatch):
 
 def test_api_route_uses_position_id_and_returns_sentence(monkeypatch):
     monkeypatch.setattr(api, "_authenticate",
-                        lambda _headers: SimpleNamespace(user_id="user-1"))
+                        lambda _headers, **_kwargs: SimpleNamespace(
+                            user_id="user-1"))
     seen = {}
 
     def fake_close(user_id, **kwargs):
