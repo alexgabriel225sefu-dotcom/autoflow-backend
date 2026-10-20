@@ -461,7 +461,7 @@ def _upstash_post(cmd_parts):
         r.raise_for_status()
         return r.json().get("result")
     except Exception as e:
-        print(f"[Redis] POST command failed {cmd_parts[0]}: {e}")
+        print(f"[Redis] POST command failed {cmd_parts[0]}: {type(e).__name__}")
         return None
 
 
@@ -521,7 +521,7 @@ def _redis_set(key, value_str):
         try:
             return bool(_r.set(key, value_str))
         except Exception as e:
-            print(f"[Redis] SET failed for {key}: {e}")
+            print(f"[Redis] SET failed: {type(e).__name__}")
             return False
     # POST, not the GET path form: the value would otherwise ride in the URL,
     # and a value that outgrows the edge's limit fails PERMANENTLY — it never
@@ -531,7 +531,7 @@ def _redis_set(key, value_str):
     # (500 rows) and whole user records, where a lost write loses a trade.
     res = _upstash_post(["SET", key, value_str])
     if res is None:
-        print(f"[Redis] SET returned no result for {key} — treating as FAILED")
+        print("[Redis] SET returned no result — treating as FAILED")
         return False
     return str(res).upper() == "OK"
 
@@ -561,7 +561,7 @@ def claim(key, ttl_s=120):
             return None          # command failed — unknown, not "taken"
         return str(res).upper() == "OK"
     except Exception as e:
-        print(f"[Redis] claim failed: {e}")
+        print(f"[Redis] claim failed: {type(e).__name__}")
         return None
 
 

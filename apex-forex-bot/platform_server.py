@@ -160,22 +160,27 @@ def callback_page(status, payload):
     finished, and give one button that goes back to the app carrying the nonce.
     On failure, say which failure in words, and offer the way to start again.
 
-    The nonce travels in the URL and that is safe by the same reasoning the
-    flow already rests on: it is not a credential, and `complete` refuses
-    unless the SESSION calling it is the user the attempt was opened for. That
-    check is what stops an account-injection attack, not the secrecy of the
-    nonce.
+    The nonce travels in the URL and is not a credential. Completion also
+    needs the one-time finish ticket delivered on this page. That ticket is
+    absent from a different browser even when somebody forwards the authorize
+    URL, so the parked broker token cannot be attached from that browser.
     """
     base = web_url()
     ok = bool(payload.get("ok"))
     nonce = (payload.get("nonce") or "") if ok else ""
+    finish = (payload.get("finishToken") or "") if ok else ""
     err = payload.get("error") or {}
     diag = str(err.get("diagnosticId") or "")
     # Two contexts, two encodings, applied once each. The nonce goes into a
     # URL, so it is percent-encoded; the finished URL goes into an href, so it
     # is HTML-escaped below. Escaping for HTML first and then again for the
     # attribute produced "&amp;lt;" — safe, but wrong, and the test caught it.
-    link = f"{base}/connect" + (f"?n={quote(nonce, safe='')}" if nonce else "")
+    params = []
+    if nonce:
+        params.append("n=" + quote(nonce, safe=""))
+    if finish:
+        params.append("t=" + quote(finish, safe=""))
+    link = f"{base}/connect" + (("?" + "&".join(params)) if params else "")
 
     if ok:
         title, tone = "Authorised", "ok"

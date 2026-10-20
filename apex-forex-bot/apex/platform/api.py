@@ -477,8 +477,15 @@ def _dispatch(method, route, headers, body, query=None):
             return _ok(_link.begin(p.user_id))
         if action == "complete":
             _id.require_verified_email(p)
-            nonce = (_body(body) or {}).get("nonce")
-            return _ok({"ctrader": _link.complete(p.user_id, nonce)})
+            data = _body(body) or {}
+            nonce = data.get("nonce")
+            proof = data.get("proof")
+            if not isinstance(proof, str) or not proof:
+                return _err(400, "BROWSER_BINDING_REQUIRED",
+                            "finish this connection in the browser that "
+                            "returned from cTrader")
+            return _ok({"ctrader": _link.complete(
+                p.user_id, nonce, proof=proof)})
         if action == "select":
             return _ok({"ctrader": _link.select_account(
                 p.user_id, (_body(body) or {}).get("ctid"))})

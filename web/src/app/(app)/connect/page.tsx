@@ -34,16 +34,20 @@ import { ErrorNotice, Spinner } from "@/components/app/state";
 const NONCE_KEY = "a4t.ctrader.pending";
 const NONCE_TTL_MS = 900_000;   // PENDING_TTL_S on the server, in milliseconds
 
-function loadNonce(): string | null {
+type Pending = { nonce: string; proof?: string; at: number };
+
+function loadPending(): Pending | null {
   try {
     const raw = sessionStorage.getItem(NONCE_KEY);
     if (!raw) return null;
-    const { nonce, at } = JSON.parse(raw) as { nonce?: string; at?: number };
+    const { nonce, proof, at } = JSON.parse(raw) as {
+      nonce?: string; proof?: string; at?: number;
+    };
     if (!nonce || !at || Date.now() - at > NONCE_TTL_MS) {
       sessionStorage.removeItem(NONCE_KEY);
       return null;
     }
-    return nonce;
+    return { nonce, proof, at };
   } catch {
     // A private window, disabled site data, or a value somebody else wrote.
     // None of those should break the page; they just mean no resume.
@@ -51,11 +55,11 @@ function loadNonce(): string | null {
   }
 }
 
-function saveNonce(nonce: string | null) {
+function savePending(nonce: string | null, proof?: string | null) {
   try {
     if (nonce === null) sessionStorage.removeItem(NONCE_KEY);
     else sessionStorage.setItem(NONCE_KEY,
-      JSON.stringify({ nonce, at: Date.now() }));
+      JSON.stringify({ nonce, proof: proof || undefined, at: Date.now() }));
   } catch { /* storage unavailable — the in-memory path still works */ }
 }
 
@@ -85,6 +89,7 @@ const RETRYABLE = new Set(["ACCOUNTS_FAILED", "RATE_LIMITED"]);
 export default function ConnectPage() {
   const status = useRead<CtraderStatus>("ctrader/status");
   const [pending, setPending] = useState<string | null>(null);
+  const [pendingProof, setPendingProof] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [diagnosticId, setDiagnosticId] = useState<string | null>(null);
@@ -126,11 +131,14 @@ export default function ConnectPage() {
   // when iOS has discarded the tab the flow started in.
   useEffect(() => {
     let fromUrl: string | null = null;
+    let fromProof: string | null = null;
     try {
-      fromUrl = new URLSearchParams(window.location.search).get("n");
+      const params = new URLSearchParams(window.location.search);
+      fromUrl = params.get("n");
+      fromProof = params.get("t");
     } catch { /* no URL access is not a reason to fail */ }
     if (fromUrl) {
-      remember(fromUrl);
+      remember(fromUrl, fromProof);
       // Take it out of the address bar: it has served its purpose, and a nonce
       // left in the URL ends up in history and in anything the visitor shares.
       try {
@@ -146,11 +154,11 @@ export default function ConnectPage() {
       // afternoon looking at RATE_LIMITED.
       if (!autoRan.current) {
         autoRan.current = true;
-        void complete(fromUrl);
+        void complete(fromUrl, fromProof);
       }
       return;
     }
-    const stored = loadNonce();
+    const stored = loadPending();
     // set-state-in-effect is disabled here deliberately, not worked around.
     // The obvious alternative — a lazy useState initialiser — would read
     // sessionStorage during render, which does not exist on the server: the
@@ -158,13 +166,17 @@ export default function ConnectPage() {
     // and the hydration mismatch is a worse bug than an extra render. An
     // effect is where a browser-only value is allowed to arrive.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (stored) setPending(stored);
+    if (stored) {
+      setPending(stored.nonce);
+      setPendingProof(stored.proof || null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function remember(nonce: string | null) {
+  function remember(nonce: string | null, proof: string | null = pendingProof) {
     setPending(nonce);
-    saveNonce(nonce);
+    setPendingProof(proof);
+    savePending(nonce, proof);
   }
 
   async function begin() {
@@ -173,11 +185,11 @@ export default function ConnectPage() {
       "ctrader/connect", { method: "POST" });
     setBusy(false);
     if (!r.ok) return setErr(`${r.code}: ${r.message}`);
-    remember(r.data.nonce);
+    remember(r.data.nonce, null);
     window.open(r.data.authorizeUrl, "_blank", "noopener");
   }
 
-  async function complete(nonceOverride?: string) {
+  async function complete(nonceOverride?: string, proofOverride?: string | null) {
     // The override exists because the automatic finish runs from the effect
     // that discovered the nonce, before React has re-rendered with it in
     // state. Reading `pending` there would read null and do nothing.
@@ -191,9 +203,15 @@ export default function ConnectPage() {
              + "Start again, or open Accounts if you are already connected.");
       return;
     }
+    const proof = proofOverride ?? pendingProof;
+    if (!proof) {
+      setErr("BROWSER_BINDING_REQUIRED: finish this connection in the browser "
+             + "that returned from cTrader.");
+      return;
+    }
     setBusy(true); setErr(null); setDiagnosticId(null);
     const r = await api<{ ctrader: CtraderStatus }>(
-      "ctrader/complete", { method: "POST", body: { nonce } });
+      "ctrader/complete", { method: "POST", body: { nonce, proof } });
     setBusy(false);
     if (!r.ok) {
       // A terminal refusal must clear the stored nonce, or the page offers
