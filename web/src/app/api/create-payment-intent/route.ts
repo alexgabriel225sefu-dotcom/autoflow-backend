@@ -10,7 +10,7 @@ import { apiError, methodNotAllowed, withApiJson } from "../_json";
  * Next.js route has no verified platform session, so it must never create a
  * PaymentIntent.
  */
-export const CHECKOUT_DISABLED =
+const CHECKOUT_DISABLED =
   "Checkout is not enabled in this release. Demo accounts are free and " +
   "require no payment. Paid access must be created by the authenticated " +
   "platform API after review; this browser route cannot create payments.";
