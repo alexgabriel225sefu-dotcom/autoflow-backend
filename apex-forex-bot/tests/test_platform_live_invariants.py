@@ -215,7 +215,10 @@ def _engine_importers():
             p = os.path.join(d, fn)
             with open(p, encoding="utf-8") as fh:
                 if "live_execution" in fh.read():
-                    found.append(os.path.relpath(p, ROOT))
+                    # Keep the AST contract portable: Windows returns
+                    # backslashes from relpath while the repository contract
+                    # uses POSIX-style module paths.
+                    found.append(os.path.relpath(p, ROOT).replace(os.sep, "/"))
     return sorted(found)
 
 
