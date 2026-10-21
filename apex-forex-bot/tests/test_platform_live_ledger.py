@@ -358,7 +358,8 @@ _env["DATA_DIR"] = tempfile.mkdtemp(prefix="a4t-ledger-child-")
 for _k in ("REDIS_URL", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"):
     _env.pop(_k, None)
 _r = subprocess.run([sys.executable, "-c", _child], capture_output=True,
-                    text=True, env=_env, timeout=120)
+                    text=True, encoding="utf-8", errors="replace",
+                    env=_env, timeout=120)
 check("importing it with no shared backend exits non-zero",
       _r.returncode != 0, f"rc={_r.returncode} out={_r.stdout.strip()!r}")
 check("the module never finished importing", "IMPORTED" not in _r.stdout)
