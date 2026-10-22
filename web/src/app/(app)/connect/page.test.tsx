@@ -126,3 +126,41 @@ describe("when the read fails", () => {
     expect(connectButton()).toBeNull();
   });
 });
+
+describe("an attempt started in THIS tab", () => {
+  // The server binds completion to the browser cTrader returned to: the
+  // callback page hands over a one-time ticket in the link it opens, and the
+  // connect page keeps it as `pendingProof`. The tab that STARTED the attempt
+  // never receives that ticket. It used to offer "I have approved — finish"
+  // anyway; the button could only fail with BROWSER_BINDING_REQUIRED while the
+  // copy told the client to press it. A control that cannot work, offered as
+  // the next step, reads as a broken product.
+  it("does not offer a finish button it cannot honour", async () => {
+    sessionStorage.setItem("a4t.ctrader.pending",
+      JSON.stringify({ nonce: "n-1", at: Date.now() }));    // no proof
+    pendingRead = Promise.resolve(NOT_CONNECTED as ApiResult<unknown>);
+    render(<ConnectPage />);
+    await screen.findByText(/waiting for you to approve access/i);
+    expect(screen.queryByRole("button", { name: /i have approved/i })).toBeNull();
+  });
+
+  it("says where the finishing actually happens", async () => {
+    sessionStorage.setItem("a4t.ctrader.pending",
+      JSON.stringify({ nonce: "n-1", at: Date.now() }));
+    pendingRead = Promise.resolve(NOT_CONNECTED as ApiResult<unknown>);
+    render(<ConnectPage />);
+    await screen.findByText(/waiting for you to approve access/i);
+    // The wording matches the button on the callback page
+    // (platform_server.py: action = "Finish connecting").
+    expect(screen.getByText(/finish connecting/i)).toBeTruthy();
+  });
+
+  it("still lets the client cancel and start again", async () => {
+    sessionStorage.setItem("a4t.ctrader.pending",
+      JSON.stringify({ nonce: "n-1", at: Date.now() }));
+    pendingRead = Promise.resolve(NOT_CONNECTED as ApiResult<unknown>);
+    render(<ConnectPage />);
+    await screen.findByText(/waiting for you to approve access/i);
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeTruthy();
+  });
+});

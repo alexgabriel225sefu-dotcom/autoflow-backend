@@ -343,7 +343,9 @@ export default function ConnectPage() {
           <>
             <p className="muted">
               We will open cTrader in a new tab. Sign in there and approve
-              access, then come back to this page.
+              access, then press &ldquo;Finish connecting&rdquo; on the page
+              cTrader sends you back to. That button is what completes the
+              link; this page cannot.
             </p>
             <button className="btn" onClick={begin} disabled={busy}>
               {busy ? "Preparing…" : "Connect cTrader"}
@@ -351,14 +353,40 @@ export default function ConnectPage() {
           </>
         ) : (
           <>
-            <p>
-              Once you have approved access in the cTrader tab, finish the
-              connection here.
-            </p>
-            <p className="muted">
-              This last step runs as you — which is how we know the account
-              being linked is being linked by its owner.
-            </p>
+            {/* THE FINISH BUTTON ONLY EXISTS WHEN THIS TAB HOLDS THE PROOF.
+                The server now binds completion to the browser cTrader
+                returned to: the callback page hands over a one-time ticket
+                in the link it opens, and this page keeps it as pendingProof.
+                A tab that STARTED the attempt never receives it, so a
+                "finish" button here could only ever fail with
+                BROWSER_BINDING_REQUIRED, while the copy told the client to
+                press it. A control that cannot work, offered as the next
+                step, reads as a broken product. */}
+            {pendingProof ? (
+              <>
+                <p>
+                  Once you have approved access in the cTrader tab, finish the
+                  connection here.
+                </p>
+                <p className="muted">
+                  This last step runs as you — which is how we know the account
+                  being linked is being linked by its owner.
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  Waiting for you to approve access in the cTrader tab.
+                </p>
+                <p className="muted">
+                  When cTrader sends you back, press
+                  &ldquo;Finish connecting&rdquo; on that page. It completes
+                  the link in the browser you signed in with. If you closed
+                  that tab, or it opened somewhere else, press Cancel and
+                  start again.
+                </p>
+              </>
+            )}
             {/* No "already connected" notice here: this branch is reached
                 only when isConnected is false, so the test would never be
                 true. It was live when `pending` took precedence; the
@@ -367,10 +395,12 @@ export default function ConnectPage() {
               {/* Wrapped, not passed directly: complete() now takes an
                   optional nonce, and a bare handler would hand it the click
                   event as one. The typechecker caught that. */}
-              <button className="btn" onClick={() => void complete()}
-                      disabled={busy}>
-                {busy ? "Finishing…" : "I have approved — finish"}
-              </button>
+              {pendingProof ? (
+                <button className="btn" onClick={() => void complete()}
+                        disabled={busy}>
+                  {busy ? "Finishing…" : "I have approved — finish"}
+                </button>
+              ) : null}
               <button className="btn btn-ghost" onClick={() => setPending(null)} disabled={busy}>
                 Cancel
               </button>
