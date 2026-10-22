@@ -557,12 +557,19 @@ body {
 .ohlc i { font-style: normal; color: var(--a4t-dim); margin-right: .2rem; }
 .ohlc b { font-weight: 600; color: var(--a4t-text); }
 
-.candles {
-  width: 100%; height: auto; display: block;
+/* The canvas is drawn by lightweight-charts, which paints its own background
+   from the same tokens (see chart-theme.ts). This is only the frame. */
+.price-chart {
+  width: 100%; position: relative; overflow: hidden;
   background: var(--a4t-bg-2);
   border: var(--a4t-border-soft); border-radius: var(--a4t-radius-sm);
-  touch-action: pan-y;
 }
+.chart-legend { margin-top: var(--sp-2); font-size: var(--fs-2xs); }
+.chart-legend p + p { margin-top: .2rem; }
+.chart-legend a { text-decoration: underline; text-underline-offset: 2px; }
+/* An old read is dimmed, not just captioned: bars that may no longer match the
+   market must not look as crisp as ones that do. */
+.chart-frame.is-stale .price-chart { opacity: .55; }
 .chart-skeleton { padding: 0; }
 
 /* ── cards ─────────────────────────────────────────────────────────── */

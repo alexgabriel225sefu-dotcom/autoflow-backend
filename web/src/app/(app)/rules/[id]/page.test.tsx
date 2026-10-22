@@ -42,6 +42,12 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
+// The charting library needs a canvas; jsdom has none. It is replaced by a
+// recorder, so what these tests can say is what this page ASKS the chart to
+// draw — not how it looks.
+vi.mock("lightweight-charts", async () => (await import("@/test/lightweight-charts-mock")).factory());
+
+import { lwc } from "@/test/lightweight-charts-mock";
 import RuleDetail from "./page";
 
 const RULE = {
@@ -105,7 +111,7 @@ const verdictShown = () => container.querySelector(".verdict") !== null;
 const isDisabled = (name: RegExp) =>
   (screen.getByRole("button", { name }) as HTMLButtonElement).disabled;
 
-beforeEach(() => { calls.length = 0; routes = baseRoutes(); });
+beforeEach(() => { calls.length = 0; routes = baseRoutes(); lwc.reset(); });
 afterEach(() => { vi.clearAllMocks(); });
 
 describe("Rule Detail — preview coupling", () => {
@@ -361,15 +367,23 @@ describe("Rule Detail — preview cannot trade", () => {
     await renderPage();
     await screen.findByRole("button", { name: /Fetch market data/ });
     // No chart before the bars arrive — there is nothing to draw.
-    expect(container.querySelector("svg.candles")).toBeNull();
+    expect(lwc.charts).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
-    await waitFor(() => expect(container.querySelector("svg.candles")).not.toBeNull());
+    await waitFor(() => expect(container.querySelector(".price-chart")).not.toBeNull());
+    // The chart was given exactly the bars the preview will evaluate.
+    expect(lwc.seriesOf("candlestick")[0].setData).toHaveBeenCalledWith(
+      BARS.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })),
+    );
     // And no marker until something has actually been evaluated.
-    expect(screen.queryAllByTestId("chart-marker")).toHaveLength(0);
+    expect(lwc.markerPlugins.flatMap((m) => m.markers)).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: /^Preview$/ }));
-    await waitFor(() => expect(screen.getAllByTestId("chart-marker")).toHaveLength(1));
+    await waitFor(() => expect(lwc.markerPlugins.flatMap((m) => m.markers)).toHaveLength(1));
+    // On the bar the snapshot was stamped with: the last one.
+    expect(lwc.markerPlugins[0].markers).toEqual([
+      expect.objectContaining({ time: BARS[BARS.length - 1].time }),
+    ]);
   });
 
   it("no chart is drawn over a read that failed", async () => {
@@ -380,7 +394,8 @@ describe("Rule Detail — preview cannot trade", () => {
     await screen.findByRole("button", { name: /Fetch market data/ });
     fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
     await waitFor(() => expect(screen.getByText(/TimeoutError/)).toBeDefined());
-    expect(container.querySelector("svg.candles")).toBeNull();
+    expect(container.querySelector(".price-chart")).toBeNull();
+    expect(lwc.charts).toHaveLength(0);
     expect(verdictShown()).toBe(false);
   });
 });
