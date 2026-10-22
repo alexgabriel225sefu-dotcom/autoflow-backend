@@ -105,6 +105,12 @@ REACHES_THE_ENGINE = {
     # and this set is its pair, which is why the field could not be left
     # here once the hand-off landed.
     "strategy",
+    # WHO ACTS ON A SETUP: signals / approval / full. `translate` writes
+    # `automation` and `copilot` together and `apex.automation.mode` resolves
+    # the level the rule named — measured over all three in
+    # tests/test_automation_level_control.py, which also pins that a misspelt
+    # name is refused (the fallback is `full`, i.e. it would trade).
+    "automationLevel",
 }
 
 RECORDED_ONLY = {

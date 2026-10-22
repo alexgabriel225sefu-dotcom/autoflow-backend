@@ -552,6 +552,9 @@ def _dispatch(method, route, headers, body, query=None):
         if not action and method == "GET":
             p = _authenticate(headers)
             return _ok(_auto.status(p.user_id))
+        if action == "why" and method == "GET":
+            p = _authenticate(headers)
+            return _ok(_auto.why(p.user_id))
         if method != "POST":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
         # Every one of these changes whether money moves, so none of them
@@ -824,7 +827,7 @@ def _create(principal, payload):
                     timeframe=payload.get("timeframe") or "1h")
     for field in ("name", "sides", "entry", "exit", "order", "sizing",
                   "stopLoss", "takeProfit", "trailingStop", "breakEven",
-                  "limits", "schedule", "evaluateOn"):
+                  "limits", "schedule", "evaluateOn", "automationLevel"):
         if field in payload:
             doc[field] = payload[field]
     return _ok({"rule": _store.create(principal.user_id, doc)}, created=True)

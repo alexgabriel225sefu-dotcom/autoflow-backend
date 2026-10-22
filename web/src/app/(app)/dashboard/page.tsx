@@ -27,6 +27,7 @@ import {
 } from "@/components/app/state";
 import { PendingApproval } from "@/components/app/pending-approval";
 import { DataTable, Num, Side, When } from "@/components/app/table";
+import { WhyCard } from "@/components/app/why-card";
 import { outcomeOf, plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
@@ -340,6 +341,8 @@ export default function Dashboard() {
             symbols={(activeRule?.symbols as string[] | undefined) ?? []}
             timeframe={activeRule?.timeframe}
           />
+
+          <WhyCard />
 
           {/* ── 4 + 5: what did it decide, and was anything placed ──── */}
           <section className="card">

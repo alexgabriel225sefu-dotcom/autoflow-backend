@@ -38,6 +38,15 @@ COMBINE = ("AND", "OR")
 # "stop" is ambiguous about existing positions.
 ON_LIMIT = ("block", "flatten")
 
+# Who acts on a setup. `engine_config.SERVICEABLE_LEVELS` is the list the
+# engine is started with; this one is what a document may NAME. They must stay
+# the same set (tests/test_automation_level_control.py asserts it), because an
+# unrecognised name falls back to "full" in `engine_config._automation_level`
+# — a typo for "approval" would place orders. So the name is refused here, at
+# the boundary, rather than defaulted downstream.
+AUTOMATION_LEVELS = ("signals", "approval", "full")
+DEFAULT_AUTOMATION_LEVEL = "full"
+
 SIZING_FIXED = "fixed_volume"
 SIZING_RISK = "risk_percent"
 SIZING = (SIZING_FIXED, SIZING_RISK)
@@ -156,6 +165,11 @@ def blank(*, user_id, account_id, symbols=None, timeframe="1h"):
         # When the rule is evaluated. "bar_close" is the honest default: an
         # intrabar evaluation can fire on a price that the bar never closes at.
         "evaluateOn": "bar_close",
+
+        # WHO ACTS ON A SETUP: "signals" (tell me, place nothing), "approval"
+        # (propose, I decide) or "full" (place it). Present on every new draft
+        # so the screen shows the real value rather than an implied one.
+        "automationLevel": DEFAULT_AUTOMATION_LEVEL,
 
         # WHICH ENGINE STRATEGY DECIDES, or None for "my conditions do".
         #
@@ -352,6 +366,14 @@ def validate(doc, *, known_condition_ids=None, known_strategy_ids=None):
 
     if doc.get("sides") not in SIDES:
         _err(problems, "sides", f"must be one of {', '.join(SIDES)}")
+
+    # Absent is allowed (rules stored before this field existed run at full,
+    # exactly as they always did). Present must be a real level: see
+    # AUTOMATION_LEVELS for why a bad one is refused and not defaulted.
+    level = doc.get("automationLevel")
+    if level is not None and level not in AUTOMATION_LEVELS:
+        _err(problems, "automationLevel",
+             f"must be one of {', '.join(AUTOMATION_LEVELS)}")
 
     order = _as_object(problems, doc, "order")
     if order.get("type") not in ORDER_TYPES:

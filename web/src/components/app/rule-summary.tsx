@@ -13,6 +13,7 @@
  * formatting only — it never decides what a condition means.
  */
 import type { ConditionSpec, RuleDoc } from "@/lib/api";
+import { plainLevel } from "./plain";
 
 const ACRONYMS = new Set(["ma", "rsi", "macd", "atr", "ema", "sma", "rr", "tp", "sl"]);
 /** Joining words stay lowercase: "Price vs MA", not "Price Vs MA". */
@@ -267,6 +268,13 @@ export function RuleTerms({
       <tbody>
         <Row k="Instruments" v={(doc.symbols as string[] | undefined)?.join(", ") || <span className="dim">none</span>} />
         <Row k="Timeframe" v={String(doc.timeframe ?? "—")} />
+        <Row
+          k="When a setup appears"
+          v={plainLevel(doc.automationLevel ?? "full")}
+          note={doc.automationLevel === "signals" || doc.automationLevel === "approval"
+            ? "This rule does not place a trade by itself."
+            : undefined}
+        />
         <Row k="Evaluated" v={doc.evaluateOn === "intrabar" ? "On every tick (intrabar)" : "On bar close"} />
         <Row
           k="Sides"

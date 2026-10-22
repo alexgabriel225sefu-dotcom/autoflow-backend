@@ -577,6 +577,33 @@ export type ApprovalResult = {
   alreadyGone?: boolean;
 };
 
+/** "Why isn't it trading?" — GET automation/why. The verdict and its sentence
+ *  are the SERVER's; the browser shows them and never re-derives a reason.
+ *
+ *  `skips` (this process's last refusals, lost on restart) and `recorded`
+ *  (the persistent decision log) are different lists and are not merged.
+ *  `recordedCount` of 0 means the log holds nothing, which is NOT the same as
+ *  "the loop had no reason" — the screen words it accordingly. */
+export type WhyRead = {
+  status: "ok";
+  state: "stopped" | "running" | "paused";
+  reason: "halted" | "paused" | "stopped" | "loop_inactive" | "level_no_orders"
+    | "position_open" | "market_closed" | "watching";
+  summary: string;
+  level: "signals" | "approval" | "full" | null;
+  levelLabel: string | null;
+  loopActive: boolean | null;
+  marketOpen: boolean | null;
+  halted: boolean;
+  openPosition: { symbol: string | null } | null;
+  maxPositions: number | null;
+  skipsToday: number | null;
+  skips: { time: string; reason: string }[];
+  recorded: { at: number | null; symbol: string | null; reason: string }[];
+  recordedCount: number;
+  recordedReadable: boolean;
+};
+
 export type AutomationState = {
   state: "stopped" | "running" | "paused";
   ruleDocId: string | null; mode: "demo" | null; startedAt: number | null;

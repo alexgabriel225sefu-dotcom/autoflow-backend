@@ -149,6 +149,144 @@ def status(user_id):
             "notApplied": rec.get("notApplied") or []}
 
 
+def why(user_id, *, loop_reader=None, declines_reader=None,
+        market_open=None):
+    """"Why isn't it trading?" — the answer the Telegram `/why` gave, for the web.
+
+    A waiting client reads silence as breakage. This says which of the real
+    reasons applies, in order of how much each one explains:
+
+      stopped / paused      the loop is not looking at all
+      halted                an emergency stop is in force
+      loop not active here  the platform says Running, this process is not
+                            running a loop for the client (a restart: the
+                            supervisor revives it, which takes minutes)
+      not an executing level  Signals only / Ask me first — a setup is not an
+                            order by design
+      position already open   the position limit is the reason
+      market closed         nothing to act on
+      otherwise             on and watching; most candidates are refused
+
+    THE TWO LISTS OF REFUSALS ARE DIFFERENT THINGS and are not merged.
+    `skips` is the loop's in-memory list for the current process: newest
+    first, last thirty, empty after a restart. `recorded` is the persistent
+    decision log: it has the instrument and survives a restart. A client whose
+    list is empty must not be told "there was no reason" — `recordedCount` is
+    0 only when the log holds nothing, and the screen words that as "nothing
+    recorded yet", never as proof the loop chose nothing.
+
+    The three readers are parameters so a test drives every branch without a
+    live loop. Never raises: an unreadable source is reported as unreadable,
+    since an explanation page that errors is the page nobody can use when
+    something is already wrong.
+    """
+    rec = _read(user_id)
+    state = rec.get("state", STOPPED)
+    level = _level_of(rec)
+    executes = (bool(_eng_auto.EXECUTES.get(level)) if level else None)
+
+    out = {"status": "ok", "state": state, "level": level,
+           "levelLabel": _plain(_eng_auto.LABEL.get(level)) if level else None,
+           "loopActive": None, "marketOpen": None, "halted": False,
+           "openPosition": None, "maxPositions": None,
+           "skipsToday": None, "skips": [], "recorded": [],
+           "recordedCount": 0, "recordedReadable": True}
+
+    # ── the engine's own view, read defensively ─────────────────────────────
+    try:
+        if loop_reader is None:
+            from apex import user_loop
+            alive = bool(user_loop.is_running(str(user_id)))
+            dash = user_loop.get_dash(str(user_id)) or {}
+        else:
+            alive, dash = loop_reader(str(user_id))
+        out["loopActive"] = alive
+        op = dash.get("openPosition")
+        if isinstance(op, dict):
+            out["openPosition"] = {"symbol": op.get("symbol")}
+        out["maxPositions"] = dash.get("maxpos")
+        out["skipsToday"] = dash.get("skipsToday")
+        out["skips"] = [{"time": str(s.get("time", "")),
+                         "reason": str(s.get("reason", ""))[:120]}
+                        for s in (dash.get("skips") or [])[:10]
+                        if isinstance(s, dict)]
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[Automation:why] loop state unreadable "
+              f"({type(e).__name__})")
+
+    try:
+        if declines_reader is None:
+            from apex import trade_events
+            rows = trade_events.declines(str(user_id), limit=10)
+        else:
+            rows = declines_reader(str(user_id))
+        for r in rows or []:
+            payload = r.get("payload") if isinstance(r, dict) else None
+            out["recorded"].append({
+                "at": r.get("ts") or r.get("time"),
+                "symbol": r.get("symbol"),
+                "reason": str((payload or {}).get("reason", ""))[:200]})
+        out["recordedCount"] = len(out["recorded"])
+    except Exception as e:                                   # noqa: BLE001
+        out["recordedReadable"] = False
+        print(f"[Automation:why] decision log unreadable "
+              f"({type(e).__name__})")
+
+    try:
+        if market_open is None:
+            from apex import forex as _fx
+            out["marketOpen"] = bool(_fx.is_market_open())
+        else:
+            out["marketOpen"] = bool(market_open())
+    except Exception:                                        # noqa: BLE001
+        pass
+
+    try:
+        _emerg.check(user_id=user_id, mode=_emerg.NOT_RESOLVED)
+    except _emerg.Halted:
+        out["halted"] = True
+    except Exception:                                        # noqa: BLE001
+        pass
+
+    # ── the verdict: ONE reason, the most explanatory that is true ──────────
+    if out["halted"]:
+        code, text = "halted", ("An emergency stop is in force, so nothing "
+                                "will be placed until it is lifted.")
+    elif state == PAUSED:
+        code, text = "paused", ("Automation is paused. It is not looking for "
+                                "setups until you resume it.")
+    elif state != RUNNING:
+        code, text = "stopped", ("Automation is stopped, which is why "
+                                 "nothing is happening. Start it from a "
+                                 "rule to switch it on.")
+    elif out["loopActive"] is False:
+        code, text = "loop_inactive", (
+            "Automation is marked as running, but its loop is not active on "
+            "the server right now. After a restart it is picked up again "
+            "automatically; that can take up to about fifteen minutes.")
+    elif executes is False:
+        code, text = "level_no_orders", (
+            f"This rule runs at “{out['levelLabel']}”, so a setup is shown to "
+            f"you and is not placed as a trade by itself.")
+    elif out["openPosition"]:
+        sym = out["openPosition"].get("symbol") or "an instrument"
+        lim = out["maxPositions"] or 1
+        code, text = "position_open", (
+            f"You already have a position open on {sym}, and the limit is "
+            f"{lim} at a time. It looks for the next setup once this one "
+            f"closes.")
+    elif out["marketOpen"] is False:
+        code, text = "market_closed", ("The forex market is closed, so "
+                                       "there is nothing to act on.")
+    else:
+        code, text = "watching", (
+            "It is on and watching. It only enters when a setup passes every "
+            "check, and most candidates are refused.")
+    out["reason"] = code
+    out["summary"] = text
+    return out
+
+
 def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     """(rule, connection) or raise. Every refusal names its own cause.
 

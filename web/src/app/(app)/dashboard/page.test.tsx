@@ -81,6 +81,14 @@ function base() {
     } },
     "ctrader/status": CONNECTED,
     automation: { ok: true, data: { state: "stopped", ruleDocId: null, mode: null, startedAt: null } },
+    // The "why no trade" card reads this. It is a READ, so it must not count
+    // as a control call in the assertions below.
+    "automation/why": { ok: true, data: {
+      status: "ok", state: "stopped", reason: "stopped",
+      summary: "Automation is stopped, which is why nothing is happening.",
+      level: null, levelLabel: null, loopActive: null, marketOpen: null,
+      halted: false, openPosition: null, maxPositions: null, skipsToday: null,
+      skips: [], recorded: [], recordedCount: 0, recordedReadable: true } },
     positions: { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", positions: [] } },
     orders: { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", orders: [] } },
     journal: { ok: true, data: { status: "ok", entries: [], total: 0, limit: 8, offset: 0, hasMore: false } },
@@ -155,7 +163,9 @@ describe("dashboard — account state", () => {
         .toBeGreaterThan(0));
     expect(screen.getAllByText("LIVE BLOCKED").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /^Start$/ })).toBeNull();
-    expect(calls.some((c) => c.path.startsWith("automation/"))).toBe(false);
+    // Controls only. `automation/why` is a read and is allowed; what this
+    // pins is that no start/pause/resume/stop is ever sent.
+    expect(calls.some((c) => c.path.startsWith("automation/") && c.init?.method === "POST")).toBe(false);
   });
 
   it("DOES offer them when the server has cleared this live account", async () => {

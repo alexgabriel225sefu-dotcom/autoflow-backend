@@ -26,6 +26,35 @@ export type Plain = {
 
 /* ── automation ───────────────────────────────────────────────────────── */
 
+/**
+ * WHO ACTS ON A SETUP. The three levels the server services, in the words the
+ * Telegram bot used, with what each one does and does NOT do. The `id` is the
+ * engine's own and is what the rule stores; an unknown id falls through to
+ * itself (see `plainLevel`) instead of being shown as a friendly guess.
+ */
+export const AUTOMATION_LEVELS = [
+  {
+    id: "signals", label: "Signals Only",
+    does: "Tells you when your rule finds a setup.",
+    doesNot: "Places nothing.",
+  },
+  {
+    id: "approval", label: "Approval Required",
+    does: "Proposes each trade and waits for you to approve it.",
+    doesNot: "Places nothing until you approve.",
+  },
+  {
+    id: "full", label: "Full Automation",
+    does: "Places the trade itself when your rule fires.",
+    doesNot: "Does not ask.",
+  },
+] as const;
+
+export function plainLevel(id: unknown): string {
+  const hit = AUTOMATION_LEVELS.find((l) => l.id === id);
+  return hit ? hit.label : String(id ?? "—");
+}
+
 export function plainAutomation(
   state: string | null | undefined,
   hasRule: boolean,
