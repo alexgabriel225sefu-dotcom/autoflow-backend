@@ -21,6 +21,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
+    "lightweight-charts": "5.2.1",
     "lucide-react": "^1.17.0",
     "motion": "^12.40.0",
     "next": "16.3.6",

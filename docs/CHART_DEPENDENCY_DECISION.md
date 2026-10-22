@@ -1,5 +1,96 @@
 # Chart dependency — the decision and how it was reached
 
+**Current decision (revisited 2026-10-22): `lightweight-charts@5.2.1`, pinned
+exactly.** The first decision, below, was "no charting dependency"; it is kept
+as written because its reasoning is what the revisit answers.
+
+## Why it was revisited
+
+The first decision named its own exit: *"The reason to revisit is streaming:
+live updating bars, multiple panes, or tens of thousands of candles. At that
+point `lightweight-charts` is the right answer."* The brief changed to ask for
+exactly that: a chart that updates its last bar in place every 5 seconds,
+overlays, and an RSI in a pane of its own. `series.update`, panes and price
+lines are the library's real strengths, and the hand-built SVG would have had
+to re-create all three.
+
+## What was re-checked on the version actually installed (5.2.1)
+
+| Claim | Result |
+|---|---|
+| Licence | Apache-2.0 (`npm view lightweight-charts@5.2.1 license`) |
+| Published | 2026-08-12, ten weeks before the pin |
+| Network in the production bundle | `fetch(`, `XMLHttpRequest`, `sendBeacon`, `WebSocket`, `EventSource`, `importScripts`: **0 occurrences** |
+| Remote image or script loaded | None. The one `new Image` is the optional image-watermark feature, which this app does not use. The attribution logo is an inline SVG link. |
+| Transitive dependency | `fancy-canvas@2.1.0` (the library's own helper; the only package added besides it) |
+| Shipped, gzipped | 60,245 B for the chunk, loaded only by `/dashboard` and `/rules/[id]` |
+| Imports in Node (prerender) | Yes: `next build` prerenders both routes with it imported |
+
+## How each reason against it was answered
+
+1. **The NOTICE file is not in the npm package.** *Still true.* The 5.2.1
+   tarball has ten files and no NOTICE. Nothing has been written from memory
+   to stand in for it. What is done: the library's own `attributionLogo` is
+   left on (its README names that as satisfying the link requirement, and a
+   test pins it on), and the chart carries a visible text link to
+   tradingview.com. **The NOTICE text itself is not reproduced and remains an
+   item for the owner**; it has to come from TradingView's repository at the
+   `v5.2.1` tag or from TradingView, not from this codebase.
+2. **It lengthens the legal launch checklist.** *Accepted.* The owner has to
+   confirm the attribution above before launch. This is the same kind of item
+   as L1–L10 in `LEGAL_LAUNCH_BLOCKERS.md` and has the same consequence if
+   left: the site would be using third-party code on terms nobody confirmed.
+3. **What is needed is small.** *No longer true*; see above.
+
+**A disclosure to be aware of:** the attribution logo is a link to
+`tradingview.com` that, **when clicked**, carries `utm_source=<host><path>` of
+the page it was clicked on. On the rule page that path includes the rule's id.
+Nothing is sent until someone clicks. If that is not acceptable, set
+`attributionLogo: false` in `price-chart.tsx` and rely on the text link, which
+carries no path; the owner decides whether that still meets the licence.
+
+## Indicators: the second reason, and what changed
+
+The first decision also refused indicators, because "an EMA computed in the
+browser would be a second implementation of something the evaluator already
+computes, and the two would disagree at the edges." That risk is real and is
+**not removed** by this revisit. It is accepted for SMA, EMA and RSI(14) on
+these terms:
+
+- every indicator is labelled **computed**, on the chart legend and beside the
+  control, with the sentence "Computed in your browser from the bars shown.
+  These are not the rule engine's values.";
+- the functions are pure and live in `indicators.ts`, with their seeding
+  conventions written at the top, and are tested against numbers worked out by
+  hand;
+- nothing is claimed to match the rule engine or another platform. EMA and RSI
+  both have several seeding conventions in use; these are SMA-seeded EMA and
+  Wilder RSI.
+
+If a verdict on screen and a line on the chart ever disagree, the verdict is
+the one that is right. If that proves confusing, the better fix is still the
+one the first decision named: have the evaluator return the series it used and
+draw that.
+
+## What "live" means, and does not
+
+The page asks for the bars every 5 seconds, not at all while the tab is
+hidden. The platform serves them from the broker through a shared candle cache
+(`apex/candle_cache.py`, 60 s by default, capped at a quarter of the bar
+period), and the response carries no fetched-at time. So the newest bar can
+trail the broker by up to the cache lifetime and the browser cannot tell. The
+chart says when **this browser** last got an answer ("Last synced"), marks it
+**stale** after 30 seconds or on a failed read, and states the cache. It does
+not say "real time", and it must not be changed to.
+
+The candles route is limited to 30 requests a minute per user
+(`RL_A4T_CANDLES_PER_MIN`). One chart at 5 seconds uses 12. Two tabs open on a
+chart use 24; a third would be refused.
+
+---
+
+# The original decision (superseded, kept for the reasoning)
+
 **Decision: no charting dependency. The chart is drawn as inline SVG.**
 
 This was not a preference. Two candidates were installed and measured, and the

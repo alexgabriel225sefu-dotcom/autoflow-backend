@@ -16,7 +16,8 @@ import {
 } from "@/components/app/rule-summary";
 import { outcomeOf } from "@/components/app/plain";
 import { TIMEFRAMES } from "@/components/app/rule-form";
-import { CandleChart, type ChartMarker } from "@/components/chart/candles";
+import { PriceChart } from "@/components/chart/price-chart";
+import type { ChartMarker } from "@/components/chart/chart-data";
 
 /**
  * What a preview decided, as a first-class outcome.
@@ -369,7 +370,7 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
                   with. */}
               {bars?.status === "ok" && bars.candles?.length ? (
                 <div style={{ marginTop: ".8rem" }}>
-                  <CandleChart
+                  <PriceChart
                     candles={bars.candles}
                     symbol={bars.symbol}
                     timeframe={bars.timeframe}
