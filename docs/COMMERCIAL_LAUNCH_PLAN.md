@@ -60,11 +60,11 @@ Use these messages for landing pages and small ad tests:
 - “Connect your own cTrader account, test your rules on demo, and manage risk
   from one control panel.”
 - “Build and preview your own trading workflow before you consider live use.”
-- “Demo access is free. No profit claims, signals, or investment advice.”
+- “Demo access is free. No outcome claims, signals, or investment advice.”
 - “Live execution is planned for a separately reviewed release.”
 
-Do not use claims about guaranteed returns, passive income, winning rates,
-automated profits, or immediate live execution. Do not imply that Apex4Traders
+Do not use outcome claims, passive income language, winning rates, automated
+gains, or immediate live execution. Do not imply that Apex4Traders
 manages client funds or gives personalised financial advice.
 
 ## Owner launch gates
