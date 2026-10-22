@@ -139,7 +139,11 @@ class _StubBroker:
         return 5000.0
 
 
-user_loop._make_broker = lambda user, user_id=None: (_StubBroker(), {})
+# Mirrors user_loop._make_broker(user, user_id=None, ctid=None). broker_read
+# passes ctid since the account-isolation commit; a stub without it raised
+# TypeError, which the read path reports as UNAVAILABLE — a real-looking
+# outage in a test that had nothing wrong.
+user_loop._make_broker = lambda user, user_id=None, ctid=None: (_StubBroker(), {})
 
 bot._start_dashboard_server()
 

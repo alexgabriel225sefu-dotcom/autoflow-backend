@@ -126,15 +126,16 @@ reset()
 _shared = {}
 
 
-def fake_claim(key, ttl_s=120):
+def fake_claim(key, value=None, ttl_s=120):
+    # Mirrors user_store.claim_value (SET NX): the ledger now calls this, not claim.
     if key in _shared:
         return False
     _shared[key] = 1
     return True
 
 
-_orig = user_store.claim
-user_store.claim = fake_claim
+_orig = user_store.claim_value
+user_store.claim_value = fake_claim
 check("instance A claims", ledger.claim(*ORDER, now=T0)[0] is True)
 reset()   # instance B has a COMPLETELY separate process memory
 check("instance B, with no local memory of it, is still blocked",
@@ -144,7 +145,7 @@ check("instance B, with no local memory of it, is still blocked",
 print("\n── a shared backend that ERRORS must not halt trading ──")
 _shared.clear()
 reset()
-user_store.claim = lambda key, ttl_s=120: None      # backend unreachable
+user_store.claim_value = lambda key, value=None, ttl_s=120: None      # backend unreachable
 ok, why, _ = ledger.claim(*ORDER, now=T0)
 check("the order is allowed, not refused", ok is True, why)
 check("and the local ledger still catches the retry",
@@ -153,7 +154,7 @@ check("the reason names it as local-only",
       "LOCAL" in ledger.claim(*ORDER, now=T0 + 2)[1])
 
 print("\n── shared_backed() is honest about which mode is active ──")
-user_store.claim = _orig
+user_store.claim_value = _orig
 check("no Redis configured in this test → False",
       ledger.shared_backed() is False)
 
