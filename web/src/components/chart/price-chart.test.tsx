@@ -359,3 +359,32 @@ describe("the OHLC readout", () => {
     expect(screen.getByText(/does not carry volume/)).toBeDefined();
   });
 });
+
+describe("the library's NOTICE is on the page that shows its chart", () => {
+  // lightweight-charts is licensed Apache-2.0 with an added term: the page
+  // that shows the chart must carry the attribution notice from the library's
+  // NOTICE file and a link to tradingview.com. The logo satisfies the link;
+  // the notice text has to be there too, and was an open item until now.
+  //
+  // Reproduced VERBATIM from the NOTICE shipped at v5.2.1, including the
+  // Cyrillic letter U+0441 the upstream file uses inside "(с)". Normalising it
+  // to a Latin "c" would make the page say something other than the notice it
+  // is meant to reproduce.
+  const TITLE = "TradingView Lightweight Charts™";
+  const COPYRIGHT = "Copyright (с) 2025 TradingView, Inc. https://www.tradingview.com/";
+
+  it("shows the notice title and copyright line exactly", () => {
+    render(<PriceChart candles={BASE} symbol="EURUSD" timeframe="1h" />);
+    // The title also appears as the link text ("Chart by ..."), so the notice
+    // is the one that is NOT inside an anchor.
+    const notice = screen.getAllByText(TITLE).filter((el) => !el.closest("a"));
+    expect(notice.length).toBe(1);
+    expect(screen.getByText(COPYRIGHT)).toBeTruthy();
+  });
+
+  it("keeps the link to tradingview.com", () => {
+    render(<PriceChart candles={BASE} symbol="EURUSD" timeframe="1h" />);
+    const links = screen.getAllByRole("link") as HTMLAnchorElement[];
+    expect(links.some((a) => a.href.startsWith("https://www.tradingview.com"))).toBe(true);
+  });
+});

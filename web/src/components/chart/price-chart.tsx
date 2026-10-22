@@ -56,6 +56,21 @@ export type PriceChartProps = {
 
 export const RSI_PERIOD = 14;
 
+/**
+ * The library's NOTICE, VERBATIM (lightweight-charts v5.2.1).
+ *
+ * Its licence is Apache-2.0 plus a term asking the page that shows the chart
+ * to carry the attribution notice from the NOTICE file and a link to
+ * tradingview.com. The logo (attributionLogo) covers the link; this covers the
+ * notice. Written as escapes on purpose: the upstream file uses a CYRILLIC
+ * letter (U+0441) inside "(с)", and a copy-paste or an editor that
+ * "normalises" it to a Latin c would make this page stop reproducing the
+ * notice it exists to reproduce. Re-fetch from the upstream NOTICE on upgrade.
+ */
+const NOTICE_TITLE = "TradingView Lightweight Charts\u2122";
+const NOTICE_COPYRIGHT =
+  "Copyright (\u0441) 2025 TradingView, Inc. https://www.tradingview.com/";
+
 export function PriceChart(props: PriceChartProps) {
   const checked = useMemo(() => toChartBars(props.candles), [props.candles]);
   if (!checked.ok) {
@@ -369,6 +384,13 @@ function Legend({ overlay, showRsi, positions }: {
           TradingView Lightweight Charts&trade;
         </a>
         . Prices are the broker&rsquo;s, not TradingView&rsquo;s. Times are UTC.
+      </p>
+      {/* The attribution notice the library's licence requires on the page
+          that shows its chart, reproduced from its NOTICE file at v5.2.1. */}
+      <p className="dim">
+        <span>{NOTICE_TITLE}</span>
+        <br />
+        <span>{NOTICE_COPYRIGHT}</span>
       </p>
     </div>
   );
