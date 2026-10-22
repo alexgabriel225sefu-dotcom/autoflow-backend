@@ -34,6 +34,7 @@ from apex.platform import broker_read as _read
 from apex.platform import position_close as _close
 from apex.platform import ctrader_link as _link
 from apex.platform import emergency as _emerg
+from apex.platform import emergency_stop as _panic
 from apex.platform import engine_config as _ecfg
 from apex.platform import entitlement as _ent
 from apex.platform import health as _health
@@ -543,6 +544,29 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         fn = _read.positions if route == "positions" else _read.orders
         return _ok(fn(p.user_id))
+
+    # ── the client's own emergency button ───────────────────────────────
+    # Stop automation and, when asked, close every open position on the
+    # selected DEMO account. Not the operator's halt (that is
+    # `emergency.py`). The confirmation is enforced HERE, not only in the
+    # browser: a request that does not carry `confirm: true` does nothing, so
+    # a stray or replayed call cannot close positions.
+    if route == "emergency/stop":
+        if method != "POST":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers, fresh=True)
+        b = _body(body) or {}
+        if b.get("confirm") is not True:
+            return _err(400, "CONFIRMATION_REQUIRED",
+                        "send confirm: true to stop automation and close positions")
+        close = b.get("closePositions", True)
+        if not isinstance(close, bool):
+            return _err(400, "BAD_REQUEST", "closePositions must be true or false")
+        ctid = str(b.get("ctid") or "") or _selected_ctid(p.user_id)
+        if close and not ctid:
+            return _err(409, "NO_ACCOUNT_SELECTED",
+                        "select a cTrader account before closing positions")
+        return _ok(_panic.run(p.user_id, ctid=ctid, close_positions=close))
 
     # ── automation control (demo only) ──────────────────────────────────
     # Separate from connecting an account, deliberately: linking cTrader to

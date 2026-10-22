@@ -28,6 +28,7 @@ import {
 import { PendingApproval } from "@/components/app/pending-approval";
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { WhyCard } from "@/components/app/why-card";
+import { EmergencyStop } from "@/components/app/emergency-stop";
 import { outcomeOf, plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
@@ -329,6 +330,12 @@ export default function Dashboard() {
                       ) : null}
                     </div>
                   )}
+
+                  {/* The client's own panic button. Offered on a selected DEMO
+                      account only: closing is a demo capability in this
+                      release, and a button that closes nothing on a live
+                      selection would be a worse lie than no button. */}
+                  {isDemo ? <EmergencyStop ctid={selected?.ctid ?? null} /> : null}
                 </>
               )}
           </section>

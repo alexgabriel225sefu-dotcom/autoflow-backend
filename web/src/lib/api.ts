@@ -577,6 +577,23 @@ export type ApprovalResult = {
   alreadyGone?: boolean;
 };
 
+/** POST emergency/stop. Every claim here is the server's and was measured:
+ *  `allFlat` is true only when a fresh read of the account found nothing open,
+ *  `closes` is null when the client chose to stop without closing, and a
+ *  position in any outcome other than closed/already_closed is NOT closed. */
+export type EmergencyResult = {
+  status: "ok";
+  automation: { stopped: boolean; alreadyStopped: boolean; error: string | null };
+  positions: { readable: boolean; reason: string | null; found: number | null;
+               notAttempted?: number } | null;
+  closes: { positionId: string; symbol: string | null; side: string | null;
+            outcome: "closed" | "already_closed" | "partial" | "refused" | "unknown" | "failed";
+            code?: string; detail?: string }[] | null;
+  verified: { readable: boolean; stillOpen: number | null; reason?: string } | null;
+  allFlat: boolean | null;
+  sentence: string;
+};
+
 /** "Why isn't it trading?" — GET automation/why. The verdict and its sentence
  *  are the SERVER's; the browser shows them and never re-derives a reason.
  *

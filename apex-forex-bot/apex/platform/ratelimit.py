@@ -139,6 +139,8 @@ def classify(method, route):
         return "preview"
     if _ACTIVATE_RE.match(route):
         return "activate"
+    if route.startswith("emergency/"):
+        return "control"
     if route.startswith("automation"):
         # A GET of the automation state is a poll, not a control action.
         return "control" if method != "GET" else "default"
