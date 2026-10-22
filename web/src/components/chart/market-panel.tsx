@@ -21,12 +21,15 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
-import type { CandlesRead, PositionsRead } from "@/lib/api";
+import type { CandlesRead, PositionsRead, QuoteRead } from "@/lib/api";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice } from "@/components/app/state";
 import { plainRead } from "@/components/app/plain";
 import { TIMEFRAMES } from "@/components/app/rule-form";
-import { isStale, positionOverlays, sameInstrument, type ChartMarker, type PositionOverlay } from "./chart-data";
+import {
+  applyQuote, isStale, positionOverlays, precisionFor, QUOTE_STALE_AFTER_S, sameInstrument,
+  type ChartMarker, type PositionOverlay,
+} from "./chart-data";
 import { PriceChart, type Overlay } from "./price-chart";
 
 /**
@@ -37,6 +40,15 @@ import { PriceChart, type Overlay } from "./price-chart";
  * floor for one chart; do not lower it.
  */
 export const CHART_REFRESH_MS = 5_000;
+
+/**
+ * How often the live price is re-read.
+ *
+ * A quote is not a historical request, so it has its own, larger rate-limit
+ * bucket (90 a minute); 3 seconds is 20 a minute per chart. It is the price
+ * that is live. The candles still arrive through the server's candle cache.
+ */
+export const QUOTE_REFRESH_MS = 3_000;
 const BARS = 200;
 
 export const PERIOD_MIN = 2;
@@ -90,6 +102,10 @@ export function MarketPanel({
     : null;
   const candles = useRead<CandlesRead>(path, CHART_REFRESH_MS);
   const positions = useRead<PositionsRead>(path ? "positions" : null, CHART_REFRESH_MS);
+  const quotePath = ctid && symbol
+    ? `accounts/${ctid}/quote?${new URLSearchParams({ symbol }).toString()}`
+    : null;
+  const quoteRead = useRead<QuoteRead>(quotePath, QUOTE_REFRESH_MS);
   const now = useNow(path !== null && candles.lastSync !== null);
 
   const result = candles.result;
@@ -107,6 +123,43 @@ export function MarketPanel({
   const stale = isStale({ lastSync: candles.lastSync, now, failed });
   const plain = read && read.status !== "ok" ? plainRead(read.status, read.reason) : null;
   const last = read?.candles?.[read.candles.length - 1];
+
+  // THE LIVE PRICE, AND HOW OLD IT IS RIGHT NOW.
+  //
+  // `useRead` keeps the previous answer while a new path loads, so a quote on
+  // hand may be for the instrument that was charted before this one: it is
+  // only used if it names THIS instrument. Its age is the age the server
+  // reported when it answered PLUS the time since this browser received that
+  // answer, so a price that stops updating ages on screen instead of freezing
+  // at "2 s ago".
+  const qResult = quoteRead.result;
+  const qData = qResult?.ok ? qResult.data : null;
+  const quoteOk = !!qData && qData.status === "ok"
+    && typeof qData.bid === "number" && typeof qData.ask === "number"
+    && typeof qData.receivedAt === "number"
+    && (!qData.symbol || sameInstrument(qData.symbol, symbol));
+  const quoteAgeSec = quoteOk && quoteRead.lastSync !== null
+    ? (qData!.ageSec ?? 0) + Math.max(0, now - quoteRead.lastSync) / 1000
+    : null;
+  const quoteStale = !quoteOk || quoteAgeSec === null || quoteAgeSec > QUOTE_STALE_AFTER_S || !!qData?.stale;
+  // Decimals come from the candles AND the quote. The candle precision alone
+  // under-reported the price: a quote of 1.1215 beside candles that happen to
+  // end in round thousandths was shown as 1.121, i.e. less than the broker
+  // gave. Never show fewer decimals than the broker sent.
+  const precisionBars = [
+    ...(read?.candles ?? []).map((c) => ({ time: c.time ?? 0, open: c.open, high: c.high, low: c.low, close: c.close })),
+    ...(quoteOk ? [{ time: 0, open: qData!.bid!, high: qData!.ask!, low: qData!.bid!, close: qData!.ask! }] : []),
+  ];
+  const decimals = precisionBars.length ? precisionFor(precisionBars) : 5;
+  const liveCandles = useMemo(() => {
+    if (!read?.candles) return undefined;
+    if (!quoteOk || quoteStale) return read.candles;
+    return applyQuote(
+      read.candles,
+      { bid: qData!.bid!, ask: qData!.ask!, receivedAt: qData!.receivedAt!, stale: false },
+      tf,
+    );
+  }, [read, quoteOk, quoteStale, qData, tf]);
 
   const period = parsePeriod(periodText);
   const overlay: Overlay | null = overlayKind !== "none" && period !== null ? { kind: overlayKind, period } : null;
@@ -216,6 +269,28 @@ export function MarketPanel({
             </p>
           ) : null}
 
+          {quotePath ? (
+            <p className="dim" style={{ fontSize: ".78rem", marginTop: ".25rem" }}
+               role="status" data-testid="live-price">
+              {quoteOk ? (
+                <>
+                  Bid <span className="mono">{qData!.bid!.toFixed(decimals)}</span>
+                  {" · "}Ask <span className="mono">{qData!.ask!.toFixed(decimals)}</span>
+                  {" · "}{quoteAgeSec !== null && quoteAgeSec < 1 ? "just now" : `${Math.round(quoteAgeSec ?? 0)} s ago`}
+                  {quoteStale ? <> · <span className="pill pill-warn">stale</span></> : null}
+                </>
+              ) : quoteRead.lastSync === null ? (
+                <>Live price loading…</>
+              ) : (
+                <>
+                  Live price unavailable
+                  {qData?.reason ? <> — {qData.reason}</> : qResult && !qResult.ok ? <> — {qResult.message}</> : null}.
+                  The chart still shows the last candles received.
+                </>
+              )}
+            </p>
+          ) : null}
+
           <div style={{ marginTop: "var(--sp-3)" }}>
             {!symbol ? (
               /* THE BROKER WAS NEVER ASKED, so it cannot have answered.
@@ -259,7 +334,7 @@ export function MarketPanel({
               <>
                 <div className={stale ? "chart-frame is-stale" : "chart-frame"}>
                   <PriceChart
-                    candles={read.candles}
+                    candles={liveCandles ?? read.candles}
                     symbol={read.symbol}
                     timeframe={read.timeframe}
                     markers={markers}

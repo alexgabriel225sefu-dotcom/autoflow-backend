@@ -61,6 +61,10 @@ _BUCKETS = {
     "oauth": ("RL_A4T_OAUTH_PER_MIN", 10, 60),
     # Broker reads that cost the shared historical budget.
     "candles": ("RL_A4T_CANDLES_PER_MIN", 30, 60),
+    # A live price. A chart polls it every few seconds, so this is its own
+    # bucket: it is not a historical request, and it must not be charged
+    # to the candles budget that protects every client on a connection.
+    "quote": ("RL_A4T_QUOTE_PER_MIN", 90, 60),
     # Evaluator runs.
     "preview": ("RL_A4T_PREVIEW_PER_MIN", 20, 60),
     # Anything that changes whether money can move.
@@ -92,6 +96,7 @@ def _mk(name):
 LIMITERS = {name: _mk(name) for name in _BUCKETS}
 
 _CANDLES_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/candles$")
+_QUOTE_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/quote$")
 _PREVIEW_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/preview$")
 _ACTIVATE_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/activate$")
 
@@ -135,6 +140,8 @@ def classify(method, route):
         return "control"
     if _CANDLES_RE.match(route):
         return "candles"
+    if _QUOTE_RE.match(route):
+        return "quote"
     if _PREVIEW_RE.match(route):
         return "preview"
     if _ACTIVATE_RE.match(route):

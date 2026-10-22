@@ -235,6 +235,62 @@ export function snapMarkers(markers: readonly ChartMarker[], bars: readonly Char
   });
 }
 
+/* ── a live price on the last candle ───────────────────────────────────── */
+
+/** Seconds in each timeframe the app offers. */
+export const TIMEFRAME_SECONDS: Readonly<Record<string, number>> = {
+  "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400,
+};
+
+/** A quote older than this is not "live". Matches QUOTE_STALE_AFTER_S in broker_read.py. */
+export const QUOTE_STALE_AFTER_S = 15;
+
+export type LiveQuote = { bid: number; ask: number; receivedAt: number; stale?: boolean };
+
+/**
+ * The candles, with the LAST one following the live price — only when that is
+ * true, and otherwise the very same array.
+ *
+ * Candles reach the browser through a cache of up to a minute, so the newest
+ * bar can lag the market. A quote says where price is now. When that quote
+ * falls INSIDE the last candle's span, the candle's close, high and low can
+ * honestly follow it. In every other case this leaves the candles alone:
+ *
+ *  - a stale quote is not current, so it moves nothing,
+ *  - a quote from before the last bar belongs to a different bar,
+ *  - a quote past the end of the last bar means the candles are BEHIND. The
+ *    bar that should now exist has an open the broker has not given us, and
+ *    inventing one would draw a price that never printed. The next candle
+ *    read catches up; until then the price is shown as a number beside the
+ *    chart instead.
+ *
+ * The BID is used because broker trendbars are bid-based; closing a bar on the
+ * ask would draw a spread-sized step the market never made.
+ *
+ * Containment is tested as `bar start <= received < bar start + period`
+ * rather than by rounding to an epoch multiple, so a timeframe whose bars do
+ * not align to UTC midnight (a daily bar at the broker's rollover) is handled
+ * correctly instead of silently never matching.
+ *
+ * Returns the same array when nothing changes, so a caller can tell "no
+ * change" by identity; never mutates its input.
+ */
+export function applyQuote(
+  candles: Candle[], quote: LiveQuote | null | undefined, timeframe: string,
+): Candle[] {
+  if (!quote || quote.stale || !candles.length) return candles;
+  const period = TIMEFRAME_SECONDS[String(timeframe || "").toLowerCase()];
+  const bid = quote.bid;
+  if (!period || !(bid > 0) || !(quote.receivedAt > 0)) return candles;
+  const last = candles[candles.length - 1];
+  if (typeof last.time !== "number") return candles;
+  if (quote.receivedAt < last.time || quote.receivedAt >= last.time + period) return candles;
+  const moved: Candle = {
+    ...last, close: bid, high: Math.max(last.high, bid), low: Math.min(last.low, bid),
+  };
+  return [...candles.slice(0, -1), moved];
+}
+
 /* ── staleness ────────────────────────────────────────────────────────── */
 
 /** A read older than this is not "live", whatever else is true of it. */

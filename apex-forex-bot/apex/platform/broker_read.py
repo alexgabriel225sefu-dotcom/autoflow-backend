@@ -290,6 +290,19 @@ MAX_CANDLES = 1000
 DEFAULT_CANDLES = 200
 
 
+def validate_symbol(symbol):
+    """The normalised instrument, or ValueError. Checked BEFORE a broker opens."""
+    from apex import forex
+    sym = str(symbol or "").strip().upper()
+    if not sym:
+        raise ValueError("symbol is required")
+    if not forex.is_tradeable(sym):
+        raise ValueError(
+            f"{sym} is not an instrument this platform trades — spot FX with "
+            f"a USD leg, plus metals")
+    return sym
+
+
 def validate_candle_query(symbol, timeframe, limit):
     """(symbol, timeframe, limit) or ValueError.
 
@@ -299,13 +312,7 @@ def validate_candle_query(symbol, timeframe, limit):
     does not exist. It also means a bad request never spends a socket.
     """
     from apex import forex
-    sym = str(symbol or "").strip().upper()
-    if not sym:
-        raise ValueError("symbol is required")
-    if not forex.is_tradeable(sym):
-        raise ValueError(
-            f"{sym} is not an instrument this platform trades — spot FX with "
-            f"a USD leg, plus metals")
+    sym = validate_symbol(symbol)
     tf = str(timeframe or "").strip().lower()
     if tf not in forex.TIMEFRAMES:
         raise ValueError(
@@ -347,6 +354,115 @@ def candles(user_id, *, symbol, timeframe, limit=None, **kw):
         out["requested"] = n
         out["count"] = len(out.get("candles") or [])
     return out
+
+
+# ── a live price, read on its own ───────────────────────────────────────────
+#
+# WHY NOT JUST POLL THE CANDLES FASTER
+#
+# Candles are served through a shared cache of up to a minute, and the answer
+# carries no time at which it was produced. A chart that polled them every five
+# seconds looked live and could be showing a bar a minute behind the market,
+# with nothing in the response to say so. So the price is read separately,
+# from the broker's spot quote, and it carries WHEN the broker produced it.
+#
+# WHAT THE CACHE IS FOR
+#
+# Every request opens a fresh broker object, so the connector's own 3-second
+# quote cache never applies and each poll would re-subscribe to spots on a
+# socket shared with the trading loop. A short process-level cache means a
+# burst of polls (two tabs, a phone and a laptop) costs the broker one
+# subscription, not many. It is two seconds because a quote that is older than
+# that is not what "live" means, and the age is computed when the answer is
+# SERVED, from the broker's own timestamp, so a cached answer never looks newer
+# than it is.
+#
+# A spot subscription is an ordinary request in cTrader's documented limits,
+# not a historical one, which is why this has its own bucket in ratelimit.py
+# instead of spending the candles budget.
+QUOTE_CACHE_TTL_S = 2.0
+# Beyond this a price is not "live", whatever else is true of it. Generous
+# enough for a quiet market, where the feed can go several seconds between
+# ticks; a closed market ages past it and is shown as stale, which is the truth.
+QUOTE_STALE_AFTER_S = 15.0
+QUOTE_CACHE_MAX = 512
+_quote_cache = {}
+_quote_cache_lock = threading.Lock()
+_quote_fetch_locks = {}
+
+
+def reset_quote_cache():
+    """Forget every cached quote. For tests, and for a reconnect."""
+    with _quote_cache_lock:
+        _quote_cache.clear()
+        _quote_fetch_locks.clear()
+
+
+def _number(value):
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return out if out == out else 0.0          # NaN is not a price
+
+
+def quote(user_id, *, symbol, **kw):
+    """The broker's current bid and ask for one instrument, and how old it is.
+
+    Read-only: this module imports no gate, no ledger and no order function,
+    and a test walks its AST to keep it that way.
+
+    A failure is `unavailable` with a reason, never a price of zero, and is
+    never cached: the next poll must be able to recover the moment the broker
+    does. A price that is old is still ANSWERED, with its age and `stale:
+    true`, so the screen can show what it has and say that it is old instead of
+    going blank.
+    """
+    sym = validate_symbol(symbol)
+    broker, other = _open(user_id, ctid=kw.get("ctid"),
+                          connection_fn=kw.get("connection_fn"),
+                          broker_fn=kw.get("broker_fn"))
+    if broker is None:
+        return other
+    conn = other
+    key = (str(user_id), str(conn.get("ctid")), sym)
+    with _quote_cache_lock:
+        fetch_lock = _quote_fetch_locks.setdefault(key, threading.Lock())
+    # One broker subscription per key at a time: concurrent polls queue behind
+    # it and are then served from the cache it fills.
+    with fetch_lock:
+        now = time.monotonic()
+        with _quote_cache_lock:
+            cached = _quote_cache.get(key)
+        if cached and now - cached[0] < QUOTE_CACHE_TTL_S:
+            bid, ask, received_at = cached[1]
+        else:
+            try:
+                raw_bid, raw_ask, raw_at = _quote(broker, sym)
+            except Exception as e:  # noqa: BLE001
+                return {"connected": True, "status": UNAVAILABLE,
+                        "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                        "reason": _scrub(e, conn.get("accessToken"))}
+            bid, ask, received_at = (
+                _number(raw_bid), _number(raw_ask), _number(raw_at))
+            if not (bid > 0 and ask > 0 and received_at > 0):
+                return {"connected": True, "status": UNAVAILABLE,
+                        "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                        "reason": f"the broker returned no usable price for "
+                                  f"{sym}"}
+            with _quote_cache_lock:
+                _quote_cache[key] = (time.monotonic(),
+                                     (bid, ask, received_at))
+                if len(_quote_cache) > QUOTE_CACHE_MAX:
+                    oldest = sorted(_quote_cache,
+                                    key=lambda item: _quote_cache[item][0])
+                    for old_key in oldest[:len(_quote_cache) - QUOTE_CACHE_MAX]:
+                        _quote_cache.pop(old_key, None)
+    age = max(0.0, time.time() - received_at)
+    return {"connected": True, "status": OK, "accountId": conn.get("ctid"),
+            "mode": conn.get("mode"), "symbol": sym, "bid": bid, "ask": ask,
+            "mid": (bid + ask) / 2.0, "receivedAt": received_at,
+            "ageSec": round(age, 1), "stale": age > QUOTE_STALE_AFTER_S}
 
 
 def _shape(rows):

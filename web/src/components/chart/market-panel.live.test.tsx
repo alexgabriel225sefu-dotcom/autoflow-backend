@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   calls: [] as { path: string; method?: string }[],
   candles: null as unknown,
   positions: null as unknown,
+  quote: null as unknown,
 }));
 
 vi.mock("next/link", () => ({
@@ -21,6 +22,7 @@ vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
   api: vi.fn(async (path: string, init?: { method?: string }) => {
     h.calls.push({ path, method: init?.method });
+    if (path.includes("/quote")) return h.quote as ApiResult<unknown>;
     return (path.startsWith("accounts/") ? h.candles : h.positions) as ApiResult<unknown>;
   }),
 }));
@@ -40,7 +42,15 @@ const readOf = (closes: number[]) => ({
 });
 const asBar = (i: number, close: number) => bar(i, close);
 
-const candleCalls = () => h.calls.filter((c) => c.path.startsWith("accounts/"));
+const candleCalls = () => h.calls.filter((c) => c.path.includes("/candles"));
+const quoteCalls = () => h.calls.filter((c) => c.path.includes("/quote"));
+const QUOTE_OK = (over: Record<string, unknown> = {}) => ({
+  ok: true, data: {
+    connected: true, status: "ok", accountId: 501, mode: "demo", symbol: "EURUSD",
+    bid: 1.1215, ask: 1.1217, mid: 1.1216, receivedAt: T0 + 2 * 3600 + 60,
+    ageSec: 1, stale: false, ...over,
+  },
+});
 const positionCalls = () => h.calls.filter((c) => c.path === "positions");
 
 async function tick(ms: number) {
@@ -56,6 +66,7 @@ beforeEach(() => {
   lwc.reset();
   vi.mocked(createChart).mockClear();
   h.candles = readOf([1.10, 1.11, 1.12]);
+  h.quote = QUOTE_OK();
   h.positions = { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", positions: [] } };
   setHidden(false);
 });
@@ -90,6 +101,10 @@ describe("the live loop, with the real hook", () => {
   });
 
   it("applies each refresh to the same chart with series.update", async () => {
+    // This test is about how the CANDLE read reaches the chart. The live price
+    // is made stale so it cannot move the last bar and muddy that: what a
+    // quote does to the last candle has its own tests below.
+    h.quote = QUOTE_OK({ stale: true, ageSec: 60 });
     await mount();
     expect(createChart).toHaveBeenCalledTimes(1);
     const series = lwc.seriesOf("candlestick")[0];
@@ -127,7 +142,9 @@ describe("the live loop, with the real hook", () => {
     await mount();
     setHidden(true);
     await tick(40_000);
-    expect(screen.getByText("stale")).toBeDefined();
+    // The candle sync line carries its own marker (the live price has one too,
+    // so the text alone is no longer unique).
+    expect(document.querySelector(".sync-line .pill-warn")?.textContent).toBe("stale");
     expect(screen.getByText(/Last synced \d+s ago/)).toBeDefined();
   });
 
@@ -150,5 +167,91 @@ describe("the live loop, with the real hook", () => {
     await tick(5_000);
     expect(document.querySelector(".price-chart")).not.toBeNull();
     expect(screen.queryByText("stale")).toBeNull();
+  });
+});
+
+
+describe("the live price, with the real hook", () => {
+  it("reads the quote on mount, then every 3 seconds — not sooner", async () => {
+    await mount();
+    expect(quoteCalls()).toHaveLength(1);
+    await tick(2_999);
+    expect(quoteCalls(), "polled before 3 s").toHaveLength(1);
+    await tick(1);
+    expect(quoteCalls()).toHaveLength(2);
+  });
+
+  it("asks for the instrument that is charted", async () => {
+    await mount();
+    expect(quoteCalls()[0].path).toBe("accounts/501/quote?symbol=EURUSD");
+  });
+
+  it("does not spend the historical budget faster: candles still every 5 s", async () => {
+    await mount();
+    await tick(12_000);
+    // 1 on mount + 2 refreshes in 12 s. The faster quote cadence must not
+    // have dragged the candle read along with it.
+    expect(candleCalls()).toHaveLength(3);
+    expect(quoteCalls().length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("only ever issues GETs for the price", async () => {
+    await mount();
+    await tick(10_000);
+    for (const c of quoteCalls()) expect(c.method ?? "GET").toBe("GET");
+  });
+
+  it("shows bid, ask and how old the price is", async () => {
+    await mount();
+    const line = screen.getByTestId("live-price");
+    // Four decimals, as the broker sent them. With the precision taken from
+    // the candles alone these read "1.121" and "1.122": less than the broker
+    // gave, and not the price the client would see in cTrader.
+    expect(line.textContent).toContain("Bid 1.1215");
+    expect(line.textContent).toContain("Ask 1.1217");
+    expect(line.textContent).toMatch(/just now|\d+ s ago/);
+  });
+
+  it("moves the last candle to the bid when the price is inside it", async () => {
+    await mount();
+    const series = lwc.seriesOf("candlestick")[0];
+    const lastSet = series.setData.mock.calls.at(-1)![0];
+    expect(lastSet.at(-1).close).toBe(1.1215);
+  });
+
+  it("does NOT move the candle with a stale price", async () => {
+    h.quote = QUOTE_OK({ stale: true, ageSec: 60 });
+    await mount();
+    const series = lwc.seriesOf("candlestick")[0];
+    const lastSet = series.setData.mock.calls.at(-1)![0];
+    expect(lastSet.at(-1).close).toBe(1.12);               // the candle read, untouched
+    expect(screen.getByTestId("live-price").textContent).toMatch(/stale/);
+  });
+
+  it("ages the price on screen when polls stop, instead of freezing at '1 s ago'", async () => {
+    await mount();
+    expect(screen.getByTestId("live-price").textContent).not.toMatch(/stale/);
+    // A hidden tab stops polling. Nothing refreshes the price, so the age it
+    // was shown with must keep growing on its own clock.
+    setHidden(true);
+    await tick(20_000);
+    const text = screen.getByTestId("live-price").textContent ?? "";
+    expect(text).toMatch(/stale/);
+    expect(text).toMatch(/\b(1[5-9]|2\d) s ago/);
+  });
+
+  it("says so, and keeps the chart, when the price cannot be read", async () => {
+    h.quote = { ok: false, status: 503, code: "STORE_UNAVAILABLE", message: "broker down" };
+    await mount();
+    expect(screen.getByTestId("live-price").textContent).toMatch(/Live price unavailable/);
+    expect(screen.getByTestId("live-price").textContent).toMatch(/last candles received/);
+    expect(createChart).toHaveBeenCalledTimes(1);          // the chart is still there
+  });
+
+  it("does not show a price for a different instrument", async () => {
+    h.quote = QUOTE_OK({ symbol: "GBPUSD" });
+    await mount();
+    expect(screen.getByTestId("live-price").textContent).toMatch(/unavailable/);
+    expect(screen.getByTestId("live-price").textContent).not.toContain("1.1215");
   });
 });

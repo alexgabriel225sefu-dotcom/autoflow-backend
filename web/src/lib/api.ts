@@ -412,6 +412,13 @@ export type CandlesRead = Omit<PositionsRead, "positions"> & {
   count?: number; requested?: number;
 };
 
+/** A live price and when the broker produced it. `stale` is the server's verdict
+ *  on `ageSec`; the page also ages it by the time since it was fetched. */
+export type QuoteRead = Omit<PositionsRead, "positions"> & {
+  symbol?: string; bid?: number; ask?: number; mid?: number;
+  receivedAt?: number; ageSec?: number; stale?: boolean;
+};
+
 export type RuleSummary = {
   ruleDocId: string; name: string; state: "draft" | "active" | "paused" | "archived";
   version: number; symbols: string[]; timeframe: string; updatedAt: number;

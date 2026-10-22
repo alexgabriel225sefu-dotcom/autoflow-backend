@@ -36,7 +36,7 @@ vi.mock("lightweight-charts", async () => (await import("@/test/lightweight-char
 import { lwc } from "@/test/lightweight-charts-mock";
 import { createChart } from "lightweight-charts";
 import { TIMEFRAMES } from "@/components/app/rule-form";
-import { CHART_REFRESH_MS, MarketPanel } from "./market-panel";
+import { CHART_REFRESH_MS, MarketPanel, QUOTE_REFRESH_MS } from "./market-panel";
 
 const T0 = 1_758_542_400;
 const BARS = [
@@ -92,10 +92,27 @@ describe("market panel — what it asks the hook for", () => {
     expect(CHART_REFRESH_MS).toBe(5000);
     mount();
     expect(h.useRead).toHaveBeenCalledWith(expect.stringMatching(/^accounts\/501\/candles\?/), 5000);
-    // The broker's historical budget is shared; no read on this panel may poll quicker.
-    for (const [, interval] of h.useRead.mock.calls) {
+    // The broker's historical budget is shared; no HISTORICAL read on this
+    // panel may poll quicker. The live price is not a historical request and
+    // has its own bucket, so it is checked on its own below rather than
+    // exempted from a blanket rule.
+    for (const [path, interval] of h.useRead.mock.calls) {
+      if (typeof path === "string" && /\/quote\?/.test(path)) continue;
       expect(interval).toBeGreaterThanOrEqual(5000);
     }
+  });
+
+  it("reads a live price for the charted instrument, on its own cadence", () => {
+    expect(QUOTE_REFRESH_MS).toBe(3000);
+    mount();
+    expect(h.useRead).toHaveBeenCalledWith(
+      expect.stringMatching(/^accounts\/501\/quote\?symbol=EURUSD$/), QUOTE_REFRESH_MS);
+    // Never faster than the quote bucket (90/min) can carry two tabs.
+    const quoteIntervals = h.useRead.mock.calls
+      .filter(([path]) => typeof path === "string" && /\/quote\?/.test(path))
+      .map(([, interval]) => interval);
+    expect(quoteIntervals.length).toBeGreaterThan(0);
+    for (const interval of quoteIntervals) expect(interval).toBeGreaterThanOrEqual(2000);
   });
 
   it("reads open positions for the lines on the chart, at the same cadence", () => {
