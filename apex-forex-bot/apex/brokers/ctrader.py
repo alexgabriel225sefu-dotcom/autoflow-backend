@@ -68,7 +68,7 @@ try:
     )
     from apex.ctrader_proto.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
-        ProtoOAExecutionType, ProtoOAOrderStatus,
+        ProtoOAExecutionType, ProtoOAOrderStatus, ProtoOAPositionStatus,
     )
     _SDK_OK = True
     _SDK_ERR = ""
@@ -1521,6 +1521,36 @@ class CtraderBroker:
                     "code": execution_type,
                     "sentence": "The broker rejected the close request."}
 
+        # WHICH POSITION THIS ANSWER IS ABOUT, AND WHETHER IT IS STILL OPEN.
+        #
+        # Two things the volume alone cannot tell us, both found in a
+        # read-only review before the first real close:
+        #
+        # * The reply arrives on a socket shared with the rest of the
+        #   account. A stop-loss or take-profit fill on ANOTHER position can
+        #   land in the same window, and reporting it as "Position closed"
+        #   would book a close that never happened. An answer about a
+        #   different position is UNKNOWN, which keeps the idempotency claim
+        #   and tells the client to check.
+        # * "Partial" can only mean the position is STILL OPEN. This used to
+        #   return PARTIAL whenever the event carried a non-zero volume. What
+        #   volume a fully closed position reports is not in the schema; if
+        #   it reports the one it had, every successful full close read as
+        #   "partially closed", released the claim, and invited a second
+        #   Close on a position that was already gone. The broker's own
+        #   status is the answer, not the arithmetic.
+        position_closed = False
+        if res.HasField("position"):
+            returned = int(getattr(res.position, "positionId", 0) or 0)
+            if returned and returned != pid:
+                return {"status": "UNKNOWN", "positionId": pid,
+                        "sentence": "The broker answered about a different "
+                                    "position. Check your positions before "
+                                    "trying again."}
+            position_closed = (
+                getattr(res.position, "positionStatus", None)
+                == ProtoOAPositionStatus.POSITION_STATUS_CLOSED)
+
         executed = None
         if res.HasField("order"):
             executed = int(getattr(res.order, "executedVolume", 0) or 0) or None
@@ -1528,7 +1558,8 @@ class CtraderBroker:
         if res.HasField("position"):
             remaining = int(getattr(res.position.tradeData, "volume", 0) or 0) or None
         if execution_type == "ORDER_PARTIAL_FILL" or (
-                remaining is not None and remaining > 0):
+                remaining is not None and remaining > 0
+                and not position_closed):
             remaining_units = (round(remaining / 100.0, 8)
                                if remaining is not None else None)
             return {"status": "PARTIAL", "positionId": pid,
