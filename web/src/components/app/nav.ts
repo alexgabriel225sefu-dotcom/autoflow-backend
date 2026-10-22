@@ -9,7 +9,7 @@
  * discoverable.
  */
 import {
-  Bell, BookOpen, LayoutDashboard, ListChecks, Receipt, Settings,
+  BarChart3, Bell, BookOpen, LayoutDashboard, ListChecks, Receipt, Settings,
   TrendingUp, Wallet, type LucideIcon,
 } from "lucide-react";
 
@@ -26,6 +26,7 @@ export const NAV: NavItem[] = [
   { href: "/rules", label: "Rules", icon: ListChecks, primary: true },
   { href: "/positions", label: "Positions", icon: TrendingUp, primary: true },
   { href: "/orders", label: "Orders", icon: Receipt },
+  { href: "/performance", label: "Performance", icon: BarChart3 },
   { href: "/journal", label: "Journal", icon: BookOpen, primary: true },
   { href: "/notifications", label: "Alerts", icon: Bell },
   { href: "/accounts", label: "Accounts", icon: Wallet },

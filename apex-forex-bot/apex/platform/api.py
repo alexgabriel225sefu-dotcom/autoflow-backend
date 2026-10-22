@@ -41,6 +41,7 @@ from apex.platform import health as _health
 from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
+from apex.platform import performance_read as _perfread
 from apex.platform import preview as _preview
 from apex.platform import linklog as _log
 from apex.platform import ratelimit as _rl
@@ -668,6 +669,13 @@ def _dispatch(method, route, headers, body, query=None):
     if m and method == "POST":
         p = _authenticate(headers)
         return _ok(_notify.mark_read(p.user_id, m.group(1)))
+
+    # ── performance (closed trades the engine recorded) ─────────────────
+    if route == "performance" and method == "GET":
+        p = _authenticate(headers)
+        q = query or {}
+        return _ok(_perfread.read(p.user_id, period=q.get("period") or "all",
+                                  mode=q.get("mode") or "demo"))
 
     # ── journal ─────────────────────────────────────────────────────────
     if route == "journal" and method == "GET":

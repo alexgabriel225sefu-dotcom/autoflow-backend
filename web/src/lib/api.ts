@@ -577,6 +577,28 @@ export type ApprovalResult = {
   alreadyGone?: boolean;
 };
 
+/** GET performance. Closed trades the ENGINE recorded, from the same maths the
+ *  Telegram bot used. `profit_factor` is null with `noLosses: true` when there
+ *  was no losing trade; a group with `thin: true` has fewer than `minTrades`
+ *  trades and is not evidence. status "unavailable" means the journal could not
+ *  be read — never to be shown as zero trades. */
+export type PerfSummary = {
+  trades: number; wins: number; losses: number; win_rate: number | null;
+  net: number | null; profit_factor: number | null; expectancy: number | null;
+  max_drawdown: number | null; avg_win: number | null; avg_loss: number | null;
+  best: number | null; worst: number | null; noLosses: boolean;
+  r: { trades: number; expectancy_R: number | null; win_rate_R: number | null } | null;
+};
+export type PerfGroup = PerfSummary & { id: string; label: string; thin: boolean };
+export type PerformanceRead =
+  | { status: "unavailable"; reason: string }
+  | {
+    status: "ok"; period: "today" | "week" | "month" | "all"; mode: "demo" | "live" | "all";
+    summary: PerfSummary; byStrategy: PerfGroup[]; bySymbol: PerfGroup[];
+    minTrades: number; excluded: { unknownMode: number; otherMode: number };
+    journalTrades: number; note: string;
+  };
+
 /** POST emergency/stop. Every claim here is the server's and was measured:
  *  `allFlat` is true only when a fresh read of the account found nothing open,
  *  `closes` is null when the client chose to stop without closing, and a
