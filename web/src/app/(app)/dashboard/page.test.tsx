@@ -87,7 +87,7 @@ function base() {
       status: "ok", state: "stopped", reason: "stopped",
       summary: "Automation is stopped, which is why nothing is happening.",
       level: null, levelLabel: null, loopActive: null, marketOpen: null,
-      halted: false, openPosition: null, maxPositions: null, skipsToday: null,
+      halted: false, openPosition: null, maxPositions: null, riskGuard: { state: "unknown", reasons: [] }, skipsToday: null,
       skips: [], recorded: [], recordedCount: 0, recordedReadable: true } },
     positions: { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", positions: [] } },
     orders: { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", orders: [] } },

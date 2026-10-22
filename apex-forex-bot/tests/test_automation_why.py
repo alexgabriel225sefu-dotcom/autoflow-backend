@@ -166,6 +166,52 @@ flat = repr(ask(dash=dash, rows=rows)).lower()
 check("nothing credential-shaped", not any(
     w in flat for w in ("token", "secret", "password", "apikey")), flat[:200])
 
+# ── 5b. the Risk Guard ──────────────────────────────────────────────────────
+print("\n[5b] the Risk Guard's last report is carried, and never invented")
+HOLD = lambda uid: ("holding", ["daily loss limit 4% reached"])      # noqa: E731
+OKR = lambda uid: ("ok", [])                                           # noqa: E731
+UNK = lambda uid: ("unknown", [])                                      # noqa: E731
+
+
+def ask_risk(reader, *, alive=True, level="full"):
+    put(AU.RUNNING, level)
+    return AU.why(USER, loop_reader=lambda u: (alive, {}),
+                  declines_reader=lambda u: [], market_open=lambda: True,
+                  risk_reader=reader)
+
+
+r = ask_risk(HOLD)
+check("a holding guard is the stated reason, with its own reasons",
+      r["reason"] == "risk_holding" and "daily loss limit 4% reached" in r["summary"],
+      str(r))
+check("and the guard block is carried for the screen",
+      r["riskGuard"] == {"state": "holding", "reasons": ["daily loss limit 4% reached"]},
+      str(r["riskGuard"]))
+check("a holding guard outranks 'this level places no orders'",
+      ask_risk(HOLD, level="approval")["reason"] == "risk_holding")
+check("but a dead loop is still named first",
+      ask_risk(HOLD, alive=False)["reason"] == "loop_inactive")
+check("an ok guard does not change the verdict",
+      ask_risk(OKR)["reason"] == "watching" and ask_risk(OKR)["riskGuard"]["state"] == "ok")
+check("a guard that has not reported is 'unknown', never 'ok'",
+      ask_risk(UNK)["riskGuard"]["state"] == "unknown", str(ask_risk(UNK)["riskGuard"]))
+
+
+def _raises(uid):
+    raise RuntimeError("dash unavailable")
+
+
+check("an unreadable guard is 'unknown' and does not raise",
+      AU.risk_guard(USER, reader=_raises) == {"state": "unknown", "reasons": []})
+check("an unrecognised state from the reader is 'unknown', not passed through",
+      AU.risk_guard(USER, reader=lambda u: ("fine", [])) ["state"] == "unknown")
+check("reasons are bounded",
+      len(AU.risk_guard(USER, reader=lambda u: ("holding", ["x"] * 50))["reasons"]) <= 5)
+put(AU.RUNNING, "full")
+check("status() carries the guard so every screen can show it",
+      "riskGuard" in AU.status(USER) and AU.status(USER)["riskGuard"]["state"] in ("ok", "holding", "unknown"),
+      str(AU.status(USER).get("riskGuard")))
+
 # ── 6. the route exists and is a GET ────────────────────────────────────────
 print("\n[6] GET /automation/why is routed")
 src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()

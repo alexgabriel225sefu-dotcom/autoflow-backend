@@ -605,7 +605,8 @@ export type WhyRead = {
   status: "ok";
   state: "stopped" | "running" | "paused";
   reason: "halted" | "paused" | "stopped" | "loop_inactive" | "level_no_orders"
-    | "position_open" | "market_closed" | "watching";
+    | "position_open" | "market_closed" | "watching" | "risk_holding";
+  riskGuard: RiskGuard;
   summary: string;
   level: "signals" | "approval" | "full" | null;
   levelLabel: string | null;
@@ -621,6 +622,8 @@ export type WhyRead = {
   recordedReadable: boolean;
 };
 
+export type RiskGuard = { state: "ok" | "holding" | "unknown"; reasons: string[] };
+
 export type AutomationState = {
   state: "stopped" | "running" | "paused";
   ruleDocId: string | null; mode: "demo" | null; startedAt: number | null;
@@ -635,6 +638,9 @@ export type AutomationState = {
    *  in the browser would be free to drift from the one the loop obeys.
    *  Null when nothing is running — there is no level to report. */
   level?: "signals" | "approval" | "full" | null;
+  /** The Risk Guard's last report, as the loop published it. "unknown" is a
+   *  guard that has not reported — it is never to be shown as "active". */
+  riskGuard?: RiskGuard;
   levelLabel?: string | null;
   levelBlurb?: string | null;
   levelExecutes?: boolean | null;

@@ -23,7 +23,8 @@ const why = (over: Partial<WhyRead> = {}): WhyRead => ({
   status: "ok", state: "running", reason: "watching",
   summary: "It is on and watching.", level: "full", levelLabel: "Full Automation",
   loopActive: true, marketOpen: true, halted: false, openPosition: null,
-  maxPositions: 1, skipsToday: null, skips: [], recorded: [],
+  maxPositions: 1, riskGuard: { state: "unknown", reasons: [] },
+  skipsToday: null, skips: [], recorded: [],
   recordedCount: 0, recordedReadable: true, ...over,
 });
 const ok = (data: unknown) => ({ ok: true, status: 200, data } as ApiResult<unknown>);

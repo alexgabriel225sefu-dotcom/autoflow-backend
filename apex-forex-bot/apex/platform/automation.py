@@ -114,6 +114,28 @@ def _plain(label):
     return "".join(c for c in str(label or "") if c.isascii()).strip() or None
 
 
+def risk_guard(user_id, *, reader=None):
+    """What the Risk Guard last reported, as the LOOP published it.
+
+    `{"state": "ok" | "holding" | "unknown", "reasons": [...]}`. Never raises
+    and never recomputes: asking the guard to evaluate would advance the very
+    state the badge describes (see `apex.ui_state`). "unknown" is a guard that
+    has not reported — it is NOT "ok" and is never worded as the guard having
+    said yes, which is the one line this badge must not get wrong.
+    """
+    try:
+        if reader is None:
+            from apex import ui_state
+            reader = ui_state.risk_state
+        state, reasons = reader(str(user_id))
+        if state not in ("ok", "holding", "unknown"):
+            state = "unknown"
+        return {"state": state,
+                "reasons": [str(r)[:160] for r in (reasons or [])][:5]}
+    except Exception:                                        # noqa: BLE001
+        return {"state": "unknown", "reasons": []}
+
+
 def status(user_id):
     """Safe to hand a browser. Carries no token and no broker credential."""
     rec = _read(user_id)
@@ -146,11 +168,14 @@ def status(user_id):
             # nothing to tell them apart. `engineSnapshot` is deliberately
             # absent: it is the account's previous settings, which is state
             # for stop() to use and not something to render.
-            "notApplied": rec.get("notApplied") or []}
+            "notApplied": rec.get("notApplied") or [],
+            # The Risk Guard's last report, so every screen can show it. Only
+            # meaningful while a loop runs; the browser shows it then.
+            "riskGuard": risk_guard(user_id)}
 
 
 def why(user_id, *, loop_reader=None, declines_reader=None,
-        market_open=None):
+        market_open=None, risk_reader=None):
     """"Why isn't it trading?" — the answer the Telegram `/why` gave, for the web.
 
     A waiting client reads silence as breakage. This says which of the real
@@ -189,6 +214,7 @@ def why(user_id, *, loop_reader=None, declines_reader=None,
            "levelLabel": _plain(_eng_auto.LABEL.get(level)) if level else None,
            "loopActive": None, "marketOpen": None, "halted": False,
            "openPosition": None, "maxPositions": None,
+           "riskGuard": risk_guard(user_id, reader=risk_reader),
            "skipsToday": None, "skips": [], "recorded": [],
            "recordedCount": 0, "recordedReadable": True}
 
@@ -264,6 +290,11 @@ def why(user_id, *, loop_reader=None, declines_reader=None,
             "Automation is marked as running, but its loop is not active on "
             "the server right now. After a restart it is picked up again "
             "automatically; that can take up to about fifteen minutes.")
+    elif out["riskGuard"]["state"] == "holding":
+        why_txt = "; ".join(out["riskGuard"]["reasons"]) or "a risk limit was hit"
+        code, text = "risk_holding", (
+            f"The Risk Guard is holding new trades: {why_txt}. This protects "
+            f"your account; it lifts when the limit no longer applies.")
     elif executes is False:
         code, text = "level_no_orders", (
             f"This rule runs at “{out['levelLabel']}”, so a setup is shown to "
