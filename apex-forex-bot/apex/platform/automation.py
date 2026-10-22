@@ -337,7 +337,24 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
         # Captured BEFORE the write, so stop() can put back what was there.
         # Without it a rule that ran once leaves its settings behind for
         # whatever runs next.
-        snapshot = _ecfg.snapshot_of(user_store.load(user_id))
+        #
+        # BUT ONLY THE FIRST TIME. `start` also runs on REVIVE (the supervisor
+        # restarting a loop after a deploy) and on RESUME (after a pause). By
+        # then the account record already carries the RULE's terms, so
+        # reading it again captured the rule's own settings as though they
+        # were the client's, and overwrote the original snapshot on the
+        # automation record. A Stop after any redeploy or pause then
+        # "restored" the rule's settings and the client's real ones were
+        # gone: a rule that ran once left its risk, stop and target behind.
+        #
+        # An existing snapshot on a RUNNING or PAUSED record is therefore
+        # kept as it is. `{}` is a legitimate snapshot (the account held none
+        # of the keys), so presence is tested, not truthiness.
+        if (rec.get("state") in (RUNNING, PAUSED)
+                and rec.get("engineSnapshot") is not None):
+            snapshot = rec["engineSnapshot"]
+        else:
+            snapshot = _ecfg.snapshot_of(user_store.load(user_id))
         user_store.update(user_id, dict(applied, active=True))
     except Exception as e:  # noqa: BLE001
         raise AutomationRefused("STORE_UNAVAILABLE",
@@ -726,28 +743,33 @@ def _flatten_answer(rec):
     mode — a client who presses Stop and is told "stopped" reasonably reads
     that as "and I am flat", and on a live account that belief is expensive.
 
-    This release declines, and the reason is not squeamishness: closing a
-    position is an ORDER, and this platform has nothing that places a closing
-    one. `bridge` is imported by nothing in production, and `approvals` —
-    which is the one thing here that can place an order at all — can only ask
-    the controller to OPEN the setup a client approved. Claiming to flatten
-    would be claiming to place an order we cannot place.
+    Stop still declines to flatten, on purpose: it ends the LOOP, and closing a
+    position is an order the client should decide per position, with the
+    position in front of them. Stop must not become a hidden "close
+    everything".
 
-    THE SENTENCE BELOW USED TO BE WIDER THAN THE TRUTH. It said this release
-    "cannot place orders of any kind", which was exactly right while nothing
-    could, and became false the moment Approval Required worked: a client who
-    approves a setup gets an opening order. The reason for declining is
-    specific to CLOSING, so the sentence now says that and no more — a
-    reassurance that overstates is still a thing a client acts on.
+    THIS SENTENCE HAS BEEN WRONG TWICE, in opposite directions, and both times
+    a client would have acted on it:
+
+      1. It said this release "cannot place orders of any kind". True while
+         nothing could; false once Approval Required worked.
+      2. It then said "this release has no way to close a position". True
+         until the demo Close arrived (position_close.close_demo, reached from
+         the Positions page). After that it told a client there was no way to
+         do something they could do in one click.
+
+    So it now says what Stop does NOT do and where closing IS available. The
+    pairing test (tests/test_stop_sentence_truthful.py) ties the sentence to
+    the capability, so it cannot drift a third time.
     """
     return {
         "flattened": False,
         "flattenDeclined": True,
         "flattenReason": (
             "Stopping ends the trading loop. It does not close positions that "
-            "are already open — this release has no way to close a position. "
-            "Any open position stays at your broker with the stop and target "
-            "it was given, and you close it there."),
+            "are already open. Any open position stays at your broker with "
+            "the stop and target it was given. You can close it from the "
+            "Positions page on a demo account, or in cTrader."),
     }
 
 

@@ -36,9 +36,9 @@ const DECLINED = {
   flattenDeclined: true,
   flattenReason:
     "Stopping ends the trading loop. It does not close positions that are "
-    + "already open — this release has no way to close a position. Any open "
-    + "position stays at your broker with the stop and target it was given, "
-    + "and you close it there.",
+    + "already open. Any open position stays at your broker with the stop "
+    + "and target it was given. You can close it from the Positions page on a "
+    + "demo account, or in cTrader.",
 };
 
 describe("the outcome of a stop", () => {
@@ -61,7 +61,8 @@ describe("the outcome of a stop", () => {
   it("tells the client where the position is and who closes it", () => {
     const out = outcomeOf(DECLINED);
     expect(out).toMatch(/stays at your broker/);
-    expect(out).toMatch(/you close it there/);
+    expect(out).toMatch(/Positions page/);
+    expect(out).toMatch(/cTrader/);
   });
 });
 
