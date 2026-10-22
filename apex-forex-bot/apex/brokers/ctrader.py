@@ -662,12 +662,18 @@ class CtraderBroker:
         return 100000.0
 
     # -- market data ----------------------------------------------------------
-    def get_quote(self, instrument=None):
+    def get_quote(self, instrument=None, wait_s=8):
         """Return the broker quote and the timestamp at which it was received.
 
         Position screens need the timestamp as well as bid/ask so an old spot
         cannot be presented as current.  Keep ``get_bid_ask`` as the public
         compatibility method used by the trading loop.
+
+        ``wait_s`` is how long to wait for a tick, WITH THE CONNECTION'S LOCK
+        HELD. The default of 8 is what the trading loop has always had. A chart
+        polls every few seconds, and on a closed market or a quiet instrument
+        every poll would otherwise hold the shared socket for the full 8 and
+        queue the loop's own requests behind it, so its reads pass a short one.
         """
         sym = _to_ct_symbol(instrument or self._c.SYMBOL)
         sid = self._symbol_id(instrument)
@@ -682,10 +688,11 @@ class CtraderBroker:
             req.symbolId.append(sid)
             cid = conn._send(req)
             # wait for the first spot event carrying bid+ask for this symbol
-            deadline = now + 8
+            deadline = now + wait_s
             bid = ask = None
             while time.time() < deadline:
-                pm = conn._read_frame(timeout=8)
+                pm = conn._read_frame(
+                    timeout=max(0.1, min(wait_s, deadline - time.time())))
                 if pm.payloadType == ProtoOASpotEvent().payloadType:
                     ev = ProtoOASpotEvent()
                     ev.ParseFromString(pm.payload)

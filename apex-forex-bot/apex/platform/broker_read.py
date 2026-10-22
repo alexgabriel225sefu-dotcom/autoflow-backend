@@ -154,7 +154,11 @@ def _enrich_positions(broker):
     for original in rows:
         row = dict(original)
         symbol = row.get("symbol")
-        bid, ask, received_at = _quote(broker, symbol)
+        # The short wait, for the same reason as the chart's price read: this
+        # runs on a 5-second poll and get_quote holds the shared socket's lock
+        # while it waits for a tick, so an open position on a market with no
+        # ticks would otherwise hold it for 8 seconds, per position, on every poll.
+        bid, ask, received_at = _quote_short(broker, symbol)
         side = str(row.get("side") or "").upper()
         current = bid if side == "BUY" else ask if side == "SELL" else None
         age = max(0.0, time.time() - float(received_at))
@@ -386,6 +390,15 @@ QUOTE_CACHE_TTL_S = 2.0
 # ticks; a closed market ages past it and is shown as stale, which is the truth.
 QUOTE_STALE_AFTER_S = 15.0
 QUOTE_CACHE_MAX = 512
+# How long a price read waits for a tick. get_quote holds the connection's lock
+# while it waits, and that socket is shared with the trading loop, so a chart
+# poll on a closed market must not sit on it for the loop's 8 seconds.
+QUOTE_WAIT_S = 2.0
+# After a failed read the broker is left alone for this long and the failure is
+# served again. Without it, a market with no ticks turns every poll into a fresh
+# wait on the shared socket; with it, the worst case is one short wait per pause.
+QUOTE_FAILURE_PAUSE_S = 5.0
+_quote_failures = {}
 _quote_cache = {}
 _quote_cache_lock = threading.Lock()
 _quote_fetch_locks = {}
@@ -396,6 +409,7 @@ def reset_quote_cache():
     with _quote_cache_lock:
         _quote_cache.clear()
         _quote_fetch_locks.clear()
+        _quote_failures.clear()
 
 
 def _number(value):
@@ -404,6 +418,31 @@ def _number(value):
     except (TypeError, ValueError):
         return 0.0
     return out if out == out else 0.0          # NaN is not a price
+
+
+def _quote_short(broker, symbol):
+    """`_quote`, but asking the connector for a SHORT wait where it supports one.
+
+    A connector without the parameter (a test double, an older one) is called
+    as before; only the real cTrader connector takes `wait_s`.
+    """
+    import inspect
+    getter = getattr(broker, "get_quote", None)
+    if callable(getter):
+        try:
+            takes_wait = "wait_s" in inspect.signature(getter).parameters
+        except (TypeError, ValueError):
+            takes_wait = False
+        if takes_wait:
+            quote = getter(symbol, wait_s=QUOTE_WAIT_S)
+            if isinstance(quote, dict):
+                return (quote["bid"], quote["ask"],
+                        quote.get("receivedAt", quote.get("timestamp", time.time())))
+            if len(quote) == 3:
+                return quote
+            bid, ask = quote
+            return bid, ask, time.time()
+    return _quote(broker, symbol)
 
 
 def quote(user_id, *, symbol, **kw):
@@ -434,15 +473,30 @@ def quote(user_id, *, symbol, **kw):
         now = time.monotonic()
         with _quote_cache_lock:
             cached = _quote_cache.get(key)
+        with _quote_cache_lock:
+            failed = _quote_failures.get(key)
+        if failed and time.monotonic() < failed[0] and not (
+                cached and now - cached[0] < QUOTE_CACHE_TTL_S):
+            # Recently failed: do not make the broker (and the socket the
+            # trading loop shares) wait again for a tick that is not coming.
+            return {"connected": True, "status": UNAVAILABLE,
+                    "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                    "reason": failed[1]}
         if cached and now - cached[0] < QUOTE_CACHE_TTL_S:
             bid, ask, received_at = cached[1]
         else:
             try:
-                raw_bid, raw_ask, raw_at = _quote(broker, sym)
+                raw_bid, raw_ask, raw_at = _quote_short(broker, sym)
             except Exception as e:  # noqa: BLE001
+                reason = _scrub(e, conn.get("accessToken"))
+                with _quote_cache_lock:
+                    _quote_failures[key] = (
+                        time.monotonic() + QUOTE_FAILURE_PAUSE_S, reason)
+                    if len(_quote_failures) > QUOTE_CACHE_MAX:
+                        _quote_failures.pop(next(iter(_quote_failures)), None)
                 return {"connected": True, "status": UNAVAILABLE,
                         "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                        "reason": _scrub(e, conn.get("accessToken"))}
+                        "reason": reason}
             bid, ask, received_at = (
                 _number(raw_bid), _number(raw_ask), _number(raw_at))
             if not (bid > 0 and ask > 0 and received_at > 0):
@@ -451,6 +505,7 @@ def quote(user_id, *, symbol, **kw):
                         "reason": f"the broker returned no usable price for "
                                   f"{sym}"}
             with _quote_cache_lock:
+                _quote_failures.pop(key, None)
                 _quote_cache[key] = (time.monotonic(),
                                      (bid, ask, received_at))
                 if len(_quote_cache) > QUOTE_CACHE_MAX:

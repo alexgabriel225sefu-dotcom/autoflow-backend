@@ -59,12 +59,20 @@ class _Broker:
     def __init__(self, bid=1.1000, ask=1.1002, age=0.0, error=None):
         self.bid, self.ask, self.age, self.error = bid, ask, age, error
         self.calls = []
+        self.waits = []
 
-    def get_quote(self, symbol):
+    def get_quote(self, symbol, wait_s=8):
         self.calls.append(symbol)
+        self.waits.append(wait_s)
         if self.error:
             raise RuntimeError(self.error)
         return self.bid, self.ask, time.time() - self.age
+
+
+def pause_over():
+    """Let the post-failure pause elapse, without sleeping through it."""
+    for k, (_until, reason) in list(BR._quote_failures.items()):
+        BR._quote_failures[k] = (0.0, reason)
 
 
 def read(broker, *, user="user-1", ctid=501, symbol="EURUSD"):
@@ -109,8 +117,10 @@ check("with a reason", "no spot price" in str(r.get("reason")), str(r))
 check("and no price fields that look like data",
       "bid" not in r and "ask" not in r, str(r))
 healed = _Broker(bid=1.2000, ask=1.2002)
+pause_over()
 r = _read_keep(healed)
-check("the very next read succeeds (the failure was not cached)",
+check("once the short pause is over the next read succeeds (a failure is "
+      "never kept as if it were a price)",
       r.get("status") == "ok" and r.get("bid") == 1.2000, str(r))
 
 print("\n[3b] a broker that returns no usable price is unavailable too")
@@ -193,6 +203,45 @@ check("it allows a 3 s poll with room for a second tab (>= 40/min)",
       _q is not None and _q.limit >= 40, str(getattr(_q, "limit", None)))
 check("and it is still a real limit, not unmetered (<= 240/min)",
       _q is not None and 0 < _q.limit <= 240, str(getattr(_q, "limit", None)))
+
+# ── 9. the chart must not be able to hold the shared socket ─────────────────
+print("\n[9] the price read waits briefly for a tick, not the loop's 8 seconds")
+b = _Broker()
+read(b)
+check("the broker was asked with a short wait", b.waits and b.waits[0] <= 3,
+      str(b.waits))
+check("the wait is a real number, not unlimited", b.waits and b.waits[0] > 0,
+      str(b.waits))
+
+print("\n[10] after a failure the broker is left alone for a few seconds")
+# A closed market means no tick, so every poll would otherwise spend its full
+# wait holding the shared socket. A short pause after a failure caps that.
+BR.reset_quote_cache()
+down = _Broker(error="cTrader: no spot price for EURUSD")
+first = _read_keep(down)
+check("the first read fails honestly", first.get("status") == "unavailable", str(first))
+again = _read_keep(down)
+check("the second poll, moments later, does NOT reach the broker",
+      len(down.calls) == 1, f"{len(down.calls)} calls")
+check("and still answers unavailable, with the same reason",
+      again.get("status") == "unavailable" and "no spot price" in str(again.get("reason")),
+      str(again))
+pause_over()
+third = _read_keep(down)
+check("once the pause is over it asks the broker again", len(down.calls) == 2,
+      f"{len(down.calls)} calls")
+
+print("\n[10b] a broker that has recovered is read again as soon as the pause ends")
+BR.reset_quote_cache()
+flaky = _Broker(error="cTrader: no spot price for EURUSD")
+_read_keep(flaky)
+flaky.error = None
+pause_over()
+r = _read_keep(flaky)
+check("the recovered broker answers ok", r.get("status") == "ok", str(r))
+r = _read_keep(flaky)
+check("and the failure is gone: the next read is a price, not the old error",
+      r.get("status") == "ok" and "reason" not in r, str(r))
 
 print()
 if _fails:
