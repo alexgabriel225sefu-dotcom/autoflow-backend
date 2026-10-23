@@ -377,6 +377,26 @@ try:
     check("without burning a claim", rid is None, str(rid))
     user_store.save(LIVE_USER, {"id": LIVE_USER})
 
+    print("\n[7g] a legacy live loop whose user switched /paper on mid-tick")
+    # The broker is real (bound live, not simulating); the record flipped. The
+    # tick still in flight must be held to the live gates, not judged "not live".
+    user_store.save(TG_USER, {"id": TG_USER, "paper": True})
+    _ent_ok = gates.live_entitlement
+    gates.live_entitlement = lambda uid, u=None: ("unknown", "stubbed unknown")
+    try:
+        d, _ = order(TG_USER, units=1800, bound_account="123", bound_env="live",
+                     bound_paper=False)
+        check("an unknown entitlement is refused as for any live order",
+              not d.allowed and d.reason == "ENTITLEMENT_UNKNOWN",
+              f"{d.reason}: {d.detail}")
+        d, _ = order(TG_USER, units=1801, bound_account="123", bound_env="live",
+                     bound_paper=True)
+        check("while a broker that itself simulates is unaffected",
+              d.reason != "ENTITLEMENT_UNKNOWN", f"{d.reason}: {d.detail}")
+    finally:
+        gates.live_entitlement = _ent_ok
+    user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+
     print("\n[8] a store that cannot be read, for a live loop")
     _real_strict = PS._read_strict
 

@@ -177,7 +177,7 @@ check("the first press closes as asked", st1 == 200 and _runs[0].get("close_posi
       f"{st1} {_runs[:1]}")
 check("a second press from another session of the same person still STOPS",
       st2 == 200 and len(_runs) == 2 and _runs[1].get("ctid") == ""
-      and "NOT attempted" in str(_runs[1].get("no_account_reason")),
+      and _runs[1].get("not_attempted") is True,
       f"{st2} {_runs}")
 check("and is marked throttled",
       (r2.get("data") or r2).get("throttled") is True, str(r2)[:300])
@@ -187,10 +187,12 @@ from apex.platform import emergency_stop as _ES              # noqa: E402
 _real = _ES.run("u", ctid=_runs[1]["ctid"],
                 close_positions=_runs[1]["close_positions"],
                 no_account_reason=_runs[1]["no_account_reason"],
+                not_attempted=_runs[1]["not_attempted"],
                 stopper=lambda uid: {"stopped": True})
 check("the throttled answer is NOT 'confirmed flat' and says closing was not attempted",
       _real["allFlat"] is False and _real["positions"]["readable"] is False
-      and _real["closes"] == [] and "NOT attempted" in _real["sentence"],
+      and _real["closes"] == [] and "NOT attempted" in _real["sentence"]
+      and "could not be read" not in _real["sentence"],
       str(_real)[:400])
 check("an unconfirmed request does not spend the budget (it is refused first)",
       st3 == 400, f"{st3} {r3}")
