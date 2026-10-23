@@ -94,6 +94,16 @@ def close_demo(user_id, *, ctid, position_id, connection_fn=None,
             (other or {}).get("reason") or "the cTrader account is unavailable",
             status=503,
         )
+    # The mode was read from the link record at the top; the connection that
+    # will actually carry the close is a separate read. Ask the one in hand,
+    # so a close can never be sent on a connection that is not demo.
+    if str((other or {}).get("mode") or "").lower() != "demo":
+        _ledger.release(rid)
+        raise CloseRefused(
+            "DEMO_ONLY",
+            "position close is available only for cTrader demo accounts",
+            status=403,
+        )
     submit = getattr(broker, "close_position_by_id", None)
     if not callable(submit):
         _ledger.release(rid)
@@ -127,7 +137,17 @@ def close_demo(user_id, *, ctid, position_id, connection_fn=None,
         # so a subsequent click must be allowed to claim the remainder.
         _ledger.release(rid)
         return result
-    if status in ("ALREADY_CLOSED", "FILLED"):
+    if status == "ALREADY_CLOSED":
+        # Either nothing was sent (the position was not in the broker's list)
+        # or the broker answered that it no longer exists; in neither case is
+        # there an execution a retry could duplicate, and a position id is
+        # never reused. The claim used to be recorded and held for minutes, and
+        # when the broker had only briefly listed no positions that turned
+        # "it was not there a moment ago" into a refused retry
+        # (DUPLICATE_CLOSE) of a position that was still open.
+        _ledger.release(rid)
+        return result
+    if status == "FILLED":
         _ledger.record(rid, result)
         return result
     raise CloseUnknown("the broker returned an unrecognised close result")

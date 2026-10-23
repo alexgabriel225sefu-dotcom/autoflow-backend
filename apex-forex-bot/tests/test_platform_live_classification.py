@@ -295,6 +295,108 @@ try:
           f"{d.reason}: {d.detail}")
     check("and burns no claim", rid is None, str(rid))
 
+    print("\n[7c] a platform account whose record says paper=True but whose loop is bound live")
+    # A platform connection always builds a non-simulated broker, so the stored
+    # flag cannot make a live-bound loop simulated. The explicit-paper shortcut
+    # used to skip the classification for it entirely.
+    connect(LIVE_USER, CTL.LIVE)
+    user_store.save(LIVE_USER, {"id": LIVE_USER, "paper": True})
+    d, rid = order(LIVE_USER, units=1400, bound_account="900001", bound_env="live")
+    check("it is held to the live gates (a reason only reachable when live)",
+          not d.allowed and any(k in str(d.reason) for k in _only_if_live),
+          f"{d.reason}: {d.detail}")
+    d, rid = order(LIVE_USER, units=1500, bound_account="900001", bound_env="demo")
+    check("while a paper-flagged loop bound to DEMO is still simulated and passes",
+          d.allowed, f"{d.reason}: {d.detail}")
+    user_store.save(LIVE_USER, {"id": LIVE_USER})
+
+    print("\n[7d] one blip on the second read does not refuse a legacy live order")
+    user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+    _real_strict2 = PS._read_strict
+    _n = {"calls": 0}
+
+    def _flaky(key):
+        # the tombstone read in the not-a-platform-account branch fails once
+        if "ctrader" in str(key) and _n["calls"] == 1:
+            _n["calls"] += 1
+            raise RuntimeError("transient")
+        _n["calls"] += 1 if "ctrader" in str(key) else 0
+        return _real_strict2(key)
+
+    PS._read_strict = _flaky
+    try:
+        d, _ = order(TG_USER, units=1600, bound_account="123", bound_env="live")
+    finally:
+        PS._read_strict = _real_strict2
+    check("the legacy order is not refused as LIVE_CLASSIFY_FAILED",
+          d.reason != "LIVE_CLASSIFY_FAILED", f"{d.reason}: {d.detail}")
+
+    print("\n[7e] an order the broker itself simulates is not refused over a store blip")
+    user_store.save(TG_USER, {"id": TG_USER, "paper": True})
+    _real_strict3 = PS._read_strict
+
+    def _always_down(key):
+        raise RuntimeError("redis is down")
+
+    PS._read_strict = _always_down
+    try:
+        d, _ = order(TG_USER, units=1700, bound_account="123", bound_env="live",
+                     bound_paper=True)
+    finally:
+        PS._read_strict = _real_strict3
+    check("a paper order with the store down is not LIVE_CLASSIFY_FAILED",
+          d.reason != "LIVE_CLASSIFY_FAILED", f"{d.reason}: {d.detail}")
+    user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+
+    print("\n[7f] a stored paper flag is not the broker: a live-bound platform loop is not exempt")
+    # The record says paper, the loop's broker is a real one (a platform
+    # connection always builds one, bound_paper False). Neither exemption above
+    # may apply: that would be real money with every live gate skipped.
+    connect(LIVE_USER, CTL.LIVE)
+    user_store.save(LIVE_USER, {"id": LIVE_USER, "paper": True})
+    PS._read_strict = _always_down
+    try:
+        d, rid = order(LIVE_USER, units=1710, bound_account="900001",
+                       bound_env="live", bound_paper=False)
+        check("store down: refused as LIVE_CLASSIFY_FAILED, not AUTHORIZED",
+              not d.allowed and d.reason == "LIVE_CLASSIFY_FAILED",
+              f"{d.reason}: {d.detail}")
+        d, _ = order(LIVE_USER, units=1711, bound_account="900001", bound_env="live")
+        check("and so is a caller that does not say whether its broker simulates",
+              not d.allowed and d.reason == "LIVE_CLASSIFY_FAILED",
+              f"{d.reason}: {d.detail}")
+    finally:
+        PS._read_strict = _real_strict3
+    CTL.disconnect(LIVE_USER)
+    user_store.save(LIVE_USER, {"id": LIVE_USER, "paper": True})
+    d, rid = order(LIVE_USER, units=1720, bound_account="900001",
+                   bound_env="live", bound_paper=False)
+    check("a disconnected platform account with a paper-flagged record: refused "
+          "as PLATFORM_DISCONNECTED", not d.allowed and d.reason == "PLATFORM_DISCONNECTED",
+          f"{d.reason}: {d.detail}")
+    check("without burning a claim", rid is None, str(rid))
+    user_store.save(LIVE_USER, {"id": LIVE_USER})
+
+    print("\n[7g] a legacy live loop whose user switched /paper on mid-tick")
+    # The broker is real (bound live, not simulating); the record flipped. The
+    # tick still in flight must be held to the live gates, not judged "not live".
+    user_store.save(TG_USER, {"id": TG_USER, "paper": True})
+    _ent_ok = gates.live_entitlement
+    gates.live_entitlement = lambda uid, u=None: ("unknown", "stubbed unknown")
+    try:
+        d, _ = order(TG_USER, units=1800, bound_account="123", bound_env="live",
+                     bound_paper=False)
+        check("an unknown entitlement is refused as for any live order",
+              not d.allowed and d.reason == "ENTITLEMENT_UNKNOWN",
+              f"{d.reason}: {d.detail}")
+        d, _ = order(TG_USER, units=1801, bound_account="123", bound_env="live",
+                     bound_paper=True)
+        check("while a broker that itself simulates is unaffected",
+              d.reason != "ENTITLEMENT_UNKNOWN", f"{d.reason}: {d.detail}")
+    finally:
+        gates.live_entitlement = _ent_ok
+    user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+
     print("\n[8] a store that cannot be read, for a live loop")
     _real_strict = PS._read_strict
 

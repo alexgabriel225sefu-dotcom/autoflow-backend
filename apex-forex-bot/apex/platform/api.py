@@ -213,8 +213,9 @@ def handle(method, path, headers=None, body=None, *, client_key=None):
         result = _handle(method, path, headers=headers, body=body,
                          client_key=client_key)
     except Exception as e:                                   # noqa: BLE001
+        from apex import redact as _redact
         print(f"[API] unhandled {type(e).__name__} on "
-              f"{(method or 'GET').upper()} {path}: {e}")
+              f"{(method or 'GET').upper()} {path}: {_redact.scrub(str(e))[:300]}")
         # Says nothing about whether the request took effect, because this
         # branch cannot know: the exception may have been raised after a
         # partial write. Claiming "nothing was changed" would be the exact
@@ -346,9 +347,11 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         return _err(422 if e.code == "INSUFFICIENT_DATA" else 400,
                     e.code, e.detail)
     except _close.CloseRefused as e:
-        return _err(e.status, e.code, e.detail)
+        from apex import redact as _redact
+        return _err(e.status, e.code, _redact.scrub_for_client(e.detail, limit=300))
     except _close.CloseUnknown as e:
-        return _err(503, "CLOSE_UNKNOWN", str(e))
+        from apex import redact as _redact
+        return _err(503, "CLOSE_UNKNOWN", _redact.scrub_for_client(e, limit=300))
     except _notify.NotificationNotFound:
         return _err(404, "NOT_FOUND", "no such notification")
     except _jstore.JournalNotFound:
@@ -566,6 +569,31 @@ def _dispatch(method, route, headers, body, query=None):
         close = b.get("closePositions", True)
         if not isinstance(close, bool):
             return _err(400, "BAD_REQUEST", "closePositions must be true or false")
+        # Counted per PERSON now that the session is verified and the request
+        # is well-formed (a malformed one must not spend the budget): the
+        # pre-auth limit is per session, and a person can open more sessions.
+        # OVER THE LIMIT THE STOP STILL RUNS. Refusing the whole request would
+        # leave automation trading for up to a minute because of how often the
+        # button was pressed; what is withheld is only the closing sweep, which
+        # is the part that holds a worker for minutes.
+        _person_ok, _person_wait = _rl.check_user("emergency_user", p.user_id)
+        if not _person_ok:
+            # Asked as "close, but there is no account to close on": the answer
+            # then carries unreadable positions, no closes and allFlat False, so
+            # the screen says "Not confirmed flat" instead of showing neither.
+            # A stop-only press had no sweep to withhold and is left as it was.
+            if close:
+                out = _panic.run(
+                    p.user_id, ctid="", close_positions=True,
+                    not_attempted=True,
+                    no_account_reason=(
+                        "Emergency was pressed too many times in the last "
+                        f"minute - wait {int(_person_wait or 1)}s and press it "
+                        "again"))
+            else:
+                out = _panic.run(p.user_id, ctid="", close_positions=False)
+            out["throttled"] = True
+            return _ok(out)
         # THE STOP RUNS WHATEVER THE ACCOUNT. This used to answer 409
         # NO_ACCOUNT_SELECTED before the stop step, so a client with no
         # selected account - after a disconnect, or when the selection could

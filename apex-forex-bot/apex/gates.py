@@ -67,6 +67,16 @@ def _live(user):
     return not (user or {}).get("paper", True)
 
 
+def _exc_text(e, n=120):
+    """An exception's text for a refusal that reaches a client: scrubbed of
+    anything credential-shaped (apex.redact: the values this process holds and
+    the shapes of tokens, bearers and keys), then bounded. A store or provider
+    error can carry a URL, a header or a token, and these strings are returned
+    in API answers."""
+    from apex import redact as _redact
+    return _redact.scrub_for_client(e, limit=n)
+
+
 def _platform_mode(user_id):
     """"demo" / "live" / "unknown" for a platform account, None otherwise.
 
@@ -121,7 +131,7 @@ def live_entitlement(user_id, user=None):
     try:
         u = user if user is not None else user_store.load(user_id)
     except Exception as e:
-        return "unknown", f"user store unreachable: {str(e)[:80]}"
+        return "unknown", f"user store unreachable: {_exc_text(e, 80)}"
     if (u or {}).get("license_grace_since"):
         return "unknown", "licence unverifiable — in grace, no new live orders"
     if (u or {}).get("license_key"):
@@ -129,7 +139,7 @@ def live_entitlement(user_id, user=None):
     try:
         state = access.allowed_state(user_id)
     except Exception as e:
-        return "unknown", f"access store unreachable: {str(e)[:80]}"
+        return "unknown", f"access store unreachable: {_exc_text(e, 80)}"
     if state == "allowed":
         return "allowed", "granted"
     if state == "denied":
@@ -139,7 +149,7 @@ def live_entitlement(user_id, user=None):
 
 def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
                     origin="unknown", user=None, dash=None,
-                    bound_account=None, bound_env=None):
+                    bound_account=None, bound_env=None, bound_paper=None):
     """The one gate every new position passes, whatever asked for it.
 
     Order matters: the cheapest and most decisive checks first, so a denied
@@ -149,7 +159,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     try:
         u = user if user is not None else user_store.load(user_id)
     except Exception as e:
-        return Decision(False, "STORE_UNREACHABLE", str(e)[:120]), None
+        return Decision(False, "STORE_UNREACHABLE", _exc_text(e)), None
     live = _live(u)
 
     # 0. WHOSE ACCOUNT IS THIS, and is real money at stake? Asked once, here,
@@ -182,16 +192,42 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     #    It also keeps the legacy hot path free: an explicitly-paper order
     #    pays for no extra store read.
     is_platform = False
-    if u.get("paper") is not True:
+    # Asked BEFORE the explicit-paper shortcut: a loop whose broker is bound to
+    # a LIVE environment is real money whatever a stored flag says, and a
+    # platform connection always builds a non-simulated broker. Cheap and
+    # local; the store is only read for the rare paper-flagged account that is
+    # bound live.
+    bound_live = str(bound_env or "").strip().lower() == "live"
+    # The exemptions for a paper-flagged record below (store down, no tombstone
+    # check, not live) are only safe when the loop's broker config simulates. A stored
+    # flag can disagree with the broker the loop holds: a platform connection
+    # always builds a real one, whatever the record says. `bound_paper` is what
+    # the loop's broker config says; unknown (None) is not "simulated".
+    simulated = u.get("paper") is True and (not bound_live
+                                            or bound_paper is True)
+    if bound_live and not simulated:
+        # Real money whatever the stored flag says - for a legacy user too: one
+        # who switches /paper on while a live loop is mid-tick would otherwise
+        # have that tick judged "not live" and skip the entitlement-unknown
+        # denial, the broker-environment check, the lease and the fail-closed
+        # ledger. A platform account is also marked below, after it is known.
+        live = True
+    if u.get("paper") is not True or bound_live:
         try:
             _pmode = _platform_mode(user_id)
         except Exception as e:
             # Fails closed, and ONLY for an account nobody has declared
             # simulated. A store that cannot be read cannot rule out a live
             # platform account, and "we could not tell" must never be spent
-            # as "no real money here".
+            # as "no real money here". An account positively declared simulated
+            # (paper) has no real money to protect, so refusing its order over a
+            # store blip is a cost with no matching danger.
             print(f"[Gates] could not classify {user_id}: {e}")
-            return Decision(False, "LIVE_CLASSIFY_FAILED", str(e)[:120]), None
+            if simulated:
+                _pmode = None
+            else:
+                return Decision(False, "LIVE_CLASSIFY_FAILED",
+                                _exc_text(e)), None
         is_platform = _pmode is not None
         if is_platform and _pmode != "demo":
             # live, or a mode the broker would not confirm. Both are real
@@ -209,7 +245,6 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
         # loop carry on placing real-money orders on the account it
         # started with. The callers that own a broker pass what it is bound
         # to, and the order is judged against THAT.
-        bound_live = str(bound_env or "").strip().lower() == "live"
         if is_platform and bound_live:
             live = True
         if is_platform and bound_account is not None and (bound_live or live):
@@ -220,7 +255,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
                 print(f"[Gates] could not read the selected account for "
                       f"{user_id}: {e}")
                 return Decision(False, "LIVE_CLASSIFY_FAILED",
-                                str(e)[:120]), None
+                                _exc_text(e)), None
             if _sel is None or str(_sel) != str(bound_account):
                 return Decision(
                     False, "ACCOUNT_CHANGED",
@@ -230,18 +265,28 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
                      "selected now")
                     + "; stop it and start it again on the account you "
                       "mean"), None
-        if not is_platform and bound_live:
+        if not is_platform and bound_live and not simulated:
             # An ordinary legacy-bot live order lands here and must pass. A
             # PLATFORM account that was disconnected while its loop kept
             # running lands here too, and must not: the tombstone is what
             # tells them apart.
-            try:
-                from apex.platform import ctrader_link as _ctl3
-                _was = _ctl3.was_platform_account(user_id)
-            except Exception as e:
-                print(f"[Gates] could not classify {user_id}: {e}")
+            from apex.platform import ctrader_link as _ctl3
+            _was, _err = None, None
+            for _attempt in (1, 2):
+                # One retry: this is a second read of a key step 0 has just read
+                # successfully, so a failure here is far more likely a blip than
+                # an outage, and an order the legacy bot is entitled to place
+                # should not be refused for one. Two failures still refuse.
+                try:
+                    _was = _ctl3.was_platform_account(user_id)
+                    _err = None
+                    break
+                except Exception as e:
+                    _err = e
+            if _err is not None:
+                print(f"[Gates] could not classify {user_id}: {_err}")
                 return Decision(False, "LIVE_CLASSIFY_FAILED",
-                                str(e)[:120]), None
+                                _exc_text(_err)), None
             if _was:
                 return Decision(
                     False, "PLATFORM_DISCONNECTED",
@@ -281,7 +326,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
         except Exception as e:
             return Decision(False, "ACCOUNT_MODE_UNKNOWN",
                             f"could not resolve the broker environment: "
-                            f"{str(e)[:80]}"), None
+                            f"{_exc_text(e, 80)}"), None
         if mode not in (account_mode.LIVE, account_mode.DEMO):
             return Decision(False, "ACCOUNT_MODE_UNVERIFIED",
                             "the broker cannot confirm this account's "
@@ -348,7 +393,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
         # A portfolio-check bug must not become a way to open a position. This
         # is a risk gate: it fails closed, like every other branch here.
         print(f"[Gates] portfolio check failed for {user_id}: {e}")
-        return Decision(False, "PORTFOLIO_CHECK_FAILED", str(e)[:120]), None
+        return Decision(False, "PORTFOLIO_CHECK_FAILED", _exc_text(e)), None
 
     # 5. Ownership. Another container managing the same account is worse than
     #    a missed entry, and an unverifiable lease is not ownership.
@@ -400,7 +445,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
             # only for accounts the platform actually owns. A missing audit
             # backend denying a platform live order is §7 working.
             print(f"[Gates] platform live guard failed for {user_id}: {e}")
-            return Decision(False, "LIVE_GUARD_FAILED", str(e)[:120]), None
+            return Decision(False, "LIVE_GUARD_FAILED", _exc_text(e)), None
         if _pv is None:
             # Step 0 established that this IS a platform account, so "no
             # platform opinion" can only mean the connection vanished in the
@@ -425,7 +470,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
 
 
 def authorize_close(user_id, *, position_id=None, symbol=None, origin="unknown",
-                    user=None, emergency=False):
+                    user=None, emergency=False, position_keyed=False):
     """The one gate every close passes. Returns (Decision, close_intent_id).
 
     A close is not an order and is not gated like one:
@@ -446,7 +491,7 @@ def authorize_close(user_id, *, position_id=None, symbol=None, origin="unknown",
     try:
         u = user if user is not None else user_store.load(user_id)
     except Exception as e:
-        return Decision(False, "STORE_UNREACHABLE", str(e)[:120]), None
+        return Decision(False, "STORE_UNREACHABLE", _exc_text(e)), None
     live = _live(u)
 
     if not emergency:
@@ -473,8 +518,22 @@ def authorize_close(user_id, *, position_id=None, symbol=None, origin="unknown",
     # whether it succeeded or not. The residual risk is a duplicate close
     # request, which the broker answers with "no such position" — bounded, and
     # smaller than being unable to exit.
+    #
+    # THE THIRD CASE, `position_keyed`: a DEMO close addressed to one position
+    # id. The reason a normal close fails closed is that two containers closing
+    # "EURUSD" or "everything flat" can land the second close on a position
+    # opened after the first. A position id is not reusable - a reopened
+    # position has a new one - so a duplicate request for the same id can only
+    # be answered "no such position", which is the bounded residual the
+    # emergency case already accepts. The client's own exit (single close and
+    # the Emergency button) was being refused whenever Redis blipped, which is
+    # the wrong way round for the one control that exists to get them out. Only
+    # the platform's demo adapter sets this; a live account never reaches it
+    # (DEMO_ONLY is checked before the gate), and the symbol/flat closes the
+    # legacy bot makes keep the strict policy.
     ok, why, rid = ledger.claim(user_id, f"CLOSE:{intent}", "CLOSE", 0,
-                                None, None, fail_closed=not emergency)
+                                None, None,
+                                fail_closed=not (emergency or position_keyed))
     if not ok:
         if why == "COORDINATION_UNAVAILABLE":
             return Decision(False, "CLOSE_COORDINATION_UNAVAILABLE",
@@ -499,11 +558,33 @@ def authorize_platform_demo_close(user_id, *, position_id, origin="platform",
     # With an account, the claim is per ACCOUNT and per position (as an integer).
     # Keyed on the position alone, a close sent under the wrong account answered
     # "already closed" and used up the claim the right account then needed.
-    intent = (f"{account}:{int(position_id)}"
-              if account is not None and str(position_id).strip().isdigit()
-              else position_id)
+    keyed = (account is not None and str(position_id).strip().isdigit())
+    intent = f"{account}:{int(position_id)}" if keyed else position_id
+    # The relaxed idempotency policy is for a DEMO account only, and the gate
+    # decides that from the platform's own link record rather than trusting the
+    # caller to have checked: this adapter is a function any future caller can
+    # reach, and "the caller already verified demo" is how a real-money close
+    # ends up skipping the strict policy without anyone noticing.
+    relaxed = keyed and _demo_account_confirmed(user_id, account)
     return authorize_close(user_id, position_id=intent, origin=origin,
-                           user=user)
+                           user=user, position_keyed=relaxed)
+
+
+def _demo_account_confirmed(user_id, account):
+    """True only if this user's own link record lists `account` as a DEMO account.
+
+    Anything else - no record, an unreadable store, an account that is not in
+    the list, a live or unknown mode - is False, which keeps the strict policy.
+    """
+    try:
+        from apex.platform import ctrader_link as _ctl
+        rec = _ctl._read_conn(str(user_id))
+    except Exception:
+        return False
+    for a in rec.get("accounts") or []:
+        if str(a.get("ctid")) == str(account):
+            return str(a.get("mode") or "").strip().lower() == "demo"
+    return False
 
 
 def _dash(user_id):

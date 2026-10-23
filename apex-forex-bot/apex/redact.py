@@ -130,6 +130,89 @@ def scrub(text) -> str:
     return s
 
 
+# ── text that is going to a CLIENT ──────────────────────────────────────────
+# `scrub` above is for logs, and says so: it masks the secrets this process
+# holds and the shapes it knows, and it deliberately does not guess at
+# high-entropy strings, because a log line that has had every order id
+# mangled gets turned off. Text that goes to a client's screen has the opposite
+# trade: nothing that merely LOOKS like a credential is worth showing, and a
+# refresh token or an app secret that this process never held (it arrived in an
+# upstream error) has no known value or known shape to match on.
+_CLIENT_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
+# The name may be quoted (a JSON or repr dump: 'refresh_token': 'x') and so may
+# the value; the value runs to the next quote, space, comma or closing brace.
+_CLIENT_KEYED = re.compile(
+    r"(?i)\b(access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+    r"authorization|api[_-]?key|password|secret|token)\b[\"']?\s*[=:]\s*"
+    r"[\"']?[^\"'\s,}]+")
+# "=" is not part of the class: a `name=value` pair is split so a short code
+# after it (errorCode=POSITION_NOT_FOUND) is judged on its own, and a long value
+# after it is still caught as a run of its own.
+# Three shapes: a long run; a shorter run that ends in base64 padding (a 16-byte
+# secret is 22 characters and "=="); two runs joined by "=" (each under 24, so
+# neither is caught alone).
+_CLIENT_TOKEN_LIKE = re.compile(
+    r"[A-Za-z0-9_\-\.+/]{24,}"
+    r"|[A-Za-z0-9_\-\.+/]{12,}={1,2}(?![A-Za-z0-9])"
+    r"|[A-Za-z0-9_\-\.+/]{12,}=[A-Za-z0-9_\-\.+/]{12,}")
+# A broker or API error CODE is not a credential and the client needs it:
+# POSITION_NOT_FOUND, CH_CLIENT_AUTH_FAILURE, an order id such as CT_PAPER_17297...
+# Upper-case words joined by underscores only; a real token carries lower-case
+# letters or hyphens, or has no underscore at all.
+# A word segment is short letters with at most a few trailing digits (V2,
+# HTTP2); a long digit segment is an order id. A secret that merely contains an
+# underscore alternates letters and digits or runs on, so it does not fit.
+_CLIENT_CODE_LIKE = re.compile(
+    r"(?=.{1,48}\Z)[A-Z]{1,14}[0-9]{0,4}"
+    r"(?:_(?:[A-Z]{1,14}[0-9]{0,4}|[0-9]{1,16}))+")
+
+
+def _benign_value(part):
+    return bool(_CLIENT_CODE_LIKE.fullmatch(part)
+                or (part.isdigit() and len(part) <= 30))
+
+
+def _benign_name(part):
+    # An identifier (ctidTraderAccountId). Only the NAME side may be plain
+    # letters: a value of letters alone is as likely to be a secret.
+    return part.isalpha() and len(part) <= 20
+
+
+def _client_token_sub(m):
+    text = m.group(0)
+    if _CLIENT_CODE_LIKE.fullmatch(text):
+        return text
+    if text.isdigit() and len(text) <= 30:
+        return text
+    if "=" in text and not text.endswith("="):
+        # name=value of two short runs: kept when both sides read as an
+        # identifier, a code or a number, not as a credential.
+        name, value = text.split("=", 1)
+        if _benign_name(name) and _benign_value(value):
+            return text
+    return "[redacted]"
+
+
+def scrub_for_client(text, *secrets, limit=160) -> str:
+    """Bounded text with anything credential-shaped removed, for a client.
+
+    Every given secret and every held secret is replaced, then bearer headers,
+    `name=value` pairs for credential names, and any unbroken run of 24 or more
+    token characters. Whitespace is collapsed and the result cut to `limit`.
+    """
+    if text is None:
+        return ""
+    out = text if isinstance(text, str) else str(text)
+    for sec in secrets:
+        if sec and isinstance(sec, str) and len(sec) >= 8:
+            out = out.replace(sec, "[redacted]")
+    out = scrub(out)
+    out = _CLIENT_BEARER.sub(r"\1 [redacted]", out)
+    out = _CLIENT_KEYED.sub(lambda m: f"{m.group(1)}=[redacted]", out)
+    out = _CLIENT_TOKEN_LIKE.sub(_client_token_sub, out)
+    return " ".join(out.split())[:limit]
+
+
 class _ScrubbedStream:
     """A write-through stream that scrubs. Deliberately thin.
 

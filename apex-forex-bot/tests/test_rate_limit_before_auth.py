@@ -126,6 +126,77 @@ n = sum(1 for i in range(80) if RL.check("POST", "emergency/stop",
 check("a flood of junk tokens at Emergency from one address is still capped",
       n == 50, str(n))
 
+# ── 6. and per PERSON, once the session is verified ─────────────────────────
+print("\n[6] several sessions of one person share one Emergency budget")
+RL.LIMITERS["emergency_user"].limit = 3
+res = [RL.check_user("emergency_user", "person-1")[0] for _ in range(5)]
+check("a person is limited whichever session the presses come from (3 then refused)",
+      res[:3] == [True] * 3 and res[3] is False and res[4] is False, str(res))
+ok, wait = RL.check_user("emergency_user", "person-1")
+check("the refusal carries a wait", ok is False and wait >= 1, f"{ok} {wait}")
+check("another person is unaffected",
+      RL.check_user("emergency_user", "person-2")[0] is True)
+check("an unknown bucket or an empty id does not refuse",
+      RL.check_user("nonexistent", "x")[0] is True
+      and RL.check_user("emergency_user", "")[0] is True)
+api_src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()
+route = api_src.split('if route == "emergency/stop":', 1)[1].split("# ── automation control", 1)[0]
+_a, _v, _c, _r = (route.find("_authenticate(headers, fresh=True)"),
+                  route.find("closePositions must be true or false"),
+                  route.find('check_user("emergency_user"'),
+                  route.find("_panic.run("))
+check("the route counts the person at all", _c != -1,
+      "the per-person Emergency limit is not called")
+check("after authenticating and validating, before the closing work",
+      -1 != _a < _v < _c < _r,
+      "a malformed request must not spend the budget, and the id must be verified")
+
+# Behaviour: over the limit the STOP still runs, only the closing sweep is withheld.
+from apex.platform import api as API                         # noqa: E402
+import types as _types                                       # noqa: E402
+_runs = []
+_real_auth, _real_run = API._authenticate, API._panic.run
+API._authenticate = lambda headers, fresh=False: _types.SimpleNamespace(user_id="person-9")
+API._panic.run = lambda uid, **kw: (_runs.append(kw) or
+                                    {"status": "ok", "sentence": "Automation is stopped.",
+                                     "automation": {"stopped": True}})
+RL.LIMITERS["emergency_user"].limit = 1
+RL.LIMITERS["emergency_user"].hits.clear() if hasattr(RL.LIMITERS["emergency_user"], "hits") else None
+RL.LIMITERS["emergency"].limit = 100
+try:
+    hdr = {"Authorization": "Bearer person-9-session-1"}
+    body = b'{"confirm": true, "ctid": "501"}'
+    st1, r1 = API.handle("POST", "/api/v1/emergency/stop", hdr, body)
+    st2, r2 = API.handle("POST", "/api/v1/emergency/stop",
+                         {"Authorization": "Bearer person-9-session-2"}, body)
+    st3, r3 = API.handle("POST", "/api/v1/emergency/stop",
+                         {"Authorization": "Bearer person-9-session-3"}, b'{"confirm": false}')
+finally:
+    API._authenticate, API._panic.run = _real_auth, _real_run
+check("the first press closes as asked", st1 == 200 and _runs[0].get("close_positions", True) is True,
+      f"{st1} {_runs[:1]}")
+check("a second press from another session of the same person still STOPS",
+      st2 == 200 and len(_runs) == 2 and _runs[1].get("ctid") == ""
+      and _runs[1].get("not_attempted") is True,
+      f"{st2} {_runs}")
+check("and is marked throttled",
+      (r2.get("data") or r2).get("throttled") is True, str(r2)[:300])
+# The answer must not read as "positions were left alone by choice": run for
+# real with the arguments the route passes and look at what the screen gets.
+from apex.platform import emergency_stop as _ES              # noqa: E402
+_real = _ES.run("u", ctid=_runs[1]["ctid"],
+                close_positions=_runs[1]["close_positions"],
+                no_account_reason=_runs[1]["no_account_reason"],
+                not_attempted=_runs[1]["not_attempted"],
+                stopper=lambda uid: {"stopped": True})
+check("the throttled answer is NOT 'confirmed flat' and says closing was not attempted",
+      _real["allFlat"] is False and _real["positions"]["readable"] is False
+      and _real["closes"] == [] and "NOT attempted" in _real["sentence"]
+      and "could not be read" not in _real["sentence"],
+      str(_real)[:400])
+check("an unconfirmed request does not spend the budget (it is refused first)",
+      st3 == 400, f"{st3} {r3}")
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

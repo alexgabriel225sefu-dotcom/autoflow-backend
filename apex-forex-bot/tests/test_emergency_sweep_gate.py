@@ -87,8 +87,10 @@ print("\n2. It is still an EMERGENCY — the gate must not block the exit")
 check("ownership is waived, as before", "emergency=True" in SWEEP)
 _gsrc = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
 _ac = _gsrc[_gsrc.index("def authorize_close("):]
+# The expression grew a second way to be relaxed (a demo close addressed to a
+# single position id); an emergency close is still always one of them.
 check("an emergency close does NOT fail closed on a coordination outage",
-      "fail_closed=not emergency" in _ac)
+      "fail_closed=not (emergency or position_keyed)" in _ac)
 check("and ownership is skipped for an emergency",
       "if not emergency:" in _ac)
 

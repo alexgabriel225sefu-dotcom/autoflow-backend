@@ -94,8 +94,33 @@ def test_already_flat_books_no_pnl(monkeypatch):
     )
     assert result["status"] == "ALREADY_CLOSED"
     assert "netPnl" not in result
-    assert releases == []
-    assert records[0][1]["status"] == "ALREADY_CLOSED"
+    # Nothing was sent to the broker, so nothing a retry could duplicate: the
+    # claim is RELEASED, not recorded. It used to be held for minutes, and when
+    # the broker had only briefly listed no positions, "not there a moment ago"
+    # turned the retry of a still-open position into DUPLICATE_CLOSE.
+    assert releases == ["rid-1"]
+    assert records == []
+
+
+def test_close_is_refused_when_the_connection_in_hand_is_not_demo(monkeypatch):
+    """The mode is read from the link record first; the connection that will
+    carry the close is a separate read, and it is the one that is judged."""
+    broker = _Broker({"status": "FILLED", "sentence": "Position closed."})
+    releases = []
+    monkeypatch.setattr(close._link, "_read_conn", lambda _uid: _connected("demo"))
+    monkeypatch.setattr(close._gates, "authorize_platform_demo_close", _gate)
+    monkeypatch.setattr(close._read, "_open",
+                        lambda *_a, **_kw: (broker, {"ctid": 501, "mode": "live",
+                                                     "accessToken": "redacted"}))
+    monkeypatch.setattr(close._ledger, "release", lambda rid: releases.append(rid))
+    try:
+        close.close_demo("user-1", ctid="501", position_id="77")
+    except close.CloseRefused as e:
+        assert e.code == "DEMO_ONLY"
+    else:
+        raise AssertionError("a close was accepted on a connection that is not demo")
+    assert broker.position_ids == [], "nothing may reach the broker"
+    assert releases == ["rid-1"]
 
 
 def test_definite_rejection_releases_claim(monkeypatch):

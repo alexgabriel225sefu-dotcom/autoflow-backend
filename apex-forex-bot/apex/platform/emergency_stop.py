@@ -43,6 +43,7 @@ broker.
 """
 import time
 
+from apex import redact as _redact
 from apex.platform import automation as _auto
 from apex.platform import broker_read as _read
 from apex.platform import position_close as _close
@@ -94,9 +95,10 @@ def _close_one(user_id, ctid, row, closer):
     try:
         result = closer(user_id, ctid=ctid, position_id=base["positionId"])
     except _close.CloseRefused as e:
-        return dict(base, outcome=REFUSED, code=e.code, detail=str(e.detail)[:200])
+        return dict(base, outcome=REFUSED, code=e.code,
+                    detail=_redact.scrub_for_client(e.detail, limit=200))
     except _close.CloseUnknown as e:
-        return dict(base, outcome=UNKNOWN, detail=str(e)[:200])
+        return dict(base, outcome=UNKNOWN, detail=_redact.scrub_for_client(e, limit=200))
     except Exception as e:                                   # noqa: BLE001
         return dict(base, outcome=FAILED, detail=_scrub(e))
     status = str((result or {}).get("status") or "").upper()
@@ -129,6 +131,12 @@ def _sentence(out):
         return " ".join(parts)
 
     pos = out["positions"]
+    if pos.get("attempted") is False:
+        parts.append(f"Closing positions was NOT attempted ({pos['reason']}). "
+                     "They are NOT confirmed flat: they stay at your broker "
+                     "with their stop and target; close them in cTrader if "
+                     "needed.")
+        return " ".join(parts)
     if not pos["readable"]:
         parts.append("Your open positions could not be read, so none were "
                      f"closed ({pos['reason']}). They stay at your broker with "
@@ -167,7 +175,7 @@ def _sentence(out):
 
 def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
         closer=None, connection_fn=None, broker_fn=None, mode_fn=None,
-        budget_s=CLOSE_BUDGET_S, no_account_reason=None):
+        budget_s=CLOSE_BUDGET_S, no_account_reason=None, not_attempted=False):
     """Stop automation and, if asked, close every position on `ctid`.
 
     Never raises for a step that failed: each failure is part of the answer.
@@ -201,6 +209,9 @@ def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
         out["positions"] = {"readable": False, "found": None,
                             "reason": no_account_reason
                             or "no cTrader account is selected"}
+        if not_attempted:
+            # Withheld on purpose (the press was throttled), not unreadable.
+            out["positions"]["attempted"] = False
         out["closes"] = []
         out["verified"] = {"readable": False, "stillOpen": None}
         out["allFlat"] = False

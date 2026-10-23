@@ -70,6 +70,11 @@ _BUCKETS = {
     # by hand got 429 on Emergency. Generous: pressing it again is the right
     # reaction to a slow answer, and the work it does is bounded elsewhere.
     "emergency": ("RL_A4T_EMERGENCY_PER_MIN", 30, 60),
+    # The same panic button, counted per PERSON after the session is verified.
+    # The per-token bucket above is per session, so a user with several tabs or
+    # devices multiplied it; one press can hold a worker for minutes, so the
+    # person is bounded as well.
+    "emergency_user": ("RL_A4T_EMERGENCY_USER_PER_MIN", 30, 60),
     # Freezing a version.
     "activate": ("RL_A4T_ACTIVATE_PER_MIN", 10, 60),
     # The payment provider. Generous: it retries, and being throttled off a
@@ -306,6 +311,29 @@ def _shared_check(key, limit, window_s):
     if n is None:
         return None
     return n <= limit
+
+
+def check_user(bucket, user_id):
+    """(allowed, retry_after_seconds) for a VERIFIED user id.
+
+    Called by a route after authentication, for the few routes where the work
+    done per request is large enough that a per-session limit can be multiplied
+    by opening more sessions. Like `check`, a failure of the limiter itself
+    allows: the limiter must not become the outage.
+    """
+    lim = LIMITERS.get(bucket)
+    if lim is None or not user_id:
+        return True, 0
+    key = f"user:{bucket}:{user_id}"
+    try:
+        ok = None
+        if _MODE != "memory":
+            ok = _shared_check(key, lim.limit, lim.window_s)
+        if ok is None:
+            ok = lim.check(key)
+    except Exception:
+        return True, 0
+    return bool(ok), (0 if ok else _seconds_until_reset(lim.window_s))
 
 
 def reset_all():
