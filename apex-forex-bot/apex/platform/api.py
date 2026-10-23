@@ -48,6 +48,7 @@ from apex.platform import referral as _referral
 from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
 from apex.platform import waitlist as _wait
+from apex.platform.safe_errors import message as _safe_message
 from apex import user_store as _ustore
 
 PREFIX = "/api/v1/"
@@ -68,6 +69,10 @@ def _err(status, code, message, **extra):
                                        **{k: v for k, v in extra.items()
                                           if v is not None})}
     return status, body
+
+
+def _safe_error(exc):
+    return _safe_message(exc)
 
 
 def _ok(payload=None, **kw):
@@ -267,23 +272,23 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         return _dispatch(method, route, headers or {}, body,
                          _query(path))
     except _id.AuthFailed as e:
-        return _err(401, "AUTH_REQUIRED", str(e))
+        return _err(401, "AUTH_REQUIRED", _safe_error(e))
     except _id.AuthUnavailable as e:
         # 503, never 401. The client's session may be perfectly good; it is
         # the platform that cannot check right now, and telling them their
         # login is invalid would be a lie that also hides the real fault.
-        return _err(503, "AUTH_UNAVAILABLE", str(e))
+        return _err(503, "AUTH_UNAVAILABLE", _safe_error(e))
     except _ustore.StoreUnavailable as e:
         # 503, never a 200 that says the account has nothing. The record may
         # be perfectly intact; it is the store that did not answer, and
         # rendering that as "no cTrader account is connected" tells the
         # account's owner a falsehood about their own account while hiding
         # the real fault. Same reasoning as AUTH_UNAVAILABLE above.
-        return _err(503, "STORE_UNAVAILABLE", str(e))
+        return _err(503, "STORE_UNAVAILABLE", _safe_error(e))
     except _link.LinkConfigError as e:
         # The platform is misconfigured, which is not the client's fault and
         # must not read as one. 503, like every other "we cannot", never 400.
-        return _err(503, e.code, e.detail,
+        return _err(503, e.code, _safe_error(e.detail),
                     diagnosticId=getattr(e, "attempt", None))
     except _link.LinkError as e:
         # diagnosticId is a keyed reference to the attempt, safe to show and
@@ -302,11 +307,11 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         # is the only accessor and it returns the two together.
         signup = (_referral.broker_signup()
                   if e.code == "ACCOUNT_LIMIT" else None)
-        return _err(400, e.code, e.detail,
+        return _err(400, e.code, _safe_error(e.detail),
                     diagnosticId=getattr(e, "attempt", None),
                     brokerSignup=signup)
     except _lic.LicenceRequired as e:
-        return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
+        return _err(402, "LICENCE_REQUIRED", _safe_error(e), licenceState=e.state)
     except _ent.NotEntitled as e:
         # A WITHDRAWN licence keeps the 402 the client already understands,
         # so support can withdraw access without the UI needing a new branch.
@@ -315,10 +320,10 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         # not be rendered as one. Sending somebody to a checkout because their
         # broker session expired would be the worst possible answer.
         if e.code == "LICENCE_REVOKED":
-            return _err(402, "LICENCE_REQUIRED", str(e), licenceState=e.state)
-        return _err(409, e.code, str(e))
+            return _err(402, "LICENCE_REQUIRED", _safe_error(e), licenceState=e.state)
+        return _err(409, e.code, _safe_error(e))
     except _auto.AutomationRefused as e:
-        return _err(409, e.code, e.detail)
+        return _err(409, e.code, _safe_error(e.detail))
     except _emerg.Halted as e:
         # THE ONE REFUSAL THE CLIENT COULD NOT READ, AND IT IS THE MOST
         # IMPORTANT ONE IN THE PRODUCT.
@@ -334,12 +339,12 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         # 503, not 409. A halt is not a conflict with the request — the
         # request was fine and the service is deliberately stopped. That
         # distinction is what tells a client this is not theirs to fix.
-        return _err(503, e.code, str(e), scope=e.scope)
+        return _err(503, e.code, _safe_error(e), scope=e.scope)
     except _preview.PreviewRefused as e:
         # INSUFFICIENT_DATA is a 422: the request was understood and the data
         # to answer it was not there. A 400 would say the client malformed it.
         return _err(422 if e.code == "INSUFFICIENT_DATA" else 400,
-                    e.code, e.detail)
+                    e.code, _safe_error(e.detail))
     except _notify.NotificationNotFound:
         return _err(404, "NOT_FOUND", "no such notification")
     except _jstore.JournalNotFound:
@@ -355,7 +360,7 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         return _err(422, "RULE_INVALID", "this rule cannot be activated",
                     problems=e.problems)
     except ValueError as e:
-        return _err(400, "BAD_REQUEST", str(e))
+        return _err(400, "BAD_REQUEST", _safe_error(e))
 
 
 def _dispatch(method, route, headers, body, query=None):
@@ -423,7 +428,7 @@ def _dispatch(method, route, headers, body, query=None):
                                  broker=payload.get("broker"))
         except _wait.WaitlistError as e:
             status = 503 if e.code == "NOT_CONFIGURED" else 400
-            return _err(status, e.code, e.detail)
+            return _err(status, e.code, _safe_error(e.detail))
         return _ok(_wait.public_result(outcome))
 
     if route == "billing/checkout" and method == "POST":
@@ -587,7 +592,7 @@ def _dispatch(method, route, headers, body, query=None):
             # travels to the UI so a client is told WHICH refusal — expired,
             # already answered, not running — instead of one sentence that
             # fits none of them.
-            return _err(409, e.code, e.detail)
+            return _err(409, e.code, _safe_error(e.detail))
 
     # ── notifications ───────────────────────────────────────────────────
     if route == "notifications":

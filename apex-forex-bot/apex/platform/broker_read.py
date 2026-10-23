@@ -33,6 +33,7 @@ there.
 """
 
 from apex.platform import ctrader_link as _link
+from apex.platform.safe_errors import message as _safe_message
 
 # Bounded so a hung broker cannot hold an HTTP worker open indefinitely.
 DEFAULT_TIMEOUT_S = 12.0
@@ -49,7 +50,7 @@ def _scrub(text, *secrets):
     for s in secrets:
         if s and isinstance(s, str) and len(s) >= 8 and s in out:
             out = out.replace(s, "[redacted]")
-    return out[:300]
+    return _safe_message(out)
 
 
 def _disconnected(reason="no cTrader account is connected"):

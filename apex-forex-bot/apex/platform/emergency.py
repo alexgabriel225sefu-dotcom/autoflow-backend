@@ -55,6 +55,7 @@ import time
 
 from apex import user_store
 from apex.platform import store as _store
+from apex.platform.safe_errors import message as _safe_message
 
 # Scopes, widest first. The order is load-bearing: `_widest` compares by index.
 ALL = "all"
@@ -180,7 +181,7 @@ def state():
         # that reads as "stop"; for practice money it does not. See the module
         # docstring — this asymmetry is the decision, not an accident.
         out["storeReachable"] = False
-        out["storeError"] = f"{type(e).__name__}: {e}"
+        out["storeError"] = _safe_message(e)
         out["storeScope"] = LIVE
         out["scope"] = _widest(env_scope, LIVE)
         out["source"] = SRC_ENV if env_scope == ALL else SRC_UNCERTAIN
