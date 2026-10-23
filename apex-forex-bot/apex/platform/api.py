@@ -50,6 +50,7 @@ from apex.platform import ruledoc as _rd
 from apex.platform import store as _store
 from apex.platform import waitlist as _wait
 from apex import user_store as _ustore
+from apex import performance as _performance
 
 PREFIX = "/api/v1/"
 
@@ -73,6 +74,34 @@ def _err(status, code, message, **extra):
 
 def _ok(payload=None, **kw):
     return 200, dict({"ok": True}, **dict(payload or {}, **kw))
+
+
+def _performance_summary(rows):
+    """Return broker-deal metrics in the web API's stable, JSON-safe shape."""
+    summary = _performance.summarize(rows)
+    # JSON has no honest representation for an infinite ratio. The UI can
+    # say why it is unavailable when every recorded trade won.
+    pf = summary.get("profit_factor")
+    out = {
+        "trades": summary["trades"], "winningTrades": summary["wins"],
+        "losingTrades": summary["losses"], "winRate": summary["win_rate"],
+        "net": summary["net"],
+        "profitFactor": None if pf == float("inf") else pf,
+        "profitFactorStatus": "no losing trades" if pf == float("inf") else None,
+        "expectancy": summary["expectancy"], "maxDrawdown": summary["max_drawdown"],
+        "averageWin": summary["avg_win"], "averageLoss": summary["avg_loss"],
+        "best": summary["best"], "worst": summary["worst"],
+    }
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def _performance_group(rows, key):
+    groups = {}
+    for row in rows:
+        name = row.get(key) or ("Unlabelled" if key == "strategyId" else "—")
+        groups[name] = _performance_summary(
+            [r for r in rows if (r.get(key) or ("Unlabelled" if key == "strategyId" else "—")) == name])
+    return groups
 
 
 def _body(raw):
@@ -499,6 +528,37 @@ def _dispatch(method, route, headers, body, query=None):
     if route == "accounts" and method == "GET":
         p = _authenticate(headers)
         return _ok(_link.public_status(p.user_id))
+
+    if route == "performance" and method == "GET":
+        p = _authenticate(headers)
+        period = str((query or {}).get("period", "7d")).lower()
+        if period not in ("today", "7d", "30d", "all"):
+            return _err(400, "BAD_REQUEST", "period must be today, 7d, 30d, or all")
+        read = _read.deals(p.user_id, ctid=(query or {}).get("accountId"),
+                            days=3650 if period == "all" else 30)
+        if read.get("status") != _read.OK:
+            return _err(503, "PERFORMANCE_UNAVAILABLE",
+                        read.get("reason", "closed trades could not be read"))
+        import time as _time
+        now = _time.time()
+        cutoff = {"today": now - 86400, "7d": now - 7 * 86400,
+                  "30d": now - 30 * 86400, "all": 0}[period]
+        rows = []
+        for deal in read.get("deals", []):
+            closed = deal.get("closedAt")
+            try:
+                if closed is not None and float(closed) < cutoff:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            rows.append({"netPnl": deal.get("net"), "symbol": deal.get("symbol"),
+                         "strategyId": deal.get("strategyId"), "entry": deal.get("entry"),
+                         "exit": deal.get("exit"), "side": deal.get("side"), "time": closed})
+        return _ok({"status": read.get("status"), "accountId": read.get("accountId"),
+                    "mode": read.get("mode"), "period": period,
+                    "summary": _performance_summary(rows),
+                    "byStrategy": _performance_group(rows, "strategyId"),
+                    "byInstrument": _performance_group(rows, "symbol")})
 
     # A manual close is deliberately a separate route from the read-only
     # account views. It authenticates first, verifies the linked account is a

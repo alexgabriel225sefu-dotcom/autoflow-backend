@@ -215,8 +215,8 @@ def _deal_rows(broker, days):
         days = int(days)
     except (TypeError, ValueError):
         raise ValueError("days must be a whole number")
-    if days < 1 or days > 30:
-        raise ValueError("days must be between 1 and 30")
+    if days < 1 or days > 3650:
+        raise ValueError("days must be between 1 and 3650")
     end = int(time.time())
     history = broker.get_deal_history(end - days * 86400, end)
     if not isinstance(history, dict) or not history.get("ok"):
@@ -233,6 +233,7 @@ def _deal_rows(broker, days):
         "exit": row.get("exitPrice"),
         "net": row.get("netPnl"),
         "closedAt": row.get("closedAt"),
+        "strategyId": row.get("strategyId"),
         "positionId": row.get("positionId"),
     } for row in raw.values()]
 

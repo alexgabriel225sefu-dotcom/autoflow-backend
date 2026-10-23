@@ -381,6 +381,18 @@ export type PositionsRead = {
 };
 export type OrdersRead = Omit<PositionsRead, "positions"> & { orders?: Order[] };
 export type DealsRead = Omit<PositionsRead, "positions"> & { deals?: ClosedTrade[] };
+export type PerformanceSummary = {
+  trades: number; winningTrades: number; losingTrades: number; winRate: number;
+  net: number; profitFactor?: number; profitFactorStatus?: string;
+  expectancy: number; maxDrawdown: number; averageWin: number; averageLoss: number;
+  best: number; worst: number;
+};
+export type PerformanceRead = Omit<PositionsRead, "positions"> & {
+  period: "today" | "7d" | "30d" | "all";
+  summary: PerformanceSummary;
+  byStrategy: Record<string, PerformanceSummary>;
+  byInstrument: Record<string, PerformanceSummary>;
+};
 export type Position = {
   symbol: string; side: "BUY" | "SELL"; units: number;
   entryPrice: number | null; stopLoss: number | null; takeProfit: number | null;
