@@ -53,6 +53,8 @@ OK = "ok"
 # for one minute is honest and prevents dashboard polling from becoming a
 # broker-history loop. Failures are never cached; the next request must be able
 # to recover as soon as the broker does.
+# The most deal history one request may ask for.
+MAX_DEAL_DAYS = 3650
 DEALS_CACHE_TTL_S = 60.0
 DEALS_CACHE_MAX = 256
 _deals_cache = {}
@@ -215,13 +217,24 @@ def _deal_rows(broker, days):
         days = int(days)
     except (TypeError, ValueError):
         raise ValueError("days must be a whole number")
-    if days < 1 or days > 3650:
-        raise ValueError("days must be between 1 and 3650")
+    if days < 1 or days > MAX_DEAL_DAYS:
+        raise ValueError(f"days must be between 1 and {MAX_DEAL_DAYS}")
     end = int(time.time())
     history = broker.get_deal_history(end - days * 86400, end)
     if not isinstance(history, dict) or not history.get("ok"):
         reason = (history or {}).get("error", "the broker did not return deal history")
         raise RuntimeError(reason)
+    # A history that broke off part-way, or stopped when the page budget ran
+    # out, is NOT the account's history. The connector reports both (an `error`
+    # beside ok:true, or `truncated`); serving the partial set — and caching it —
+    # showed a confident total over trades it had not read.
+    if history.get("error"):
+        raise RuntimeError(
+            f"the broker's deal history was cut short: {history['error']}")
+    if history.get("truncated"):
+        raise RuntimeError(
+            "the broker's deal history is longer than could be read here; "
+            "try a shorter period")
     raw = history.get("deals")
     if not isinstance(raw, dict):
         raise RuntimeError("the broker returned an invalid deal history")
@@ -252,6 +265,13 @@ def deals(user_id, *, days=7, **kw):
         return {"connected": True, "status": UNAVAILABLE,
                 "accountId": conn.get("ctid"), "mode": conn.get("mode"),
                 "reason": "days must be a whole number"}
+    # Range-checked BEFORE the per-request lock key is built (same bounds as
+    # `_deal_rows`). The key includes `days`, the locks are never pruned, and an
+    # unchecked value made every distinct number a new entry for ever.
+    if parsed_days < 1 or parsed_days > MAX_DEAL_DAYS:
+        return {"connected": True, "status": UNAVAILABLE,
+                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                "reason": f"days must be between 1 and {MAX_DEAL_DAYS}"}
     key = (str(user_id), str(conn.get("ctid")), parsed_days)
     with _deals_cache_lock:
         fetch_lock = _deals_fetch_locks.setdefault(key, threading.Lock())

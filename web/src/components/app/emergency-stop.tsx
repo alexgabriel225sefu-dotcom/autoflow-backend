@@ -18,6 +18,9 @@ import { ErrorNotice } from "./state";
  *    shown only when the server says `allFlat`, which it says only after a
  *    fresh read of the account. Anything else is shown as not confirmed.
  */
+/** The server stops starting new closes after its own budget (see emergency_stop.py). */
+export const EMERGENCY_TIMEOUT_MS = 150_000;
+
 const OUTCOME_WORDS: Record<string, string> = {
   closed: "closed",
   already_closed: "was already closed",
@@ -66,6 +69,10 @@ export function EmergencyStop({
     const r = await api<EmergencyResult>("emergency/stop", {
       method: "POST",
       body: { confirm: true, closePositions: true, ...(ctid ? { ctid: String(ctid) } : {}) },
+      // Up to twenty closes, one at a time, then a re-read. Longer than a read,
+      // and a timeout here does NOT mean nothing happened.
+      timeoutMs: EMERGENCY_TIMEOUT_MS,
+      timeoutMessage: "No answer yet — the stop and the closes may still be running. Check Positions before pressing again.",
     });
     setBusy(false);
     setStep("idle");

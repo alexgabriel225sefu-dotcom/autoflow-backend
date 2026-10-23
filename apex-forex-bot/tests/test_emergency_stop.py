@@ -210,6 +210,16 @@ check("the overflow is reported", r["positions"]["notAttempted"] == 5, str(r["po
 check("not flat, and the sentence says to press again",
       r["allFlat"] is False and "press again" in r["sentence"], r["sentence"])
 
+print("\n[8b] a spent time budget stops STARTING closes, and says so")
+w = World(5)
+r = run(w, budget_s=-1.0)          # already spent when the first close finishes
+check("the first close is always attempted", len(r["closes"]) == 1, str(len(r["closes"])))
+check("the rest are reported as not attempted", r["positions"]["notAttempted"] == 4, str(r["positions"]))
+check("not flat, and the sentence says to press again", r["allFlat"] is False and "press again" in r["sentence"], r["sentence"])
+w = World(5)
+r = run(w, budget_s=1000.0)
+check("with a generous budget all are attempted", len(r["closes"]) == 5 and r["positions"]["notAttempted"] == 0, str(r["positions"]))
+
 # ── 9. nothing to close ─────────────────────────────────────────────────────
 print("\n[9] an empty account is reported as such")
 r = run(World(0))
@@ -250,6 +260,24 @@ w = World(1)
 r = run(w, mode_fn=_mode_boom)
 check("an unreadable account mode is treated as not-demo, not as demo",
       not [x for x in w.log if x.startswith("close:")] and r["allFlat"] is False, str(w.log))
+
+# ── 10c. error text reaching the browser is redacted ───────────────────────
+print("\n[10c] an exception's credential-shaped text never reaches the answer")
+SECRET = "ACCESS-TOKEN-VALUE-0123456789abcdef"
+
+
+def leak(uid, *, ctid, position_id):
+    raise RuntimeError(f"upstream said: Authorization: Bearer {SECRET} access_token={SECRET}")
+
+
+w = World(1)
+r = ES.run(USER, ctid="501", stopper=w.stopper, opener=w.opener, closer=leak,
+           mode_fn=lambda uid, ctid: "demo")
+import json as _json                                          # noqa: E402
+blob = _json.dumps(r)
+check("the secret is nowhere in the response", SECRET not in blob, blob[:300])
+check("the failure is still reported with its type", r["closes"][0]["outcome"] == "failed"
+      and "RuntimeError" in r["closes"][0]["detail"], str(r["closes"]))
 
 # ── 11. the route ───────────────────────────────────────────────────────────
 print("\n[11] the API requires explicit confirmation and a selected account")

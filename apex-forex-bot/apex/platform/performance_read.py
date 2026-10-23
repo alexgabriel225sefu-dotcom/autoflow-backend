@@ -46,12 +46,17 @@ _DAYS_BACK = {"today": 0, "week": 6, "month": 29}
 MIN_TRADES = 3
 # The broker keeps this much deal history reachable through `broker_read.deals`.
 BROKER_WINDOW_DAYS = 30
+# "All time" asks the broker for this much (a year); older trades are only
+# remembered by the engine journal. A history longer than the connector can page
+# through is refused as truncated rather than shown as complete.
+BROKER_ALL_DAYS = 365
 
-NOTE = ("Closed trades from your broker's deal history for the last 30 days "
-        "(\"All time\" adds older trades the engine recorded). Each deal is "
-        "counted once, so a position closed in two parts counts as two. Trades "
-        "the engine did not open show as unlabelled, and an open position is "
-        "not a result yet.")
+NOTE = ("Closed trades from your broker's deal history: the last 30 days, or "
+        "up to a year for \"All time\" (which also adds older trades the engine "
+        "recorded, and those cannot be tied to one account). A position closed "
+        "in several parts is one "
+        "trade with the parts added up. Trades the engine did not open show as "
+        "unlabelled, and an open position is not a result yet.")
 
 
 def _finite(v):
@@ -147,7 +152,8 @@ def read(user_id, *, period="all", mode="demo", ctid=None, deals_reader=None,
         if deals_reader is None:
             from apex.platform import broker_read
             deals_reader = lambda uid, **kw: broker_read.deals(uid, **kw)  # noqa: E731
-        got = deals_reader(str(user_id), days=BROKER_WINDOW_DAYS, ctid=ctid)
+        window_days = BROKER_ALL_DAYS if period == "all" else BROKER_WINDOW_DAYS
+        got = deals_reader(str(user_id), days=window_days, ctid=ctid)
     except Exception as e:                                   # noqa: BLE001
         print(f"[Performance] broker deals unreadable ({type(e).__name__})")
         return {"status": "unavailable",
@@ -180,17 +186,23 @@ def read(user_id, *, period="all", mode="demo", ctid=None, deals_reader=None,
     # "All time" is the broker's window plus anything older that only the
     # journal remembers (deduplicated by position id). Journal-only rows keep
     # their own recorded mode; one with no recorded mode is counted and left out.
+    # Only rows OLDER than the broker's window. A journal row inside the window
+    # that the broker does not list is not ours to add: it may belong to another
+    # account, and the broker is the authority on what closed there. (Journal
+    # rows carry no account id, which is why "All time" is stated as not tied to
+    # one account.) Decided by the window's start, not by the oldest deal: an
+    # account with no deals at all must not pull in its whole journal.
+    now = now or datetime.now()
     if period == "all":
-        oldest = min((r["time"] for r in rows if r["time"]), default=None)
+        window_start = (now - timedelta(days=BROKER_ALL_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
         for j in journal:
             pid = str(j.get("positionId")) if j.get("positionId") is not None else None
             if pid and pid in deal_ids:
                 continue
-            if oldest is not None and str(j.get("time", "")) >= oldest:
-                continue        # inside the broker's window, and not there: not ours
+            if str(j.get("time", "")) >= window_start:
+                continue
             rows.append(dict(j, _attributed=bool(j.get("strategyId"))))
 
-    now = now or datetime.now()
     if period != "all":
         day = (now - timedelta(days=_DAYS_BACK[period])).strftime("%Y-%m-%d")
         in_period = _perf.since(rows, day)
@@ -212,7 +224,7 @@ def read(user_id, *, period="all", mode="demo", ctid=None, deals_reader=None,
         "excluded": {"unknownMode": len(unknown) if mode != "all" else 0,
                      "otherMode": len(wrong)},
         "source": {"closedTrades": "broker deal history",
-                   "windowDays": BROKER_WINDOW_DAYS,
+                   "windowDays": BROKER_ALL_DAYS if period == "all" else BROKER_WINDOW_DAYS,
                    "journalReadable": journal_ok,
                    "attributed": attributed,
                    "unattributed": len(chosen) - attributed},

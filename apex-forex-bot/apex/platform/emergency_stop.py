@@ -41,11 +41,16 @@ expensive sentence this product can print. So:
 All collaborators are parameters so a test can drive every branch without a
 broker.
 """
+import time
+
 from apex.platform import automation as _auto
 from apex.platform import broker_read as _read
 from apex.platform import position_close as _close
 
 MAX_CLOSES = 20
+# Stop STARTING new closes after this long (seconds). The browser waits a little
+# longer than this plus the last close and the re-read.
+CLOSE_BUDGET_S = 90.0
 
 # Per-position outcomes.
 CLOSED = "closed"
@@ -59,9 +64,11 @@ _DONE = (CLOSED, ALREADY_CLOSED)
 
 
 def _scrub(e):
-    # The exception text only; closers raise sentences, not credentials, but a
-    # long message is cut so a stack of detail cannot reach the browser.
-    return f"{type(e).__name__}: {str(e)[:160]}"
+    # Redacted AND bounded, by the same function the journal uses. This text goes
+    # to the browser (automation.error, positions.reason, closes[].detail), and
+    # truncation alone leaves anything credential-shaped that happens to be in
+    # the first 160 characters.
+    return _auto._safe_cause(e)
 
 
 def _list_positions(user_id, ctid, opener, connection_fn=None, broker_fn=None):
@@ -138,7 +145,7 @@ def _sentence(out):
         parts.append(f"{len(bad)} could not be confirmed closed — see below.")
     if pos.get("notAttempted"):
         parts.append(f"{pos['notAttempted']} more were not attempted "
-                     f"(limit {MAX_CLOSES} per press); press again.")
+                     f"(at most {MAX_CLOSES} per press, within a time budget); press again.")
 
     v = out["verified"]
     if not v["readable"]:
@@ -159,7 +166,8 @@ def _sentence(out):
 
 
 def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
-        closer=None, connection_fn=None, broker_fn=None, mode_fn=None):
+        closer=None, connection_fn=None, broker_fn=None, mode_fn=None,
+        budget_s=CLOSE_BUDGET_S):
     """Stop automation and, if asked, close every position on `ctid`.
 
     Never raises for a step that failed: each failure is part of the answer.
@@ -218,9 +226,20 @@ def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
         return out
 
     attempt = rows[:MAX_CLOSES]
+    # A time budget on top of the count cap. Each close can wait on the broker
+    # for tens of seconds; twenty of them in a row would hold one HTTP worker for
+    # minutes and outlast the browser's patience. Once the budget is spent no
+    # further close is STARTED (one already under way is never cut), and the
+    # answer says how many were not attempted.
+    started = time.monotonic()
+    closes = []
+    for r in attempt:
+        if closes and time.monotonic() - started > budget_s:
+            break
+        closes.append(_close_one(user_id, ctid, r, closer))
     out["positions"] = {"readable": True, "reason": None, "found": len(rows),
-                        "notAttempted": max(0, len(rows) - len(attempt))}
-    out["closes"] = [_close_one(user_id, ctid, r, closer) for r in attempt]
+                        "notAttempted": max(0, len(rows) - len(closes))}
+    out["closes"] = closes
 
     # 4. verify by looking again, never by trusting the closes
     again, why = _list_positions(user_id, ctid, opener, connection_fn, broker_fn)

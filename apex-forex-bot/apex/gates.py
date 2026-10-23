@@ -427,14 +427,20 @@ def authorize_close(user_id, *, position_id=None, symbol=None, origin="unknown",
 
 
 def authorize_platform_demo_close(user_id, *, position_id, origin="platform",
-                                  user=None):
+                                  user=None, account=None):
     """Platform adapter for the same close gate used by every other origin.
 
     The platform checks the broker account is DEMO before calling this
     adapter. Keeping the adapter here makes that policy explicit while the
     platform package remains outside the legacy execution import graph.
     """
-    return authorize_close(user_id, position_id=position_id, origin=origin,
+    # With an account, the claim is per ACCOUNT and per position (as an integer).
+    # Keyed on the position alone, a close sent under the wrong account answered
+    # "already closed" and used up the claim the right account then needed.
+    intent = (f"{account}:{int(position_id)}"
+              if account is not None and str(position_id).strip().isdigit()
+              else position_id)
+    return authorize_close(user_id, position_id=intent, origin=origin,
                            user=user)
 
 

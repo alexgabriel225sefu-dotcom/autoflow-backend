@@ -33,6 +33,7 @@ derived from a stored record and the second is not. What it never does is
 decide for itself.
 """
 
+import hashlib
 import re
 import time
 import uuid
@@ -501,7 +502,8 @@ def _record_starter_failure(user_id, corr, conn, exc, *, revive):
     if revive:
         try:
             first = user_store.claim(
-                f"revive-err:{user_id}:{abs(hash(cause)) % 10**8}", ttl_s=3600)
+                f"revive-err:{user_id}:{hashlib.sha1(cause.encode()).hexdigest()[:12]}",
+                ttl_s=3600)
         except Exception:                                    # noqa: BLE001
             first = None
         if first is False:
@@ -1048,7 +1050,7 @@ def stop(user_id, *, stopper=None):
     if rec.get("state") == STOPPED:
         return dict(status(user_id), stopped=False, alreadyStopped=True,
                     **_flatten_answer(rec))
-    _halt(user_id, stopper)
+    stopped_here = _halt(user_id, stopper)
     _jstore.record_automation(
         _jstore._j.AUTOMATION_STOPPED, correlation_id=uuid.uuid4().hex,
         user_id=user_id, account_id=str(rec.get("accountId") or ""),
@@ -1072,10 +1074,25 @@ def stop(user_id, *, stopper=None):
     _notify.notify(user_id, type=_notify.SYSTEM, title="Automation stopped",
                    body="The trading loop has been stopped. "
                         + ans["flattenReason"])
-    return dict(status(user_id), stopped=True, alreadyStopped=False, **ans)
+    out = dict(status(user_id), stopped=True, alreadyStopped=False,
+               loopStoppedHere=stopped_here, **ans)
+    if not stopped_here:
+        # NOT "stopped" on the strength of a record alone. No loop was running
+        # in the process that took this request. If one runs in another
+        # container (a deploy overlap) it honours the recorded stop at its next
+        # tick; saying so is the difference between a sentence that is true and
+        # one that is only hopeful.
+        out["stopNote"] = (
+            "No trading loop was running on this server instance. If one is "
+            "running on another instance — possible for a few minutes after an "
+            "update — it will notice this stop at its next check, within about "
+            "five minutes.")
+    return out
 
 
 def _halt(user_id, stopper):
+    """Record the stop and stop the loop in THIS process. Returns whether a loop
+    here was actually stopped (False: none was running in this process)."""
     if stopper is None:
         from apex import user_loop
         stopper = user_loop.stop
@@ -1083,4 +1100,4 @@ def _halt(user_id, stopper):
         user_store.update(user_id, {"active": False})
     except Exception:
         pass
-    stopper(user_id)
+    return bool(stopper(user_id))

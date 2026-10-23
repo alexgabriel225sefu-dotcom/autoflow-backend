@@ -144,7 +144,15 @@ export async function publicApi<T>(
 
 export async function api<T>(
   path: string,
-  init: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+  init: {
+    method?: string; body?: unknown; signal?: AbortSignal;
+    /** For the few requests whose work legitimately takes longer than a read: a
+     *  close waits on the broker. Default REQUEST_TIMEOUT_MS. */
+    timeoutMs?: number;
+    /** What to say if it does time out, when "check your connection" would be
+     *  wrong — the server may still be doing the work. */
+    timeoutMessage?: string;
+  } = {},
 ): Promise<ApiResult<T>> {
   const token = await bearer();
   if (token === TIMED_OUT) {
@@ -159,7 +167,10 @@ export async function api<T>(
 
 async function request<T>(
   path: string,
-  init: { method?: string; body?: unknown; signal?: AbortSignal },
+  init: {
+    method?: string; body?: unknown; signal?: AbortSignal;
+    timeoutMs?: number; timeoutMessage?: string;
+  },
   token: string | null,
 ): Promise<ApiResult<T>> {
   let res: Response;
@@ -167,7 +178,7 @@ async function request<T>(
   // request ends as an error the page can show instead of as nothing.
   const ctl = new AbortController();
   let timedOut = false;
-  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, init.timeoutMs ?? REQUEST_TIMEOUT_MS);
   const onCallerAbort = () => ctl.abort();
   if (init.signal) {
     if (init.signal.aborted) ctl.abort();
@@ -189,7 +200,8 @@ async function request<T>(
     // no screen can mistake it for "you have nothing".
     if (timedOut) {
       return fail(0, CODES.NETWORK,
-        "The request took too long. Check your connection and try again.");
+        init.timeoutMessage
+          ?? "The request took too long. Check your connection and try again.");
     }
     return fail(0, CODES.NETWORK, e instanceof Error ? e.message : "Network error");
   } finally {
@@ -731,4 +743,7 @@ export type AutomationState = {
   flattened?: boolean;
   flattenDeclined?: boolean;
   flattenReason?: string | null;
+  /** Set when no loop was stopped in the process that took the Stop request. */
+  stopNote?: string | null;
+  loopStoppedHere?: boolean;
 };

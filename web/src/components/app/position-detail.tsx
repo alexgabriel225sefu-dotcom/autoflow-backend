@@ -23,6 +23,8 @@ import { Num, Side } from "./table";
  *   its sentence, verbatim. Only FILLED and ALREADY_CLOSED mean the position is
  *   closed. PARTIAL says the remainder is still open.
  */
+/** How long to wait for a close; the server allows the broker longer than a read. */
+export const CLOSE_TIMEOUT_MS = 90_000;
 const NOT_AVAILABLE = "Closing from here is not available yet. Close it in cTrader.";
 
 type Stage = "idle" | "confirm" | "sending";
@@ -58,7 +60,14 @@ export function PositionDetail({
     setStage("sending");
     const r = await api<ClosePositionRead>(
       `accounts/${encodeURIComponent(String(accountId))}/positions/${encodeURIComponent(id)}/close`,
-      { method: "POST" },
+      {
+        method: "POST",
+        // A close waits on the broker (a reconcile, then the close), which can
+        // legitimately outlast a read. If it still times out the position may
+        // have closed: say that, not "check your connection".
+        timeoutMs: CLOSE_TIMEOUT_MS,
+        timeoutMessage: "No answer yet — the close may still complete. Check Positions before trying again.",
+      },
     );
     setResult(r);
     setStage("idle");

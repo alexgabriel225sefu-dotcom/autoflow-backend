@@ -20,7 +20,7 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
-import { EmergencyStop } from "./emergency-stop";
+import { EMERGENCY_TIMEOUT_MS, EmergencyStop } from "./emergency-stop";
 
 let reloadState = "stopped";
 const reload = vi.fn(async () => ({ ok: true, status: 200, data: { state: reloadState } }) as never);
@@ -73,6 +73,17 @@ describe("EmergencyStop — what it sends", () => {
     expect(calls[0].path).toBe("emergency/stop");
     expect(calls[0].init?.method).toBe("POST");
     expect(calls[0].init?.body).toEqual({ confirm: true, closePositions: true, ctid: "501" });
+  });
+
+  it("stop and close waits longer than a read, and says the work may still be running", async () => {
+    answer = ok(result());
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
+    click(/Emergency/); click("Stop and close positions"); click("Yes, stop and close");
+    await waitFor(() => expect(calls.length).toBe(1));
+    const init = calls[0].init as { timeoutMs?: number; timeoutMessage?: string };
+    expect(init.timeoutMs).toBe(EMERGENCY_TIMEOUT_MS);
+    expect(init.timeoutMs!).toBeGreaterThan(90_000);
+    expect(init.timeoutMessage).toMatch(/may still be running/);
   });
 
   it("stop only: runs the EXISTING automation stop, closes nothing, and re-reads the state", async () => {

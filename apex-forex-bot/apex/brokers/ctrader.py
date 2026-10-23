@@ -271,6 +271,29 @@ _HIST_PER_SEC = float(os.getenv("CTRADER_HIST_RPS") or 5)
 _OTHER_PER_SEC = float(os.getenv("CTRADER_RPS") or 50)
 
 
+def _merge_close_rows(prev, new):
+    """Add one more closing part of the SAME position to its row.
+
+    Money and volume are summed; the exit price becomes the volume-weighted
+    average; the time and balance are the latest part's. Entry, symbol and side
+    belong to the position and are kept.
+    """
+    out = dict(prev)
+    for k in ("netPnl", "grossPnl", "swap", "commissionUsd"):
+        out[k] = round((prev.get(k) or 0.0) + (new.get(k) or 0.0), 2)
+    u0, u1 = prev.get("units") or 0.0, new.get("units") or 0.0
+    out["units"] = round(u0 + u1, 8)
+    p0, p1 = prev.get("exitPrice"), new.get("exitPrice")
+    if p0 is not None and p1 is not None and (u0 + u1) > 0:
+        out["exitPrice"] = (p0 * u0 + p1 * u1) / (u0 + u1)
+    elif p1 is not None:
+        out["exitPrice"] = p1
+    out["closedAt"] = max(prev.get("closedAt") or 0, new.get("closedAt") or 0)
+    if new.get("balance") is not None:
+        out["balance"] = new["balance"]
+    return out
+
+
 class _RateLimit:
     """A sliding window: at most `allowance` acquisitions in any `per` seconds.
 
@@ -889,7 +912,7 @@ class CtraderBroker:
         separates "the account had no trades" from "we could not ask" — a
         caller that writes to a journal must never confuse the two.
         """
-        out, opened, ok = {}, {}, False
+        out, opened, ok, truncated = {}, {}, False, False
         if getattr(self._c, "PAPER_TRADING", True):
             return {"ok": True, "deals": out}
         self._load_symbols()
@@ -952,7 +975,7 @@ class CtraderBroker:
                             bal = cpd.balance / scale
                     except Exception:
                         pass
-                    out[str(d.positionId)] = {
+                    row = {
                         "positionId": str(d.positionId),
                         "symbol": id2name.get(d.symbolId, str(d.symbolId)),
                         # A close can be partial. Prefer the broker's explicit
@@ -970,11 +993,22 @@ class CtraderBroker:
                         "balance": bal,
                         "closedAt": int(d.executionTimestamp) // 1000,
                     }
+                    pid = str(d.positionId)
+                    # A position closed in parts has one closing deal per part.
+                    # Keying by position id and overwriting kept only the LAST
+                    # part, so its P&L, volume and win/loss were wrong. Added up
+                    # instead — still one row per position, which is what every
+                    # caller indexes by.
+                    out[pid] = _merge_close_rows(out[pid], row) if pid in out else row
                 if not getattr(res, "hasMore", False):
                     break
                 if newest <= cur:
                     break              # no forward progress; stop rather than spin
                 cur = newest + 1
+            else:
+                # The page budget ran out while the broker still had more. Said,
+                # not swallowed: a history that stops silently looks complete.
+                truncated = True
         except Exception as e:
             print(f"[cTrader] deal history {from_ts}..{to_ts} failed: {e}")
             return {"ok": ok, "deals": out, "error": str(e)[:200]}
@@ -986,7 +1020,10 @@ class CtraderBroker:
                 _row["openedAt"] = opened[_pid]
                 if _row.get("closedAt"):
                     _row["durationS"] = max(0, _row["closedAt"] - opened[_pid])
-        return {"ok": ok, "deals": out}
+        res_out = {"ok": ok, "deals": out}
+        if truncated:
+            res_out["truncated"] = True
+        return res_out
 
     # -- positions ------------------------------------------------------------
     def get_open_position(self, instrument=None):

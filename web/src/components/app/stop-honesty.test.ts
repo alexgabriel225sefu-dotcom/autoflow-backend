@@ -90,3 +90,16 @@ describe("and it stops warning when there is nothing to warn about", () => {
       .toBe("Automation is now stopped");
   });
 });
+
+
+describe("a stop that stopped nothing in this process", () => {
+  it("shows the server's caution after the stop sentence", () => {
+    const text = outcomeOf({ ...DECLINED, stopNote: "No trading loop was running on this server instance. If one is running on another instance it will notice this stop within about five minutes." });
+    expect(text).toContain(DECLINED.flattenReason);
+    expect(text).toContain("another instance");
+  });
+
+  it("says nothing extra when a loop here was stopped", () => {
+    expect(outcomeOf(DECLINED)).not.toContain("another instance");
+  });
+});

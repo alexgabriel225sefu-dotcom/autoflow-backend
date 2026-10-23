@@ -228,13 +228,16 @@ export function outcomeOf(a: {
   flattened?: boolean;
   flattenDeclined?: boolean;
   flattenReason?: string | null;
+  /** Present when the stop was recorded but no loop was stopped in the process
+   *  that took the request. Shown verbatim: it is the server's caution. */
+  stopNote?: string | null;
 }): string {
   const base = `Automation is now ${a.state}`;
   // Only when the server actually declined. A release that later closes
   // positions will send `flattened: true`, and this must then say nothing
   // extra rather than keep repeating a warning that has stopped being true.
-  if (a.flattenDeclined && a.flattenReason) return `${base}. ${a.flattenReason}`;
-  return base;
+  const flat = a.flattenDeclined && a.flattenReason ? `${base}. ${a.flattenReason}` : base;
+  return a.stopNote ? `${flat} ${a.stopNote}` : flat;
 }
 
 /* ── licence ──────────────────────────────────────────────────────────── */

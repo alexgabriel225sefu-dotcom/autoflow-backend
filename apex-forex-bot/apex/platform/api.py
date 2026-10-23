@@ -550,8 +550,11 @@ def _dispatch(method, route, headers, body, query=None):
     # Stop automation and, when asked, close every open position on the
     # selected DEMO account. Not the operator's halt (that is
     # `emergency.py`). The confirmation is enforced HERE, not only in the
-    # browser: a request that does not carry `confirm: true` does nothing, so
-    # a stray or replayed call cannot close positions.
+    # browser: a request that does not carry `confirm: true` does nothing, so a
+    # stray or malformed call (a script, a retry, a form post) cannot close
+    # positions. It is NOT replay protection: a holder of a valid, freshly
+    # verified session could send it twice, and the guard against closing the
+    # same position twice is the ledger claim, not this flag.
     if route == "emergency/stop":
         if method != "POST":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")

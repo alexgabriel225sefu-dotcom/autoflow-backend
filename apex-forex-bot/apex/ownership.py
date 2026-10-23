@@ -278,6 +278,12 @@ def may_trade(user_id, live):
     """
     if not shared_backed():
         return True, "UNCONTENDED"
+    if _shutdown.is_set():
+        # Released on purpose and being replaced. Without this an empty key read
+        # as "ownership unknown", which a demo account treats as permission — so
+        # a tick still finishing, or a request served in the last seconds, could
+        # act while the replacement started to.
+        return False, "SHUTTING_DOWN"
     v = holds(user_id)
     if v is True:
         return True, "OWNER"

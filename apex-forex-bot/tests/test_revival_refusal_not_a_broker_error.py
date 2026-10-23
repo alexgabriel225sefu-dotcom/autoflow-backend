@@ -145,6 +145,9 @@ try:
         check("four identical revival failures -> one entry", len(engine_errs) == 1, str(len(engine_errs)))
         AU._record_starter_failure("u1", "c8", CONN, ValueError("a different fault"), revive=True)
         check("a different cause is its own entry", len(engine_errs) == 2, str(len(engine_errs)))
+        check("the dedupe key is stable across processes (not Python's salted hash())",
+              any(k.startswith("revive-err:u1:") and len(k.split(":")[-1]) == 12 and all(c in "0123456789abcdef" for c in k.split(":")[-1]) for k in _claims),
+              str(_claims))
         reset()
         for _ in range(3):
             AU._record_starter_failure("u1", "c9", CONN, ValueError("same fault"), revive=False)

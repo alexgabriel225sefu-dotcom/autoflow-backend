@@ -2264,6 +2264,25 @@ def _loop(user_id, alert_fn, gen=None):
             except Exception:
                 pass
             break
+        # A STOP PRESSED ON ANOTHER CONTAINER. `stop()` only reaches loops in
+        # the process that handled the request, so during a deploy overlap
+        # (both containers serving) a client could press Stop on one while the
+        # loop ran on the other, be told "stopped", and have it keep opening
+        # positions until its container was killed. Stop writes `active: False`
+        # to the shared store; honouring it here, once per tick, is what makes
+        # that sentence true wherever the loop is. An explicit False only — an
+        # absent flag is a record that never recorded one.
+        if _stop_requested(user_id):
+            print(f"[UserLoop:{user_id}] stop recorded elsewhere — standing down")
+            with _lock:
+                if user_id in _loops:
+                    _loops[user_id]["running"] = False
+            try:
+                ownership.stop_renewer(user_id)
+                ownership.release(user_id)
+            except Exception:
+                pass
+            break
         try:
             if not forex.is_market_open():
                 time.sleep(60)
@@ -5103,6 +5122,19 @@ def start(user_id, alert_fn=None):
         _loops[user_id]["thread"] = t
     print(f"[UserLoop] Started for user {user_id}")
     return True
+
+
+def _stop_requested(user_id):
+    """True only when the shared record explicitly says `active: False`.
+
+    Unreadable store, missing record, or a missing flag all answer False: a
+    loop must not stand itself down on a Redis hiccup.
+    """
+    try:
+        rec = user_store.load(str(user_id))
+    except Exception:
+        return False
+    return isinstance(rec, dict) and rec.get("active") is False
 
 
 def stop(user_id):

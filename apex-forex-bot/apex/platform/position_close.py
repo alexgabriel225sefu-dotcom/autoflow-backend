@@ -45,47 +45,65 @@ def close_demo(user_id, *, ctid, position_id, connection_fn=None,
             status=403,
         )
 
-    gate = gate_fn or _gates.authorize_platform_demo_close
+    # A position id is a whole number. Checked BEFORE the gate takes its claim:
+    # `abc` used to take the claim, fail at the broker, come back as "result
+    # unknown" and then lock out a retry of the right id for minutes. "0123" is
+    # normalised so it cannot take a second claim on the same position.
+    raw_id = str(position_id).strip()
+    if not raw_id.isdigit():
+        raise CloseRefused("BAD_POSITION_ID",
+                           "the position id must be a whole number", status=400)
+    position_id = str(int(raw_id))
+
+    # The default gate keys its claim on the account AND the position, so a close
+    # sent under the wrong account cannot use up the right account's claim.
+    gate = gate_fn or (lambda uid, **kw: _gates.authorize_platform_demo_close(
+        uid, account=ctid, **kw))
     decision, rid = gate(str(user_id), position_id=position_id,
                          origin="platform")
     if not decision:
         raise CloseRefused("CLOSE_REFUSED", decision.detail or decision.reason)
 
+    # Everything up to `submit(...)` happens BEFORE anything reaches cTrader, so
+    # a failure here proves nothing was closed: the claim is released and the
+    # refusal is specific. Only an exception from the submit itself can leave
+    # the outcome unknown.
     try:
         broker, other = _read._open(
             str(user_id), ctid=ctid, connection_fn=connection_fn,
             broker_fn=broker_fn)
-        if broker is None:
-            if (other or {}).get("status") == _read.REAUTH_REQUIRED:
-                _ledger.release(rid)
-                raise CloseRefused(
-                    "REAUTH_REQUIRED",
-                    "the cTrader authorisation has expired — reconnect the account",
-                    status=401,
-                )
-            _ledger.release(rid)
+    except Exception as e:  # noqa: BLE001
+        _ledger.release(rid)
+        if isinstance(e, _link.LinkError):
+            raise
+        raise CloseRefused(
+            "BROKER_UNAVAILABLE",
+            "the cTrader connection could not be prepared — nothing was sent",
+            status=503,
+        ) from None
+    if broker is None:
+        _ledger.release(rid)
+        if (other or {}).get("status") == _read.REAUTH_REQUIRED:
             raise CloseRefused(
-                "BROKER_UNAVAILABLE",
-                (other or {}).get("reason") or "the cTrader account is unavailable",
-                status=503,
+                "REAUTH_REQUIRED",
+                "the cTrader authorisation has expired — reconnect the account",
+                status=401,
             )
-        submit = getattr(broker, "close_position_by_id", None)
-        if not callable(submit):
-            _ledger.release(rid)
-            raise CloseRefused(
-                "UNSUPPORTED",
-                "this cTrader connector cannot close positions by position id",
-                status=501,
-            )
+        raise CloseRefused(
+            "BROKER_UNAVAILABLE",
+            (other or {}).get("reason") or "the cTrader account is unavailable",
+            status=503,
+        )
+    submit = getattr(broker, "close_position_by_id", None)
+    if not callable(submit):
+        _ledger.release(rid)
+        raise CloseRefused(
+            "UNSUPPORTED",
+            "this cTrader connector cannot close positions by position id",
+            status=501,
+        )
+    try:
         result = submit(position_id)
-    except _link.LinkError as e:
-        # Refresh failures happen before the close request leaves this
-        # process, so the user must be able to retry after reconnecting.
-        if e.code in ("REFRESH_UNAVAILABLE", "REFRESH_FAILED"):
-            _ledger.release(rid)
-        raise
-    except CloseRefused:
-        raise
     except Exception as e:  # noqa: BLE001
         # A socket timeout or connection drop does not prove the broker did
         # nothing. Keep the claim so a retry cannot close a position that was

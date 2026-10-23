@@ -91,3 +91,21 @@ describe("the request has a deadline", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+
+describe("a request may be given its own deadline and its own words", () => {
+  it("a close that outlasts the default is not cut at 25 s", async () => {
+    vi.stubGlobal("fetch", vi.fn((_u: string, init: RequestInit) => new Promise((_res, rej) => {
+      init.signal?.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError")));
+    })));
+    let result: Awaited<ReturnType<typeof api>> | undefined;
+    void api("accounts/1/positions/7/close", { method: "POST", timeoutMs: 90_000,
+      timeoutMessage: "No answer yet — the close may still complete." }).then((r) => { result = r; });
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS + 5_000);
+    expect(result, "cut at the default deadline").toBeUndefined();
+    await vi.advanceTimersByTimeAsync(90_000 - REQUEST_TIMEOUT_MS);
+    expect(result).toBeDefined();
+    expect(!result!.ok && result!.message).toBe("No answer yet — the close may still complete.");
+    expect(!result!.ok && result!.message).not.toMatch(/check your connection/);
+  });
+});

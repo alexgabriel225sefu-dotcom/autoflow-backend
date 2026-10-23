@@ -19,7 +19,7 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
-import { PositionDetail } from "./position-detail";
+import { CLOSE_TIMEOUT_MS, PositionDetail } from "./position-detail";
 
 const POS: Position = {
   symbol: "EURUSD", side: "BUY", units: 1000, entryPrice: 1.1, stopLoss: 1.09,
@@ -53,6 +53,18 @@ describe("PositionDetail — nothing is sent without confirmation", () => {
     click("Cancel");
     expect(calls.length).toBe(0);
     expect(screen.queryByRole("button", { name: "Close position" })).not.toBeNull();
+  });
+
+  it("the close waits longer than a read, and a timeout does not blame the connection", async () => {
+    answer = closeOk("FILLED", "ok");
+    mount();
+    click("Close position"); click("Yes, close it");
+    await waitFor(() => expect(calls.length).toBe(1));
+    const init = calls[0].init as { timeoutMs?: number; timeoutMessage?: string };
+    expect(init.timeoutMs).toBe(CLOSE_TIMEOUT_MS);
+    expect(init.timeoutMs!).toBeGreaterThan(25_000);
+    expect(init.timeoutMessage).toMatch(/may still complete/);
+    expect(init.timeoutMessage).not.toMatch(/connection/);
   });
 
   it("confirming sends ONE POST, by position id, with no symbol anywhere", async () => {

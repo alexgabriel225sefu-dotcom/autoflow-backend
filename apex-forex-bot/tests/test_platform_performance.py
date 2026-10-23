@@ -156,13 +156,35 @@ check("week = 2", read(dl, period="week")["summary"]["trades"] == 2)
 check("month = 4", read(dl, period="month")["summary"]["trades"] == 4)
 check("all = 4", read(dl, period="all")["summary"]["trades"] == 4)
 
+print("\n[4a] the window asked of the broker: 30 days, or a year for 'all'")
+asked = []
+
+
+def spy(uid, **kw):
+    asked.append(kw["days"])
+    return {"connected": True, "status": "ok", "accountId": 501, "mode": "demo", "deals": []}
+
+
+for per, want in (("today", 30), ("week", 30), ("month", 30), ("all", 365)):
+    asked.clear()
+    PR.read("u", period=per, deals_reader=spy, rows_reader=lambda u: [], now=NOW)
+    check(f"{per}: asks for {want} days", asked == [want], str(asked))
+
 print("\n[4b] 'all time' adds older trades only the journal remembers, once each")
-old = jrow(50, "trend", day="2026-08-01", net=7.0)
+old = jrow(50, "trend", day="2025-08-01", net=7.0)
 r = read(dl, journal=[old, jrow(2, "trend", day="2026-10-16")], period="all")
 check("the older journal trade is added", r["summary"]["trades"] == 5, str(r["summary"]))
 check("a journal row that duplicates a deal is not counted twice",
       sum(1 for s in r["byStrategy"] for _ in range(s["trades"])) == 5)
 check("but 30 days does not include it", read(dl, journal=[old], period="month")["summary"]["trades"] == 4)
+
+print("\n[4c] an account with NO deals does not pull in its whole journal")
+inside = jrow(77, "trend", day="2026-10-10", net=5.0)      # inside the 30-day window
+r = read([], journal=[inside, old], period="all")
+check("only the row older than the window is added",
+      r["summary"]["trades"] == 1 and r["summary"]["net"] == 7.0, str(r["summary"]))
+check("a journal row inside the window, absent from the broker, is not ours",
+      read([], journal=[inside], period="all")["summary"]["trades"] == 0)
 
 # ── 5. valid JSON ───────────────────────────────────────────────────────────
 print("\n[5] a profit factor with no losses is null, never Infinity")

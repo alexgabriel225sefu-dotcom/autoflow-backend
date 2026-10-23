@@ -77,6 +77,16 @@ _BUCKETS = {
     "waitlist": ("RL_A4T_WAITLIST_PER_MIN", 5, 60),
     # Everything else: reads the dashboard polls.
     "default": ("RL_A4T_DEFAULT_PER_MIN", 240, 60),
+    # PER NETWORK ADDRESS, before the token is known to be real. The buckets
+    # above are keyed on a hash of whatever bearer string arrives, and a string
+    # nobody has verified is free to invent: every junk token got a fresh
+    # bucket, so an anonymous caller could send unlimited control requests, each
+    # forcing a Supabase lookup, until that service throttled the platform's key
+    # and every client — including the Emergency button — saw AUTH_UNAVAILABLE.
+    # Generous, because several people can share one address.
+    "addr": ("RL_A4T_ADDR_PER_MIN", 600, 60),
+    # The same, for the routes that move money or change what can.
+    "addr_control": ("RL_A4T_ADDR_CONTROL_PER_MIN", 120, 60),
 }
 
 
@@ -93,6 +103,7 @@ LIMITERS = {name: _mk(name) for name in _BUCKETS}
 
 _CANDLES_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/candles$")
 _PREVIEW_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/preview$")
+_CLOSE_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/positions/[A-Za-z0-9_-]{1,64}/close$")
 _ACTIVATE_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/activate$")
 
 
@@ -141,6 +152,10 @@ def classify(method, route):
         return "activate"
     if route.startswith("emergency/"):
         return "control"
+    if _CLOSE_RE.match(route):
+        # Closing a position moves money. It sat in "default" (240 a minute),
+        # twelve times looser than a Stop.
+        return "control"
     if route.startswith("automation"):
         # A GET of the automation state is a poll, not a control action.
         return "control" if method != "GET" else "default"
@@ -163,6 +178,10 @@ def key_for(client_key, auth_header):
     return "a:" + str(client_key or "unknown")
 
 
+# The buckets whose routes change whether, or how, money moves.
+_MONEY_BUCKETS = ("control", "oauth", "activate")
+
+
 def check(method, route, *, client_key=None, auth_header=None):
     """(allowed, bucket, retry_after_seconds).
 
@@ -174,6 +193,19 @@ def check(method, route, *, client_key=None, auth_header=None):
     limiter = LIMITERS.get(bucket) or LIMITERS["default"]
     key = key_for(client_key, auth_header)
     try:
+        # The address floor comes first and does not depend on the token.
+        if client_key:
+            floors = ["addr"] + (["addr_control"] if bucket in _MONEY_BUCKETS else [])
+            for name in floors:
+                lim = LIMITERS[name]
+                akey = f"ip:{name}:{client_key}"
+                aok = None
+                if _MODE != "memory":
+                    aok = _shared_check(akey, lim.limit, lim.window_s)
+                if aok is None:
+                    aok = lim.check(akey)
+                if not aok:
+                    return False, name, _seconds_until_reset(lim.window_s)
         ok = None
         if _MODE != "memory":
             ok = _shared_check(key, limiter.limit, limiter.window_s)
