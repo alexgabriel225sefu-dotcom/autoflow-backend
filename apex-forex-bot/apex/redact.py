@@ -159,14 +159,32 @@ _CLIENT_TOKEN_LIKE = re.compile(
 # POSITION_NOT_FOUND, CH_CLIENT_AUTH_FAILURE, an order id such as CT_PAPER_17297...
 # Upper-case words joined by underscores only; a real token carries lower-case
 # letters or hyphens, or has no underscore at all.
-# A word segment is short (<=14); a long digit segment is an order id. A long
-# upper-case segment is a secret that merely contains an underscore.
+# A word segment is short letters with at most a few trailing digits (V2,
+# HTTP2); a long digit segment is an order id. A secret that merely contains an
+# underscore alternates letters and digits or runs on, so it does not fit.
 _CLIENT_CODE_LIKE = re.compile(
-    r"[A-Z][A-Z0-9]{0,13}(?:_(?:[A-Z][A-Z0-9]{0,13}|[0-9]{1,20}))+")
+    r"(?=.{1,48}\Z)[A-Z]{1,14}[0-9]{0,4}"
+    r"(?:_(?:[A-Z]{1,14}[0-9]{0,4}|[0-9]{1,16}))+")
+
+
+def _benign_part(part):
+    return bool(_CLIENT_CODE_LIKE.fullmatch(part)
+                or (part.isdigit() and len(part) <= 30)
+                or (part.isalpha() and len(part) <= 20))
 
 
 def _client_token_sub(m):
-    return m.group(0) if _CLIENT_CODE_LIKE.fullmatch(m.group(0)) else "[redacted]"
+    text = m.group(0)
+    if _CLIENT_CODE_LIKE.fullmatch(text):
+        return text
+    if text.isdigit() and len(text) <= 30:
+        return text
+    if "=" in text and not text.endswith("="):
+        # name=value of two short runs: kept when both sides read as an
+        # identifier, a code or a number, not as a credential.
+        if all(_benign_part(part) for part in text.split("=", 1)):
+            return text
+    return "[redacted]"
 
 
 def scrub_for_client(text, *secrets, limit=160) -> str:

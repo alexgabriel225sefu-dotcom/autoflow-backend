@@ -198,13 +198,20 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     # local; the store is only read for the rare paper-flagged account that is
     # bound live.
     bound_live = str(bound_env or "").strip().lower() == "live"
-    # The two exemptions for a paper-flagged record below (store down, no
-    # tombstone check) are only safe when the BROKER itself simulates. A stored
+    # The exemptions for a paper-flagged record below (store down, no tombstone
+    # check, not live) are only safe when the loop's broker config simulates. A stored
     # flag can disagree with the broker the loop holds: a platform connection
     # always builds a real one, whatever the record says. `bound_paper` is what
     # the loop's broker config says; unknown (None) is not "simulated".
     simulated = u.get("paper") is True and (not bound_live
                                             or bound_paper is True)
+    if bound_live and not simulated:
+        # Real money whatever the stored flag says - for a legacy user too: one
+        # who switches /paper on while a live loop is mid-tick would otherwise
+        # have that tick judged "not live" and skip the entitlement-unknown
+        # denial, the broker-environment check, the lease and the fail-closed
+        # ledger. A platform account is also marked below, after it is known.
+        live = True
     if u.get("paper") is not True or bound_live:
         try:
             _pmode = _platform_mode(user_id)

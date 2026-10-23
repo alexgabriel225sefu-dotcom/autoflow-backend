@@ -581,12 +581,17 @@ def _dispatch(method, route, headers, body, query=None):
             # Asked as "close, but there is no account to close on": the answer
             # then carries unreadable positions, no closes and allFlat False, so
             # the screen says "Not confirmed flat" instead of showing neither.
-            out = _panic.run(
-                p.user_id, ctid="", close_positions=True,
-                no_account_reason=(
-                    "closing positions was NOT attempted: Emergency was pressed "
-                    "too many times in the last minute - wait "
-                    f"{int(_person_wait or 1)}s and press it again"))
+            # A stop-only press had no sweep to withhold and is left as it was.
+            if close:
+                out = _panic.run(
+                    p.user_id, ctid="", close_positions=True,
+                    not_attempted=True,
+                    no_account_reason=(
+                        "Emergency was pressed too many times in the last "
+                        f"minute - wait {int(_person_wait or 1)}s and press it "
+                        "again"))
+            else:
+                out = _panic.run(p.user_id, ctid="", close_positions=False)
             out["throttled"] = True
             return _ok(out)
         # THE STOP RUNS WHATEVER THE ACCOUNT. This used to answer 409
