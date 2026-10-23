@@ -148,12 +148,21 @@ _CLIENT_KEYED = re.compile(
 # "=" is not part of the class: a `name=value` pair is split so a short code
 # after it (errorCode=POSITION_NOT_FOUND) is judged on its own, and a long value
 # after it is still caught as a run of its own.
-_CLIENT_TOKEN_LIKE = re.compile(r"[A-Za-z0-9_\-\.+/]{24,}")
+# Three shapes: a long run; a shorter run that ends in base64 padding (a 16-byte
+# secret is 22 characters and "=="); two runs joined by "=" (each under 24, so
+# neither is caught alone).
+_CLIENT_TOKEN_LIKE = re.compile(
+    r"[A-Za-z0-9_\-\.+/]{24,}"
+    r"|[A-Za-z0-9_\-\.+/]{12,}={1,2}(?![A-Za-z0-9])"
+    r"|[A-Za-z0-9_\-\.+/]{12,}=[A-Za-z0-9_\-\.+/]{12,}")
 # A broker or API error CODE is not a credential and the client needs it:
 # POSITION_NOT_FOUND, CH_CLIENT_AUTH_FAILURE, an order id such as CT_PAPER_17297...
 # Upper-case words joined by underscores only; a real token carries lower-case
 # letters or hyphens, or has no underscore at all.
-_CLIENT_CODE_LIKE = re.compile(r"[A-Z]+(?:_[A-Z0-9]+)+")
+# A word segment is short (<=14); a long digit segment is an order id. A long
+# upper-case segment is a secret that merely contains an underscore.
+_CLIENT_CODE_LIKE = re.compile(
+    r"[A-Z][A-Z0-9]{0,13}(?:_(?:[A-Z][A-Z0-9]{0,13}|[0-9]{1,20}))+")
 
 
 def _client_token_sub(m):

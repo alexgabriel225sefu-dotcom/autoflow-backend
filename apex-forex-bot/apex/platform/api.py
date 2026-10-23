@@ -578,12 +578,16 @@ def _dispatch(method, route, headers, body, query=None):
         # is the part that holds a worker for minutes.
         _person_ok, _person_wait = _rl.check_user("emergency_user", p.user_id)
         if not _person_ok:
-            out = _panic.run(p.user_id, ctid="", close_positions=False)
+            # Asked as "close, but there is no account to close on": the answer
+            # then carries unreadable positions, no closes and allFlat False, so
+            # the screen says "Not confirmed flat" instead of showing neither.
+            out = _panic.run(
+                p.user_id, ctid="", close_positions=True,
+                no_account_reason=(
+                    "closing positions was NOT attempted: Emergency was pressed "
+                    "too many times in the last minute - wait "
+                    f"{int(_person_wait or 1)}s and press it again"))
             out["throttled"] = True
-            out["sentence"] = (
-                out["sentence"] + " Closing positions was NOT attempted: "
-                "Emergency was pressed too many times in the last minute - "
-                f"wait {int(_person_wait or 1)}s and press it again.")
             return _ok(out)
         # THE STOP RUNS WHATEVER THE ACCOUNT. This used to answer 409
         # NO_ACCOUNT_SELECTED before the stop step, so a client with no

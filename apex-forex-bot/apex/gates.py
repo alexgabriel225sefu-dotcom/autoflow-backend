@@ -149,7 +149,7 @@ def live_entitlement(user_id, user=None):
 
 def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
                     origin="unknown", user=None, dash=None,
-                    bound_account=None, bound_env=None):
+                    bound_account=None, bound_env=None, bound_paper=None):
     """The one gate every new position passes, whatever asked for it.
 
     Order matters: the cheapest and most decisive checks first, so a denied
@@ -198,6 +198,13 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     # local; the store is only read for the rare paper-flagged account that is
     # bound live.
     bound_live = str(bound_env or "").strip().lower() == "live"
+    # The two exemptions for a paper-flagged record below (store down, no
+    # tombstone check) are only safe when the BROKER itself simulates. A stored
+    # flag can disagree with the broker the loop holds: a platform connection
+    # always builds a real one, whatever the record says. `bound_paper` is what
+    # the loop's broker config says; unknown (None) is not "simulated".
+    simulated = u.get("paper") is True and (not bound_live
+                                            or bound_paper is True)
     if u.get("paper") is not True or bound_live:
         try:
             _pmode = _platform_mode(user_id)
@@ -209,7 +216,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
             # (paper) has no real money to protect, so refusing its order over a
             # store blip is a cost with no matching danger.
             print(f"[Gates] could not classify {user_id}: {e}")
-            if u.get("paper") is True:
+            if simulated:
                 _pmode = None
             else:
                 return Decision(False, "LIVE_CLASSIFY_FAILED",
@@ -251,7 +258,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
                      "selected now")
                     + "; stop it and start it again on the account you "
                       "mean"), None
-        if not is_platform and bound_live and u.get("paper") is not True:
+        if not is_platform and bound_live and not simulated:
             # An ordinary legacy-bot live order lands here and must pass. A
             # PLATFORM account that was disconnected while its loop kept
             # running lands here too, and must not: the tombstone is what

@@ -93,6 +93,18 @@ check("a token-shaped run is still removed even when written in capitals",
       "ABCDEF0123456789ABCDEF0123456789" not in
       _R.scrub_for_client("x ABCDEF0123456789ABCDEF0123456789"))
 
+print("\n[1c] base64 padding, joined runs and upper-case secrets with underscores")
+for secret in ("q83vEjRWeJCrze8SNFZ4kA==",
+               "sig=AAAAAAAAAAAAAAAAAAAAA=BBBBBBBBBBBBBBBBBBBBBBB",
+               "AKIA_IOSFODNN7EXAMPLE_ABCDEFGHIJ",
+               "GHP_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123"):
+    got = _R.scrub_for_client(f"upstream {secret} end")
+    check(f"{secret[:22]!r}: removed",
+          not any(part in got for part in ("q83vEjRWeJ", "AAAAAAAAAAAAAAAAAAAAA",
+                                           "BBBBBBBBBBBBBBBBBBBBBBB", "IOSFODNN7",
+                                           "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123")),
+          got)
+
 # ── 2. the Emergency close detail ───────────────────────────────────────────
 print("\n[2] the Emergency button's per-position detail is redacted")
 

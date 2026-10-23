@@ -331,7 +331,7 @@ try:
     check("the legacy order is not refused as LIVE_CLASSIFY_FAILED",
           d.reason != "LIVE_CLASSIFY_FAILED", f"{d.reason}: {d.detail}")
 
-    print("\n[7e] an order the account itself marks as simulated is not refused over a store blip")
+    print("\n[7e] an order the broker itself simulates is not refused over a store blip")
     user_store.save(TG_USER, {"id": TG_USER, "paper": True})
     _real_strict3 = PS._read_strict
 
@@ -340,12 +340,42 @@ try:
 
     PS._read_strict = _always_down
     try:
-        d, _ = order(TG_USER, units=1700, bound_account="123", bound_env="live")
+        d, _ = order(TG_USER, units=1700, bound_account="123", bound_env="live",
+                     bound_paper=True)
     finally:
         PS._read_strict = _real_strict3
     check("a paper order with the store down is not LIVE_CLASSIFY_FAILED",
           d.reason != "LIVE_CLASSIFY_FAILED", f"{d.reason}: {d.detail}")
     user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+
+    print("\n[7f] a stored paper flag is not the broker: a live-bound platform loop is not exempt")
+    # The record says paper, the loop's broker is a real one (a platform
+    # connection always builds one, bound_paper False). Neither exemption above
+    # may apply: that would be real money with every live gate skipped.
+    connect(LIVE_USER, CTL.LIVE)
+    user_store.save(LIVE_USER, {"id": LIVE_USER, "paper": True})
+    PS._read_strict = _always_down
+    try:
+        d, rid = order(LIVE_USER, units=1710, bound_account="900001",
+                       bound_env="live", bound_paper=False)
+        check("store down: refused as LIVE_CLASSIFY_FAILED, not AUTHORIZED",
+              not d.allowed and d.reason == "LIVE_CLASSIFY_FAILED",
+              f"{d.reason}: {d.detail}")
+        d, _ = order(LIVE_USER, units=1711, bound_account="900001", bound_env="live")
+        check("and so is a caller that does not say whether its broker simulates",
+              not d.allowed and d.reason == "LIVE_CLASSIFY_FAILED",
+              f"{d.reason}: {d.detail}")
+    finally:
+        PS._read_strict = _real_strict3
+    CTL.disconnect(LIVE_USER)
+    user_store.save(LIVE_USER, {"id": LIVE_USER, "paper": True})
+    d, rid = order(LIVE_USER, units=1720, bound_account="900001",
+                   bound_env="live", bound_paper=False)
+    check("a disconnected platform account with a paper-flagged record: refused "
+          "as PLATFORM_DISCONNECTED", not d.allowed and d.reason == "PLATFORM_DISCONNECTED",
+          f"{d.reason}: {d.detail}")
+    check("without burning a claim", rid is None, str(rid))
+    user_store.save(LIVE_USER, {"id": LIVE_USER})
 
     print("\n[8] a store that cannot be read, for a live loop")
     _real_strict = PS._read_strict

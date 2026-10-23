@@ -129,6 +129,11 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         except Exception as e:  # noqa: BLE001
             return None, {"connected": True, "status": UNAVAILABLE,
                           "reason": _scrub(e, conn.get("accessToken"))}
+        # Built for the connection's own account when none was asked about, so a
+        # selection that changes between the two reads is neither served nor
+        # refused as a mismatch: the broker is for the account that was read.
+        if ctid is None:
+            ctid = conn.get("ctid")
         broker_fn = lambda: user_loop._make_broker(
             user, user_id, ctid=ctid)[0]
     try:
