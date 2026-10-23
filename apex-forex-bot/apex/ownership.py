@@ -76,6 +76,11 @@ _lock = threading.Lock()
 _held = {}                          # user_id -> last successful renew ts
 _renewers = {}                      # user_id -> {"alive": bool}
 _lost = set()                       # users a renewer confirmed we lost
+# Set once this process has been told to stop. From then on it must neither take
+# a lease nor renew one: `heartbeat` re-acquires a key that has GONE ("the lease
+# had lapsed"), which is right for a container that is staying and exactly wrong
+# for one that has just handed its leases back — it would take them again.
+_shutdown = threading.Event()
 
 
 def _key(user_id):
@@ -88,16 +93,56 @@ def shared_backed():
     return bool(getattr(user_store, "_USE_REDIS", False))
 
 
+def _register_unless_shutdown(user_id):
+    """Record a freshly claimed lease as held - unless the shutdown has begun.
+
+    The flag is checked and `_held` written under ONE lock, the same lock
+    `release_all` takes its snapshot under after the flag is set, so one of the
+    two sides always sees the other: either the sweep sees this lease and
+    releases it, or this sees the flag and hands the lease back itself.
+    """
+    with _lock:
+        if _shutdown.is_set():
+            return False
+        _held[str(user_id)] = time.time()
+        return True
+
+
+def _give_back_after_shutdown(user_id):
+    """Drop a lease that was taken after this process began shutting down.
+
+    Best effort: if the release itself fails the key still expires on its own,
+    which is the behaviour before this existed, never worse.
+    """
+    with _lock:
+        _held.pop(str(user_id), None)
+    try:
+        user_store.release_claim(_key(str(user_id)), INSTANCE_ID)
+    except Exception:                                        # noqa: BLE001
+        pass
+    print(f"[Ownership] {user_id}: lease taken during shutdown, handed back")
+
+
 def acquire(user_id):
     """Take ownership of this user. True = ours, False = someone else's,
     None = no shared backend (uncontended, so treated as ours by callers)."""
     user_id = str(user_id)
     if not shared_backed():
         return None
+    if _shutdown.is_set():
+        # Being stopped: never start owning something new. A loop started in the
+        # last seconds of this process would be orphaned the moment it exits.
+        return False
     got = user_store.claim_value(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
+    if got is True and not _register_unless_shutdown(user_id):
+        # The shutdown began between the check above and the claim. Its sweep
+        # may already have run, so this lease would be one nobody releases and
+        # the replacement container would stand down for the whole TTL. Hand it
+        # straight back.
+        _give_back_after_shutdown(user_id)
+        return False
     if got is True:
         with _lock:
-            _held[user_id] = time.time()
             # Holding the lease again makes any previous loss history. Without
             # this the flag survived the restart that fixed it: the loop broke
             # on was_lost() without going through stop(), so nothing cleared
@@ -132,6 +177,8 @@ def heartbeat(user_id):
     user_id = str(user_id)
     if not shared_backed():
         return None
+    if _shutdown.is_set():
+        return None                 # unknown, deliberately: neither renew nor re-take
     ok = user_store.renew_claim(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
     if ok is True:
         with _lock:
@@ -144,10 +191,16 @@ def heartbeat(user_id):
     cur = user_store.get_blob(_key(user_id))
     if cur is None:
         # Nobody holds it. Re-acquire rather than abandon the user.
+        if _shutdown.is_set():
+            return None             # shutdown began since the check at the top
         again = user_store.claim_value(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
+        if again is True and not _register_unless_shutdown(user_id):
+            # Began between the check and the claim: this is the lease that
+            # begin_shutdown() has just released, taken straight back. Give it
+            # back again rather than make the replacement wait out the TTL.
+            _give_back_after_shutdown(user_id)
+            return None
         if again is True:
-            with _lock:
-                _held[user_id] = time.time()
             print(f"[Ownership] lease for {user_id} had lapsed — reacquired")
             return True
         if again is None:
@@ -267,6 +320,12 @@ def may_trade(user_id, live):
     """
     if not shared_backed():
         return True, "UNCONTENDED"
+    if _shutdown.is_set():
+        # Released on purpose and being replaced. Without this an empty key read
+        # as "ownership unknown", which a demo account treats as permission — so
+        # a tick still finishing, or a request served in the last seconds, could
+        # act while the replacement started to.
+        return False, "SHUTTING_DOWN"
     v = holds(user_id)
     if v is True:
         return True, "OWNER"
@@ -313,3 +372,21 @@ def release_all():
     if held:
         print(f"[Ownership] released {freed}/{len(set(held))} lease(s) on shutdown")
     return freed
+
+
+def begin_shutdown():
+    """For a process that is being stopped: refuse new leases, then hand back
+    every one held, so the replacement takes over in seconds instead of waiting
+    out the TTL (about twelve minutes of nobody managing the positions, after
+    every deploy).
+
+    `release_all` alone is not enough here. A renewer thread that is already
+    past its liveness check, or a loop tick that calls `acquire`, would take
+    the lease straight back from the empty key. The flag set first closes both.
+    """
+    _shutdown.set()
+    return release_all()
+
+
+def shutting_down():
+    return _shutdown.is_set()

@@ -93,12 +93,33 @@ function isBrokerSignup(v: unknown): v is { url: string; disclosure: string } {
  * that refreshed in another tab must be the one we send, and a stale one
  * would log the client out of a session that is perfectly alive.
  */
-async function bearer(): Promise<string | null> {
+/** How long the session lookup may take before it is reported, not awaited. */
+export const SESSION_TIMEOUT_MS = 8_000;
+/** How long one API request may take. Reads on a phone moving between WiFi and
+ *  mobile data can otherwise hang with nothing to show but a skeleton. */
+export const REQUEST_TIMEOUT_MS = 25_000;
+
+const TIMED_OUT = Symbol("timed out");
+
+async function bearer(): Promise<string | null | typeof TIMED_OUT> {
+  // THE SESSION LOOKUP HAS A DEADLINE. `getSession` can wait on a storage lock
+  // held by another tab, or on a token refresh over a connection that has
+  // just changed. With no deadline the read never resolved, and an
+  // authenticated page stayed a skeleton for ever — seen on a phone, where
+  // "Account · Loading" never gave way to the selected demo account. A
+  // deadline turns that into an answer the page can show and retry.
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const { data } = await createClient().auth.getSession();
-    return data.session?.access_token ?? null;
+    const lookup = createClient().auth.getSession()
+      .then(({ data }) => data.session?.access_token ?? null);
+    const deadline = new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), SESSION_TIMEOUT_MS);
+    });
+    return await Promise.race([lookup, deadline]);
   } catch {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -123,9 +144,21 @@ export async function publicApi<T>(
 
 export async function api<T>(
   path: string,
-  init: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+  init: {
+    method?: string; body?: unknown; signal?: AbortSignal;
+    /** For the few requests whose work legitimately takes longer than a read: a
+     *  close waits on the broker. Default REQUEST_TIMEOUT_MS. */
+    timeoutMs?: number;
+    /** What to say if it does time out, when "check your connection" would be
+     *  wrong — the server may still be doing the work. */
+    timeoutMessage?: string;
+  } = {},
 ): Promise<ApiResult<T>> {
   const token = await bearer();
+  if (token === TIMED_OUT) {
+    return fail(0, CODES.AUTH_UNAVAILABLE,
+      "Your session could not be confirmed in time. Check your connection and try again.");
+  }
   if (!token) {
     return fail(401, CODES.AUTH_REQUIRED, "Sign in to continue.");
   }
@@ -134,14 +167,27 @@ export async function api<T>(
 
 async function request<T>(
   path: string,
-  init: { method?: string; body?: unknown; signal?: AbortSignal },
+  init: {
+    method?: string; body?: unknown; signal?: AbortSignal;
+    timeoutMs?: number; timeoutMessage?: string;
+  },
   token: string | null,
 ): Promise<ApiResult<T>> {
   let res: Response;
+  // One signal for "the caller gave up" and "this took too long", so a hung
+  // request ends as an error the page can show instead of as nothing.
+  const ctl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, init.timeoutMs ?? REQUEST_TIMEOUT_MS);
+  const onCallerAbort = () => ctl.abort();
+  if (init.signal) {
+    if (init.signal.aborted) ctl.abort();
+    else init.signal.addEventListener("abort", onCallerAbort, { once: true });
+  }
   try {
     res = await fetch(`${API_BASE}/api/v1/${path.replace(/^\//, "")}`, {
       method: init.method ?? "GET",
-      signal: init.signal,
+      signal: ctl.signal,
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -152,7 +198,15 @@ async function request<T>(
   } catch (e) {
     // A network failure is NOT an empty result. Reported as its own code so
     // no screen can mistake it for "you have nothing".
+    if (timedOut) {
+      return fail(0, CODES.NETWORK,
+        init.timeoutMessage
+          ?? "The request took too long. Check your connection and try again.");
+    }
     return fail(0, CODES.NETWORK, e instanceof Error ? e.message : "Network error");
+  } finally {
+    clearTimeout(timer);
+    init.signal?.removeEventListener("abort", onCallerAbort);
   }
 
   let payload: Record<string, unknown> = {};
@@ -380,10 +434,25 @@ export type PositionsRead = {
   positions?: Position[];
 };
 export type OrdersRead = Omit<PositionsRead, "positions"> & { orders?: Order[] };
+export type DealsRead = Omit<PositionsRead, "positions"> & { deals?: ClosedTrade[] };
 export type Position = {
   symbol: string; side: "BUY" | "SELL"; units: number;
   entryPrice: number | null; stopLoss: number | null; takeProfit: number | null;
   positionId: number | string;
+  currentPrice?: number | null; quoteAgeSec?: number | null; quoteStale?: boolean;
+  pnlPips?: number | null; pnlAccount?: number | null; pnlIsEstimate?: boolean;
+  stopDistancePips?: number | null; targetDistancePips?: number | null;
+  hasStop?: boolean; warning?: string; openTime?: number | null;
+};
+export type ClosePositionRead = {
+  close: { status: "FILLED" | "PARTIAL" | "ALREADY_CLOSED"; sentence: string;
+    remainingVolume?: number | null; positionId?: number | string };
+  sentence: string;
+};
+export type ClosedTrade = {
+  symbol: string | null; side: "BUY" | "SELL" | null; units: number | null;
+  entry: number | null; exit: number | null; net: number | null;
+  closedAt: number | null; positionId?: number | string;
 };
 export type Order = {
   orderId: number | string; symbol: string; side: "BUY" | "SELL"; units: number;
@@ -562,6 +631,79 @@ export type ApprovalResult = {
   alreadyGone?: boolean;
 };
 
+/** GET performance. Closed trades the ENGINE recorded, from the same maths the
+ *  Telegram bot used. `profit_factor` is null with `noLosses: true` when there
+ *  was no losing trade; a group with `thin: true` has fewer than `minTrades`
+ *  trades and is not evidence. status "unavailable" means the journal could not
+ *  be read — never to be shown as zero trades. */
+export type PerfSummary = {
+  trades: number; wins: number; losses: number; win_rate: number | null;
+  net: number | null; profit_factor: number | null; expectancy: number | null;
+  max_drawdown: number | null; avg_win: number | null; avg_loss: number | null;
+  best: number | null; worst: number | null; noLosses: boolean;
+  r: { trades: number; expectancy_R: number | null; win_rate_R: number | null } | null;
+};
+export type PerfGroup = PerfSummary & { id: string; label: string; thin: boolean };
+export type PerformanceRead =
+  | { status: "unavailable"; reason: string; brokerStatus?: string | null }
+  | {
+    status: "ok"; period: "today" | "week" | "month" | "all"; mode: "demo" | "live" | "all";
+    summary: PerfSummary; byStrategy: PerfGroup[]; bySymbol: PerfGroup[];
+    minTrades: number; excluded: { unknownMode: number; otherMode: number };
+    journalTrades: number; note: string;
+    /** Where the closed trades come from: the broker's deal history, joined to
+     *  the engine's journal only to learn the strategy. */
+    source: { closedTrades: string; windowDays: number; journalReadable: boolean;
+              attributed: number; unattributed: number };
+  };
+
+/** POST emergency/stop. Every claim here is the server's and was measured:
+ *  `allFlat` is true only when a fresh read of the account found nothing open,
+ *  `closes` is null when the client chose to stop without closing, and a
+ *  position in any outcome other than closed/already_closed is NOT closed. */
+export type EmergencyResult = {
+  status: "ok";
+  automation: { stopped: boolean; alreadyStopped: boolean; error: string | null };
+  positions: { readable: boolean; reason: string | null; found: number | null;
+               notAttempted?: number } | null;
+  closes: { positionId: string; symbol: string | null; side: string | null;
+            outcome: "closed" | "already_closed" | "partial" | "refused" | "unknown" | "failed";
+            code?: string; detail?: string }[] | null;
+  verified: { readable: boolean; stillOpen: number | null; reason?: string } | null;
+  allFlat: boolean | null;
+  sentence: string;
+};
+
+/** "Why isn't it trading?" — GET automation/why. The verdict and its sentence
+ *  are the SERVER's; the browser shows them and never re-derives a reason.
+ *
+ *  `skips` (this process's last refusals, lost on restart) and `recorded`
+ *  (the persistent decision log) are different lists and are not merged.
+ *  `recordedCount` of 0 means the log holds nothing, which is NOT the same as
+ *  "the loop had no reason" — the screen words it accordingly. */
+export type WhyRead = {
+  status: "ok";
+  state: "stopped" | "running" | "paused";
+  reason: "halted" | "paused" | "stopped" | "loop_inactive" | "level_no_orders"
+    | "position_open" | "market_closed" | "watching" | "risk_holding";
+  riskGuard: RiskGuard;
+  summary: string;
+  level: "signals" | "approval" | "full" | null;
+  levelLabel: string | null;
+  loopActive: boolean | null;
+  marketOpen: boolean | null;
+  halted: boolean;
+  openPosition: { symbol: string | null } | null;
+  maxPositions: number | null;
+  skipsToday: number | null;
+  skips: { time: string; reason: string }[];
+  recorded: { at: number | null; symbol: string | null; reason: string }[];
+  recordedCount: number;
+  recordedReadable: boolean;
+};
+
+export type RiskGuard = { state: "ok" | "holding" | "unknown"; reasons: string[] };
+
 export type AutomationState = {
   state: "stopped" | "running" | "paused";
   ruleDocId: string | null; mode: "demo" | null; startedAt: number | null;
@@ -576,6 +718,9 @@ export type AutomationState = {
    *  in the browser would be free to drift from the one the loop obeys.
    *  Null when nothing is running — there is no level to report. */
   level?: "signals" | "approval" | "full" | null;
+  /** The Risk Guard's last report, as the loop published it. "unknown" is a
+   *  guard that has not reported — it is never to be shown as "active". */
+  riskGuard?: RiskGuard;
   levelLabel?: string | null;
   levelBlurb?: string | null;
   levelExecutes?: boolean | null;
@@ -598,4 +743,7 @@ export type AutomationState = {
   flattened?: boolean;
   flattenDeclined?: boolean;
   flattenReason?: string | null;
+  /** Set when no loop was stopped in the process that took the Stop request. */
+  stopNote?: string | null;
+  loopStoppedHere?: boolean;
 };

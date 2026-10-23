@@ -91,6 +91,21 @@ describe("the framework is not one with a known hole in it", () => {
   });
 });
 
+describe("the chart library is the one that was reviewed", () => {
+  it("lightweight-charts is pinned to an exact version, not a range", () => {
+    // It is the only third-party code that draws a client's broker data, and
+    // it carries a licence notice (docs/CHART_DEPENDENCY_DECISION.md). A caret
+    // would let a deploy install a release nobody read the terms of.
+    expect(pkg.dependencies["lightweight-charts"]).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it("and it is the only charting dependency", () => {
+    const names = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    const charting = names.filter((n) => /chart|d3|plotly|recharts|highcharts|echarts|tradingview/i.test(n));
+    expect(charting).toEqual(["lightweight-charts"]);
+  });
+});
+
 describe("the build knows which of the two products it is", () => {
   const config = readFileSync(join(WEB, "next.config.ts"), "utf8");
 

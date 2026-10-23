@@ -76,3 +76,25 @@ The supplied `live_pilot.py` path and the newer `position_close.py` path are not
 present on the requested base commit. The existing `live_execution.py` is
 wired behind the release switch and the live invariant suite remains
 unchanged; no claim is made that the absent pilot guard was reviewed.
+
+## Resolution (follow-up on this branch)
+
+The branch was brought current by merging `claude/fix-low-findings` (which
+contains `claude/apex4traders-platform-v1`). That resolves the "branch mismatch"
+findings: `position_close.py`, `emergency_stop.py`, `live_pilot.py` and the
+shutdown-aware ownership contract come from approved upstream commits (PRs #16,
+#17 and #18) and were not re-created here.
+
+| Finding | Resolution | Regression test |
+|---|---|---|
+| P1 `broker_read.py` `_scrub` | Redacts by shape through `redact.scrub_for_client` (refresh tokens, app secrets, bearer headers, quoted dumps, token-like runs, base64 padding); error codes survive. | `test_error_redaction_paths.py` [4], `test_review_low_findings.py` [1] |
+| P1 `api.py` typed handlers | Every typed handler (auth, store, link, licence, entitlement, automation, halt, preview, waitlist, approval, close, bad request) answers through `safe_errors.message`, which is `scrub_for_client` plus URL, host and filesystem-path shapes. Codes, statuses and diagnostic ids are unchanged. | `test_error_redaction_paths.py` [1], [2] - one named check per handler |
+| P1 `emergency.py` `state()` | `storeError` is now `STORE_UNREACHABLE (<ExceptionClass>)`; the message goes only to the scrubbed log. The halt refusal built from it carries the same string. | `test_error_redaction_paths.py` [3] |
+| P2 ownership race | Present upstream (`begin_shutdown`, lock shared with `release_all`); covered by `test_platform_shutdown_release.py`. | upstream |
+| P2 missing modules | Branch mismatch, resolved by the merge above. | upstream |
+| Live invariant: `apex/gates.py` "additional module" | Not an extra path. `gates.authorize_order` is the single gate; it is the one engine module outside `apex/platform/` that names `live_execution` and no platform module imports it. The check compares POSIX-style paths; a checkout that predates the separator normalisation (commit `eca3c6e6c` upstream) reports `apex\\gates.py` on Windows and the expected module itself shows up as the mismatch. The expectation is unchanged and not relaxed. | `test_platform_live_invariants.py` [1c] |
+
+Mutation proof: each handler's redaction was removed in turn and the matching
+named check failed (for example `AuthFailed: no URL, host, path, header or token
+in the answer`, `waitlist: refusal text is redacted`, `storeError carries no
+message from the store`); the file was restored after each.

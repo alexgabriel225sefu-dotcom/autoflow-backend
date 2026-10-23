@@ -10,12 +10,11 @@ The callback arrives carrying the ATTACKER's user id, and the VICTIM's live
 trading account is now bound to the attacker's dashboard.
 
 `state` cannot close that on its own, because the attacker's state is
-perfectly valid — it is their state. So the callback here does NOT finish the
-link. It parks the authorization code server-side and hands the browser a
-nonce. The link is completed by an authenticated POST, and the session making
-that call must be the same user that began the flow. An attacker who cannot
-sign in as the victim cannot complete it, and a victim who is signed in as
-themselves completes their own.
+perfectly valid — it is their state. So the callback here exchanges the code
+immediately, parks the encrypted token server-side and hands the callback page
+a nonce plus a one-time finish ticket. The link is completed by an
+authenticated POST, and the session making that call must be the same user
+that began the flow. A different browser does not receive the finish ticket.
 
 ON PKCE
 
@@ -174,14 +173,46 @@ def _consume_once(nonce) -> bool:
     """True if this caller is the first to consume `nonce`.
 
     user_store.claim is SET NX, which is the only primitive that works across
-    the processes a Render deploy runs side by side. It returns None when
-    there is no shared backend — "I could not ask", not "nobody has it" — and
-    the caller below falls back to the record's own flag, which coordinates
-    within one process only. That is development behaviour and is stated where
-    it matters rather than hidden.
+    the processes a Render deploy runs side by side. A failed shared claim
+    refuses; it must never fall back to process-local coordination. Only a
+    development process with no shared backend uses the record's own flag.
     """
     got = user_store.claim(_k_consume(nonce), ttl_s=PENDING_TTL_S)
-    return got if got is not None else None
+    if got is None and user_store._USE_REDIS:
+        raise _storage_failure("claim", nonce)
+    return got
+
+
+def _storage_failure(operation, nonce=None):
+    attempt = _log.attempt_id(nonce) if nonce else None
+    _log.event("storage.failed", operation=operation, attempt=attempt,
+               code="STORE_UNAVAILABLE")
+    return LinkConfigError(
+        "STORE_UNAVAILABLE",
+        "The connection store could not confirm this step. Try again when "
+        "the service recovers. If authorization at cTrader completed but "
+        "could not be saved, start a new connection.", attempt=attempt)
+
+
+def _pending(nonce):
+    try:
+        return _store._read_strict(_k_pending(nonce))
+    except (user_store.StoreUnavailable, ValueError, OSError):
+        raise _storage_failure("read", nonce) from None
+
+
+def _save_link(key, doc, *, nonce=None):
+    """Never report a saved connection or consume pending tokens on write loss.
+
+    Storage errors may contain the full key, including a pending nonce. Only
+    the operation and a keyed attempt reference may leave this boundary.
+    """
+    try:
+        back = _store._write_strict(key, doc)
+        if back != doc:
+            raise user_store.StoreUnavailable("connection readback mismatch")
+    except (user_store.StoreUnavailable, ValueError, OSError):
+        raise _storage_failure("write", nonce or doc.get("nonce")) from None
 
 
 # ── the flow ────────────────────────────────────────────────────────────────
@@ -203,7 +234,7 @@ def begin(user_id, *, now=None, redirect_uri=None, authorize_url_fn=None):
             "the client back to")
     nonce = secrets.token_urlsafe(32)
     ts = int(now)
-    _store._write(_k_pending(nonce), {
+    _save_link(_k_pending(nonce), {
         "nonce": nonce, "userId": user_id, "createdAt": ts,
         "status": "awaiting_callback", "code": None, "redirectUri": uri})
     if authorize_url_fn is None:
@@ -227,6 +258,15 @@ def _code_digest(code: str) -> str:
     """
     return hmac.new(_secret(), (code or "").encode("utf-8"),
                     hashlib.sha256).hexdigest()
+
+
+def _callback_result(rec):
+    """Return the callback hand-off without exposing the parked token."""
+    proof = user_store.decrypt_value(rec.get("finishToken") or "")
+    out = {"nonce": rec.get("nonce")}
+    if proof:
+        out["finishToken"] = proof
+    return out
 
 
 def handle_callback(query, *, now=None, exchanger=None):
@@ -291,17 +331,18 @@ def _handle_callback(query, *, now=None, exchanger=None, ctx=None):
         ctx["attempt"] = attempt
     _log.event("callback.state", ok=True, attempt=attempt)
 
-    claimed = _consume_once(nonce)
-    _log.event("callback.claim", attempt=attempt,
-               claimed=("none" if claimed is None else bool(claimed)))
-
-    rec = _store._read(_k_pending(nonce))
+    rec = _pending(nonce)
     _log.event("callback.pending", attempt=attempt, found=bool(rec),
                status=(rec or {}).get("status"))
     if not rec:
         raise LinkError("STATE_UNKNOWN",
                         "this connection attempt is not one this platform "
                         "started, or it has already been cleaned up")
+
+    # Read before claiming: an unavailable store must not burn a valid state.
+    claimed = _consume_once(nonce)
+    _log.event("callback.claim", attempt=attempt,
+               claimed=("none" if claimed is None else bool(claimed)))
 
     # Two ways to learn this nonce has been through here before: the shared
     # claim said so (False), or there is no shared backend and the record's own
@@ -328,7 +369,7 @@ def _handle_callback(query, *, now=None, exchanger=None, ctx=None):
                          and already == _code_digest(code))
         if rec.get("status") == "awaiting_confirmation" and same_code:
             _log.event("callback.replay", attempt=attempt, outcome="idempotent")
-            return {"nonce": nonce}
+            return _callback_result(rec)
         # A reload after the exchange itself failed must show what failed, not
         # a refusal about replays. Replacing a real diagnosis with a wrong one
         # is the exact shape of the bug that sent this flow hunting
@@ -345,7 +386,7 @@ def _handle_callback(query, *, now=None, exchanger=None, ctx=None):
                         "this connection link has already been used")
     if not code:
         rec["status"] = "failed"
-        _store._write(_k_pending(nonce), rec)
+        _save_link(_k_pending(nonce), rec)
         _log.event("callback.no_code", attempt=attempt)
         raise LinkError("NO_CODE", "cTrader sent no authorization code")
 
@@ -355,7 +396,7 @@ def _handle_callback(query, *, now=None, exchanger=None, ctx=None):
         rec["status"] = "failed"
         rec["failureCode"] = err_code
         rec["failureMessage"] = message
-        _store._write(_k_pending(nonce), rec)
+        _save_link(_k_pending(nonce), rec)
         _log.event("exchange.result", attempt=attempt, ok=False,
                    code=err_code)
         # Returns the error rather than raising it, so the caller's `raise`
@@ -390,26 +431,33 @@ def _handle_callback(query, *, now=None, exchanger=None, ctx=None):
     rec["expiresAt"] = (float(now) + float(expires_in)) if expires_in else None
     rec["status"] = "awaiting_confirmation"
     rec["callbackAt"] = int(now)
-    _store._write(_k_pending(nonce), rec)
+    # This is delivered only in the callback browser's page. The nonce is
+    # intentionally public, but this one-time hand-off is what prevents a
+    # person who started a flow from completing it after another browser
+    # approved the broker account.
+    rec["finishToken"] = user_store.encrypt_value(
+        secrets.token_urlsafe(32))
+    _save_link(_k_pending(nonce), rec)
     _log.event("exchange.result", attempt=attempt, ok=True,
                hasRefresh=bool(refresh), expiresIn=expires_in)
     _log.event("callback.pending_write", attempt=attempt,
                status="awaiting_confirmation")
-    return {"nonce": nonce}
+    return _callback_result(rec)
 
 
-def complete(user_id, nonce, *, now=None, lister=None):
+def complete(user_id, nonce, *, proof=None, now=None, lister=None):
     """Finish the link, stamping every refusal with the attempt it concerns."""
     ctx = {}
     try:
-        return _complete(user_id, nonce, now=now, lister=lister, ctx=ctx)
+        return _complete(user_id, nonce, proof=proof, now=now,
+                         lister=lister, ctx=ctx)
     except LinkError as e:
         if getattr(e, "attempt", None) is None:
             e.attempt = ctx.get("attempt")
         raise
 
 
-def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
+def _complete(user_id, nonce, *, proof=None, now=None, lister=None, ctx=None):
     """Finish the link, as the signed-in user who started it.
 
     This is where the account-injection attack in the module docstring dies:
@@ -430,7 +478,7 @@ def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
     attempt = _log.attempt_id(nonce)
     if ctx is not None:
         ctx["attempt"] = attempt
-    rec = _store._read(_k_pending(str(nonce or "")))
+    rec = _pending(str(nonce))
     _log.event("complete.called", attempt=attempt,
                user=_log.user_ref(user_id), found=bool(rec),
                status=(rec or {}).get("status"))
@@ -477,6 +525,16 @@ def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
         raise LinkError("STATE_EXPIRED",
                         "this connection attempt has expired — start again")
 
+    expected = user_store.decrypt_value(rec.get("finishToken") or "")
+    # The public API requires proof before it calls this function. Keeping the
+    # argument optional here preserves trusted in-process maintenance callers;
+    # an external request can never reach this branch without the API check.
+    if proof is not None and expected and (
+            not hmac.compare_digest(str(proof), expected)):
+        raise LinkError("BROWSER_BINDING_INVALID",
+                        "finish this connection in the browser that returned "
+                        "from cTrader")
+
     # Already encrypted by the callback, and moved across without a decrypt
     # and re-encrypt round trip.
     access_enc = rec.get("accessToken") or ""
@@ -519,17 +577,17 @@ def _complete(user_id, nonce, *, now=None, lister=None, ctx=None):
                demo=sum(1 for a in conn["accounts"] if a["mode"] == DEMO),
                live=sum(1 for a in conn["accounts"] if a["mode"] == LIVE),
                ctids=",".join(str(a["ctid"]) for a in conn["accounts"]))
-    _store._write(_k_conn(user_id), conn)
-    _log.event("complete.connected", attempt=attempt,
-               user=_log.user_ref(user_id), count=len(conn["accounts"]),
-               selected=False)
+    _save_link(_k_conn(user_id), conn, nonce=nonce)
     # The pending record is finished with. The code inside it is single-use on
     # cTrader's side anyway, but leaving it lying around encrypted serves
     # nothing and could be replayed against a future bug.
-    _store._write(_k_pending(nonce), {"nonce": nonce, "userId": user_id,
+    _save_link(_k_pending(nonce), {"nonce": nonce, "userId": user_id,
                                       "status": "completed", "code": None,
                                       "accessToken": None,
                                       "refreshToken": None})
+    _log.event("complete.connected", attempt=attempt,
+               user=_log.user_ref(user_id), count=len(conn["accounts"]),
+               selected=False)
     return public_status(user_id)
 
 
@@ -605,6 +663,35 @@ def selected_mode(user_id):
         return None
     mode = str(rec.get("selectedMode") or "").strip().lower()
     return mode if mode in MODES else UNKNOWN
+
+
+def selected_ctid(user_id):
+    """The cTrader account id this client has selected NOW, or None.
+
+    The id on the caller's own link record, for the order gate to compare with
+    the account a running loop was built on. None means no platform connection
+    or nothing selected; a store that cannot be read raises, so the caller
+    refuses rather than reading a fault as "nothing selected".
+    """
+    try:
+        rec = _read_conn(str(user_id))
+    except LinkError:
+        return None
+    ctid = rec.get("selectedCtid")
+    return None if ctid is None else str(ctid)
+
+
+def was_platform_account(user_id) -> bool:
+    """True if this user has EVER connected a platform cTrader account.
+
+    `is_platform_account` answers "is there a usable connection right now", and
+    disconnecting leaves a tombstone that makes it answer no. A loop that was
+    started on a live account keeps its broker session after that, so the order
+    gate needs the other question as well: was this a platform user at all.
+    The tombstone is the evidence. Raises on a store it cannot read.
+    """
+    rec = _store._read_strict(_k_conn(str(user_id)))
+    return bool(rec) and str(rec.get("userId")) == str(user_id)
 
 
 def public_status(user_id):
@@ -730,7 +817,7 @@ def select_account(user_id, ctid):
     rec["tradedCtids"] = traded
     rec["selectedCtid"] = match["ctid"]
     rec["selectedMode"] = match["mode"]
-    _store._write(_k_conn(str(user_id)), rec)
+    _save_link(_k_conn(str(user_id)), rec)
     return public_status(user_id)
 
 
@@ -854,7 +941,7 @@ def access_token_for(user_id, *, now=None, refresher=None, skew_s=120):
         rec["refreshToken"] = user_store.encrypt_value(new_refresh)
     ein = tok.get("expiresIn") or tok.get("expires_in")
     rec["expiresAt"] = (float(now) + float(ein)) if ein else None
-    _store._write(_k_conn(str(user_id)), rec)
+    _save_link(_k_conn(str(user_id)), rec)
     return access
 
 
@@ -910,7 +997,7 @@ def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None):
 def disconnect(user_id):
     """Forget the tokens. Does not revoke them at cTrader — say so plainly
     rather than implying a revocation that never happened."""
-    _store._write(_k_conn(str(user_id)),
+    _save_link(_k_conn(str(user_id)),
                   {"userId": str(user_id), "disconnectedAt": time.time()})
     return {"connected": False, "note": "tokens removed from this platform; "
                                         "revoke app access in cTrader too if "

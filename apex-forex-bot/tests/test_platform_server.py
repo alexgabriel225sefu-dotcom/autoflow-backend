@@ -310,12 +310,15 @@ check("with the same code, so the two representations agree",
 # The success page is what the person actually sees, so it is built directly
 # rather than inferred from the failure one.
 ok_html = ps.callback_page(200, {"ok": True, "nonce": "ABC123",
+                                 "finishToken": "FINISH456",
                                  "pendingOnly": True})
 check("the success page says authorisation worked", "Authorised" in ok_html)
 check("and says plainly that it is NOT the last step",
       "not the last step" in ok_html.lower(), ok_html[:120])
 check("and carries the nonce back to the app, so a dead tab is survivable",
       "?n=ABC123" in ok_html, ok_html[-200:])
+check("and carries the one-time browser finish ticket",
+      "t=FINISH456" in ok_html, ok_html[-220:])
 # A nonce is generated server-side, but the page renders whatever arrives, so
 # it is treated as hostile input. Percent-encoded for the URL, HTML-escaped for
 # the attribute — once each, which is what the first version got wrong.

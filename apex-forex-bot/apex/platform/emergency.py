@@ -181,7 +181,12 @@ def state():
         # that reads as "stop"; for practice money it does not. See the module
         # docstring — this asymmetry is the decision, not an accident.
         out["storeReachable"] = False
-        out["storeError"] = _safe_message(e)
+        # A stable code and the exception CLASS: enough to tell an operator what
+        # kind of failure it was. The message is never echoed - it is shown to
+        # clients through the status route and the halt refusal - and goes only
+        # to the scrubbed log.
+        print(f"[Emergency] store read failed: {_safe_message(e)}")
+        out["storeError"] = f"STORE_UNREACHABLE ({type(e).__name__})"
         out["storeScope"] = LIVE
         out["scope"] = _widest(env_scope, LIVE)
         out["source"] = SRC_ENV if env_scope == ALL else SRC_UNCERTAIN

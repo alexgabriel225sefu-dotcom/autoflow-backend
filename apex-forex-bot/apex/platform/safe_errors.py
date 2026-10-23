@@ -1,20 +1,34 @@
-"""Redact provider and storage exception text before it crosses a boundary."""
+"""Redact provider and storage exception text before it crosses a boundary.
+
+This is the one helper for text that reaches a client, a journal entry or a
+state/status response. It is the shape-based client redactor
+(`apex.redact.scrub_for_client`: bearer headers, `name=value` credential pairs,
+quoted dumps, unlabeled token-like runs, base64 padding) with two more shapes
+added that only matter for an exception message: URLs and filesystem paths.
+Error CODES and diagnostic ids survive, because the client needs them.
+"""
 
 import re
 
-_URL = re.compile(r"https?://[^\s\"']+", re.IGNORECASE)
-_PATH = re.compile(r"(?:[A-Za-z]:\\|/)(?:[^\s\"']+[/\\])*[^\s\"']+")
-_TOKEN = re.compile(
-    r"(?i)(?:bearer\s+|access[_ -]?token[=: ]+|refresh[_ -]?token[=: ]+)"
-    r"[A-Za-z0-9._~+/=-]{8,}"
+from apex import redact
+
+_URL = re.compile(r"\b[a-z][a-z0-9+.\-]*://[^\s\"']+", re.IGNORECASE)
+# `host='api.example.com'` in a connection-pool message names a provider too.
+_HOST = re.compile(
+    r"(?i)\b(host|hostname|server|endpoint)\b[\"']?\s*[=:]\s*[\"']?[^\s\"',)]+")
+# A path has a root and at least two segments, so prose such as "and/or" or
+# "Settings/Trading" is left alone: /home/app/x.py, /tmp/x, C:\\private\\trace.log
+_PATH = re.compile(
+    r"(?<![\w/:.\-])/(?:[\w.\-~@+]+/)+[\w.\-~@+]*"
+    r"|(?<![\w])[A-Za-z]:[\\/](?:[^\s\"'\\/]+[\\/])*[^\s\"'\\/]*"
 )
 
 
-def message(exc, *, fallback="request failed"):
-    """Return bounded diagnostic prose without URLs, paths, or credentials."""
-    raw = str(exc).strip() or fallback
-    raw = _TOKEN.sub("[redacted]", raw)
+def message(exc, *, fallback="request failed", limit=300):
+    """Bounded diagnostic prose with no URL, path, header or credential in it."""
+    raw = str(exc).strip() if exc is not None else ""
+    raw = raw or fallback
     raw = _URL.sub("[redacted-url]", raw)
+    raw = _HOST.sub(lambda m: f"{m.group(1)}=[redacted-host]", raw)
     raw = _PATH.sub("[redacted-path]", raw)
-    return raw[:300]
-
+    return redact.scrub_for_client(raw, limit=limit)

@@ -65,6 +65,16 @@ _BUCKETS = {
     "preview": ("RL_A4T_PREVIEW_PER_MIN", 20, 60),
     # Anything that changes whether money can move.
     "control": ("RL_A4T_CONTROL_PER_MIN", 20, 60),
+    # The client's own panic button, on a bucket nothing else spends. It shared
+    # "control" with single closes, so a client who had closed twenty positions
+    # by hand got 429 on Emergency. Generous: pressing it again is the right
+    # reaction to a slow answer, and the work it does is bounded elsewhere.
+    "emergency": ("RL_A4T_EMERGENCY_PER_MIN", 30, 60),
+    # The same panic button, counted per PERSON after the session is verified.
+    # The per-token bucket above is per session, so a user with several tabs or
+    # devices multiplied it; one press can hold a worker for minutes, so the
+    # person is bounded as well.
+    "emergency_user": ("RL_A4T_EMERGENCY_USER_PER_MIN", 30, 60),
     # Freezing a version.
     "activate": ("RL_A4T_ACTIVATE_PER_MIN", 10, 60),
     # The payment provider. Generous: it retries, and being throttled off a
@@ -77,6 +87,16 @@ _BUCKETS = {
     "waitlist": ("RL_A4T_WAITLIST_PER_MIN", 5, 60),
     # Everything else: reads the dashboard polls.
     "default": ("RL_A4T_DEFAULT_PER_MIN", 240, 60),
+    # PER NETWORK ADDRESS, before the token is known to be real. The buckets
+    # above are keyed on a hash of whatever bearer string arrives, and a string
+    # nobody has verified is free to invent: every junk token got a fresh
+    # bucket, so an anonymous caller could send unlimited control requests, each
+    # forcing a Supabase lookup, until that service throttled the platform's key
+    # and every client — including the Emergency button — saw AUTH_UNAVAILABLE.
+    # Generous, because several people can share one address.
+    "addr": ("RL_A4T_ADDR_PER_MIN", 600, 60),
+    # The same, for the routes that move money or change what can.
+    "addr_control": ("RL_A4T_ADDR_CONTROL_PER_MIN", 120, 60),
 }
 
 
@@ -93,6 +113,7 @@ LIMITERS = {name: _mk(name) for name in _BUCKETS}
 
 _CANDLES_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/candles$")
 _PREVIEW_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/preview$")
+_CLOSE_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/positions/[A-Za-z0-9_-]{1,64}/close$")
 _ACTIVATE_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/activate$")
 
 
@@ -139,6 +160,12 @@ def classify(method, route):
         return "preview"
     if _ACTIVATE_RE.match(route):
         return "activate"
+    if route.startswith("emergency/"):
+        return "emergency"
+    if _CLOSE_RE.match(route):
+        # Closing a position moves money. It sat in "default" (240 a minute),
+        # twelve times looser than a Stop.
+        return "control"
     if route.startswith("automation"):
         # A GET of the automation state is a poll, not a control action.
         return "control" if method != "GET" else "default"
@@ -161,6 +188,16 @@ def key_for(client_key, auth_header):
     return "a:" + str(client_key or "unknown")
 
 
+# The buckets whose routes change whether, or how, money moves.
+# "emergency" is NOT in this tuple, on purpose. The stricter per-address floor is
+# counted before the token is verified, so anyone behind the same address (a
+# carrier NAT, an office, a VPN) could spend it with invented tokens and leave a
+# real client's panic button answering 429. The emergency route is still under
+# the generic address floor and its own per-token bucket; what it gives up is
+# the tighter per-address ceiling the other money routes carry.
+_MONEY_BUCKETS = ("control", "oauth", "activate")
+
+
 def check(method, route, *, client_key=None, auth_header=None):
     """(allowed, bucket, retry_after_seconds).
 
@@ -172,6 +209,19 @@ def check(method, route, *, client_key=None, auth_header=None):
     limiter = LIMITERS.get(bucket) or LIMITERS["default"]
     key = key_for(client_key, auth_header)
     try:
+        # The address floor comes first and does not depend on the token.
+        if client_key:
+            floors = ["addr"] + (["addr_control"] if bucket in _MONEY_BUCKETS else [])
+            for name in floors:
+                lim = LIMITERS[name]
+                akey = f"ip:{name}:{client_key}"
+                aok = None
+                if _MODE != "memory":
+                    aok = _shared_check(akey, lim.limit, lim.window_s)
+                if aok is None:
+                    aok = lim.check(akey)
+                if not aok:
+                    return False, name, _seconds_until_reset(lim.window_s)
         ok = None
         if _MODE != "memory":
             ok = _shared_check(key, limiter.limit, limiter.window_s)
@@ -261,6 +311,29 @@ def _shared_check(key, limit, window_s):
     if n is None:
         return None
     return n <= limit
+
+
+def check_user(bucket, user_id):
+    """(allowed, retry_after_seconds) for a VERIFIED user id.
+
+    Called by a route after authentication, for the few routes where the work
+    done per request is large enough that a per-session limit can be multiplied
+    by opening more sessions. Like `check`, a failure of the limiter itself
+    allows: the limiter must not become the outage.
+    """
+    lim = LIMITERS.get(bucket)
+    if lim is None or not user_id:
+        return True, 0
+    key = f"user:{bucket}:{user_id}"
+    try:
+        ok = None
+        if _MODE != "memory":
+            ok = _shared_check(key, lim.limit, lim.window_s)
+        if ok is None:
+            ok = lim.check(key)
+    except Exception:
+        return True, 0
+    return bool(ok), (0 if ok else _seconds_until_reset(lim.window_s))
 
 
 def reset_all():

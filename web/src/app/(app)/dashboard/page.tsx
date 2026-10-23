@@ -27,7 +27,10 @@ import {
 } from "@/components/app/state";
 import { PendingApproval } from "@/components/app/pending-approval";
 import { DataTable, Num, Side, When } from "@/components/app/table";
-import { outcomeOf, plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
+import { WhyCard } from "@/components/app/why-card";
+import { EmergencyStop } from "@/components/app/emergency-stop";
+import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
+import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -72,6 +75,10 @@ export default function Dashboard() {
   // one: it must survive the status reload that follows, which is the
   // moment the old code lost it.
   const [selectErr, setSelectErr] = useState<ApiError | null>(null);
+  // What the last Start / Pause / Resume / Stop did, kept HERE and not inside
+  // the button that was pressed: on a successful Stop that button unmounts, and
+  // the sentence saying open positions were NOT closed went with it.
+  const [controlResult, setControlResult] = useState<ControlResult | null>(null);
 
   const account = ct.result?.ok ? ct.result.data : null;
   const selected = account?.selected ?? null;
@@ -122,16 +129,14 @@ export default function Dashboard() {
     invalidate("ctrader/status", "accounts", "me");
   }
 
-  async function control(action: "start" | "pause" | "resume" | "stop") {
-    const body = action === "start" && activeRule
-      ? { ruleDocId: activeRule.ruleDocId } : undefined;
-    const r = await api<AutomationState>(`automation/${action}`, { method: "POST", body });
-    // By endpoint, not by this page's private copies. The app shell polls
-    // `automation` too, for the status strip, and reloading only the local
-    // read left the strip claiming STOPPED while this panel said running.
-    invalidate("automation", "journal?limit=8", "me");
-    if (!r.ok) return `${r.code}: ${r.message}`;
-    return outcomeOf(r.data);
+  async function control(action: ControlAction) {
+    setControlResult(null);
+    const res = await runAutomationControl(action, {
+      ruleDocId: activeRule?.ruleDocId, reload: auto.reload,
+    });
+    setControlResult(res);
+    // The text lives in the panel below, which outlives the button.
+    return "";
   }
 
   return (
@@ -328,6 +333,23 @@ export default function Dashboard() {
                       ) : null}
                     </div>
                   )}
+
+                  {controlResult ? (
+                    <p
+                      role={controlResult.ok ? "status" : "alert"}
+                      data-control-result={controlResult.ok ? "ok" : "error"}
+                      className={controlResult.ok ? "muted" : "notice notice-error"}
+                      style={{ marginTop: "var(--sp-2)", fontSize: ".85rem" }}
+                    >
+                      {controlResult.text}
+                    </p>
+                  ) : null}
+
+                  {/* The client's own panic button. Offered on a selected DEMO
+                      account only: closing is a demo capability in this
+                      release, and a button that closes nothing on a live
+                      selection would be a worse lie than no button. */}
+                  {isDemo ? <EmergencyStop ctid={selected?.ctid ?? null} reloadAutomation={auto.reload} /> : null}
                 </>
               )}
           </section>
@@ -340,6 +362,8 @@ export default function Dashboard() {
             symbols={(activeRule?.symbols as string[] | undefined) ?? []}
             timeframe={activeRule?.timeframe}
           />
+
+          <WhyCard />
 
           {/* ── 4 + 5: what did it decide, and was anything placed ──── */}
           <section className="card">

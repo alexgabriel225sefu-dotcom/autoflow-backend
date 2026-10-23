@@ -142,3 +142,37 @@ describe("the level chip, which says what RUNNING means", () => {
     expect(text).not.toContain("Signals Only");
   });
 });
+
+describe("the Risk Guard chip", () => {
+  const running = (riskGuard?: unknown) => ({
+    ok: true,
+    data: { state: "running", ruleDocId: "r1", riskGuard } as unknown as AutomationState,
+  });
+  const text = (auto: unknown) => strip({ ok: true, data: CONNECTED }, auto).textContent ?? "";
+
+  it("shows HOLDING with its reasons when the guard is holding", () => {
+    const t = text(running({ state: "holding", reasons: ["daily loss limit"] }));
+    expect(t).toContain("Risk Guard");
+    expect(t).toContain("HOLDING");
+    expect(document.querySelector('[title="daily loss limit"]')).not.toBeNull();
+  });
+
+  it("shows Active only when the guard reported ok", () => {
+    expect(text(running({ state: "ok", reasons: [] }))).toContain("Active");
+  });
+
+  it("a guard that has not reported is 'No report yet' — never Active", () => {
+    const t = text(running({ state: "unknown", reasons: [] }));
+    expect(t).toContain("No report yet");
+    expect(t).not.toContain("Active");
+  });
+
+  it("is not shown at all when nothing is running (there is no report to show)", () => {
+    expect(text({ ok: true, data: { state: "stopped", riskGuard: { state: "unknown", reasons: [] } } }))
+      .not.toContain("Risk Guard");
+  });
+
+  it("is not invented when the server sent no guard block", () => {
+    expect(text(running(undefined))).not.toContain("Risk Guard");
+  });
+});

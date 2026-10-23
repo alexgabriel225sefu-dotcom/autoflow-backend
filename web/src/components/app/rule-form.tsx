@@ -14,6 +14,7 @@
  */
 import type { ConditionSpec, RuleDoc } from "@/lib/api";
 import { ConditionEditor, defaultsFor, type ConditionValue } from "./condition-editor";
+import { AUTOMATION_LEVELS } from "./plain";
 
 export const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -24,6 +25,7 @@ export type Draft = {
   timeframe: string;
   sides: string;
   evaluateOn: string;
+  automationLevel: string;
   entryCombine: string;
   entry: ConditionValue[];
   exitCombine: string;
@@ -57,6 +59,7 @@ export type Draft = {
 /** The same defaults the server would apply, made visible instead of implied. */
 export const BLANK: Draft = {
   name: "", symbols: "EURUSD", timeframe: "1h", sides: "BOTH", evaluateOn: "bar_close",
+  automationLevel: "full",
   entryCombine: "AND", entry: [], exitCombine: "OR", exit: [],
   sizingMode: "risk_percent", riskPercent: "1.0", fixedVolume: "0.1",
   slMode: "atr", slAtrMultiple: "1.5", slPips: "20",
@@ -85,6 +88,7 @@ export function toDoc(d: Draft): Partial<RuleDoc> {
     timeframe: d.timeframe,
     sides: d.sides,
     evaluateOn: d.evaluateOn,
+    automationLevel: d.automationLevel,
     entry: { combine: d.entryCombine, conditions: d.entry },
     exit: { combine: d.exitCombine, conditions: d.exit },
     order: {
@@ -175,6 +179,8 @@ export function fromDoc(doc: RuleDoc): FromDoc {
       timeframe: str(doc.timeframe) || BLANK.timeframe,
       sides: str(doc.sides) || BLANK.sides,
       evaluateOn: str(doc.evaluateOn) || BLANK.evaluateOn,
+      // A rule stored before the field existed ran at full; say so.
+      automationLevel: str(doc.automationLevel) || BLANK.automationLevel,
       entryCombine: str(entry.combine) || BLANK.entryCombine,
       entry: (Array.isArray(entry.conditions) ? entry.conditions : []) as ConditionValue[],
       exitCombine: str(exit.combine) || BLANK.exitCombine,
@@ -350,6 +356,22 @@ export function RuleForm({
               </span>
             ) : null}
           </div>
+        </div>
+        <div className="field"><span>When a setup appears</span>
+          <div className="seg" role="group">
+            {AUTOMATION_LEVELS.map((l) => (
+              <button key={l.id} type="button" aria-pressed={d.automationLevel === l.id}
+                      onClick={() => set("automationLevel", l.id)}>
+                {l.label}
+              </button>
+            ))}
+          </div>
+          <span className="field-note">
+            {(() => {
+              const l = AUTOMATION_LEVELS.find((x) => x.id === d.automationLevel);
+              return l ? `${l.does} ${l.doesNot}` : "Choose who acts on a setup.";
+            })()}
+          </span>
         </div>
         <div className="field"><span>Evaluate</span>
           <Seg value={d.evaluateOn} options={["bar_close", "intrabar"]}

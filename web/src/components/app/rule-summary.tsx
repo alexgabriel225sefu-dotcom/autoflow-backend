@@ -13,6 +13,7 @@
  * formatting only — it never decides what a condition means.
  */
 import type { ConditionSpec, RuleDoc } from "@/lib/api";
+import { plainLevel } from "./plain";
 
 const ACRONYMS = new Set(["ma", "rsi", "macd", "atr", "ema", "sma", "rr", "tp", "sl"]);
 /** Joining words stay lowercase: "Price vs MA", not "Price Vs MA". */
@@ -132,7 +133,14 @@ export function ruleSentence(
   if (sched) s += `; only ${sched}`;
   const limits = (doc.limits ?? {}) as Record<string, unknown>;
   if (limits.maxOpenPositions) s += `; at most ${limits.maxOpenPositions} open position${Number(limits.maxOpenPositions) === 1 ? "" : "s"}`;
-  return `${s}.`;
+  s = `${s}.`;
+  // WHO ACTS ON A SETUP, said in words as well as in the terms table. A rule
+  // at "Approval Required" or "Signals Only" does not place a trade by itself,
+  // and a sentence that read "Buy EURUSD when ..." without saying so would
+  // describe a rule that trades. Rules stored before the field existed ran at
+  // full, so absent reads as Full Automation.
+  s += ` When a setup appears: ${plainLevel(doc.automationLevel ?? "full")}.`;
+  return s;
 }
 
 export function RuleSentence({
@@ -267,6 +275,13 @@ export function RuleTerms({
       <tbody>
         <Row k="Instruments" v={(doc.symbols as string[] | undefined)?.join(", ") || <span className="dim">none</span>} />
         <Row k="Timeframe" v={String(doc.timeframe ?? "—")} />
+        <Row
+          k="When a setup appears"
+          v={plainLevel(doc.automationLevel ?? "full")}
+          note={doc.automationLevel === "signals" || doc.automationLevel === "approval"
+            ? "This rule does not place a trade by itself."
+            : undefined}
+        />
         <Row k="Evaluated" v={doc.evaluateOn === "intrabar" ? "On every tick (intrabar)" : "On bar close"} />
         <Row
           k="Sides"

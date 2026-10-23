@@ -91,38 +91,52 @@ export default function Landing() {
               <span />
               <strong>Apex4Traders / demo control</strong>
             </div>
-            <div className="mkt-terminal-grid">
-              <div className="mkt-terminal-panel mkt-terminal-wide">
-                <small>Broker link</small>
-                <b>cTrader connected</b>
-                <p>Demo account selected · encrypted tokens · no custody</p>
-              </div>
-              <div className="mkt-terminal-panel">
-                <small>Execution mode</small>
-                <b className="mkt-terminal-safe">Demo only</b>
-                <p>Live unavailable in this release</p>
-              </div>
-              <div className="mkt-terminal-panel">
-                <small>Automation</small>
-                <b>Stopped</b>
-                <p>Start requires explicit confirmation</p>
-              </div>
-              <div className="mkt-terminal-panel mkt-terminal-wide">
-                <small>Rule preview</small>
-                <div className="mkt-terminal-rule">
-                  EURUSD · 15m · RSI + moving average · risk 1% · stop required
+            <div className="mkt-terminal-body">
+              <aside className="mkt-terminal-side" aria-label="Preview navigation">
+                <strong className="mkt-terminal-brand"><span>A4</span> Apex4Traders</strong>
+                {['Dashboard', 'Rules', 'cTrader Connection', 'Positions', 'Activity Journal', 'Settings'].map((item, index) => (
+                  <span className={index === 0 ? 'is-active' : ''} key={item}>
+                    <i aria-hidden>{['⌂', '□', '↗', '▥', '≡', '⚙'][index]}</i>{item}
+                  </span>
+                ))}
+                <div className="mkt-terminal-account">
+                  <b><i className="mkt-dot" aria-hidden /> cTrader connected</b>
+                  <small>Demo account</small>
+                  <span>cTrader <em>Demo</em></span>
                 </div>
-                <p>User-configured summary, not a recommendation.</p>
-              </div>
-              <div className="mkt-terminal-panel mkt-terminal-accent">
-                <small>Risk guard</small>
-                <b>Refuse if unsafe</b>
-                <p>No silent substitution</p>
-              </div>
-              <div className="mkt-terminal-panel">
-                <small>Journal</small>
-                <b>Every decision</b>
-                <p>Including no-action outcomes</p>
+              </aside>
+              <div className="mkt-terminal-main">
+                <div className="mkt-terminal-heading">
+                  <div><b>Good morning</b><small>Your demo workspace is ready.</small></div>
+                  <span className="mkt-terminal-avatar">JD</span>
+                </div>
+                <div className="mkt-terminal-stats">
+                  <div><small>Connection</small><b className="mkt-terminal-safe">● cTrader</b><span>Demo account</span></div>
+                  <div><small>Rules running</small><b>Preview</b><span>Start is explicit</span></div>
+                  <div><small>Open positions</small><b>Read-only</b><span>No fake balance</span></div>
+                </div>
+                <div className="mkt-terminal-workspace">
+                  <div className="mkt-terminal-chart mkt-terminal-panel">
+                    <div className="mkt-terminal-panel-head"><b>EURUSD</b><span>1m&nbsp;&nbsp; 5m&nbsp;&nbsp; <strong>15m</strong>&nbsp;&nbsp; 1h</span></div>
+                    <div className="mkt-chart-area" aria-label="Illustrative EURUSD chart preview">
+                      {[42, 56, 38, 64, 52, 70, 61, 76, 68, 84, 72, 89, 78, 94, 82, 72, 86, 78].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}
+                    </div>
+                    <small className="mkt-chart-note">Illustrative preview · broker candles appear after connection</small>
+                  </div>
+                  <div className="mkt-terminal-rulebox mkt-terminal-panel">
+                    <div className="mkt-terminal-panel-head"><b>Rule preview</b><span className="mkt-terminal-chip">Not running</span></div>
+                    <label>IF <span>All conditions are met</span></label>
+                    <p>EMA (21) <em>crosses above</em> EMA (50)</p>
+                    <p>RSI (14) <em>greater than</em> 55</p>
+                    <p>Symbol <em>equals</em> EURUSD</p>
+                    <label className="mkt-terminal-then">THEN <span>Execute your action</span></label>
+                    <p className="mkt-terminal-action">Open Buy Position</p>
+                  </div>
+                </div>
+                <div className="mkt-terminal-bottom">
+                  <div className="mkt-terminal-panel"><div className="mkt-terminal-panel-head"><b>Risk guard</b><span>Visible</span></div><dl><dt>Stop required</dt><dd>Yes</dd><dt>Max open positions</dt><dd>5</dd><dt>Daily loss limit</dt><dd>User set</dd></dl></div>
+                  <div className="mkt-terminal-panel"><div className="mkt-terminal-panel-head"><b>Activity journal</b><span>Read-only</span></div><ul><li><i />Rule preview checked <small>No order placed</small></li><li><i />cTrader connected <small>Demo account</small></li><li><i />Automation stopped <small>Awaiting confirmation</small></li></ul></div>
+                </div>
               </div>
             </div>
           </div>

@@ -186,6 +186,13 @@ def record_error(message, *, correlation_id, user_id, account_id=None,
                                symbol=symbol, ts=ts))
 
 
+def record_engine_error(message, *, correlation_id, user_id, account_id=None,
+                        symbol=None):
+    return append(_j.for_engine_error(message, correlation_id=correlation_id,
+                                      user_id=user_id, account_id=account_id,
+                                      symbol=symbol))
+
+
 def record_automation(status, *, correlation_id, user_id, **kw):
     return append(_j.for_automation(status, correlation_id=correlation_id,
                                     user_id=user_id, **kw))

@@ -26,6 +26,11 @@ THE ORDER OF THE GATES IS THE DESIGN
   11 §6   confirm filled / rejected / abandon UNKNOWN
   12 §7   audit the outcome
 
+The pilot guard (`live_pilot`) is two more gates that only refuse: after the
+entitlement it asks whether this user and this account are in the operator's
+pilot, and once the order's size is known it asks whether it is within the
+pilot cap. Both doors run it; unconfigured, it refuses everything.
+
 Numbers 8 and 11 are the pair that matters most. The claim is taken before the
 call and released only on a CONFIRMED outcome; a submit that timed out may
 have filled, so an unknown result keeps the claim and the key stays held. That
@@ -73,6 +78,7 @@ from apex.platform import bridge as _bridge
 from apex.platform import decision as _dec
 from apex.platform import emergency as _emerg
 from apex.platform import entitlement as _ent
+from apex.platform import live_pilot as _pilot
 from apex.platform import live_ledger as _ledger
 from apex.platform import order_rate as _rate
 from apex.platform import risk_gates as _gates
@@ -180,6 +186,11 @@ def place(rule_doc, decision, snapshot, *, user_id, account_id,
             "this account does not hold the plan that covers real-money "
             "trading", gate="entitlement", **aud)
 
+    # ── 3b. the pilot: the operator's own account only ─────────────────────
+    _p = _pilot.check_identity(user_id, account_id)
+    if _p:
+        return _refused(_p[0], _p[1], gate="pilot", **aud)
+
     # ── 4. §3 the mode, from the broker, read now ──────────────────────────
     try:
         mode = mode_reader()
@@ -225,6 +236,11 @@ def place(rule_doc, decision, snapshot, *, user_id, account_id,
         return _refused(BUILD_REFUSED,
                         f"the order could not be built ({type(e).__name__})",
                         gate="build", **aud)
+
+    # ── 7b. the pilot: which instrument and how much, on the built request ─
+    _p = _pilot.check_order(req.symbol, req.volume)
+    if _p:
+        return _refused(_p[0], _p[1], gate="pilot", **aud)
 
     # ── 8. §5 the thirteen risk gates ──────────────────────────────────────
     # `req.price` is None for a MARKET order — there is no limit price to
@@ -391,6 +407,11 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
                   "this account does not hold the plan that covers "
                   "real-money trading", gate="entitlement")
 
+    # ── 3b. the pilot: the operator's own account only ─────────────────────
+    _p = _pilot.check_identity(user_id, account_id)
+    if _p:
+        return no(_p[0], _p[1], gate="pilot")
+
     # ── 4. §3 the mode, from the broker, read now ──────────────────────────
     try:
         mode = mode_reader()
@@ -404,6 +425,11 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
                   f"the broker reports this account as {mode!r}, so the live "
                   f"path does not apply to it", gate="mode_verification")
 
+    # ── 4b. the pilot: which instrument and how much ───────────────────────
+    _p = _pilot.check_order(symbol, units)
+    if _p:
+        return no(_p[0], _p[1], gate="pilot")
+
     # ── 5. §9 the per-client order rate ────────────────────────────────────
     try:
         _rate.authorize(user_id, now=now)
@@ -415,6 +441,10 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
     # Allowed — and §7 records that too. An audit trail that holds only
     # refusals cannot answer the question anybody actually asks after a bad
     # day, which is what WAS permitted and on whose authority.
+    #
+    # This record is the only platform audit entry for an engine order, so an
+    # order whose record could not be written is an order nobody can account
+    # for: refused (spec §7), never allowed with a warning.
     try:
         _audit.record_refusal(
             user_id=user_id, actor=actor, account_id=account_id,
@@ -422,11 +452,16 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
             reason=f"{side} {units} {symbol} passed every live gate")
     except Exception as e:                                   # noqa: BLE001
         print(f"[LiveExec] the authorization for {user_id} could not be "
-              f"audited ({type(e).__name__}) — the order was still allowed")
+              f"audited ({type(e).__name__}) — the order is refused")
+        return {"allowed": False, "code": AUDIT_UNAVAILABLE,
+                "gate": "audit",
+                "detail": "the authorization could not be written to the "
+                          "audit trail, so no live order is sent"}
     return {"allowed": True, "code": None, "gate": None, "detail": ""}
 
 
-def guard_engine_order(user_id, *, symbol, side, units, origin="unknown"):
+def guard_engine_order(user_id, *, symbol, side, units, origin="unknown",
+                       bound_account=None):
     """The platform's live gates for an engine order, or None if they do not apply.
 
     `gates.authorize_order` calls this for every LIVE order, whoever asked.
@@ -447,7 +482,7 @@ def guard_engine_order(user_id, *, symbol, side, units, origin="unknown"):
     """
     from apex.platform import ctrader_link as _ctl
     try:
-        _ctl._read_conn(str(user_id))
+        _conn = _ctl._read_conn(str(user_id))
     except _ctl.LinkError:
         # NOT_CONNECTED. There is no platform cTrader account here, so the
         # platform has no say over this order — every Telegram-bot user lands
@@ -480,10 +515,21 @@ def guard_engine_order(user_id, *, symbol, side, units, origin="unknown"):
         # MODE_UNVERIFIED, which is the correct outcome and the correct code.
         if not v.get("verified"):
             raise RuntimeError(v.get("reason") or "mode not verified")
+        # The broker confirmed the mode of the account SELECTED at this read.
+        # When the caller says which account the loop holds, that is the one
+        # whose mode matters; a different one verified is not an answer.
+        if bound_account is not None and str(v.get("ctid")) != str(bound_account):
+            raise RuntimeError("the account selected now is not the account "
+                               "this loop trades")
         return v.get("mode")
 
+    # The account id is the one the loop is BOUND to (its broker's own), or,
+    # failing that, the one on the caller's own link record (spec §4) - never
+    # one a request supplied. The pilot guard compares it to the list.
     return authorize_order(str(user_id), symbol=symbol, side=side,
                            units=units, mode_reader=mode_reader,
+                           account_id=(bound_account if bound_account is not None
+                                       else (_conn or {}).get("selectedCtid")),
                            actor=f"engine:{origin}")
 
 

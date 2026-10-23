@@ -42,6 +42,11 @@ ORDER_CONFIRMED = "order_confirmed"           # the broker took it
 ORDER_REJECTED = "order_rejected"  # the broker or a gate refused it
 POSITION_CLOSED = "position_closed"
 BROKER_ERROR = "broker_error"
+# The engine or this platform failed, and the BROKER did not reject anything.
+# Kept apart from BROKER_ERROR on purpose: a journal that files an internal
+# exception, or an ordinary lease handover, under "Broker error" sends a client
+# looking for a fault at a provider that did nothing wrong.
+ENGINE_ERROR = "engine_error"
 
 # A setup the engine found and deliberately did not place, because the rule
 # runs at the `signals` automation level. Its own status rather than HOLD: a
@@ -62,7 +67,7 @@ AUTOMATION_STOPPED = "automation_stopped"
 
 STATUSES = (EVALUATED, HOLD, REJECT, EXECUTION_REQUESTED, ORDER_SENT,
             ORDER_CONFIRMED, ORDER_REJECTED, POSITION_CLOSED, BROKER_ERROR,
-            AUTOMATION_STARTED, AUTOMATION_PAUSED, AUTOMATION_STOPPED,
+            ENGINE_ERROR, AUTOMATION_STARTED, AUTOMATION_PAUSED, AUTOMATION_STOPPED,
             SIGNAL)
 
 # Anything whose name looks like a credential is dropped, whatever its value.
@@ -206,6 +211,15 @@ def for_error(message, *, correlation_id, user_id, account_id=None,
     return JournalEntry(
         kind=ERROR, correlation_id=correlation_id, user_id=user_id,
         status=BROKER_ERROR, account_id=account_id, symbol=symbol,
+        error=str(message)[:500], ts=ts)
+
+
+def for_engine_error(message, *, correlation_id, user_id, account_id=None,
+                     symbol=None, ts=None):
+    """An error that was the engine's or the platform's, not the broker's."""
+    return JournalEntry(
+        kind=ERROR, correlation_id=correlation_id, user_id=user_id,
+        status=ENGINE_ERROR, account_id=account_id, symbol=symbol,
         error=str(message)[:500], ts=ts)
 
 

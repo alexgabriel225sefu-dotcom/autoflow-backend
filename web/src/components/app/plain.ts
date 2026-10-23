@@ -26,6 +26,35 @@ export type Plain = {
 
 /* ── automation ───────────────────────────────────────────────────────── */
 
+/**
+ * WHO ACTS ON A SETUP. The three levels the server services, in the words the
+ * Telegram bot used, with what each one does and does NOT do. The `id` is the
+ * engine's own and is what the rule stores; an unknown id falls through to
+ * itself (see `plainLevel`) instead of being shown as a friendly guess.
+ */
+export const AUTOMATION_LEVELS = [
+  {
+    id: "signals", label: "Signals Only",
+    does: "Tells you when your rule finds a setup.",
+    doesNot: "Places nothing.",
+  },
+  {
+    id: "approval", label: "Approval Required",
+    does: "Proposes each trade and waits for you to approve it.",
+    doesNot: "Places nothing until you approve.",
+  },
+  {
+    id: "full", label: "Full Automation",
+    does: "Places the trade itself when your rule fires.",
+    doesNot: "Does not ask.",
+  },
+] as const;
+
+export function plainLevel(id: unknown): string {
+  const hit = AUTOMATION_LEVELS.find((l) => l.id === id);
+  return hit ? hit.label : String(id ?? "—");
+}
+
 export function plainAutomation(
   state: string | null | undefined,
   hasRule: boolean,
@@ -99,6 +128,11 @@ export function plainDecision(e: {
       return { label: "Position closed", tone: "accent" };
     case "broker_error":
       return { label: "Broker error", detail: e.error ?? undefined, tone: "short" };
+    // The engine or the platform failed and the broker rejected nothing. Its
+    // own label: calling it a broker error sends the reader to look for a
+    // fault at a provider that did nothing wrong.
+    case "engine_error":
+      return { label: "Engine error", detail: e.error ?? undefined, tone: "short" };
     case "automation_started":
       return { label: "Automation started", tone: "long" };
     case "automation_paused":
@@ -194,13 +228,16 @@ export function outcomeOf(a: {
   flattened?: boolean;
   flattenDeclined?: boolean;
   flattenReason?: string | null;
+  /** Present when the stop was recorded but no loop was stopped in the process
+   *  that took the request. Shown verbatim: it is the server's caution. */
+  stopNote?: string | null;
 }): string {
   const base = `Automation is now ${a.state}`;
   // Only when the server actually declined. A release that later closes
   // positions will send `flattened: true`, and this must then say nothing
   // extra rather than keep repeating a warning that has stopped being true.
-  if (a.flattenDeclined && a.flattenReason) return `${base}. ${a.flattenReason}`;
-  return base;
+  const flat = a.flattenDeclined && a.flattenReason ? `${base}. ${a.flattenReason}` : base;
+  return a.stopNote ? `${flat} ${a.stopNote}` : flat;
 }
 
 /* ── licence ──────────────────────────────────────────────────────────── */

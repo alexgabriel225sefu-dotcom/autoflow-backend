@@ -68,7 +68,7 @@ try:
     )
     from apex.ctrader_proto.OpenApiModelMessages_pb2 import (
         ProtoOATrendbarPeriod, ProtoOAOrderType, ProtoOATradeSide,
-        ProtoOAExecutionType, ProtoOAOrderStatus,
+        ProtoOAExecutionType, ProtoOAOrderStatus, ProtoOAPositionStatus,
     )
     _SDK_OK = True
     _SDK_ERR = ""
@@ -222,6 +222,19 @@ def _is_terminal_execution(evt):
     return name in _TERMINAL_EXEC
 
 
+def _is_close_terminal_execution(evt):
+    """Only accept a known terminal close result.
+
+    The general order path deliberately accepts an unknown event and performs
+    a follow-up position read. A manual close has no such safe fallback in the
+    request boundary, so an unrecognised event must remain UNKNOWN rather than
+    becoming a false "Position closed" response.
+    """
+    if str(getattr(evt, "errorCode", "") or "").strip():
+        return True
+    return _exec_name(getattr(evt, "executionType", None)) in _TERMINAL_EXEC
+
+
 # ── Synchronous protobuf client ──────────────────────────────────────────────
 
 # cTrader rates every request against one of two budgets, and both are counted
@@ -256,6 +269,29 @@ _HISTORICAL_REQUESTS = frozenset({
 
 _HIST_PER_SEC = float(os.getenv("CTRADER_HIST_RPS") or 5)
 _OTHER_PER_SEC = float(os.getenv("CTRADER_RPS") or 50)
+
+
+def _merge_close_rows(prev, new):
+    """Add one more closing part of the SAME position to its row.
+
+    Money and volume are summed; the exit price becomes the volume-weighted
+    average; the time and balance are the latest part's. Entry, symbol and side
+    belong to the position and are kept.
+    """
+    out = dict(prev)
+    for k in ("netPnl", "grossPnl", "swap", "commissionUsd"):
+        out[k] = round((prev.get(k) or 0.0) + (new.get(k) or 0.0), 2)
+    u0, u1 = prev.get("units") or 0.0, new.get("units") or 0.0
+    out["units"] = round(u0 + u1, 8)
+    p0, p1 = prev.get("exitPrice"), new.get("exitPrice")
+    if p0 is not None and p1 is not None and (u0 + u1) > 0:
+        out["exitPrice"] = (p0 * u0 + p1 * u1) / (u0 + u1)
+    elif p1 is not None:
+        out["exitPrice"] = p1
+    out["closedAt"] = max(prev.get("closedAt") or 0, new.get("closedAt") or 0)
+    if new.get("balance") is not None:
+        out["balance"] = new["balance"]
+    return out
 
 
 class _RateLimit:
@@ -649,13 +685,19 @@ class CtraderBroker:
         return 100000.0
 
     # -- market data ----------------------------------------------------------
-    def get_bid_ask(self, instrument=None):
+    def get_quote(self, instrument=None):
+        """Return the broker quote and the timestamp at which it was received.
+
+        Position screens need the timestamp as well as bid/ask so an old spot
+        cannot be presented as current.  Keep ``get_bid_ask`` as the public
+        compatibility method used by the trading loop.
+        """
         sym = _to_ct_symbol(instrument or self._c.SYMBOL)
         sid = self._symbol_id(instrument)
         now = time.time()
         cached = self._spot_cache.get(sid)
         if cached and now - cached[2] < 3:
-            return cached[0], cached[1]
+            return cached
         conn = self._conn()
         with conn._lock:
             req = ProtoOASubscribeSpotsReq()
@@ -681,7 +723,12 @@ class CtraderBroker:
                     continue
         if not bid or not ask:
             raise RuntimeError(f"cTrader: no spot price for {sym}")
-        self._spot_cache[sid] = (bid, ask, time.time())
+        received_at = time.time()
+        self._spot_cache[sid] = (bid, ask, received_at)
+        return bid, ask, received_at
+
+    def get_bid_ask(self, instrument=None):
+        bid, ask, _received_at = self.get_quote(instrument)
         return bid, ask
 
     def get_price(self, instrument=None):
@@ -865,7 +912,7 @@ class CtraderBroker:
         separates "the account had no trades" from "we could not ask" — a
         caller that writes to a journal must never confuse the two.
         """
-        out, opened, ok = {}, {}, False
+        out, opened, ok, truncated = {}, {}, False, False
         if getattr(self._c, "PAPER_TRADING", True):
             return {"ok": True, "deals": out}
         self._load_symbols()
@@ -928,9 +975,14 @@ class CtraderBroker:
                             bal = cpd.balance / scale
                     except Exception:
                         pass
-                    out[str(d.positionId)] = {
+                    row = {
                         "positionId": str(d.positionId),
                         "symbol": id2name.get(d.symbolId, str(d.symbolId)),
+                        # A close can be partial. Prefer the broker's explicit
+                        # closed volume and fall back to the deal volume for
+                        # older protobuf replies that omit it.
+                        "units": round((getattr(cpd, "closedVolume", 0)
+                                         or getattr(d, "volume", 0)) / 100.0, 8),
                         "netPnl": round(gross + swap - comm, 2),
                         "grossPnl": round(gross, 2),
                         "swap": round(swap, 2),
@@ -941,11 +993,22 @@ class CtraderBroker:
                         "balance": bal,
                         "closedAt": int(d.executionTimestamp) // 1000,
                     }
+                    pid = str(d.positionId)
+                    # A position closed in parts has one closing deal per part.
+                    # Keying by position id and overwriting kept only the LAST
+                    # part, so its P&L, volume and win/loss were wrong. Added up
+                    # instead — still one row per position, which is what every
+                    # caller indexes by.
+                    out[pid] = _merge_close_rows(out[pid], row) if pid in out else row
                 if not getattr(res, "hasMore", False):
                     break
                 if newest <= cur:
                     break              # no forward progress; stop rather than spin
                 cur = newest + 1
+            else:
+                # The page budget ran out while the broker still had more. Said,
+                # not swallowed: a history that stops silently looks complete.
+                truncated = True
         except Exception as e:
             print(f"[cTrader] deal history {from_ts}..{to_ts} failed: {e}")
             return {"ok": ok, "deals": out, "error": str(e)[:200]}
@@ -957,7 +1020,10 @@ class CtraderBroker:
                 _row["openedAt"] = opened[_pid]
                 if _row.get("closedAt"):
                     _row["durationS"] = max(0, _row["closedAt"] - opened[_pid])
-        return {"ok": ok, "deals": out}
+        res_out = {"ok": ok, "deals": out}
+        if truncated:
+            res_out["truncated"] = True
+        return res_out
 
     # -- positions ------------------------------------------------------------
     def get_open_position(self, instrument=None):
@@ -1007,7 +1073,7 @@ class CtraderBroker:
         out = []
         for p in res.position:
             td = p.tradeData
-            out.append({
+            row = {
                 "symbol": id2name.get(td.symbolId, str(td.symbolId)),
                 "side": "BUY" if td.tradeSide == ProtoOATradeSide.BUY else "SELL",
                 "units": round(td.volume / 100.0, 8),  # fractional allowed
@@ -1015,7 +1081,24 @@ class CtraderBroker:
                 "stopLoss": p.stopLoss if p.HasField("stopLoss") else None,
                 "takeProfit": p.takeProfit if p.HasField("takeProfit") else None,
                 "positionId": p.positionId,
-            })
+            }
+            # These fields are present in the vendored ProtoOAPosition schema
+            # (and openTimestamp in its ProtoOATradeData). Read only fields the
+            # wire message actually defines; do not infer broker state.
+            if td.HasField("openTimestamp"):
+                row["openTime"] = td.openTimestamp
+            if p.HasField("swap"):
+                digits = getattr(p, "moneyDigits", 0) or 2
+                row["swap"] = p.swap / (10 ** digits)
+            if p.HasField("commission"):
+                digits = getattr(p, "moneyDigits", 0) or 2
+                row["commission"] = p.commission / (10 ** digits)
+            if p.HasField("usedMargin"):
+                digits = getattr(p, "moneyDigits", 0) or 2
+                row["usedMargin"] = p.usedMargin / (10 ** digits)
+            if p.HasField("utcLastUpdateTimestamp"):
+                row["lastUpdateTime"] = p.utcLastUpdateTimestamp
+            out.append(row)
         return out
 
     def get_pending_orders(self):
@@ -1205,8 +1288,9 @@ class CtraderBroker:
         # is amended with ABSOLUTE prices (rounded to the symbol's digits)
         # immediately after the fill, then verified — see below.
         try:
-            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
-                                        accept=_is_terminal_execution)
+            res = self._conn()._request(
+                req, ProtoOAExecutionEvent, timeout=20,
+                accept=_is_terminal_execution)
         except Exception as e:
             print(f"[cTrader] order failed {side} {units} {sym}: {e}")
             raise
@@ -1352,8 +1436,9 @@ class CtraderBroker:
         req.positionId = pos["positionId"]
         req.volume = int(round(pos["units"] * 100))  # fractional-safe (0.34 oz → 34)
         try:
-            res = self._conn()._request(req, ProtoOAExecutionEvent, timeout=20,
-                                        accept=_is_terminal_execution)
+            res = self._conn()._request(
+                req, ProtoOAExecutionEvent, timeout=20,
+                accept=_is_terminal_execution)
         except Exception as e:
             print(f"[cTrader] close failed {sym}: {e}")
             raise
@@ -1402,6 +1487,132 @@ class CtraderBroker:
         return {"orderId": str(getattr(res.order, "orderId", "")),
                 "status": "FILLED", "fillPrice": fill,
                 "commissionUsd": _extract_commission(res)}
+
+    def close_position_by_id(self, position_id, volume=None):
+        """Close one cTrader position by its broker position id.
+
+        The platform deliberately does not resolve a symbol here. Symbols are
+        not unique in hedged accounts, while the position id is the broker's
+        identity for the exact exposure the client selected. The result keeps
+        partial fills and already-flat responses explicit so callers never
+        book a full P&L for a broker response that did not close the whole
+        position.
+        """
+        try:
+            pid = int(position_id)
+        except (TypeError, ValueError) as e:
+            raise ValueError("positionId must be an integer") from e
+
+        position = None
+        if volume is None:
+            for candidate in self.get_all_positions() or []:
+                if str(candidate.get("positionId")) == str(pid):
+                    position = candidate
+                    break
+            if position is None:
+                return {"status": "ALREADY_CLOSED", "positionId": pid,
+                        "sentence": "Position already closed."}
+            try:
+                volume = int(round(float(position.get("units")) * 100))
+            except (TypeError, ValueError) as e:
+                raise RuntimeError("the broker position has no usable volume") from e
+        volume = int(volume)
+        if volume <= 0:
+            raise ValueError("close volume must be positive")
+
+        if getattr(self._c, "PAPER_TRADING", True):
+            return {"status": "FILLED", "positionId": pid,
+                    "executedVolume": volume,
+                    "sentence": "Position closed."}
+
+        req = ProtoOAClosePositionReq()
+        req.ctidTraderAccountId = self._ctid()
+        req.positionId = pid
+        req.volume = volume
+        try:
+            res = self._conn()._request(
+                req, ProtoOAExecutionEvent, timeout=20,
+                accept=_is_close_terminal_execution)
+        except Exception as e:
+            text = str(e).upper()
+            if any(marker in text for marker in
+                   ("POSITION_NOT_FOUND", "POSITION_CLOSED", "NO_SUCH_POSITION")):
+                return {"status": "ALREADY_CLOSED", "positionId": pid,
+                        "sentence": "Position already closed."}
+            raise
+
+        execution_error = str(getattr(res, "errorCode", "") or "").strip()
+        if execution_error:
+            upper = execution_error.upper()
+            if any(marker in upper for marker in
+                   ("POSITION_NOT_FOUND", "POSITION_CLOSED", "NO_SUCH_POSITION")):
+                return {"status": "ALREADY_CLOSED", "positionId": pid,
+                        "sentence": "Position already closed."}
+            return {"status": "REJECTED", "positionId": pid,
+                    "code": execution_error,
+                    "sentence": "The broker rejected the close request."}
+
+        execution_type = _exec_name(getattr(res, "executionType", None))
+        if execution_type in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
+            return {"status": "REJECTED", "positionId": pid,
+                    "code": execution_type,
+                    "sentence": "The broker rejected the close request."}
+
+        # WHICH POSITION THIS ANSWER IS ABOUT, AND WHETHER IT IS STILL OPEN.
+        #
+        # Two things the volume alone cannot tell us, both found in a
+        # read-only review before the first real close:
+        #
+        # * The reply arrives on a socket shared with the rest of the
+        #   account. A stop-loss or take-profit fill on ANOTHER position can
+        #   land in the same window, and reporting it as "Position closed"
+        #   would book a close that never happened. An answer about a
+        #   different position is UNKNOWN, which keeps the idempotency claim
+        #   and tells the client to check.
+        # * "Partial" can only mean the position is STILL OPEN. This used to
+        #   return PARTIAL whenever the event carried a non-zero volume. What
+        #   volume a fully closed position reports is not in the schema; if
+        #   it reports the one it had, every successful full close read as
+        #   "partially closed", released the claim, and invited a second
+        #   Close on a position that was already gone. The broker's own
+        #   status is the answer, not the arithmetic.
+        position_closed = False
+        if res.HasField("position"):
+            returned = int(getattr(res.position, "positionId", 0) or 0)
+            if returned and returned != pid:
+                return {"status": "UNKNOWN", "positionId": pid,
+                        "sentence": "The broker answered about a different "
+                                    "position. Check your positions before "
+                                    "trying again."}
+            position_closed = (
+                getattr(res.position, "positionStatus", None)
+                == ProtoOAPositionStatus.POSITION_STATUS_CLOSED)
+
+        executed = None
+        if res.HasField("order"):
+            executed = int(getattr(res.order, "executedVolume", 0) or 0) or None
+        remaining = None
+        if res.HasField("position"):
+            remaining = int(getattr(res.position.tradeData, "volume", 0) or 0) or None
+        if execution_type == "ORDER_PARTIAL_FILL" or (
+                remaining is not None and remaining > 0
+                and not position_closed):
+            remaining_units = (round(remaining / 100.0, 8)
+                               if remaining is not None else None)
+            return {"status": "PARTIAL", "positionId": pid,
+                    "executedVolume": executed,
+                    "remainingVolume": remaining_units,
+                    "sentence": ("Position partially closed; remaining volume: "
+                                 f"{remaining_units if remaining_units is not None else 'unknown' }.")}
+
+        fill = None
+        if res.HasField("order") and res.order.HasField("executionPrice"):
+            fill = res.order.executionPrice
+        return {"status": "FILLED", "positionId": pid,
+                "executedVolume": executed or volume,
+                "fillPrice": fill,
+                "commissionUsd": _extract_commission(res),
+                "sentence": "Position closed."}
 
 
 # ── Module-level helpers (parity with other connectors) ──────────────────────

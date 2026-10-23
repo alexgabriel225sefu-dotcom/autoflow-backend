@@ -178,6 +178,16 @@ describe("the page and this test do not drift apart", () => {
     }
     expect(src).toMatch(/TERMINAL\.has\(r\.code\)/);
   });
+
+  it("requires the callback browser finish ticket", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    expect(src).toContain('get("t")');
+    expect(src).toContain("pendingProof");
+    expect(src).toContain("BROWSER_BINDING_REQUIRED");
+    expect(src).toMatch(/body:\s*\{\s*nonce,\s*proof\s*\}/);
+  });
 });
 
 /**

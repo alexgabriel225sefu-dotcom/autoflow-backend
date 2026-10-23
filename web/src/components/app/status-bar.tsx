@@ -124,6 +124,26 @@ export function StatusBar({
                 ?? "This level does not place orders — it reports setups and leaves the trade to you."} />
       ) : null}
 
+      {/* THE RISK GUARD, as the loop last reported it. Shown only while a loop
+          exists to have reported: a stopped account has no report, and a chip
+          saying "no report" there would be noise rather than information.
+          "unknown" is its own wording and is never drawn as "active" — a guard
+          that has not spoken has not said yes. */}
+      {running && running.state !== "stopped" && running.riskGuard ? (
+        <Chip
+          label="Risk Guard"
+          tone={running.riskGuard.state === "holding" ? "short"
+            : running.riskGuard.state === "ok" ? "long" : "neutral"}
+          value={running.riskGuard.state === "holding" ? "HOLDING"
+            : running.riskGuard.state === "ok" ? "Active" : "No report yet"}
+          title={running.riskGuard.state === "holding"
+            ? (running.riskGuard.reasons.join("; ") || "A risk limit was hit.")
+            : running.riskGuard.state === "unknown"
+              ? "The guard has not reported yet. This is not a statement that it is fine."
+              : undefined}
+        />
+      ) : null}
+
       {licence && licence !== "active" ? (
         <a className="stat-chip" href="/license" style={{ color: "var(--a4t-short)" }}>
           <ShieldCheck className="ico" style={{ width: 12, height: 12 }} aria-hidden />

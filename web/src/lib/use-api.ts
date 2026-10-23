@@ -51,19 +51,25 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   const [loading, setLoading] = useState(!!path);
   const abort = useRef<AbortController | null>(null);
 
-  const load = useCallback(async () => {
-    if (!path) return;
+  const load = useCallback(async (): Promise<ApiResult<T> | undefined> => {
+    if (!path) return undefined;
     abort.current?.abort();
     const ctl = new AbortController();
     abort.current = ctl;
     setLoading(true);
     const r = await api<T>(path, { signal: ctl.signal });
-    if (ctl.signal.aborted) return;
+    // A superseded read resolves to undefined: a newer one is on its way and
+    // is the one whose answer counts.
+    if (ctl.signal.aborted) return undefined;
     setResult(r);
     setLoading(false);
     // Stamped only on an answer we actually received — including a refusal.
     // Leaving it untouched on failure would show a fresh time over stale data.
     setLastSync(Date.now());
+    // Returned so a caller that has just changed something can check the
+    // answer it gets back against what it expected, instead of trusting the
+    // screen to have caught up.
+    return r;
   }, [path]);
 
   useEffect(() => {

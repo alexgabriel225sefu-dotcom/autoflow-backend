@@ -1076,8 +1076,11 @@ def _persist_open_position(user_id, cfg, pos):
         print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
 
 
-def _make_broker(user, user_id=None):
+def _make_broker(user, user_id=None, ctid=None):
     """Create the per-user broker with isolated config — cTrader exclusively.
+
+    ``ctid`` is explicit for platform reads and close actions. When omitted,
+    the selected account remains the legacy/default behaviour.
 
     ONE construction path, TWO places credentials can come from, and never
     both for the same client.
@@ -1099,7 +1102,7 @@ def _make_broker(user, user_id=None):
     ct_account = user.get("ctrader_account_id", "")
     if not ct_token and user_id:
         from apex.platform import ctrader_link as _link
-        _conn = _link.get_ctrader_connection(user_id)
+        _conn = _link.get_ctrader_connection(user_id, ctid=ctid)
         if _conn:
             ct_token = _conn["accessToken"]
             ct_account = _conn["ctid"]
@@ -2258,6 +2261,25 @@ def _loop(user_id, alert_fn, gen=None):
             # its first tick, forever.
             try:
                 ownership.stop_renewer(user_id)
+            except Exception:
+                pass
+            break
+        # A STOP PRESSED ON ANOTHER CONTAINER. `stop()` only reaches loops in
+        # the process that handled the request, so during a deploy overlap
+        # (both containers serving) a client could press Stop on one while the
+        # loop ran on the other, be told "stopped", and have it keep opening
+        # positions until its container was killed. Stop writes `active: False`
+        # to the shared store; honouring it here, once per tick, is what makes
+        # that sentence true wherever the loop is. An explicit False only — an
+        # absent flag is a record that never recorded one.
+        if _stop_requested(user_id):
+            print(f"[UserLoop:{user_id}] stop recorded elsewhere — standing down")
+            with _lock:
+                if user_id in _loops:
+                    _loops[user_id]["running"] = False
+            try:
+                ownership.stop_renewer(user_id)
+                ownership.release(user_id)
             except Exception:
                 pass
             break
@@ -4613,7 +4635,10 @@ def _loop(user_id, alert_fn, gen=None):
                         _decision, _rid = gates.authorize_order(
                             user_id, symbol=symbol, side=action, units=units,
                             sl=sl_price, tp=tp_price, origin="signal",
-                            dash=dash)
+                            dash=dash,
+                            bound_account=getattr(cfg, "CTRADER_ACCOUNT_ID", None),
+                            bound_env=getattr(cfg, "CTRADER_ENV", None),
+                            bound_paper=getattr(cfg, "PAPER_TRADING", None))
                         gates.audit(user_id, f"{action} {symbol}", _decision,
                                     origin="signal", rid=_rid)
                         # The gate's verdict, either way. Swallowed on purpose:
@@ -4647,6 +4672,19 @@ def _loop(user_id, alert_fn, gen=None):
                                     "units": units, "reason": _decision.reason})
                         else:
                             try:
+                                # STOP / EMERGENCY LANDED WHILE THIS TICK WAS
+                                # DECIDING. stop() clears a flag and hands the
+                                # lease back but does not wait for a tick that
+                                # is already running, and with the lease gone a
+                                # demo account is allowed through (ownership
+                                # answers "unknown", which demo permits). So a
+                                # position could open AFTER the emergency had
+                                # closed everything and re-read an empty list -
+                                # making "Confirmed: no positions are open"
+                                # false a moment later. Asked once more at the
+                                # last point before the broker is touched.
+                                if _stop_requested(user_id):
+                                    raise _StopBeforeSend()
                                 try:
                                     from apex import trade_events as _te3
                                     _te3.record(user_id, _te3.ORDER_SUBMITTED,
@@ -4660,6 +4698,10 @@ def _loop(user_id, alert_fn, gen=None):
                                     print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")
                                 _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
                                 ledger.record(_rid, _order_res)
+                            except _StopBeforeSend:
+                                order_ok = False
+                                print(f"[UserLoop:{user_id}] stop requested - "
+                                      f"{action} {symbol} was not sent")
                             except Exception as oe:
                                 order_ok = False
                                 # The claim stands. A submit that raised may
@@ -5102,6 +5144,24 @@ def start(user_id, alert_fn=None):
     return True
 
 
+class _StopBeforeSend(Exception):
+    """A stop was requested after an order was authorised and before it was
+    sent. Nothing reached the broker."""
+
+
+def _stop_requested(user_id):
+    """True only when the shared record explicitly says `active: False`.
+
+    Unreadable store, missing record, or a missing flag all answer False: a
+    loop must not stand itself down on a Redis hiccup.
+    """
+    try:
+        rec = user_store.load(str(user_id))
+    except Exception:
+        return False
+    return isinstance(rec, dict) and rec.get("active") is False
+
+
 def stop(user_id):
     user_id = str(user_id)
     with _lock:
@@ -5119,6 +5179,22 @@ def stop(user_id):
         print(f"[UserLoop:{user_id}] lease release failed (expires on its own): {e}")
     print(f"[UserLoop] Stopped for user {user_id}")
     return True
+
+
+def suspend_all_for_shutdown():
+    """Stop every loop in THIS process from ticking, WITHOUT marking anyone inactive.
+
+    `stop()` writes `active: False`, which is right when a client stops and
+    wrong when the process is simply being replaced: the supervisor revives
+    only accounts still marked active, so stopping this way on a deploy would
+    leave every client stopped for good. This flips the in-memory flag only.
+    A tick already under way finishes; the next one does not start.
+    """
+    with _lock:
+        ids = [uid for uid, entry in _loops.items() if entry.get("running")]
+        for uid in ids:
+            _loops[uid]["running"] = False
+    return ids
 
 
 def is_running(user_id):
@@ -5480,7 +5556,10 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
 
     _decision, _rid = gates.authorize_order(
         user_id, symbol=sym, side=side, units=units, sl=sl_price, tp=tp_price,
-        origin=origin, user=user)
+        origin=origin, user=user,
+        bound_account=getattr(cfg, "CTRADER_ACCOUNT_ID", None),
+        bound_env=getattr(cfg, "CTRADER_ENV", None),
+        bound_paper=getattr(cfg, "PAPER_TRADING", None))
     gates.audit(user_id, f"{side} {sym}", _decision, origin=origin, rid=_rid)
     _claim_ok, _claim_why = _decision.allowed, _decision.reason
     if not _claim_ok:

@@ -31,14 +31,17 @@ from apex.platform import approvals as _appr
 from apex.platform import automation as _auto
 from apex.platform import billing as _billing
 from apex.platform import broker_read as _read
+from apex.platform import position_close as _close
 from apex.platform import ctrader_link as _link
 from apex.platform import emergency as _emerg
+from apex.platform import emergency_stop as _panic
 from apex.platform import engine_config as _ecfg
 from apex.platform import entitlement as _ent
 from apex.platform import health as _health
 from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
+from apex.platform import performance_read as _perfread
 from apex.platform import preview as _preview
 from apex.platform import linklog as _log
 from apex.platform import ratelimit as _rl
@@ -146,7 +149,9 @@ def _authenticate(headers, *, fresh=False):
 _NOTIFY_RE = re.compile(r"^notifications/([A-Za-z0-9_-]{1,64})/read$")
 _JOURNAL_RE = re.compile(r"^journal/([A-Za-z0-9_-]{1,64})$")
 _ACCOUNT_RE = re.compile(
-    r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders|candles))?$")
+    r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders|deals|candles))?$")
+_POSITION_CLOSE_RE = re.compile(
+    r"^accounts/([A-Za-z0-9_-]{1,64})/positions/([A-Za-z0-9_-]{1,64})/close$")
 _RULE_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})$")
 _RULE_ACTION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/(validate|activate|pause|resume|archive"
@@ -213,8 +218,9 @@ def handle(method, path, headers=None, body=None, *, client_key=None):
         result = _handle(method, path, headers=headers, body=body,
                          client_key=client_key)
     except Exception as e:                                   # noqa: BLE001
+        from apex import redact as _redact
         print(f"[API] unhandled {type(e).__name__} on "
-              f"{(method or 'GET').upper()} {path}: {e}")
+              f"{(method or 'GET').upper()} {path}: {_redact.scrub(str(e))[:300]}")
         # Says nothing about whether the request took effect, because this
         # branch cannot know: the exception may have been raised after a
         # partial write. Claiming "nothing was changed" would be the exact
@@ -345,6 +351,10 @@ def _handle(method, path, headers=None, body=None, *, client_key=None):
         # to answer it was not there. A 400 would say the client malformed it.
         return _err(422 if e.code == "INSUFFICIENT_DATA" else 400,
                     e.code, _safe_error(e.detail))
+    except _close.CloseRefused as e:
+        return _err(e.status, e.code, _safe_error(e.detail))
+    except _close.CloseUnknown as e:
+        return _err(503, "CLOSE_UNKNOWN", _safe_error(e))
     except _notify.NotificationNotFound:
         return _err(404, "NOT_FOUND", "no such notification")
     except _jstore.JournalNotFound:
@@ -475,8 +485,15 @@ def _dispatch(method, route, headers, body, query=None):
             return _ok(_link.begin(p.user_id))
         if action == "complete":
             _id.require_verified_email(p)
-            nonce = (_body(body) or {}).get("nonce")
-            return _ok({"ctrader": _link.complete(p.user_id, nonce)})
+            data = _body(body) or {}
+            nonce = data.get("nonce")
+            proof = data.get("proof")
+            if not isinstance(proof, str) or not proof:
+                return _err(400, "BROWSER_BINDING_REQUIRED",
+                            "finish this connection in the browser that "
+                            "returned from cTrader")
+            return _ok({"ctrader": _link.complete(
+                p.user_id, nonce, proof=proof)})
         if action == "select":
             return _ok({"ctrader": _link.select_account(
                 p.user_id, (_body(body) or {}).get("ctid"))})
@@ -490,6 +507,19 @@ def _dispatch(method, route, headers, body, query=None):
     if route == "accounts" and method == "GET":
         p = _authenticate(headers)
         return _ok(_link.public_status(p.user_id))
+
+    # A manual close is deliberately a separate route from the read-only
+    # account views. It authenticates first, verifies the linked account is a
+    # DEMO account, and then delegates to the shared close gate.
+    close_match = _POSITION_CLOSE_RE.match(route)
+    if close_match:
+        if method != "POST":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers, fresh=True)
+        ctid, position_id = close_match.groups()
+        result = _close.close_demo(p.user_id, ctid=ctid,
+                                   position_id=position_id)
+        return _ok({"close": result, "sentence": result.get("sentence")})
 
     # ── read-only broker views ──────────────────────────────────────────
     # Every one of these answers {connected, status, ...} and omits its data
@@ -505,6 +535,9 @@ def _dispatch(method, route, headers, body, query=None):
             return _ok(_read.positions(p.user_id, ctid=ctid))
         if sub_route == "orders":
             return _ok(_read.orders(p.user_id, ctid=ctid))
+        if sub_route == "deals":
+            days = (query or {}).get("days", 7)
+            return _ok(_read.deals(p.user_id, ctid=ctid, days=days))
         if sub_route == "candles":
             # Market data for a preview. Read-only: broker_read imports no
             # gate, no ledger and no order function, and a test asserts it.
@@ -519,6 +552,67 @@ def _dispatch(method, route, headers, body, query=None):
         fn = _read.positions if route == "positions" else _read.orders
         return _ok(fn(p.user_id))
 
+    # ── the client's own emergency button ───────────────────────────────
+    # Stop automation and, when asked, close every open position on the
+    # selected DEMO account. Not the operator's halt (that is
+    # `emergency.py`). The confirmation is enforced HERE, not only in the
+    # browser: a request that does not carry `confirm: true` does nothing, so a
+    # stray or malformed call (a script, a retry, a form post) cannot close
+    # positions. It is NOT replay protection: a holder of a valid, freshly
+    # verified session could send it twice, and the guard against closing the
+    # same position twice is the ledger claim, not this flag.
+    if route == "emergency/stop":
+        if method != "POST":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers, fresh=True)
+        b = _body(body) or {}
+        if b.get("confirm") is not True:
+            return _err(400, "CONFIRMATION_REQUIRED",
+                        "send confirm: true to stop automation and close positions")
+        close = b.get("closePositions", True)
+        if not isinstance(close, bool):
+            return _err(400, "BAD_REQUEST", "closePositions must be true or false")
+        # Counted per PERSON now that the session is verified and the request
+        # is well-formed (a malformed one must not spend the budget): the
+        # pre-auth limit is per session, and a person can open more sessions.
+        # OVER THE LIMIT THE STOP STILL RUNS. Refusing the whole request would
+        # leave automation trading for up to a minute because of how often the
+        # button was pressed; what is withheld is only the closing sweep, which
+        # is the part that holds a worker for minutes.
+        _person_ok, _person_wait = _rl.check_user("emergency_user", p.user_id)
+        if not _person_ok:
+            # Asked as "close, but there is no account to close on": the answer
+            # then carries unreadable positions, no closes and allFlat False, so
+            # the screen says "Not confirmed flat" instead of showing neither.
+            out = _panic.run(
+                p.user_id, ctid="", close_positions=True,
+                no_account_reason=(
+                    "closing positions was NOT attempted: Emergency was pressed "
+                    "too many times in the last minute - wait "
+                    f"{int(_person_wait or 1)}s and press it again"))
+            out["throttled"] = True
+            return _ok(out)
+        # THE STOP RUNS WHATEVER THE ACCOUNT. This used to answer 409
+        # NO_ACCOUNT_SELECTED before the stop step, so a client with no
+        # selected account - after a disconnect, or when the selection could
+        # not be read - pressed the panic button and nothing stopped, while a
+        # loop that still held its broker session went on trading. Not having
+        # an account to CLOSE on is a reason to skip the closing, said in the
+        # answer; it is never a reason to skip the stop.
+        ctid = str(b.get("ctid") or "")
+        no_account = None
+        if not ctid:
+            try:
+                ctid = _selected_ctid_strict(p.user_id)
+            except Exception:                           # noqa: BLE001
+                ctid = ""
+                no_account = ("your selected account could not be read just "
+                              "now")
+        if close and not ctid and no_account is None:
+            no_account = "no cTrader account is selected"
+        return _ok(_panic.run(p.user_id, ctid=ctid, close_positions=close,
+                              no_account_reason=no_account))
+
     # ── automation control (demo only) ──────────────────────────────────
     # Separate from connecting an account, deliberately: linking cTrader to
     # look at a balance is not consent to be traded for.
@@ -527,6 +621,9 @@ def _dispatch(method, route, headers, body, query=None):
         if not action and method == "GET":
             p = _authenticate(headers)
             return _ok(_auto.status(p.user_id))
+        if action == "why" and method == "GET":
+            p = _authenticate(headers)
+            return _ok(_auto.why(p.user_id))
         if method != "POST":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
         # Every one of these changes whether money moves, so none of them
@@ -616,6 +713,14 @@ def _dispatch(method, route, headers, body, query=None):
     if m and method == "POST":
         p = _authenticate(headers)
         return _ok(_notify.mark_read(p.user_id, m.group(1)))
+
+    # ── performance (closed trades the engine recorded) ─────────────────
+    if route == "performance" and method == "GET":
+        p = _authenticate(headers)
+        q = query or {}
+        return _ok(_perfread.read(p.user_id, period=q.get("period") or "all",
+                                  mode=q.get("mode") or "demo",
+                                  ctid=q.get("accountId") or None))
 
     # ── journal ─────────────────────────────────────────────────────────
     if route == "journal" and method == "GET":
@@ -776,9 +881,17 @@ def _selected_ctid(user_id):
     selected is a rule that will not run on the account they are looking at.
     """
     try:
-        sel = (_link.public_status(user_id) or {}).get("selected") or {}
+        return _selected_ctid_strict(user_id)
     except Exception:                                   # noqa: BLE001
         return ""
+
+
+def _selected_ctid_strict(user_id):
+    """Like `_selected_ctid`, but a read that FAILS raises instead of reading
+    as "nothing selected". The emergency stop needs the difference: it must
+    still stop, and it must not tell the client no account is selected when
+    the truth is that the selection could not be read."""
+    sel = (_link.public_status(user_id) or {}).get("selected") or {}
     return str(sel.get("ctid") or "")
 
 
@@ -799,7 +912,7 @@ def _create(principal, payload):
                     timeframe=payload.get("timeframe") or "1h")
     for field in ("name", "sides", "entry", "exit", "order", "sizing",
                   "stopLoss", "takeProfit", "trailingStop", "breakEven",
-                  "limits", "schedule", "evaluateOn"):
+                  "limits", "schedule", "evaluateOn", "automationLevel"):
         if field in payload:
             doc[field] = payload[field]
     return _ok({"rule": _store.create(principal.user_id, doc)}, created=True)

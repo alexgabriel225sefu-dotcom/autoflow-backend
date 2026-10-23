@@ -9,6 +9,7 @@ import type { JournalEntry, JournalPage } from "@/lib/api";
 const STATUSES = [
   "", "evaluated", "hold", "reject", "execution_requested", "order_sent",
   "order_confirmed", "order_rejected", "position_closed", "broker_error",
+  "engine_error",
   "automation_started", "automation_paused", "automation_stopped",
   // A setup found at the Signals Only level: reported to the client, never
   // placed. It belongs in this list and not on a page of its own, because
@@ -22,7 +23,7 @@ const PAGE = 25;
 /** The statuses where the engine ran and deliberately placed nothing. */
 const QUIET = new Set(["hold", "reject", "signal"]);
 /** The statuses that mean something went wrong at the broker or in the rule. */
-const BAD = new Set(["order_rejected", "broker_error", "reject"]);
+const BAD = new Set(["order_rejected", "broker_error", "engine_error", "reject"]);
 
 function tone(e: JournalEntry): string {
   const v = e.decision?.verdict;

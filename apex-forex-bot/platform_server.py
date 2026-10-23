@@ -160,22 +160,27 @@ def callback_page(status, payload):
     finished, and give one button that goes back to the app carrying the nonce.
     On failure, say which failure in words, and offer the way to start again.
 
-    The nonce travels in the URL and that is safe by the same reasoning the
-    flow already rests on: it is not a credential, and `complete` refuses
-    unless the SESSION calling it is the user the attempt was opened for. That
-    check is what stops an account-injection attack, not the secrecy of the
-    nonce.
+    The nonce travels in the URL and is not a credential. Completion also
+    needs the one-time finish ticket delivered on this page. That ticket is
+    absent from a different browser even when somebody forwards the authorize
+    URL, so the parked broker token cannot be attached from that browser.
     """
     base = web_url()
     ok = bool(payload.get("ok"))
     nonce = (payload.get("nonce") or "") if ok else ""
+    finish = (payload.get("finishToken") or "") if ok else ""
     err = payload.get("error") or {}
     diag = str(err.get("diagnosticId") or "")
     # Two contexts, two encodings, applied once each. The nonce goes into a
     # URL, so it is percent-encoded; the finished URL goes into an href, so it
     # is HTML-escaped below. Escaping for HTML first and then again for the
     # attribute produced "&amp;lt;" — safe, but wrong, and the test caught it.
-    link = f"{base}/connect" + (f"?n={quote(nonce, safe='')}" if nonce else "")
+    params = []
+    if nonce:
+        params.append("n=" + quote(nonce, safe=""))
+    if finish:
+        params.append("t=" + quote(finish, safe=""))
+    link = f"{base}/connect" + (("?" + "&".join(params)) if params else "")
 
     if ok:
         title, tone = "Authorised", "ok"
@@ -525,6 +530,43 @@ def _supervise_platform_loops():
     threading.Thread(target=_run, name="loop-supervisor", daemon=True).start()
 
 
+def _release_for_shutdown(budget_s=5.0):
+    """Stop this process's trading loops and hand back their leases.
+
+    Without this, every deploy left the retiring container's leases held for
+    their full TTL: the incoming container correctly stood down behind them and
+    nobody managed the open positions for ~12 minutes (seen on 22 and 23 Oct).
+
+    ORDER MATTERS. Loops are suspended first so none starts a new tick, and the
+    ownership flag is set before the leases are released so nothing re-takes
+    them. Accounts are NOT marked inactive — the replacement's supervisor revives
+    only accounts still marked active.
+
+    Best effort and time-boxed: it returns after `budget_s` whatever happens.
+    """
+    result = {}
+
+    def _work():
+        try:
+            from apex import ownership as _own
+            from apex import user_loop as _ul
+            result["suspended"] = _ul.suspend_all_for_shutdown()
+            result["released"] = _own.begin_shutdown()
+        except Exception as e:                               # noqa: BLE001
+            print(f"[API] lease release on shutdown failed: {type(e).__name__}: {e}")
+
+    t = threading.Thread(target=_work, daemon=True, name="shutdown-release")
+    t.start()
+    t.join(budget_s)
+    if t.is_alive():
+        print(f"[API] lease release did not finish within {budget_s:g}s — "
+              f"leaving the rest to expire")
+    else:
+        print(f"[API] suspended {len(result.get('suspended') or [])} loop(s), "
+              f"released {result.get('released')} lease(s)")
+    return result
+
+
 def main():
     origins = allowed_origins()
     print(f"[API] Apex4Traders platform API starting on :{PORT}")
@@ -546,7 +588,15 @@ def main():
 
     def _graceful(signum, _frame):
         print(f"[API] signal {signum} — shutting down")
-        threading.Thread(target=server.shutdown, daemon=True).start()
+
+        def _stop():
+            # Hand the loops' leases back BEFORE the server stops, so the
+            # replacement container takes over in seconds. Bounded: a store
+            # that will not answer must not hold up shutdown.
+            _release_for_shutdown()
+            server.shutdown()
+
+        threading.Thread(target=_stop, daemon=True).start()
 
     for _sig in (signal.SIGTERM, signal.SIGINT):
         try:

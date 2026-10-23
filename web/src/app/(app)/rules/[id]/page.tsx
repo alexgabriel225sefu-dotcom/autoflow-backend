@@ -14,9 +14,10 @@ import { ErrorNotice, LicencePill, ReadPanel, Spinner, StatusPill } from "@/comp
 import {
   RuleSentence, RuleTerms, humanise, type NotApplied,
 } from "@/components/app/rule-summary";
-import { outcomeOf } from "@/components/app/plain";
+import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
 import { TIMEFRAMES } from "@/components/app/rule-form";
-import { CandleChart, type ChartMarker } from "@/components/chart/candles";
+import { PriceChart } from "@/components/chart/price-chart";
+import type { ChartMarker } from "@/components/chart/chart-data";
 
 /**
  * What a preview decided, as a first-class outcome.
@@ -128,6 +129,9 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [previewErr, setPreviewErr] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  // What the last control did; kept here because a successful Stop removes the
+  // button that was pressed, and its sentence must not go with it.
+  const [controlResult, setControlResult] = useState<ControlResult | null>(null);
 
   useEffect(() => {
     void api<{ conditions: Record<string, ConditionSpec> }>("conditions")
@@ -244,17 +248,13 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
     setPreview(r.data);
   }
 
-  async function control(action: "start" | "pause" | "resume" | "stop") {
-    const body = action === "start" ? { ruleDocId: id } : undefined;
-    const r = await api<AutomationState & { started?: boolean }>(
-      `automation/${action}`, { method: "POST", body });
-    // Every mounted reader of these endpoints, not this page's copies. The
-    // status strip at the top of this screen is the ONLY automation
-    // indicator here, and it is the shell's own read — reloading just the
-    // local one left it saying STOPPED over a loop that had started.
-    invalidate("automation", "journal?limit=8", "me");
-    if (!r.ok) return `${r.code}: ${r.message}`;
-    return outcomeOf(r.data);
+  async function control(action: ControlAction) {
+    setControlResult(null);
+    const res = await runAutomationControl(action, {
+      ruleDocId: action === "start" ? id : undefined, reload: auto.reload,
+    });
+    setControlResult(res);
+    return "";
   }
 
   if (rule.result && !rule.result.ok) {
@@ -369,7 +369,7 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
                   with. */}
               {bars?.status === "ok" && bars.candles?.length ? (
                 <div style={{ marginTop: ".8rem" }}>
-                  <CandleChart
+                  <PriceChart
                     candles={bars.candles}
                     symbol={bars.symbol}
                     timeframe={bars.timeframe}
@@ -558,6 +558,16 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
                                    onConfirm={() => control("stop")} />
                   ) : null}
                 </div>
+                {controlResult ? (
+                  <p
+                    role={controlResult.ok ? "status" : "alert"}
+                    data-control-result={controlResult.ok ? "ok" : "error"}
+                    className={controlResult.ok ? "muted" : "notice notice-error"}
+                    style={{ marginTop: "var(--sp-2)", fontSize: ".85rem" }}
+                  >
+                    {controlResult.text}
+                  </p>
+                ) : null}
               </>
             )}
           </section>

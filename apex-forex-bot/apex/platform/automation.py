@@ -33,6 +33,8 @@ derived from a stored record and the second is not. What it never does is
 decide for itself.
 """
 
+import hashlib
+import re
 import time
 import uuid
 
@@ -57,6 +59,12 @@ STATES = (STOPPED, RUNNING, PAUSED)
 DEMO = "demo"
 LIVE = "live"
 _START_LOCK_TTL_S = 30
+# How long stop() waits for a start that is already in flight before it halts a
+# second time. Bounded: the panic button must not wait on a stuck start.
+_STOP_SETTLE_S = 3.0
+_STOPPED_RECORD = {"state": "stopped", "ruleDocId": None, "mode": None,
+                   "startedAt": None, "appliedTerms": None,
+                   "notApplied": None, "engineSnapshot": None}
 
 
 class AutomationRefused(RuntimeError):
@@ -114,6 +122,28 @@ def _plain(label):
     return "".join(c for c in str(label or "") if c.isascii()).strip() or None
 
 
+def risk_guard(user_id, *, reader=None):
+    """What the Risk Guard last reported, as the LOOP published it.
+
+    `{"state": "ok" | "holding" | "unknown", "reasons": [...]}`. Never raises
+    and never recomputes: asking the guard to evaluate would advance the very
+    state the badge describes (see `apex.ui_state`). "unknown" is a guard that
+    has not reported — it is NOT "ok" and is never worded as the guard having
+    said yes, which is the one line this badge must not get wrong.
+    """
+    try:
+        if reader is None:
+            from apex import ui_state
+            reader = ui_state.risk_state
+        state, reasons = reader(str(user_id))
+        if state not in ("ok", "holding", "unknown"):
+            state = "unknown"
+        return {"state": state,
+                "reasons": [str(r)[:160] for r in (reasons or [])][:5]}
+    except Exception:                                        # noqa: BLE001
+        return {"state": "unknown", "reasons": []}
+
+
 def status(user_id):
     """Safe to hand a browser. Carries no token and no broker credential."""
     rec = _read(user_id)
@@ -146,7 +176,154 @@ def status(user_id):
             # nothing to tell them apart. `engineSnapshot` is deliberately
             # absent: it is the account's previous settings, which is state
             # for stop() to use and not something to render.
-            "notApplied": rec.get("notApplied") or []}
+            "notApplied": rec.get("notApplied") or [],
+            # The Risk Guard's last report, so every screen can show it. Only
+            # meaningful while a loop runs; the browser shows it then.
+            "riskGuard": risk_guard(user_id)}
+
+
+def why(user_id, *, loop_reader=None, declines_reader=None,
+        market_open=None, risk_reader=None):
+    """"Why isn't it trading?" — the answer the Telegram `/why` gave, for the web.
+
+    A waiting client reads silence as breakage. This says which of the real
+    reasons applies, in order of how much each one explains:
+
+      stopped / paused      the loop is not looking at all
+      halted                an emergency stop is in force
+      loop not active here  the platform says Running, this process is not
+                            running a loop for the client (a restart: the
+                            supervisor revives it, which takes minutes)
+      not an executing level  Signals only / Ask me first — a setup is not an
+                            order by design
+      position already open   the position limit is the reason
+      market closed         nothing to act on
+      otherwise             on and watching; most candidates are refused
+
+    THE TWO LISTS OF REFUSALS ARE DIFFERENT THINGS and are not merged.
+    `skips` is the loop's in-memory list for the current process: newest
+    first, last thirty, empty after a restart. `recorded` is the persistent
+    decision log: it has the instrument and survives a restart. A client whose
+    list is empty must not be told "there was no reason" — `recordedCount` is
+    0 only when the log holds nothing, and the screen words that as "nothing
+    recorded yet", never as proof the loop chose nothing.
+
+    The three readers are parameters so a test drives every branch without a
+    live loop. Never raises: an unreadable source is reported as unreadable,
+    since an explanation page that errors is the page nobody can use when
+    something is already wrong.
+    """
+    rec = _read(user_id)
+    state = rec.get("state", STOPPED)
+    level = _level_of(rec)
+    executes = (bool(_eng_auto.EXECUTES.get(level)) if level else None)
+
+    out = {"status": "ok", "state": state, "level": level,
+           "levelLabel": _plain(_eng_auto.LABEL.get(level)) if level else None,
+           "loopActive": None, "marketOpen": None, "halted": False,
+           "openPosition": None, "maxPositions": None,
+           "riskGuard": risk_guard(user_id, reader=risk_reader),
+           "skipsToday": None, "skips": [], "recorded": [],
+           "recordedCount": 0, "recordedReadable": True}
+
+    # ── the engine's own view, read defensively ─────────────────────────────
+    try:
+        if loop_reader is None:
+            from apex import user_loop
+            alive = bool(user_loop.is_running(str(user_id)))
+            dash = user_loop.get_dash(str(user_id)) or {}
+        else:
+            alive, dash = loop_reader(str(user_id))
+        out["loopActive"] = alive
+        op = dash.get("openPosition")
+        if isinstance(op, dict):
+            out["openPosition"] = {"symbol": op.get("symbol")}
+        out["maxPositions"] = dash.get("maxpos")
+        out["skipsToday"] = dash.get("skipsToday")
+        out["skips"] = [{"time": str(s.get("time", "")),
+                         "reason": str(s.get("reason", ""))[:120]}
+                        for s in (dash.get("skips") or [])[:10]
+                        if isinstance(s, dict)]
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[Automation:why] loop state unreadable "
+              f"({type(e).__name__})")
+
+    try:
+        if declines_reader is None:
+            from apex import trade_events
+            rows = trade_events.declines(str(user_id), limit=10)
+        else:
+            rows = declines_reader(str(user_id))
+        for r in rows or []:
+            payload = r.get("payload") if isinstance(r, dict) else None
+            out["recorded"].append({
+                "at": r.get("ts") or r.get("time"),
+                "symbol": r.get("symbol"),
+                "reason": str((payload or {}).get("reason", ""))[:200]})
+        out["recordedCount"] = len(out["recorded"])
+    except Exception as e:                                   # noqa: BLE001
+        out["recordedReadable"] = False
+        print(f"[Automation:why] decision log unreadable "
+              f"({type(e).__name__})")
+
+    try:
+        if market_open is None:
+            from apex import forex as _fx
+            out["marketOpen"] = bool(_fx.is_market_open())
+        else:
+            out["marketOpen"] = bool(market_open())
+    except Exception:                                        # noqa: BLE001
+        pass
+
+    try:
+        _emerg.check(user_id=user_id, mode=_emerg.NOT_RESOLVED)
+    except _emerg.Halted:
+        out["halted"] = True
+    except Exception:                                        # noqa: BLE001
+        pass
+
+    # ── the verdict: ONE reason, the most explanatory that is true ──────────
+    if out["halted"]:
+        code, text = "halted", ("An emergency stop is in force, so nothing "
+                                "will be placed until it is lifted.")
+    elif state == PAUSED:
+        code, text = "paused", ("Automation is paused. It is not looking for "
+                                "setups until you resume it.")
+    elif state != RUNNING:
+        code, text = "stopped", ("Automation is stopped, which is why "
+                                 "nothing is happening. Start it from a "
+                                 "rule to switch it on.")
+    elif out["loopActive"] is False:
+        code, text = "loop_inactive", (
+            "Automation is marked as running, but its loop is not active on "
+            "the server right now. After a restart it is picked up again "
+            "automatically; that can take up to about fifteen minutes.")
+    elif out["riskGuard"]["state"] == "holding":
+        why_txt = "; ".join(out["riskGuard"]["reasons"]) or "a risk limit was hit"
+        code, text = "risk_holding", (
+            f"The Risk Guard is holding new trades: {why_txt}. This protects "
+            f"your account; it lifts when the limit no longer applies.")
+    elif executes is False:
+        code, text = "level_no_orders", (
+            f"This rule runs at “{out['levelLabel']}”, so a setup is shown to "
+            f"you and is not placed as a trade by itself.")
+    elif out["openPosition"]:
+        sym = out["openPosition"].get("symbol") or "an instrument"
+        lim = out["maxPositions"] or 1
+        code, text = "position_open", (
+            f"You already have a position open on {sym}, and the limit is "
+            f"{lim} at a time. It looks for the next setup once this one "
+            f"closes.")
+    elif out["marketOpen"] is False:
+        code, text = "market_closed", ("The forex market is closed, so "
+                                       "there is nothing to act on.")
+    else:
+        code, text = "watching", (
+            "It is on and watching. It only enters when a setup passes every "
+            "check, and most candidates are refused.")
+    out["reason"] = code
+    out["summary"] = text
+    return out
 
 
 def _preflight(user_id, rule_doc_id, *, mode_lister=None):
@@ -221,7 +398,14 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # loop against an account nobody confirmed is practice money.
     check = _link.verify_selected_mode(user_id, lister=mode_lister)
     if check["mode"] in (DEMO, LIVE) and check["verified"]:
-        pass
+        # `conn` and `check` are separate reads of the selection. If it changed
+        # between them, the broker confirmed the mode of one account while the
+        # loop would be started on another.
+        if str(check.get("ctid")) != str(conn.get("ctid")):
+            raise AutomationRefused(
+                "ACCOUNT_CHANGED",
+                "the selected account changed while the start was being "
+                "checked, so nothing was started - try again")
     else:
         raise AutomationRefused(
             "MODE_UNVERIFIED",
@@ -235,6 +419,15 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # would be the one place in this file worth getting wrong.
     if check["mode"] == LIVE and not _ent.capability(user_id)["canAutomate"]:
         raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+    # And during the live pilot, only the pilot's own account may start one.
+    # Without this a client outside the pilot could start a live loop that shows
+    # "Running" while every order is refused, and could then change the selected
+    # account under it. A refusal here is the honest place to say so.
+    if check["mode"] == LIVE:
+        from apex.platform import live_pilot as _pilot
+        _pp = _pilot.check_identity(user_id, conn.get("ctid"))
+        if _pp:
+            raise AutomationRefused(_pp[0], _pp[1])
     if check["changed"]:
         # The record said one thing and the broker says another. Not adapted
         # to, on purpose: an account that changed mode under a stored record
@@ -250,6 +443,93 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     for symbol in (rule.get("symbols") or [None]):
         _emerg.check(user_id=user_id, symbol=symbol, mode=conn.get("mode"))
     return rule, conn
+
+
+def _note_engine_refused(user_id, corr, ctid, *, revive):
+    """File the engine's refusal to start a loop — unless the supervisor asked.
+
+    The supervisor retries a dead loop every few minutes and, right after a
+    deploy, the previous instance still holds the lease for up to ten minutes,
+    so the engine refuses each retry ("owned by another instance"). That is the
+    EXPECTED shape of a restart, not a fault — and it was being written to the
+    client's journal as "Broker error", once per retry (four entries after one
+    deploy), none of them about the broker. A journal whose errors include
+    every ordinary handover is one nobody can search for a real error in.
+
+    An interactive Start the client pressed is different: they asked, so the
+    refusal is theirs to see. It is filed as an ENGINE error, not a broker
+    error: the engine said no, and the provider was never asked.
+    """
+    if revive:
+        return
+    _jstore.record_engine_error(
+        "the engine refused to start this loop — it may already be owned by "
+        "another instance",
+        correlation_id=corr, user_id=user_id, account_id=str(ctid))
+
+
+# What the cTrader connector says when the PROVIDER answered with a refusal.
+# Only these count as "the broker rejected it". A timeout, a dropped socket, a
+# KeyError or any other exception from our own code is the engine's or the
+# network's, and is filed as such.
+_PROVIDER_REJECTION_PREFIXES = (
+    "ctrader error:", "ctrader order error:", "ctrader token error:",
+    "app auth failed", "account auth failed",
+)
+
+
+def _safe_cause(exc, *secrets):
+    """`TypeName: message`, bounded and with anything credential-shaped removed.
+
+    The text of an exception from a provider call can carry what was sent or
+    what came back. It is cut to a sentence, every known secret is replaced,
+    and so is anything that merely LOOKS like a token (a long unbroken run of
+    token characters) or is named like one. Provider payloads are never
+    attached — only this string.
+    """
+    # One implementation of "credential-shaped": apex.redact.scrub_for_client.
+    from apex import redact as _redact
+    text = _redact.scrub_for_client(exc, *secrets, limit=160)
+    return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
+
+
+def _is_provider_rejection(exc):
+    return str(exc).strip().lower().startswith(_PROVIDER_REJECTION_PREFIXES)
+
+
+def _record_starter_failure(user_id, corr, conn, exc, *, revive):
+    """Journal why the engine could not start, honestly labelled; return the cause.
+
+    A provider's refusal is a BROKER error. Anything else — our own exception,
+    a timeout, a dropped socket — is an ENGINE error: filing it as the broker's
+    sends the client looking for a fault at a provider that did nothing.
+
+    The supervisor's retries are deduplicated per cause for an hour: a fault
+    that persists would otherwise fill the journal at one entry every three
+    minutes, and the entry nobody has read yet is already enough.
+    """
+    cause = _safe_cause(exc, (conn or {}).get("accessToken"),
+                        (conn or {}).get("refreshToken"))
+    print(f"[Automation] starter failed for {user_id}: {cause}")
+    if revive:
+        try:
+            first = user_store.claim(
+                f"revive-err:{user_id}:{hashlib.sha1(cause.encode()).hexdigest()[:12]}",
+                ttl_s=3600)
+        except Exception:                                    # noqa: BLE001
+            first = None
+        if first is False:
+            return cause
+    ctid = str((conn or {}).get("ctid"))
+    if _is_provider_rejection(exc):
+        _jstore.record_error(
+            f"the broker rejected the request: {cause}",
+            correlation_id=corr, user_id=user_id, account_id=ctid)
+    else:
+        _jstore.record_engine_error(
+            f"the engine failed to start the loop: {cause}",
+            correlation_id=corr, user_id=user_id, account_id=ctid)
+    return cause
 
 
 def start(user_id, rule_doc_id, *, starter=None, now=None,
@@ -313,6 +593,23 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
             "another start for this account is already in flight")
     held = token is True
 
+    # A REVIVE IS A START THE CLIENT DID NOT ASK FOR, SO IT MUST NOT OUTLIVE A
+    # STOP THE CLIENT DID. `supervise` read RUNNING a moment ago; if the client
+    # pressed Stop (or Emergency) since, bringing the loop back would undo it
+    # and leave a loop trading under a record that says STOPPED. Asked again
+    # now that this start holds the lock, which is the last point where a
+    # concurrent stop is still visible before the engine is touched.
+    if revive and _read(user_id).get("state") != RUNNING:
+        if held:
+            try:
+                user_store.release_claim(lock, corr)
+            except Exception:                               # noqa: BLE001
+                pass
+        raise AutomationRefused(
+            "STOPPED_MEANWHILE",
+            "automation was stopped while it was being restarted, so it was "
+            "not restarted")
+
     if starter is None:
         starter = _engine_starter
     # NOTE WHAT IS ABSENT: `paper`. Exactly one place writes the live/demo
@@ -337,23 +634,57 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
         # Captured BEFORE the write, so stop() can put back what was there.
         # Without it a rule that ran once leaves its settings behind for
         # whatever runs next.
-        snapshot = _ecfg.snapshot_of(user_store.load(user_id))
+        #
+        # BUT ONLY THE FIRST TIME. `start` also runs on REVIVE (the supervisor
+        # restarting a loop after a deploy) and on RESUME (after a pause). By
+        # then the account record already carries the RULE's terms, so
+        # reading it again captured the rule's own settings as though they
+        # were the client's, and overwrote the original snapshot on the
+        # automation record. A Stop after any redeploy or pause then
+        # "restored" the rule's settings and the client's real ones were
+        # gone: a rule that ran once left its risk, stop and target behind.
+        #
+        # An existing snapshot on a RUNNING or PAUSED record is therefore
+        # kept as it is. `{}` is a legitimate snapshot (the account held none
+        # of the keys), so presence is tested, not truthiness.
+        if (rec.get("state") in (RUNNING, PAUSED)
+                and rec.get("engineSnapshot") is not None):
+            snapshot = rec["engineSnapshot"]
+        else:
+            snapshot = _ecfg.snapshot_of(user_store.load(user_id))
         user_store.update(user_id, dict(applied, active=True))
     except Exception as e:  # noqa: BLE001
         raise AutomationRefused("STORE_UNAVAILABLE",
                                 f"the account settings could not be saved "
                                 f"({type(e).__name__})")
 
-    ok = _run_starter(starter, user_id, lock, corr, held)
+    try:
+        ok = _run_starter(starter, user_id, lock, corr, held)
+    except Exception as e:                                   # noqa: BLE001
+        cause = _record_starter_failure(user_id, corr, conn, e, revive=revive)
+        raise AutomationRefused(
+            "ENGINE_START_FAILED",
+            f"the trading engine could not start this loop ({cause})") from None
     if ok is False:
-        _jstore.record_error(
-            "the engine refused to start this loop",
-            correlation_id=corr, user_id=user_id,
-            account_id=str(conn.get("ctid")))
+        _note_engine_refused(user_id, corr, conn.get("ctid"), revive=revive)
         raise AutomationRefused(
             "ENGINE_REFUSED",
             "the trading engine refused to start this loop — it may already "
             "be owned by another instance")
+
+    # The same question once more, before RUNNING is written over whatever is
+    # there. The engine has just been started; a stop that landed while it came
+    # up has written STOPPED, and writing RUNNING now would erase it. Halt what
+    # was just started rather than leave it trading.
+    if revive and _read(user_id).get("state") != RUNNING:
+        try:
+            _halt(user_id, None)
+        except Exception:                                   # noqa: BLE001
+            pass
+        raise AutomationRefused(
+            "STOPPED_MEANWHILE",
+            "automation was stopped while it was being restarted, so the "
+            "restarted loop was stopped again")
 
     # The mode this loop ACTUALLY runs on, not a constant. It was DEMO here
     # while demo was the only thing that could start, and leaving it would
@@ -726,28 +1057,33 @@ def _flatten_answer(rec):
     mode — a client who presses Stop and is told "stopped" reasonably reads
     that as "and I am flat", and on a live account that belief is expensive.
 
-    This release declines, and the reason is not squeamishness: closing a
-    position is an ORDER, and this platform has nothing that places a closing
-    one. `bridge` is imported by nothing in production, and `approvals` —
-    which is the one thing here that can place an order at all — can only ask
-    the controller to OPEN the setup a client approved. Claiming to flatten
-    would be claiming to place an order we cannot place.
+    Stop still declines to flatten, on purpose: it ends the LOOP, and closing a
+    position is an order the client should decide per position, with the
+    position in front of them. Stop must not become a hidden "close
+    everything".
 
-    THE SENTENCE BELOW USED TO BE WIDER THAN THE TRUTH. It said this release
-    "cannot place orders of any kind", which was exactly right while nothing
-    could, and became false the moment Approval Required worked: a client who
-    approves a setup gets an opening order. The reason for declining is
-    specific to CLOSING, so the sentence now says that and no more — a
-    reassurance that overstates is still a thing a client acts on.
+    THIS SENTENCE HAS BEEN WRONG TWICE, in opposite directions, and both times
+    a client would have acted on it:
+
+      1. It said this release "cannot place orders of any kind". True while
+         nothing could; false once Approval Required worked.
+      2. It then said "this release has no way to close a position". True
+         until the demo Close arrived (position_close.close_demo, reached from
+         the Positions page). After that it told a client there was no way to
+         do something they could do in one click.
+
+    So it now says what Stop does NOT do and where closing IS available. The
+    pairing test (tests/test_stop_sentence_truthful.py) ties the sentence to
+    the capability, so it cannot drift a third time.
     """
     return {
         "flattened": False,
         "flattenDeclined": True,
         "flattenReason": (
             "Stopping ends the trading loop. It does not close positions that "
-            "are already open — this release has no way to close a position. "
-            "Any open position stays at your broker with the stop and target "
-            "it was given, and you close it there."),
+            "are already open. Any open position stays at your broker with "
+            "the stop and target it was given. You can close it from the "
+            "Positions page on a demo account, or in cTrader."),
     }
 
 
@@ -757,7 +1093,25 @@ def stop(user_id, *, stopper=None):
     if rec.get("state") == STOPPED:
         return dict(status(user_id), stopped=False, alreadyStopped=True,
                     **_flatten_answer(rec))
-    _halt(user_id, stopper)
+    # THE INTENT IS WRITTEN BEFORE THE LOOP IS HALTED, not after. It used to be
+    # the last step, so for the length of the halt the record still said RUNNING
+    # over a loop that was gone - which is exactly what the supervisor looks for
+    # and revives. A revive that landed in that gap brought the loop back and
+    # the late STOPPED write then reported "stopped" over a loop that was
+    # trading again. With STOPPED already on the record, the supervisor skips it.
+    prior = dict(rec)
+    _write(user_id, dict(_STOPPED_RECORD))
+    try:
+        stopped_here = _halt(user_id, stopper)
+    except Exception:
+        # The halt failed, so the loop may still be running: put the record
+        # back rather than report a stop that did not happen.
+        _write(user_id, prior)
+        raise
+    # A start that began before the record said STOPPED may still be bringing a
+    # loop up, or about to write RUNNING back. Wait (bounded) for it to finish,
+    # halt once more, and repair the record if it was overwritten.
+    stopped_here = _settle_stop(user_id, stopper) or stopped_here
     _jstore.record_automation(
         _jstore._j.AUTOMATION_STOPPED, correlation_id=uuid.uuid4().hex,
         user_id=user_id, account_id=str(rec.get("accountId") or ""),
@@ -774,17 +1128,69 @@ def stop(user_id, *, stopper=None):
         # already halted the loop — the loop being stopped is the thing that
         # mattered, and the settings are visible and editable.
         pass
-    _write(user_id, {"state": STOPPED, "ruleDocId": None, "mode": None,
-                     "startedAt": None, "appliedTerms": None,
-                     "notApplied": None, "engineSnapshot": None})
     ans = _flatten_answer(rec)
     _notify.notify(user_id, type=_notify.SYSTEM, title="Automation stopped",
                    body="The trading loop has been stopped. "
                         + ans["flattenReason"])
-    return dict(status(user_id), stopped=True, alreadyStopped=False, **ans)
+    out = dict(status(user_id), stopped=True, alreadyStopped=False,
+               loopStoppedHere=stopped_here, **ans)
+    if not stopped_here:
+        # NOT "stopped" on the strength of a record alone. No loop was running
+        # in the process that took this request. If one runs in another
+        # container (a deploy overlap) it honours the recorded stop at its next
+        # tick; saying so is the difference between a sentence that is true and
+        # one that is only hopeful.
+        out["stopNote"] = (
+            "No trading loop was running on this server instance. If one is "
+            "running on another instance — possible for a few minutes after an "
+            "update — it will notice this stop at its next check, within about "
+            "five minutes.")
+    return out
+
+
+def _settle_stop(user_id, stopper):
+    """After the record says STOPPED: make sure no start still in flight wins.
+
+    Takes the start lock if it can within `_STOP_SETTLE_S` (a start holds it
+    while the engine comes up), halts again, and checks the record still says
+    STOPPED - a start that finished in the gap writes RUNNING over it, in which
+    case the intent is written back and the loop halted once more. Bounded on
+    purpose: an emergency stop does not wait on a stuck start. Returns whether
+    a loop here was stopped by these extra halts.
+    """
+    stopped = False
+    lock, corr = _k_lock(user_id), uuid.uuid4().hex
+    token = None
+    deadline = time.monotonic() + _STOP_SETTLE_S
+    try:
+        while True:
+            token = user_store.claim_value(lock, corr, ttl_s=_START_LOCK_TTL_S)
+            if token is not False or time.monotonic() >= deadline:
+                break
+            time.sleep(0.2)
+    except Exception:                                       # noqa: BLE001
+        token = None
+    try:
+        for _ in range(2):
+            try:
+                stopped = bool(_halt(user_id, stopper)) or stopped
+            except Exception:                               # noqa: BLE001
+                pass
+            if _read(user_id).get("state") == STOPPED:
+                break
+            _write(user_id, dict(_STOPPED_RECORD))
+    finally:
+        if token is True:
+            try:
+                user_store.release_claim(lock, corr)
+            except Exception:                               # noqa: BLE001
+                pass
+    return stopped
 
 
 def _halt(user_id, stopper):
+    """Record the stop and stop the loop in THIS process. Returns whether a loop
+    here was actually stopped (False: none was running in this process)."""
     if stopper is None:
         from apex import user_loop
         stopper = user_loop.stop
@@ -792,4 +1198,4 @@ def _halt(user_id, stopper):
         user_store.update(user_id, {"active": False})
     except Exception:
         pass
-    stopper(user_id)
+    return bool(stopper(user_id))

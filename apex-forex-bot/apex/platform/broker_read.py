@@ -32,8 +32,12 @@ string is the one place a credential escapes without anyone deciding to put it
 there.
 """
 
+import copy
+import threading
+import time
+
+from apex import forex
 from apex.platform import ctrader_link as _link
-from apex.platform.safe_errors import message as _safe_message
 
 # Bounded so a hung broker cannot hold an HTTP worker open indefinitely.
 DEFAULT_TIMEOUT_S = 12.0
@@ -43,18 +47,45 @@ REAUTH_REQUIRED = "reauth_required"
 UNAVAILABLE = "unavailable"
 OK = "ok"
 
+# Deal history is expensive: cTrader may walk as many as forty pages for one
+# seven-day read, and the historical request budget is shared by every reader
+# on a connection. A successful result is a read-only snapshot, so keeping it
+# for one minute is honest and prevents dashboard polling from becoming a
+# broker-history loop. Failures are never cached; the next request must be able
+# to recover as soon as the broker does.
+# The most deal history one request may ask for.
+MAX_DEAL_DAYS = 3650
+DEALS_CACHE_TTL_S = 60.0
+DEALS_CACHE_MAX = 256
+_deals_cache = {}
+_deals_cache_lock = threading.Lock()
+_deals_fetch_locks = {}
+
 
 def _scrub(text, *secrets):
     """An error message with every known secret removed."""
-    out = str(text)
-    for s in secrets:
-        if s and isinstance(s, str) and len(s) >= 8 and s in out:
-            out = out.replace(s, "[redacted]")
-    return _safe_message(out)
+    # Only the access token was known here, so a refresh token, the app secret
+    # or a bearer header in the same message went out in the clear. The shared
+    # redactor masks the secrets this process holds, the SHAPE of the usual
+    # ones, and anything else that merely looks like a credential.
+    from apex import redact as _redact
+    return _redact.scrub_for_client(text, *secrets, limit=300)
 
 
 def _disconnected(reason="no cTrader account is connected"):
     return {"connected": False, "status": NOT_CONNECTED, "reason": reason}
+
+
+def _bound_account(broker):
+    """The account id this broker object will talk to, or None if it has none
+    to report."""
+    getter = getattr(broker, "_ctid", None)
+    if not callable(getter):
+        return None
+    try:
+        return str(getter())
+    except Exception:                                        # noqa: BLE001
+        return None
 
 
 def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
@@ -62,6 +93,10 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
     getter = connection_fn or _link.get_ctrader_connection
     try:
         conn = getter(user_id, ctid=ctid)
+    except _link.LinkConfigError:
+        # A failed token persistence step is an infrastructure failure, not
+        # evidence that the client has no account. Let the API return 503.
+        raise
     except _link.LinkError as e:
         if e.code in ("NO_SUCH_ACCOUNT", "LIVE_BLOCKED"):
             raise
@@ -77,6 +112,16 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         return None, _disconnected(
             "no cTrader account is connected, or none has been selected")
 
+    # The account id is part of the security boundary, not merely a routing
+    # hint.  A connector factory or test double that returns a connection for
+    # a different account must never be allowed to service this request: all
+    # subsequent reads would otherwise be honest responses about the wrong
+    # broker account.  Refuse the mismatch before constructing a broker.
+    if ctid is not None and str(conn.get("ctid")) != str(ctid):
+        raise _link.LinkError(
+            "ACCOUNT_BINDING_MISMATCH",
+            "the broker connection did not match the requested account")
+
     if broker_fn is None:
         from apex import user_loop, user_store
         try:
@@ -84,12 +129,35 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         except Exception as e:  # noqa: BLE001
             return None, {"connected": True, "status": UNAVAILABLE,
                           "reason": _scrub(e, conn.get("accessToken"))}
-        broker_fn = lambda: user_loop._make_broker(user, user_id)[0]
+        # Built for the connection's own account when none was asked about, so a
+        # selection that changes between the two reads is neither served nor
+        # refused as a mismatch: the broker is for the account that was read.
+        if ctid is None:
+            ctid = conn.get("ctid")
+        broker_fn = lambda: user_loop._make_broker(
+            user, user_id, ctid=ctid)[0]
     try:
-        return broker_fn(), conn
+        broker = broker_fn()
     except Exception as e:  # noqa: BLE001
         return None, {"connected": True, "status": UNAVAILABLE,
                       "reason": _scrub(e, conn.get("accessToken"))}
+    # The check above is about the CONNECTION. The broker is built separately,
+    # and `user_loop._make_broker` prefers a token and account id stored on the
+    # legacy user record over the platform connection it was handed. Nothing on
+    # the platform writes those fields today, so this cannot fire now; it is
+    # here so that the day something does, a read or a close is refused rather
+    # than served - or sent - for a different account than the one asked about.
+    # With no account asked about (the default positions and orders reads), the
+    # connection's own account is what the broker must match. A broker with no
+    # account to report (a test double) is not judged.
+    bound = _bound_account(broker)
+    expected = str(ctid if ctid is not None else conn.get("ctid"))
+    if bound is not None and conn.get("ctid") is not None and bound != expected:
+        raise _link.LinkError(
+            "ACCOUNT_BINDING_MISMATCH",
+            "the broker was built for a different account than the one "
+            "requested")
+    return broker, conn
 
 
 def _read(user_id, key, call, *, ctid=None, connection_fn=None,
@@ -111,8 +179,165 @@ def _read(user_id, key, call, *, ctid=None, connection_fn=None,
             "mode": conn.get("mode"), key: data}
 
 
+def _quote(broker, symbol):
+    """Return bid, ask, received timestamp from a read-only broker quote."""
+    getter = getattr(broker, "get_quote", None)
+    if callable(getter):
+        quote = getter(symbol)
+        if isinstance(quote, dict):
+            return (quote["bid"], quote["ask"],
+                    quote.get("receivedAt", quote.get("timestamp", time.time())))
+        if len(quote) == 3:
+            return quote
+        bid, ask = quote
+        return bid, ask, time.time()
+    bid, ask = broker.get_bid_ask(symbol)
+    return bid, ask, time.time()
+
+
+def _enrich_positions(broker):
+    rows = broker.get_all_positions()
+    out = []
+    for original in rows:
+        row = dict(original)
+        symbol = row.get("symbol")
+        bid, ask, received_at = _quote(broker, symbol)
+        side = str(row.get("side") or "").upper()
+        current = bid if side == "BUY" else ask if side == "SELL" else None
+        age = max(0.0, time.time() - float(received_at))
+        row["currentPrice"] = current
+        row["quoteAgeSec"] = round(age, 1)
+        row["quoteStale"] = age > 30.0
+
+        stop = row.get("stopLoss")
+        target = row.get("takeProfit")
+        row["hasStop"] = stop is not None
+        if stop is None:
+            row["warning"] = "UNPROTECTED: no stop-loss is attached"
+        row["stopDistancePips"] = (
+            abs(forex.to_pips(current - stop, symbol, current))
+            if current is not None and stop is not None else None)
+        row["targetDistancePips"] = (
+            abs(forex.to_pips(current - target, symbol, current))
+            if current is not None and target is not None else None)
+
+        entry = row.get("entryPrice")
+        units = row.get("units")
+        if (current is not None and not row["quoteStale"] and entry is not None
+                and units is not None and side in ("BUY", "SELL")):
+            direction = 1 if side == "BUY" else -1
+            row["pnlPips"] = round(
+                forex.to_pips((current - entry) * direction, symbol, current), 1)
+            row["pnlAccount"] = round(
+                forex.pnl_usd(side, entry, current, units, symbol), 2)
+            row["pnlIsEstimate"] = not (
+                original.get("pnlPips") is not None
+                and original.get("pnlAccount") is not None)
+        else:
+            row["pnlPips"] = None
+            row["pnlAccount"] = None
+            row["pnlIsEstimate"] = True
+        out.append(row)
+    return out
+
+
 def positions(user_id, **kw):
-    return _read(user_id, "positions", lambda b: b.get_all_positions(), **kw)
+    return _read(user_id, "positions", _enrich_positions, **kw)
+
+
+def _deal_rows(broker, days):
+    if days is None:
+        days = 7
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        raise ValueError("days must be a whole number")
+    if days < 1 or days > MAX_DEAL_DAYS:
+        raise ValueError(f"days must be between 1 and {MAX_DEAL_DAYS}")
+    end = int(time.time())
+    history = broker.get_deal_history(end - days * 86400, end)
+    if not isinstance(history, dict) or not history.get("ok"):
+        reason = (history or {}).get("error", "the broker did not return deal history")
+        raise RuntimeError(reason)
+    # A history that broke off part-way, or stopped when the page budget ran
+    # out, is NOT the account's history. The connector reports both (an `error`
+    # beside ok:true, or `truncated`); serving the partial set — and caching it —
+    # showed a confident total over trades it had not read.
+    if history.get("error"):
+        raise RuntimeError(
+            f"the broker's deal history was cut short: {history['error']}")
+    if history.get("truncated"):
+        raise RuntimeError(
+            "the broker's deal history is longer than could be read here; "
+            "try a shorter period")
+    raw = history.get("deals")
+    if not isinstance(raw, dict):
+        raise RuntimeError("the broker returned an invalid deal history")
+    return [{
+        "symbol": row.get("symbol"),
+        "side": row.get("side"),
+        "units": row.get("units"),
+        "entry": row.get("entryPrice"),
+        "exit": row.get("exitPrice"),
+        "net": row.get("netPnl"),
+        "closedAt": row.get("closedAt"),
+        "strategyId": row.get("strategyId"),
+        "positionId": row.get("positionId"),
+    } for row in raw.values()]
+
+
+def deals(user_id, *, days=7, **kw):
+    broker, other = _open(user_id, ctid=kw.get("ctid"),
+                          connection_fn=kw.get("connection_fn"),
+                          broker_fn=kw.get("broker_fn"))
+    if broker is None:
+        return other
+    conn = other
+    try:
+        parsed_days = int(days if days is not None else 7)
+    except (TypeError, ValueError):
+        # Keep the same honest validation/error envelope as the uncached path.
+        return {"connected": True, "status": UNAVAILABLE,
+                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                "reason": "days must be a whole number"}
+    # Range-checked BEFORE the per-request lock key is built (same bounds as
+    # `_deal_rows`). The key includes `days`, the locks are never pruned, and an
+    # unchecked value made every distinct number a new entry for ever.
+    if parsed_days < 1 or parsed_days > MAX_DEAL_DAYS:
+        return {"connected": True, "status": UNAVAILABLE,
+                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                "reason": f"days must be between 1 and {MAX_DEAL_DAYS}"}
+    key = (str(user_id), str(conn.get("ctid")), parsed_days)
+    with _deals_cache_lock:
+        fetch_lock = _deals_fetch_locks.setdefault(key, threading.Lock())
+    # Serialize misses for one account so concurrent dashboard requests do
+    # not each walk forty pages of broker history after the TTL expires.
+    with fetch_lock:
+        now = time.monotonic()
+        with _deals_cache_lock:
+            cached = _deals_cache.get(key)
+            if cached and now - cached[0] < DEALS_CACHE_TTL_S:
+                return {"connected": True, "status": OK,
+                        "accountId": conn.get("ctid"),
+                        "mode": conn.get("mode"),
+                        "deals": copy.deepcopy(cached[1])}
+        try:
+            rows = _deal_rows(broker, parsed_days)
+        except Exception as e:  # noqa: BLE001
+            return {"connected": True, "status": UNAVAILABLE,
+                    "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                    "reason": _scrub(e, conn.get("accessToken"))}
+        stored_at = time.monotonic()
+        with _deals_cache_lock:
+            _deals_cache[key] = (stored_at, copy.deepcopy(rows))
+            if len(_deals_cache) > DEALS_CACHE_MAX:
+                oldest = sorted(_deals_cache,
+                                key=lambda item: _deals_cache[item][0])
+                for old_key in oldest[:len(_deals_cache) - DEALS_CACHE_MAX]:
+                    _deals_cache.pop(old_key, None)
+    return {"connected": True, "status": OK,
+            "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+            "deals": rows}
 
 
 def orders(user_id, **kw):
