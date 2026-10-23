@@ -21,10 +21,14 @@ on:
     branches:
       - claude/arcads-external-api-gExX7
       - claude/arcads-external-api-gexx7-6n4pr9
+      - claude/apex4traders-platform-v1
   pull_request:
+    # Pull requests are matched on their BASE branch, so a claude/issue-* or
+    # codex/issue-* branch is checked when its PR targets one of these.
     branches:
       - claude/arcads-external-api-gExX7
       - claude/arcads-external-api-gexx7-6n4pr9
+      - claude/apex4traders-platform-v1
   workflow_dispatch:
 
 permissions:
@@ -32,7 +36,7 @@ permissions:
 
 jobs:
   node:
-    name: server.js — 61 security tests
+    name: node
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -58,7 +62,7 @@ jobs:
         run: npm audit --omit=dev || true
 
   python:
-    name: apex-forex-bot — 98 test files
+    name: python
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -98,7 +102,7 @@ jobs:
         run: python -m pytest -q
 
   config-drift:
-    name: generated allowlist is current
+    name: config-drift
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -125,3 +129,34 @@ jobs:
             exit 1
           fi
           echo "allowlist is current"
+
+  web:
+    # The Next.js app in web/. Lint is deliberately not run here yet: two
+    # pre-existing ESLint errors (connect/page.tsx, pending-approval.tsx) are
+    # tracked separately and would turn every run red for unrelated reasons.
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
