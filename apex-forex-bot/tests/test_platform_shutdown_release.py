@@ -183,6 +183,37 @@ try:
     out = PS._release_for_shutdown(budget_s=5)
     check("end to end: the loop is suspended and the lease is gone",
           out.get("suspended") == ["s1"] and "own:user:s1" not in fake.kv, f"{out} {fake.kv}")
+    # ── 4. the shutdown that begins BETWEEN the check and the claim ─────────
+    print("\n[4] a lease claimed in the instant the shutdown begins is handed back")
+    # acquire() and heartbeat() check the flag at their top, but begin_shutdown()
+    # can fire after that check and before the claim reaches the store. Its sweep
+    # has then already run, so the lease taken a moment later was one nobody
+    # released and the replacement container stood down for the whole TTL.
+    class RacyFake(Fake):
+        def claim_value(self, key, value, ttl_s=120):
+            got = super().claim_value(key, value, ttl_s)
+            ownership._shutdown.set()       # the shutdown begins during the claim
+            return got
+
+    restore(); fake = RacyFake(); install(fake)
+    got = ownership.acquire("r1")
+    check("acquire refuses and does not report the lease as held", got is False,
+          str(got))
+    check("the key is not left behind for the replacement to wait out",
+          "own:user:r1" not in fake.kv, str(fake.kv))
+    check("and it is not recorded as ours", "r1" not in ownership._held)
+
+    restore(); fake = RacyFake(); install(fake)
+    got = ownership.heartbeat("r2")         # the key is absent: the re-acquire path
+    check("heartbeat does not re-take a lease the sweep has just released",
+          got is None, str(got))
+    check("the re-taken key is handed straight back",
+          "own:user:r2" not in fake.kv, str(fake.kv))
+
+    restore(); fake = Fake(); install(fake)
+    check("(control) with no shutdown, the same calls do take the lease",
+          ownership.acquire("r3") is True and "own:user:r3" in fake.kv,
+          str(fake.kv))
 finally:
     restore()
 

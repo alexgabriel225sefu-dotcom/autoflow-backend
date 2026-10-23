@@ -48,6 +48,7 @@ from apex import gates                                       # noqa: E402
 from apex.platform import ctrader_link as LINK               # noqa: E402
 from apex.platform import position_close as PC               # noqa: E402
 
+_REAL_ACCOUNT_MODE = PC._account_mode
 PC._account_mode = lambda uid, ctid: "demo"
 released, gated = [], []
 
@@ -147,6 +148,13 @@ finally:
 check("'0123' under account 501 -> '501:123'", seen[0] == "501:123", str(seen))
 check("the same id under account 502 is a different claim", seen[1] == "502:123" and seen[0] != seen[1], str(seen))
 check("without an account the old key is unchanged (other callers)", seen[2] == "123", str(seen))
+
+# The stub above replaced a module-level function for the whole interpreter. A
+# combined pytest session shares that interpreter, so it made a later file's
+# "a live account is refused before the gate" fail. Put the real one back.
+PC._account_mode = _REAL_ACCOUNT_MODE
+check("the module's own demo check is restored for whoever runs next",
+      PC._account_mode is _REAL_ACCOUNT_MODE)
 
 print()
 if _fails:

@@ -126,6 +126,30 @@ n = sum(1 for i in range(80) if RL.check("POST", "emergency/stop",
 check("a flood of junk tokens at Emergency from one address is still capped",
       n == 50, str(n))
 
+# ── 6. and per PERSON, once the session is verified ─────────────────────────
+print("\n[6] several sessions of one person share one Emergency budget")
+RL.LIMITERS["emergency_user"].limit = 3
+res = [RL.check_user("emergency_user", "person-1")[0] for _ in range(5)]
+check("a person is limited whichever session the presses come from (3 then refused)",
+      res[:3] == [True] * 3 and res[3] is False and res[4] is False, str(res))
+ok, wait = RL.check_user("emergency_user", "person-1")
+check("the refusal carries a wait", ok is False and wait >= 1, f"{ok} {wait}")
+check("another person is unaffected",
+      RL.check_user("emergency_user", "person-2")[0] is True)
+check("an unknown bucket or an empty id does not refuse",
+      RL.check_user("nonexistent", "x")[0] is True
+      and RL.check_user("emergency_user", "")[0] is True)
+api_src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()
+route = api_src.split('if route == "emergency/stop":', 1)[1].split("# ── automation control", 1)[0]
+_a, _c, _r = (route.find("_authenticate(headers, fresh=True)"),
+              route.find('check_user("emergency_user"'),
+              route.find("_panic.run("))
+check("the route counts the person at all", _c != -1,
+      "the per-person Emergency limit is not called")
+check("after authenticating and before doing any work",
+      -1 != _a < _c < _r,
+      "a per-person limit needs the verified id, and must precede the work")
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

@@ -64,15 +64,28 @@ _deals_fetch_locks = {}
 
 def _scrub(text, *secrets):
     """An error message with every known secret removed."""
-    out = str(text)
-    for s in secrets:
-        if s and isinstance(s, str) and len(s) >= 8 and s in out:
-            out = out.replace(s, "[redacted]")
-    return out[:300]
+    # Only the access token was known here, so a refresh token, the app secret
+    # or a bearer header in the same message went out in the clear. The shared
+    # redactor masks the secrets this process holds, the SHAPE of the usual
+    # ones, and anything else that merely looks like a credential.
+    from apex import redact as _redact
+    return _redact.scrub_for_client(text, *secrets, limit=300)
 
 
 def _disconnected(reason="no cTrader account is connected"):
     return {"connected": False, "status": NOT_CONNECTED, "reason": reason}
+
+
+def _bound_account(broker):
+    """The account id this broker object will talk to, or None if it has none
+    to report."""
+    getter = getattr(broker, "_ctid", None)
+    if not callable(getter):
+        return None
+    try:
+        return str(getter())
+    except Exception:                                        # noqa: BLE001
+        return None
 
 
 def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
@@ -119,10 +132,24 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         broker_fn = lambda: user_loop._make_broker(
             user, user_id, ctid=ctid)[0]
     try:
-        return broker_fn(), conn
+        broker = broker_fn()
     except Exception as e:  # noqa: BLE001
         return None, {"connected": True, "status": UNAVAILABLE,
                       "reason": _scrub(e, conn.get("accessToken"))}
+    # The check above is about the CONNECTION. The broker is built separately,
+    # and `user_loop._make_broker` prefers a token and account id stored on the
+    # legacy user record over the platform connection it was handed. Nothing on
+    # the platform writes those fields today, so this cannot fire now; it is
+    # here so that the day something does, a read or a close is refused rather
+    # than served - or sent - for a different account than the one asked about.
+    # A broker with no account to report (a test double) is not judged.
+    bound = _bound_account(broker)
+    if ctid is not None and bound is not None and bound != str(ctid):
+        raise _link.LinkError(
+            "ACCOUNT_BINDING_MISMATCH",
+            "the broker was built for a different account than the one "
+            "requested")
+    return broker, conn
 
 
 def _read(user_id, key, call, *, ctid=None, connection_fn=None,

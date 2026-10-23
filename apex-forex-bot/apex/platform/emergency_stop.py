@@ -43,6 +43,7 @@ broker.
 """
 import time
 
+from apex import redact as _redact
 from apex.platform import automation as _auto
 from apex.platform import broker_read as _read
 from apex.platform import position_close as _close
@@ -94,9 +95,10 @@ def _close_one(user_id, ctid, row, closer):
     try:
         result = closer(user_id, ctid=ctid, position_id=base["positionId"])
     except _close.CloseRefused as e:
-        return dict(base, outcome=REFUSED, code=e.code, detail=str(e.detail)[:200])
+        return dict(base, outcome=REFUSED, code=e.code,
+                    detail=_redact.scrub_for_client(e.detail, limit=200))
     except _close.CloseUnknown as e:
-        return dict(base, outcome=UNKNOWN, detail=str(e)[:200])
+        return dict(base, outcome=UNKNOWN, detail=_redact.scrub_for_client(e, limit=200))
     except Exception as e:                                   # noqa: BLE001
         return dict(base, outcome=FAILED, detail=_scrub(e))
     status = str((result or {}).get("status") or "").upper()

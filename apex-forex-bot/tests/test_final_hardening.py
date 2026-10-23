@@ -318,11 +318,33 @@ try:
     check("EMERGENCY close + same outage → proceeds", d.allowed is True, d.reason)
     check("and records that it was an emergency",
           "emergency" in d.detail, d.detail)
+
+    # The platform's DEMO close addressed to one position id. A position id is
+    # not reusable, so a duplicate request can only be answered "no such
+    # position"; refusing the client's own exit because Redis blipped was the
+    # wrong way round for the control that exists to get them out.
+    d, _ = gates.authorize_platform_demo_close("77", position_id="123",
+                                               account="501",
+                                               user={"paper": True})
+    check("a platform DEMO close by position id + idempotency DOWN → proceeds",
+          d.allowed is True, f"{d.reason}: {d.detail}")
+    d, _ = gates.authorize_close("77", position_id="123", origin="manual",
+                                 user={"paper": True})
+    check("while the same close from any other origin is still refused",
+          d.allowed is False and d.reason == "CLOSE_COORDINATION_UNAVAILABLE",
+          d.reason)
+    d, _ = gates.authorize_platform_demo_close("77", position_id="124",
+                                               account="501",
+                                               user={"paper": False})
+    check("and a REAL-MONEY account is still refused by the adapter (ownership first)",
+          d.allowed is False, f"{d.reason}: {d.detail}")
 finally:
     restore()
 GSRC2 = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
 check("the policy is one expression, not two code paths",
-      "fail_closed=not emergency" in GSRC2)
+      "fail_closed=not (emergency or position_keyed)" in GSRC2)
+check("and only the platform's demo adapter asks for the relaxed case",
+      GSRC2.count("position_keyed=True") == 1, str(GSRC2.count("position_keyed=True")))
 check("and both are audited either way", "gates.audit(" in LSRC)
 
 # ── 7 ────────────────────────────────────────────────────

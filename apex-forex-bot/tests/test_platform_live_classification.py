@@ -295,6 +295,42 @@ try:
           f"{d.reason}: {d.detail}")
     check("and burns no claim", rid is None, str(rid))
 
+    print("\n[7c] a platform account whose record says paper=True but whose loop is bound live")
+    # A platform connection always builds a non-simulated broker, so the stored
+    # flag cannot make a live-bound loop simulated. The explicit-paper shortcut
+    # used to skip the classification for it entirely.
+    connect(LIVE_USER, CTL.LIVE)
+    user_store.save(LIVE_USER, {"id": LIVE_USER, "paper": True})
+    d, rid = order(LIVE_USER, units=1400, bound_account="900001", bound_env="live")
+    check("it is held to the live gates (a reason only reachable when live)",
+          not d.allowed and any(k in str(d.reason) for k in _only_if_live),
+          f"{d.reason}: {d.detail}")
+    d, rid = order(LIVE_USER, units=1500, bound_account="900001", bound_env="demo")
+    check("while a paper-flagged loop bound to DEMO is still simulated and passes",
+          d.allowed, f"{d.reason}: {d.detail}")
+    user_store.save(LIVE_USER, {"id": LIVE_USER})
+
+    print("\n[7d] one blip on the second read does not refuse a legacy live order")
+    user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+    _real_strict2 = PS._read_strict
+    _n = {"calls": 0}
+
+    def _flaky(key):
+        # the tombstone read in the not-a-platform-account branch fails once
+        if "ctrader" in str(key) and _n["calls"] == 1:
+            _n["calls"] += 1
+            raise RuntimeError("transient")
+        _n["calls"] += 1 if "ctrader" in str(key) else 0
+        return _real_strict2(key)
+
+    PS._read_strict = _flaky
+    try:
+        d, _ = order(TG_USER, units=1600, bound_account="123", bound_env="live")
+    finally:
+        PS._read_strict = _real_strict2
+    check("the legacy order is not refused as LIVE_CLASSIFY_FAILED",
+          d.reason != "LIVE_CLASSIFY_FAILED", f"{d.reason}: {d.detail}")
+
     print("\n[8] a store that cannot be read, for a live loop")
     _real_strict = PS._read_strict
 

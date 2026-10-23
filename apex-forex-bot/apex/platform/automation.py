@@ -398,7 +398,14 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # loop against an account nobody confirmed is practice money.
     check = _link.verify_selected_mode(user_id, lister=mode_lister)
     if check["mode"] in (DEMO, LIVE) and check["verified"]:
-        pass
+        # `conn` and `check` are separate reads of the selection. If it changed
+        # between them, the broker confirmed the mode of one account while the
+        # loop would be started on another.
+        if str(check.get("ctid")) != str(conn.get("ctid")):
+            raise AutomationRefused(
+                "ACCOUNT_CHANGED",
+                "the selected account changed while the start was being "
+                "checked, so nothing was started - try again")
     else:
         raise AutomationRefused(
             "MODE_UNVERIFIED",
@@ -485,14 +492,9 @@ def _safe_cause(exc, *secrets):
     token characters) or is named like one. Provider payloads are never
     attached — only this string.
     """
-    text = str(exc)
-    for sec in secrets:
-        if sec and isinstance(sec, str) and len(sec) >= 8:
-            text = text.replace(sec, "[redacted]")
-    text = _BEARER.sub(r"\1 [redacted]", text)
-    text = _KEYED.sub(lambda m: f"{m.group(1)}=[redacted]", text)
-    text = _TOKEN_LIKE.sub("[redacted]", text)
-    text = " ".join(text.split())[:160]
+    # One implementation of "credential-shaped": apex.redact.scrub_for_client.
+    from apex import redact as _redact
+    text = _redact.scrub_for_client(exc, *secrets, limit=160)
     return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
 
 
