@@ -284,12 +284,6 @@ export function RuleTerms({
         />
         <Row k="Evaluated" v={doc.evaluateOn === "intrabar" ? "On every tick (intrabar)" : "On bar close"} />
         <Row
-          k="When a setup appears"
-          v={doc.automationLevel === "signals" ? "Signals Only"
-            : doc.automationLevel === "approval" ? "Approval Required"
-            : "Full Automation"}
-        />
-        <Row
           k="Sides"
           v={String(doc.sides ?? "—")}
           note={presetOf(doc)

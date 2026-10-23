@@ -28,7 +28,6 @@ export const NAV: NavItem[] = [
   { href: "/orders", label: "Orders", icon: Receipt },
   { href: "/performance", label: "Performance", icon: BarChart3 },
   { href: "/journal", label: "Journal", icon: BookOpen, primary: true },
-  { href: "/performance", label: "Performance", icon: TrendingUp },
   { href: "/notifications", label: "Alerts", icon: Bell },
   { href: "/accounts", label: "Accounts", icon: Wallet },
   { href: "/settings", label: "Settings", icon: Settings },
