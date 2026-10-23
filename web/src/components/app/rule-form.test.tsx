@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { BLANK, RuleForm, STEPS, toDoc, type Draft } from "./rule-form";
+import { BLANK, RuleForm, STEPS, fromDoc, toDoc, type Draft } from "./rule-form";
 import { ruleSentence } from "./rule-summary";
 import type { ConditionSpec } from "@/lib/api";
 
@@ -67,6 +67,15 @@ describe("toDoc — no field is silently dropped", () => {
     expect(doc.limits).toMatchObject({ maxOpenPositions: 1, onLimit: "block" });
     expect(doc.order).toMatchObject({ type: "MARKET" });
     expect(doc.schedule).toMatchObject({ timezone: "UTC" });
+  });
+
+  it("round-trips the selected automation level", () => {
+    const doc = toDoc({ ...BLANK, automationLevel: "approval" }) as Record<string, unknown>;
+    expect(doc.automationLevel).toBe("approval");
+    const loaded = fromDoc({ ...doc, ruleDocId: "r1", state: "draft", version: 1,
+      name: "Demo", symbols: ["EURUSD"], timeframe: "1h", updatedAt: 1 } as never);
+    expect(loaded.ok).toBe(true);
+    if (loaded.ok) expect(loaded.draft.automationLevel).toBe("approval");
   });
 
   it("an empty optional stays null rather than becoming a number", () => {

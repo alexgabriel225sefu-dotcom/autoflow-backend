@@ -97,6 +97,16 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         return None, _disconnected(
             "no cTrader account is connected, or none has been selected")
 
+    # The account id is part of the security boundary, not merely a routing
+    # hint.  A connector factory or test double that returns a connection for
+    # a different account must never be allowed to service this request: all
+    # subsequent reads would otherwise be honest responses about the wrong
+    # broker account.  Refuse the mismatch before constructing a broker.
+    if ctid is not None and str(conn.get("ctid")) != str(ctid):
+        raise _link.LinkError(
+            "ACCOUNT_BINDING_MISMATCH",
+            "the broker connection did not match the requested account")
+
     if broker_fn is None:
         from apex import user_loop, user_store
         try:
@@ -205,8 +215,8 @@ def _deal_rows(broker, days):
         days = int(days)
     except (TypeError, ValueError):
         raise ValueError("days must be a whole number")
-    if days < 1 or days > 30:
-        raise ValueError("days must be between 1 and 30")
+    if days < 1 or days > 3650:
+        raise ValueError("days must be between 1 and 3650")
     end = int(time.time())
     history = broker.get_deal_history(end - days * 86400, end)
     if not isinstance(history, dict) or not history.get("ok"):
@@ -223,6 +233,7 @@ def _deal_rows(broker, days):
         "exit": row.get("exitPrice"),
         "net": row.get("netPnl"),
         "closedAt": row.get("closedAt"),
+        "strategyId": row.get("strategyId"),
         "positionId": row.get("positionId"),
     } for row in raw.values()]
 
