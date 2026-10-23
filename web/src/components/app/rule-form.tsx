@@ -24,6 +24,7 @@ export type Draft = {
   timeframe: string;
   sides: string;
   evaluateOn: string;
+  automationLevel: "signals" | "approval" | "full";
   entryCombine: string;
   entry: ConditionValue[];
   exitCombine: string;
@@ -56,7 +57,7 @@ export type Draft = {
 
 /** The same defaults the server would apply, made visible instead of implied. */
 export const BLANK: Draft = {
-  name: "", symbols: "EURUSD", timeframe: "1h", sides: "BOTH", evaluateOn: "bar_close",
+  name: "", symbols: "EURUSD", timeframe: "1h", sides: "BOTH", evaluateOn: "bar_close", automationLevel: "full",
   entryCombine: "AND", entry: [], exitCombine: "OR", exit: [],
   sizingMode: "risk_percent", riskPercent: "1.0", fixedVolume: "0.1",
   slMode: "atr", slAtrMultiple: "1.5", slPips: "20",
@@ -85,6 +86,7 @@ export function toDoc(d: Draft): Partial<RuleDoc> {
     timeframe: d.timeframe,
     sides: d.sides,
     evaluateOn: d.evaluateOn,
+    automationLevel: d.automationLevel,
     entry: { combine: d.entryCombine, conditions: d.entry },
     exit: { combine: d.exitCombine, conditions: d.exit },
     order: {
@@ -175,6 +177,8 @@ export function fromDoc(doc: RuleDoc): FromDoc {
       timeframe: str(doc.timeframe) || BLANK.timeframe,
       sides: str(doc.sides) || BLANK.sides,
       evaluateOn: str(doc.evaluateOn) || BLANK.evaluateOn,
+      automationLevel: (["signals", "approval", "full"] as const).includes(str(doc.automationLevel) as "signals" | "approval" | "full")
+        ? str(doc.automationLevel) as Draft["automationLevel"] : BLANK.automationLevel,
       entryCombine: str(entry.combine) || BLANK.entryCombine,
       entry: (Array.isArray(entry.conditions) ? entry.conditions : []) as ConditionValue[],
       exitCombine: str(exit.combine) || BLANK.exitCombine,
@@ -224,7 +228,7 @@ function Seg({
       {options.map((o) => (
         <button key={o} type="button" aria-pressed={value === o}
                 data-tone={tones?.[o]} onClick={() => onChange(o)}>
-          {o}
+          {o === "signals" ? "Signals Only" : o === "approval" ? "Approval Required" : o === "full" ? "Full Automation" : o}
         </button>
       ))}
     </div>
@@ -358,6 +362,16 @@ export function RuleForm({
             {d.evaluateOn === "intrabar"
               ? "An intrabar evaluation can fire on a price the bar never closes at."
               : "On bar close: the decision is taken on a price the bar actually ended at."}
+          </span>
+        </div>
+        <div className="field"><span>When a setup appears</span>
+          <Seg value={d.automationLevel}
+               options={["signals", "approval", "full"]}
+               onChange={(v) => set("automationLevel", v as Draft["automationLevel"])} />
+          <span className="field-note">
+            {d.automationLevel === "signals" ? "Signals Only — the platform records setups and places no orders."
+              : d.automationLevel === "approval" ? "Approval Required — you approve each proposed order."
+              : "Full Automation — the active rule may place demo orders when its conditions are met."}
           </span>
         </div>
       </Section>

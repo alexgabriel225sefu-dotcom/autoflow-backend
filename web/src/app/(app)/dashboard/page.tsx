@@ -72,6 +72,7 @@ export default function Dashboard() {
   // one: it must survive the status reload that follows, which is the
   // moment the old code lost it.
   const [selectErr, setSelectErr] = useState<ApiError | null>(null);
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
 
   const account = ct.result?.ok ? ct.result.data : null;
   const selected = account?.selected ?? null;
@@ -130,8 +131,30 @@ export default function Dashboard() {
     // `automation` too, for the status strip, and reloading only the local
     // read left the strip claiming STOPPED while this panel said running.
     invalidate("automation", "journal?limit=8", "me");
+    // Reload this mounted copy before ConfirmAction closes its confirmation
+    // prompt. Otherwise a refused Stop can leave the page claiming RUNNING
+    // (or a successful Start claiming STOPPED) until the polling interval.
+    await auto.reload();
     if (!r.ok) return `${r.code}: ${r.message}`;
     return outcomeOf(r.data);
+  }
+
+  async function stopAndCloseDemo(): Promise<string> {
+    if (!selected || selected.mode !== "demo") return "Emergency close is available only for the selected demo account.";
+    const stop = await api<AutomationState>("automation/stop", { method: "POST" });
+    if (!stop.ok) return `${stop.code}: ${stop.message}`;
+    const current = pos.result?.ok && pos.result.data.status === "ok" ? pos.result.data.positions ?? [] : [];
+    for (const p of current) {
+      const closed = await api(`accounts/${selected.ctid}/positions/${p.positionId}/close`, { method: "POST" });
+      if (!closed.ok) return `${closed.code}: ${closed.message}`;
+    }
+    const after = await api<PositionsRead>("positions");
+    invalidate("automation", "positions", "journal?limit=8", "me");
+    await auto.reload();
+    await pos.reload();
+    if (after.ok && after.data.status === "ok" && (after.data.positions ?? []).length === 0) return "Confirmed flat.";
+    const remaining = after.ok ? (after.data.positions ?? []).map((p) => String(p.positionId)).join(", ") : "the broker read failed";
+    return `Not confirmed flat. Remaining positions: ${remaining || "unknown"}.`;
   }
 
   return (
@@ -326,8 +349,27 @@ export default function Dashboard() {
                                        question="Stop automation? Anything already open stays at your broker — this closes nothing."
                                        onConfirm={() => control("stop")} />
                       ) : null}
+                      {isDemo ? (
+                        <button className="btn btn-ghost" type="button" onClick={() => setEmergencyOpen((v) => !v)} aria-expanded={emergencyOpen}>
+                          Emergency
+                        </button>
+                      ) : null}
                     </div>
                   )}
+                  {emergencyOpen && isDemo ? (
+                    <div className="notice notice-warn" role="region" aria-label="Emergency controls">
+                      <strong>Emergency controls</strong>
+                      <p className="muted">Each action has a separate confirmation. Stop only leaves broker positions open.</p>
+                      <div className="btn-row">
+                        <ConfirmAction label="Stop only" danger
+                          question="Stop automation only? Existing demo positions remain open at cTrader."
+                          onConfirm={() => control("stop")} />
+                        <ConfirmAction label="Stop and close positions" danger
+                          question="Stop automation and close every open demo position by position ID?"
+                          onConfirm={stopAndCloseDemo} />
+                      </div>
+                    </div>
+                  ) : null}
                 </>
               )}
           </section>
