@@ -159,14 +159,17 @@ make it decorative.
 
 See `apex/platform/entitlement.py` and `docs/BETA_CONFIGURATION.md`.
 
-### Live trading is unavailable and fail-closed
+### Live trading is implemented behind a closed release switch
 
-`entitlement.live_execution_enabled()` returns a literal `False`. Not a flag,
-not an environment read, not a call — a constant, asserted on the AST.
+The live execution controller and broker bridge exist on this branch, but the
+release switch is closed by default. `entitlement.live_execution_enabled()`
+reads `A4T_LIVE_EXECUTION`; production must refuse unless the operator has
+explicitly opened that switch and every independent gate passes.
 
-`apex/platform/bridge.py`, the only module that can ask a broker to place an
-order, is **imported by nothing in production**. Its sole importer is its own
-test. `bridge.submit` is unreachable, not merely gated.
+`apex/platform/bridge.py` is imported by `live_execution.py`, so the old
+"unreachable bridge" description is stale. The path remains unavailable to
+customers while the release switch is closed and the live release gates have
+not been reviewed for production.
 
 Three further locks, each tested with the other two disabled:
 
@@ -183,10 +186,9 @@ not the two that differ.
 ### Never add a hidden live-trading bypass
 
 Not a flag, not a debug path, not an "only in staging" branch, not a test hook
-that production can reach. `tests/test_platform_live_invariants.py` fails when
-the bridge is wired up — **that failure is the review gate**. It is resolved by
-review, not by relaxing the test. When live execution is genuinely implemented,
-that file is **rewritten** to assert the new shape; it is never deleted.
+that production can reach. `tests/test_platform_live_invariants.py` asserts the
+gated controller shape and must remain green; it must never be relaxed to make
+a closed deployment appear live.
 
 The requirements for such a milestone are in
 `docs/LIVE_EXECUTION_SPECIFICATION.md`. Nothing in that document is implemented
@@ -199,8 +201,8 @@ These exist because every one of them has a cheap, tempting violation.
 ### Never claim a real integration works unless it was tested against the real integration
 
 Contract tests, stubbed brokers and a local harness prove the *contract*. They
-do not prove the integration. At the time of writing, **nothing in this platform
-has ever spoken to cTrader** — blocker **X1**. Any statement that the connected
+do not prove the integration. Prior release evidence covers cTrader demo reads,
+but no live order path has been approved or exercised. Any statement that the connected
 path works is false until that changes, however many tests pass.
 
 ### Never replace failed broker data with fake or fixture data in production paths

@@ -58,8 +58,9 @@ Toate trebuie să treacă. Nu comite cu teste roșii.
 
 Pentru Apex4Traders, în plus:
 
-- Nu activa tranzacționarea live și nu adăuga o cale către ea. `LIVE_TRADING_ENABLED`
-  nu are implementare în spate — `/readyz` refuză pornirea dacă e setat.
+- Nu activa tranzacționarea live și nu deschide switch-ul `A4T_LIVE_EXECUTION`.
+  Controllerul există, dar producția trebuie să rămână fail-closed până la
+  aprobarea separată a tuturor porților și a testului broker staging.
 - Nu acorda licențe din cereri venite din browserul clientului. Vezi
   `docs/MANUAL_LICENCE_OPERATIONS.md`.
 - Codul, UI-ul, testele, comentariile și documentația **nouă** din Apex4Traders

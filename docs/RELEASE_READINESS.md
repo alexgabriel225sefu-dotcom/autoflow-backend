@@ -285,3 +285,19 @@ Mobile destinations went from 1 of 8 to 8 of 8.
 
 None of these is blocked on code that is missing and unwritten. Three are
 blocked on the owner, and one on a cTrader demo account.
+
+## Security sweep 2026-10-23
+
+This release-readiness page predates the current gated live controller. The
+controller and broker bridge are present on the assessed branch, but
+`A4T_LIVE_EXECUTION` remains closed and no live order was placed as part of this
+sweep. The old statements that the bridge is unreachable should not be used as
+current evidence; the authoritative check is `tests/test_platform_live_invariants.py`.
+
+The security sweep found no evidence that production should be opened. Before
+any external client or live-money release, the owner still needs to complete a
+staged broker test, verify shared rate limiting and kill-switch operation,
+confirm append-only audit restore, and resolve the redaction findings recorded
+in `docs/SECURITY_SWEEP_20261023.md`. Browser QA was not performed in this
+headless session. Dependency audit coverage is partial where `pip-audit` and an
+online npm audit were unavailable.
