@@ -12,6 +12,7 @@ os.environ.setdefault("APP_ENV", "dev")
 from apex import ledger  # noqa: E402
 from apex.brokers import ctrader  # noqa: E402
 from apex.platform import api  # noqa: E402
+from apex.platform import broker_read  # noqa: E402
 
 
 def test_platform_reads_pass_explicit_ctid_to_broker_factory():
@@ -57,6 +58,28 @@ def test_releasing_a_shared_claim_uses_owner_token():
         ledger.user_store.release_claim = old_release_claim
         ledger._local.clear()
         ledger._local.update(old_local)
+
+
+def test_platform_read_refuses_connection_for_a_different_ctid():
+    """An explicit account route must never read through another account."""
+    called = []
+
+    def wrong_connection(_user_id, *, ctid=None):
+        return {"ctid": "999", "mode": "demo", "accessToken": "redacted"}
+
+    def should_not_construct():
+        called.append(True)
+        raise AssertionError("broker construction crossed the account boundary")
+
+    try:
+        broker_read._open("user-1", ctid="501",
+                          connection_fn=wrong_connection,
+                          broker_fn=should_not_construct)
+    except Exception as exc:
+        assert getattr(exc, "code", None) == "ACCOUNT_BINDING_MISMATCH"
+    else:
+        raise AssertionError("a mismatched ctid connection was accepted")
+    assert not called
 
 
 if __name__ == "__main__":

@@ -97,6 +97,16 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         return None, _disconnected(
             "no cTrader account is connected, or none has been selected")
 
+    # The account id is part of the security boundary, not merely a routing
+    # hint.  A connector factory or test double that returns a connection for
+    # a different account must never be allowed to service this request: all
+    # subsequent reads would otherwise be honest responses about the wrong
+    # broker account.  Refuse the mismatch before constructing a broker.
+    if ctid is not None and str(conn.get("ctid")) != str(ctid):
+        raise _link.LinkError(
+            "ACCOUNT_BINDING_MISMATCH",
+            "the broker connection did not match the requested account")
+
     if broker_fn is None:
         from apex import user_loop, user_store
         try:
