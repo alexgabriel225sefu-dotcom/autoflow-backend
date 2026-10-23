@@ -346,6 +346,94 @@ finally:
     RL.LIMITERS["default"].check = _real_check
     RL.reset_all()
 
+# ── 11. live-order limits are separate and fail closed ─────────────────────
+print("\n[11] future live-order limits are not API limits")
+_saved_order = (user_store._USE_REDIS, user_store.incr,
+                user_store.redis_health, RL._MODE,
+                os.environ.get("RL_A4T_ORDER_CLIENT_PER_MIN"),
+                os.environ.get("RL_A4T_ORDER_BROKER_PER_SEC"))
+try:
+    user_store._USE_REDIS = False
+    RL._MODE = "auto"
+    no_store = RL.check_live_order_rate(
+        "u1", "acc1", provider="ctrader", connection_id="conn1", now=120.0)
+    check("a live order is refused without a shared counter",
+          no_store["ok"] is False
+          and no_store["error"]["code"] == "ORDER_RATE_LIMIT_UNAVAILABLE"
+          and no_store["error"]["gate"] == "order_rate_store",
+          json.dumps(no_store))
+
+    RL.reset_all()
+    demo_read = RL.check("GET", "accounts/501/candles",
+                         client_key="1.2.3.4", auth_header="Bearer demo")
+    check("but demo reads still use the normal API limiter",
+          demo_read[0] is True and demo_read[1] == "candles", str(demo_read))
+
+    user_store._USE_REDIS = True
+    user_store.redis_health = lambda *a, **k: {
+        "configured": True, "reachable": True, "status": "HEALTHY"}
+    _order_counts = {}
+
+    def _order_incr(key, ttl_s=60):
+        _order_counts[key] = _order_counts.get(key, 0) + 1
+        return _order_counts[key]
+
+    user_store.incr = _order_incr
+    os.environ["RL_A4T_ORDER_CLIENT_PER_MIN"] = "2"
+    os.environ["RL_A4T_ORDER_BROKER_PER_SEC"] = "99"
+    _order_counts.clear()
+    client_out = [RL.check_live_order_rate(
+        "u1", "acc1", provider="ctrader", connection_id="conn1", now=180.0)
+        for _ in range(3)]
+    check("the per-client order cap is separate from the API cap",
+          client_out[0]["ok"] is True
+          and client_out[1]["ok"] is True
+          and client_out[2]["ok"] is False
+          and client_out[2]["error"]["gate"] == "client_order_rate",
+          json.dumps(client_out[2]))
+
+    os.environ["RL_A4T_ORDER_CLIENT_PER_MIN"] = "99"
+    os.environ["RL_A4T_ORDER_BROKER_PER_SEC"] = "2"
+    _order_counts.clear()
+    broker_out = [RL.check_live_order_rate(
+        f"u{i}", f"acc{i}", provider="ctrader",
+        connection_id="one-shared-connection", now=240.0)
+        for i in range(3)]
+    check("the broker-connection order cap is shared across clients",
+          broker_out[0]["ok"] is True
+          and broker_out[1]["ok"] is True
+          and broker_out[2]["ok"] is False
+          and broker_out[2]["error"]["gate"] == "broker_order_rate",
+          json.dumps(broker_out[2]))
+    check("order counters are in their own namespace",
+          all(":order_rl:" in k for k in _order_counts),
+          str(list(_order_counts)[:4]))
+    check("order counters do not carry user ids or account ids",
+          not any("u1" in k or "acc1" in k or "Bearer" in k
+                  for k in _order_counts),
+          str(list(_order_counts)[:4]))
+
+    user_store.incr = lambda key, ttl_s=60: None
+    unavailable = RL.check_live_order_rate(
+        "u1", "acc1", provider="ctrader", connection_id="conn1", now=300.0)
+    check("a counter failure refuses instead of using process memory",
+          unavailable["ok"] is False
+          and unavailable["error"]["code"] == "ORDER_RATE_LIMIT_UNAVAILABLE"
+          and unavailable["error"]["gate"] == "client_order_rate",
+          json.dumps(unavailable))
+finally:
+    (user_store._USE_REDIS, user_store.incr, user_store.redis_health,
+     RL._MODE, _env_client, _env_broker) = _saved_order
+    if _env_client is None:
+        os.environ.pop("RL_A4T_ORDER_CLIENT_PER_MIN", None)
+    else:
+        os.environ["RL_A4T_ORDER_CLIENT_PER_MIN"] = _env_client
+    if _env_broker is None:
+        os.environ.pop("RL_A4T_ORDER_BROKER_PER_SEC", None)
+    else:
+        os.environ["RL_A4T_ORDER_BROKER_PER_SEC"] = _env_broker
+    RL.reset_all()
+
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()
