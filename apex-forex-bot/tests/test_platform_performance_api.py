@@ -2,6 +2,11 @@
 import os
 import sys
 
+os.environ.setdefault("APP_ENV", "dev")
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
+os.environ.setdefault("PRODUCT", "forex")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
