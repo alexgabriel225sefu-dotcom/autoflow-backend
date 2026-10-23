@@ -209,8 +209,24 @@ Whichever parts the change touches must pass; an agent states which it ran. CI
 branches and has no web job; see the audit. Until that is fixed, **CI green is
 not evidence for platform work**; the local run is.
 
-## 9. What Phase 1 does not do
+## 9. Phase 2 status (what actually runs)
 
-No scheduled task, no trigger, no workflow, no auto-merge, no change to Render,
-no branch protection, no credential. Those are Phase 2 and need the owner's
-explicit approval. The proposal is in `docs/ORCHESTRATOR_PHASE1_AUDIT.md`.
+| Piece | State |
+|---|---|
+| CI on the platform branch and its PRs | `tests.yml` extended (jobs `node`, `python`, `web`, `config-drift`) |
+| Claude intake | A scheduled Claude task polls for `ready` + `apex-claude` issues, every two hours, and follows this protocol. It does nothing when the queue is empty |
+| Codex intake | **Manual.** Codex has no documented way to read issues or labels. For a `ready` + `apex-codex` issue the poller only comments and sets `needs-owner`; the owner starts the Codex cloud task, and Codex works on `codex/issue-<N>-<slug>` |
+| Codex review of Claude PRs | `@codex review` on a PR. First use: PR #12. Treat Codex as integrated only for what a real result has shown |
+| Claude review of Codex PRs | **Not automated.** Needs a GitHub trigger configured in the claude.ai UI (pull_request opened, head branch `codex/*`); not creatable from a session |
+| Merge, deploy, branch protection | Owner only |
+
+A run that hits the subscription usage limit is rejected and nothing is
+retried; the next scheduled run picks up what is still `ready`. Usage credits
+(metered overage) stay off.
+
+## 10. What the orchestrator never does
+
+Auto-merge, deploy, a change to Render, a credential, a change to
+`.github/workflows/**` from a queue task, or a metered (paid) run. These stay with
+the owner. The branch-protection plan is in
+`docs/ORCHESTRATOR_PHASE1_AUDIT.md` §5 and is applied by the owner.
