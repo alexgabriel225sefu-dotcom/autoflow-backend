@@ -237,8 +237,8 @@ def place(rule_doc, decision, snapshot, *, user_id, account_id,
                         f"the order could not be built ({type(e).__name__})",
                         gate="build", **aud)
 
-    # ── 7b. the pilot: the largest order allowed, on the built request ─────
-    _p = _pilot.check_size(req.volume)
+    # ── 7b. the pilot: which instrument and how much, on the built request ─
+    _p = _pilot.check_order(req.symbol, req.volume)
     if _p:
         return _refused(_p[0], _p[1], gate="pilot", **aud)
 
@@ -425,8 +425,8 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
                   f"the broker reports this account as {mode!r}, so the live "
                   f"path does not apply to it", gate="mode_verification")
 
-    # ── 4b. the pilot: the largest order allowed ───────────────────────────
-    _p = _pilot.check_size(units)
+    # ── 4b. the pilot: which instrument and how much ───────────────────────
+    _p = _pilot.check_order(symbol, units)
     if _p:
         return no(_p[0], _p[1], gate="pilot")
 
@@ -441,6 +441,10 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
     # Allowed — and §7 records that too. An audit trail that holds only
     # refusals cannot answer the question anybody actually asks after a bad
     # day, which is what WAS permitted and on whose authority.
+    #
+    # This record is the only platform audit entry for an engine order, so an
+    # order whose record could not be written is an order nobody can account
+    # for: refused (spec §7), never allowed with a warning.
     try:
         _audit.record_refusal(
             user_id=user_id, actor=actor, account_id=account_id,
@@ -448,7 +452,11 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
             reason=f"{side} {units} {symbol} passed every live gate")
     except Exception as e:                                   # noqa: BLE001
         print(f"[LiveExec] the authorization for {user_id} could not be "
-              f"audited ({type(e).__name__}) — the order was still allowed")
+              f"audited ({type(e).__name__}) — the order is refused")
+        return {"allowed": False, "code": AUDIT_UNAVAILABLE,
+                "gate": "audit",
+                "detail": "the authorization could not be written to the "
+                          "audit trail, so no live order is sent"}
     return {"allowed": True, "code": None, "gate": None, "detail": ""}
 
 

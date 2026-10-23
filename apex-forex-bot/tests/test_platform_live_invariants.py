@@ -326,25 +326,47 @@ for _door_name, _door in (("place", _place), ("authorize_order", _auth_door)):
     check(f"{_door_name} asks the pilot guard who may trade",
           "_pilot.check_identity" in _door,
           f"`_pilot.check_identity` is not in {_door_name}()")
-    check(f"{_door_name} asks the pilot guard how much",
-          "_pilot.check_size" in _door,
-          f"`_pilot.check_size` is not in {_door_name}()")
+    check(f"{_door_name} asks the pilot guard which instrument and how much",
+          "_pilot.check_order" in _door,
+          f"`_pilot.check_order` is not in {_door_name}()")
     _i = _door.index("_pilot.check_identity") if "_pilot.check_identity" in _door else -1
     check(f"{_door_name}: the pilot identity check follows the entitlement and "
           f"precedes the broker read of the mode",
           _door.index("entitlement_of") < _i < _door.index("mode_reader()"),
           "a refused client must not cost a broker round trip, and a client "
           "told 'not entitled' should hear that before 'not in the pilot'")
-_s_place = _place.index("_pilot.check_size") if "_pilot.check_size" in _place else -1
+_s_place = _place.index("_pilot.check_order") if "_pilot.check_order" in _place else -1
 check("place: the size check runs on the built request, before the risk gates",
       _place.index("_bridge.build") < _s_place < _place.index("_gates.authorize"))
-_s_auth = _auth_door.index("_pilot.check_size") if "_pilot.check_size" in _auth_door else -1
+_s_auth = _auth_door.index("_pilot.check_order") if "_pilot.check_order" in _auth_door else -1
 check("authorize_order: the size check follows the mode and precedes the rate",
       _auth_door.index("mode_reader()") < _s_auth < _auth_door.index("_rate.authorize"))
 check("and the engine door is handed the account from the link record",
       'get("selectedCtid")' in body_src("live_execution", "guard_engine_order"),
       "the pilot account list is compared to the caller's own link record, "
       "never to a value from a request")
+
+# The loop holds the account it was built on; the order gate must be told which,
+# or a selection changed under a running loop silently drops it out of every
+# live gate. Both order sites in user_loop must pass what their broker is bound
+# to, and a live start must be held to the pilot before anything is running.
+print("\n[1b3] the loop tells the order gate which account it holds")
+_UL = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "apex", "user_loop.py")).read()
+_sites = [seg for seg in _UL.split("gates.authorize_order(")[1:]]
+check("user_loop has the two order sites", len(_sites) == 2, str(len(_sites)))
+for _n, _seg in enumerate(_sites, 1):
+    _call = _seg[:_seg.index(")\n")]
+    check(f"order site {_n} passes the account its broker is bound to",
+          "bound_account=" in _call and "CTRADER_ACCOUNT_ID" in _call,
+          "without it the gate reads only the CURRENT selection")
+    check(f"order site {_n} passes the environment its broker is bound to",
+          "bound_env=" in _call and "CTRADER_ENV" in _call)
+_pre = body_src("automation", "_preflight")
+check("a live start is held to the pilot, after the broker confirmed the mode",
+      "_pilot.check_identity" in _pre
+      and _pre.index("verify_selected_mode") < _pre.index("_pilot.check_identity"),
+      "a client outside the pilot must not be able to start a live loop")
 
 # §6's one rule, asserted on the source: an unknown outcome keeps the claim.
 check("an unknown broker outcome abandons without releasing",

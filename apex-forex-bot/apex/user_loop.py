@@ -4635,7 +4635,9 @@ def _loop(user_id, alert_fn, gen=None):
                         _decision, _rid = gates.authorize_order(
                             user_id, symbol=symbol, side=action, units=units,
                             sl=sl_price, tp=tp_price, origin="signal",
-                            dash=dash)
+                            dash=dash,
+                            bound_account=getattr(cfg, "CTRADER_ACCOUNT_ID", None),
+                            bound_env=getattr(cfg, "CTRADER_ENV", None))
                         gates.audit(user_id, f"{action} {symbol}", _decision,
                                     origin="signal", rid=_rid)
                         # The gate's verdict, either way. Swallowed on purpose:
@@ -5531,7 +5533,9 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
 
     _decision, _rid = gates.authorize_order(
         user_id, symbol=sym, side=side, units=units, sl=sl_price, tp=tp_price,
-        origin=origin, user=user)
+        origin=origin, user=user,
+        bound_account=getattr(cfg, "CTRADER_ACCOUNT_ID", None),
+        bound_env=getattr(cfg, "CTRADER_ENV", None))
     gates.audit(user_id, f"{side} {sym}", _decision, origin=origin, rid=_rid)
     _claim_ok, _claim_why = _decision.allowed, _decision.reason
     if not _claim_ok:

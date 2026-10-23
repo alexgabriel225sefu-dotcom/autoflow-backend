@@ -11,21 +11,34 @@ entitlement and it only ever REFUSES.
 
 THREE VALUES, AND ALL THREE MUST BE SET
 
-  A4T_LIVE_PILOT_USERS      comma-separated platform user ids allowed to trade
-  A4T_LIVE_PILOT_ACCOUNTS   comma-separated cTrader account ids allowed
+  A4T_LIVE_PILOT_PAIRS      comma-separated  user_id:account_id  pairs
+  A4T_LIVE_PILOT_SYMBOLS    comma-separated instruments that may be traded
   A4T_LIVE_PILOT_MAX_UNITS  largest single order, in instrument units
+
+A PAIR, NOT TWO LISTS. Two lists admit every listed user on every listed
+account, so two clients who had linked the same cTrader login would both be
+inside. A pair names one user on one account.
+
+SYMBOLS ARE LISTED BECAUSE ONE NUMBER OF UNITS MEANS DIFFERENT THINGS. 10,000
+units is about 0.1 lot on EURUSD and 10,000 ounces on XAUUSD. The cap is only
+meaningful for the instruments it was chosen for, so the pilot trades only
+those.
 
 FAIL CLOSED, BY DEFAULT AND IN EVERY DIRECTION
 
   * Any of the three unset, empty or unparseable refuses every live order
     (`PILOT_UNCONFIGURED`). Opening the release switch alone therefore does
-    nothing until someone has also said WHO and HOW MUCH.
-  * A user or an account that is not listed is refused.
+    nothing until someone has also said WHO, WHAT and HOW MUCH.
+  * A pair that is not listed is refused, as is an instrument that is not.
   * A size that is over the cap, or that cannot be measured, is refused: a fact
     we could not establish is not a fact in our favour.
 
 The account id compared is the one on the caller's own link record, never one
 taken from a request (spec §4).
+
+THE CAP MUST NOT BE BELOW THE BROKER'S MINIMUM ORDER. The broker raises a
+smaller order to its minimum after this check has passed, and that order would
+exceed the cap. The operator sets the cap at or above the minimum.
 
 WIDENING IS NOT A CONFIG CHANGE. Step 3 of the rollout (one consenting client)
 needs its own review; it is done by changing this module and its tests, not by
@@ -37,21 +50,40 @@ anything: every function returns a refusal or None.
 """
 import os
 
-USERS_ENV = "A4T_LIVE_PILOT_USERS"
-ACCOUNTS_ENV = "A4T_LIVE_PILOT_ACCOUNTS"
+PAIRS_ENV = "A4T_LIVE_PILOT_PAIRS"
+SYMBOLS_ENV = "A4T_LIVE_PILOT_SYMBOLS"
 MAX_UNITS_ENV = "A4T_LIVE_PILOT_MAX_UNITS"
 
 PILOT_UNCONFIGURED = "PILOT_UNCONFIGURED"
-NOT_PILOT_USER = "NOT_PILOT_USER"
 NOT_PILOT_ACCOUNT = "NOT_PILOT_ACCOUNT"
+NOT_PILOT_SYMBOL = "NOT_PILOT_SYMBOL"
 OVER_PILOT_SIZE = "OVER_PILOT_SIZE"
 
-CODES = (PILOT_UNCONFIGURED, NOT_PILOT_USER, NOT_PILOT_ACCOUNT, OVER_PILOT_SIZE)
+CODES = (PILOT_UNCONFIGURED, NOT_PILOT_ACCOUNT, NOT_PILOT_SYMBOL,
+         OVER_PILOT_SIZE)
 
 
-def _ids(name):
+def _items(name):
     raw = os.getenv(name) or ""
     return {part.strip() for part in raw.split(",") if part.strip()}
+
+
+def _symbol(value):
+    return str(value or "").strip().upper().replace("/", "").replace("_", "")
+
+
+def _symbols():
+    return {_symbol(s) for s in _items(SYMBOLS_ENV) if _symbol(s)}
+
+
+def _pairs():
+    out = set()
+    for item in _items(PAIRS_ENV):
+        user, sep, account = item.partition(":")
+        user, account = user.strip(), account.strip()
+        if sep and user and account:
+            out.add((user, account))
+    return out
 
 
 def _max_units():
@@ -64,10 +96,10 @@ def _max_units():
 
 
 def _unconfigured():
-    if not _ids(USERS_ENV) or not _ids(ACCOUNTS_ENV) or _max_units() is None:
+    if not _pairs() or not _symbols() or _max_units() is None:
         return (PILOT_UNCONFIGURED,
-                "the live pilot is not configured (who may trade, on which "
-                "account, and the largest order), so no live order is sent")
+                "the live pilot is not configured (which account, which "
+                "instruments, and the largest order), so no live order is sent")
     return None
 
 
@@ -76,21 +108,21 @@ def check_identity(user_id, account_id):
     refusal = _unconfigured()
     if refusal:
         return refusal
-    if str(user_id) not in _ids(USERS_ENV):
-        return (NOT_PILOT_USER,
-                "this client is not part of the live pilot, which is limited "
-                "to the operator's own account")
-    if account_id is None or str(account_id) not in _ids(ACCOUNTS_ENV):
+    if account_id is None or (str(user_id), str(account_id)) not in _pairs():
         return (NOT_PILOT_ACCOUNT,
-                "this trading account is not part of the live pilot")
+                "this client and trading account are not part of the live "
+                "pilot, which is limited to the operator's own account")
     return None
 
 
-def check_size(units):
-    """None if one order of `units` is within the pilot cap, else (code, detail)."""
+def check_order(symbol, units):
+    """None if one order of `units` in `symbol` is inside the pilot, else (code, detail)."""
     refusal = _unconfigured()
     if refusal:
         return refusal
+    if _symbol(symbol) not in _symbols():
+        return (NOT_PILOT_SYMBOL,
+                "this instrument is not part of the live pilot")
     cap = _max_units()
     try:
         if isinstance(units, bool):

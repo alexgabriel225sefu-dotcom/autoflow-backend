@@ -186,6 +186,100 @@ try:
 finally:
     CTL._read_conn = _real_read
 
+# ── 6-8. the account the LOOP holds, not the one selected now ──────────────
+# A loop builds its broker once and keeps that account. The checks above read
+# the client's CURRENT selection, which can change under a running loop: the
+# loop then classified as demo (or as the legacy bot), skipped every live gate,
+# and went on placing real-money orders on the account it started with. The
+# order gate is now told what the loop is bound to and judges THAT.
+_only_if_live = ("LIVE_REFUSED", "LIVE_GUARD_FAILED", "NOT_OWNER",
+                 "ENTITLEMENT_UNKNOWN", "LIVE_NOT_RELEASED",
+                 "LIVE_MODE_UNCONFIRMED", "LIVE_NOT_ENABLED", "HALTED",
+                 "NOT_ENTITLED", "MODE_UNVERIFIED", "NOT_PILOT_ACCOUNT",
+                 "PILOT_UNCONFIGURED")
+_real_ent = gates.live_entitlement
+gates.live_entitlement = lambda uid, u=None: ("allowed", "stubbed for test")
+
+
+def order(uid, units=1000, **kw):
+    # `units` varies where the same demo order is placed twice: an identical
+    # request inside the window is the idempotency ledger's to refuse.
+    return gates.authorize_order(uid, symbol="EURUSD", side="BUY", units=units,
+                                 origin="test", dash={}, **kw)
+
+
+def reselect(uid, ctid, mode):
+    rec = PS._read_strict(CTL._k_conn(uid))
+    rec["selectedCtid"], rec["selectedMode"] = ctid, mode
+    PS._write(CTL._k_conn(uid), rec)
+
+
+try:
+    print("\n[6] a live loop whose selected account is later changed")
+    connect(LIVE_USER, CTL.LIVE)                      # selected 900001, live
+    reselect(LIVE_USER, "900002", CTL.DEMO)           # the client re-selects demo
+    d, rid = order(LIVE_USER, bound_account="900001", bound_env="live")
+    check("the live loop's order is refused", not d.allowed,
+          f"{d.reason}: {d.detail}")
+    check("by name, as the account having changed",
+          d.reason == "ACCOUNT_CHANGED", str(d.reason))
+    check("without burning an idempotency claim", rid is None, str(rid))
+
+    connect(LIVE_USER, CTL.LIVE)
+    reselect(LIVE_USER, "900001", CTL.DEMO)           # same account, mode now reads demo
+    d, rid = order(LIVE_USER, bound_account="900001", bound_env="live")
+    check("a record that now says demo does not turn a live loop into a demo order",
+          not d.allowed and d.reason != "AUTHORIZED",
+          f"{d.reason}: {d.detail}")
+    check("it is held to the live gates (a reason only reachable when live)",
+          any(k in str(d.reason) for k in _only_if_live), str(d.reason))
+
+    connect(LIVE_USER, CTL.LIVE)
+    reselect(LIVE_USER, "900002", CTL.LIVE)           # another live account selected
+    d, _ = order(LIVE_USER, bound_account="900001", bound_env="live")
+    check("a different LIVE account selected under the loop is refused too",
+          d.reason == "ACCOUNT_CHANGED", str(d.reason))
+
+    connect(DEMO_USER, CTL.DEMO)
+    d, rid = order(DEMO_USER, units=1100, bound_account="900001", bound_env="demo")
+    check("a demo loop on the account that is still selected is untouched",
+          d.allowed, f"{d.reason}: {d.detail}")
+    d, _ = order(DEMO_USER, units=1200)
+    check("and so is a caller that does not say what it is bound to",
+          d.allowed, f"{d.reason}: {d.detail}")
+
+    print("\n[7] a platform account disconnected while its loop keeps running")
+    connect(LIVE_USER, CTL.LIVE)
+    CTL.disconnect(LIVE_USER)
+    d, rid = order(LIVE_USER, bound_account="900001", bound_env="live")
+    check("a live order from a disconnected platform account is refused",
+          not d.allowed and d.reason == "PLATFORM_DISCONNECTED",
+          f"{d.reason}: {d.detail}")
+    check("without burning a claim", rid is None, str(rid))
+
+    user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+    d, _ = order(TG_USER, bound_account="123", bound_env="live")
+    check("but a legacy Telegram user trading live is not mistaken for one",
+          d.reason != "PLATFORM_DISCONNECTED", f"{d.reason}: {d.detail}")
+
+    print("\n[8] a store that cannot be read, for a live loop")
+    _real_strict = PS._read_strict
+
+    def _down(key):
+        raise RuntimeError("redis is down")
+
+    PS._read_strict = _down
+    try:
+        d, rid = order(TG_USER, bound_account="123", bound_env="live")
+        check("is not read as 'not a platform account'",
+              not d.allowed and d.reason == "LIVE_CLASSIFY_FAILED",
+              f"{d.reason}: {d.detail}")
+        check("and burns no claim", rid is None, str(rid))
+    finally:
+        PS._read_strict = _real_strict
+finally:
+    gates.live_entitlement = _real_ent
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

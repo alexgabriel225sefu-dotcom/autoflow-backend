@@ -406,6 +406,15 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # would be the one place in this file worth getting wrong.
     if check["mode"] == LIVE and not _ent.capability(user_id)["canAutomate"]:
         raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+    # And during the live pilot, only the pilot's own account may start one.
+    # Without this a client outside the pilot could start a live loop that shows
+    # "Running" while every order is refused, and could then change the selected
+    # account under it. A refusal here is the honest place to say so.
+    if check["mode"] == LIVE:
+        from apex.platform import live_pilot as _pilot
+        _pp = _pilot.check_identity(user_id, conn.get("ctid"))
+        if _pp:
+            raise AutomationRefused(_pp[0], _pp[1])
     if check["changed"]:
         # The record said one thing and the broker says another. Not adapted
         # to, on purpose: an account that changed mode under a stored record

@@ -138,7 +138,8 @@ def live_entitlement(user_id, user=None):
 
 
 def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
-                    origin="unknown", user=None, dash=None):
+                    origin="unknown", user=None, dash=None,
+                    bound_account=None, bound_env=None):
     """The one gate every new position passes, whatever asked for it.
 
     Order matters: the cheapest and most decisive checks first, so a denied
@@ -196,6 +197,54 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
             # live, or a mode the broker would not confirm. Both are real
             # money until proven otherwise, and step 5b §3 is what proves it.
             live = True
+
+        # THE ACCOUNT THE LOOP ACTUALLY HOLDS, NOT THE ONE SELECTED NOW
+        #
+        # A loop builds its broker once, when it starts, and keeps that
+        # account and environment for as long as it runs. Everything above
+        # reads the client's CURRENT selection, which can change under it:
+        # select_account only rewrites the stored record, and disconnect
+        # only blanks it. Either made this step classify a live loop as
+        # demo (or as the legacy bot), skip every live gate, and let the
+        # loop carry on placing real-money orders on the account it
+        # started with. The callers that own a broker pass what it is bound
+        # to, and the order is judged against THAT.
+        bound_live = str(bound_env or "").strip().lower() == "live"
+        if is_platform and bound_live:
+            live = True
+        if is_platform and bound_account is not None and (bound_live or live):
+            try:
+                from apex.platform import ctrader_link as _ctl2
+                _sel = _ctl2.selected_ctid(user_id)
+            except Exception as e:
+                print(f"[Gates] could not read the selected account for "
+                      f"{user_id}: {e}")
+                return Decision(False, "LIVE_CLASSIFY_FAILED",
+                                str(e)[:120]), None
+            if _sel is None or str(_sel) != str(bound_account):
+                return Decision(
+                    False, "ACCOUNT_CHANGED",
+                    "this loop trades real money on an account that is not "
+                    "the one selected now; stop it and start it again on the "
+                    "account you mean"), None
+        if not is_platform and bound_live:
+            # An ordinary legacy-bot live order lands here and must pass. A
+            # PLATFORM account that was disconnected while its loop kept
+            # running lands here too, and must not: the tombstone is what
+            # tells them apart.
+            try:
+                from apex.platform import ctrader_link as _ctl3
+                _was = _ctl3.was_platform_account(user_id)
+            except Exception as e:
+                print(f"[Gates] could not classify {user_id}: {e}")
+                return Decision(False, "LIVE_CLASSIFY_FAILED",
+                                str(e)[:120]), None
+            if _was:
+                return Decision(
+                    False, "PLATFORM_DISCONNECTED",
+                    "this loop trades real money on an account that was "
+                    "disconnected from the platform; stop it and reconnect "
+                    "before trading again"), None
 
     # 1. Entitlement. UNKNOWN denies for live money, allows for a simulation.
     ent, why = live_entitlement(user_id, u)
