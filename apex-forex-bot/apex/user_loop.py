@@ -5124,6 +5124,22 @@ def stop(user_id):
     return True
 
 
+def suspend_all_for_shutdown():
+    """Stop every loop in THIS process from ticking, WITHOUT marking anyone inactive.
+
+    `stop()` writes `active: False`, which is right when a client stops and
+    wrong when the process is simply being replaced: the supervisor revives
+    only accounts still marked active, so stopping this way on a deploy would
+    leave every client stopped for good. This flips the in-memory flag only.
+    A tick already under way finishes; the next one does not start.
+    """
+    with _lock:
+        ids = [uid for uid, entry in _loops.items() if entry.get("running")]
+        for uid in ids:
+            _loops[uid]["running"] = False
+    return ids
+
+
 def is_running(user_id):
     user_id = str(user_id)
     with _lock:

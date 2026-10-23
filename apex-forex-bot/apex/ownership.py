@@ -76,6 +76,11 @@ _lock = threading.Lock()
 _held = {}                          # user_id -> last successful renew ts
 _renewers = {}                      # user_id -> {"alive": bool}
 _lost = set()                       # users a renewer confirmed we lost
+# Set once this process has been told to stop. From then on it must neither take
+# a lease nor renew one: `heartbeat` re-acquires a key that has GONE ("the lease
+# had lapsed"), which is right for a container that is staying and exactly wrong
+# for one that has just handed its leases back — it would take them again.
+_shutdown = threading.Event()
 
 
 def _key(user_id):
@@ -94,6 +99,10 @@ def acquire(user_id):
     user_id = str(user_id)
     if not shared_backed():
         return None
+    if _shutdown.is_set():
+        # Being stopped: never start owning something new. A loop started in the
+        # last seconds of this process would be orphaned the moment it exits.
+        return False
     got = user_store.claim_value(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
     if got is True:
         with _lock:
@@ -132,6 +141,8 @@ def heartbeat(user_id):
     user_id = str(user_id)
     if not shared_backed():
         return None
+    if _shutdown.is_set():
+        return None                 # unknown, deliberately: neither renew nor re-take
     ok = user_store.renew_claim(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
     if ok is True:
         with _lock:
@@ -313,3 +324,21 @@ def release_all():
     if held:
         print(f"[Ownership] released {freed}/{len(set(held))} lease(s) on shutdown")
     return freed
+
+
+def begin_shutdown():
+    """For a process that is being stopped: refuse new leases, then hand back
+    every one held, so the replacement takes over in seconds instead of waiting
+    out the TTL (about twelve minutes of nobody managing the positions, after
+    every deploy).
+
+    `release_all` alone is not enough here. A renewer thread that is already
+    past its liveness check, or a loop tick that calls `acquire`, would take
+    the lease straight back from the empty key. The flag set first closes both.
+    """
+    _shutdown.set()
+    return release_all()
+
+
+def shutting_down():
+    return _shutdown.is_set()
