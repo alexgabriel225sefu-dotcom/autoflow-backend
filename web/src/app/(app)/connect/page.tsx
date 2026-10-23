@@ -167,7 +167,11 @@ export default function ConnectPage() {
     // effect is where a browser-only value is allowed to arrive.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored) {
+      // Browser-only recovery state is intentionally hydrated after mount.
+      // The server cannot access sessionStorage during the initial render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPending(stored.nonce);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPendingProof(stored.proof || null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

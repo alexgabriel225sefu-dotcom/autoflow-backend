@@ -75,9 +75,9 @@ export function PendingApproval() {
   // state of its own — the remaining time is computed from the server's
   // number and `lastSync` on every render, so a stale tick cannot survive a
   // reload.
-  const [, setTick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = window.setInterval(() => setTick((n) => n + 1), 1000);
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -121,7 +121,7 @@ export function PendingApproval() {
   const a = data.approval;
   if (!a) return null;                 // read succeeded; there is none waiting
 
-  const elapsed = r.lastSync ? (Date.now() - r.lastSync) / 1000 : 0;
+  const elapsed = r.lastSync ? (now - r.lastSync) / 1000 : 0;
   const left = a.expiresInSec - elapsed;
   const gone = a.expired || left <= 0;
   // The server's verdict AND the clock. Either one saying no is a no: the
