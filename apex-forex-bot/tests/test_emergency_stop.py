@@ -288,8 +288,46 @@ check("the session is re-checked, not read from cache", "fresh=True" in seg)
 check("POST only", 'method != "POST"' in seg)
 check("it calls the module under test", "_panic.run(" in seg)
 import apex.platform.ratelimit as RL                          # noqa: E402
-check("it is metered as a control action",
-      RL.classify("POST", "emergency/stop") == "control", RL.classify("POST", "emergency/stop"))
+check("it is metered on a bucket of its own, not the one single closes spend",
+      RL.classify("POST", "emergency/stop") == "emergency", RL.classify("POST", "emergency/stop"))
+
+# ── 12. no selected account: the STOP still runs ───────────────────────────
+print("\n[12] with no account selected the stop still happens, and nothing is called flat")
+# The route used to answer 409 NO_ACCOUNT_SELECTED before the stop step. After a
+# disconnect (or a selection that could not be read) the panic button then did
+# nothing at all while a loop that still held its broker session went on trading.
+w = World(2)
+r = ES.run(USER, ctid="", stopper=w.stopper, opener=w.opener, closer=w.closer,
+           mode_fn=lambda uid, ctid: "demo")
+check("the automation was stopped", r["automation"]["stopped"] is True
+      and "stop" in w.log, str(w.log))
+check("nothing was read or closed", w.log == ["stop"], str(w.log))
+check("the answer is not 'flat'", r["allFlat"] is False)
+check("it says no account is selected",
+      "no cTrader account is selected" in r["sentence"], r["sentence"])
+check("and that the positions were not closed, never 'Confirmed'",
+      "none were closed" in r["sentence"] and "Confirmed" not in r["sentence"],
+      r["sentence"])
+w = World(2)
+r = ES.run(USER, ctid="", stopper=w.stopper, opener=w.opener, closer=w.closer,
+           mode_fn=lambda uid, ctid: "demo",
+           no_account_reason="your selected account could not be read just now")
+check("a selection that could not be READ is not reported as 'none selected'",
+      "could not be read just now" in r["sentence"]
+      and "no cTrader account is selected" not in r["sentence"], r["sentence"])
+w = World(2)
+r = ES.run(USER, ctid="", close_positions=False, stopper=w.stopper,
+           opener=w.opener, closer=w.closer)
+check("stop-only with no account is unchanged", w.log == ["stop"]
+      and r["closes"] is None, str(w.log))
+
+# The route must reach the module with no account, not refuse first.
+_route = src.split('if route == "emergency/stop":', 1)[1].split("# ── automation control", 1)[0]
+check("the route no longer refuses before the stop for want of an account",
+      '_err(409' not in _route, "a 409 here skips the stop")
+check("it hands the reason to the module", "no_account_reason=" in _route)
+check("and tells a failed read apart from an empty selection",
+      "_selected_ctid_strict(" in _route)
 
 print()
 if _fails:

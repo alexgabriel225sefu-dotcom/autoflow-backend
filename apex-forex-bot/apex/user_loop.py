@@ -4671,6 +4671,19 @@ def _loop(user_id, alert_fn, gen=None):
                                     "units": units, "reason": _decision.reason})
                         else:
                             try:
+                                # STOP / EMERGENCY LANDED WHILE THIS TICK WAS
+                                # DECIDING. stop() clears a flag and hands the
+                                # lease back but does not wait for a tick that
+                                # is already running, and with the lease gone a
+                                # demo account is allowed through (ownership
+                                # answers "unknown", which demo permits). So a
+                                # position could open AFTER the emergency had
+                                # closed everything and re-read an empty list -
+                                # making "Confirmed: no positions are open"
+                                # false a moment later. Asked once more at the
+                                # last point before the broker is touched.
+                                if _stop_requested(user_id):
+                                    raise _StopBeforeSend()
                                 try:
                                     from apex import trade_events as _te3
                                     _te3.record(user_id, _te3.ORDER_SUBMITTED,
@@ -4684,6 +4697,10 @@ def _loop(user_id, alert_fn, gen=None):
                                     print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")
                                 _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
                                 ledger.record(_rid, _order_res)
+                            except _StopBeforeSend:
+                                order_ok = False
+                                print(f"[UserLoop:{user_id}] stop requested - "
+                                      f"{action} {symbol} was not sent")
                             except Exception as oe:
                                 order_ok = False
                                 # The claim stands. A submit that raised may
@@ -5124,6 +5141,11 @@ def start(user_id, alert_fn=None):
         _loops[user_id]["thread"] = t
     print(f"[UserLoop] Started for user {user_id}")
     return True
+
+
+class _StopBeforeSend(Exception):
+    """A stop was requested after an order was authorised and before it was
+    sent. Nothing reached the broker."""
 
 
 def _stop_requested(user_id):

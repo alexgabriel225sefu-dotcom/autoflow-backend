@@ -167,7 +167,7 @@ def _sentence(out):
 
 def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
         closer=None, connection_fn=None, broker_fn=None, mode_fn=None,
-        budget_s=CLOSE_BUDGET_S):
+        budget_s=CLOSE_BUDGET_S, no_account_reason=None):
     """Stop automation and, if asked, close every position on `ctid`.
 
     Never raises for a step that failed: each failure is part of the answer.
@@ -192,6 +192,18 @@ def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
            "closes": None, "verified": None, "allFlat": None}
 
     if not close_positions:
+        out["sentence"] = _sentence(out)
+        return out
+
+    # 1b. no account to close on. The stop above has already run; what is left
+    # is to say plainly that nothing was closed and why, never "flat".
+    if not ctid:
+        out["positions"] = {"readable": False, "found": None,
+                            "reason": no_account_reason
+                            or "no cTrader account is selected"}
+        out["closes"] = []
+        out["verified"] = {"readable": False, "stillOpen": None}
+        out["allFlat"] = False
         out["sentence"] = _sentence(out)
         return out
 
