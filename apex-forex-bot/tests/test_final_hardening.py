@@ -322,29 +322,54 @@ try:
     # The platform's DEMO close addressed to one position id. A position id is
     # not reusable, so a duplicate request can only be answered "no such
     # position"; refusing the client's own exit because Redis blipped was the
-    # wrong way round for the control that exists to get them out.
-    d, _ = gates.authorize_platform_demo_close("77", position_id="123",
-                                               account="501",
-                                               user={"paper": True})
-    check("a platform DEMO close by position id + idempotency DOWN → proceeds",
-          d.allowed is True, f"{d.reason}: {d.detail}")
+    # wrong way round for the control that exists to get them out. The gate
+    # decides "demo" itself, from the platform's link record.
+    _real_confirm = gates._demo_account_confirmed
+    try:
+        gates._demo_account_confirmed = lambda uid, acct: True
+        d, _ = gates.authorize_platform_demo_close("77", position_id="123",
+                                                   account="501",
+                                                   user={"paper": True})
+        check("a platform DEMO close by position id + idempotency DOWN → proceeds",
+              d.allowed is True, f"{d.reason}: {d.detail}")
+        # A platform account has NO paper key, so the stored-flag route cannot
+        # tell live from demo; only the link record can, which is why the gate
+        # asks it. An account the record does not confirm as demo keeps the
+        # strict policy.
+        gates._demo_account_confirmed = lambda uid, acct: False
+        d, _ = gates.authorize_platform_demo_close("77", position_id="124",
+                                                   account="501", user={})
+        check("a close the link record does not confirm as DEMO is still refused",
+              d.allowed is False and d.reason == "CLOSE_COORDINATION_UNAVAILABLE",
+              f"{d.reason}: {d.detail}")
+        gates._demo_account_confirmed = lambda uid, acct: True
+        d, _ = gates.authorize_platform_demo_close("77", position_id="not-a-number",
+                                                   account="501", user={})
+        check("a non-numeric id never gets the relaxed policy, whatever the mode",
+              d.allowed is False and d.reason == "CLOSE_COORDINATION_UNAVAILABLE",
+              f"{d.reason}: {d.detail}")
+        d, _ = gates.authorize_platform_demo_close("77", position_id="125",
+                                                   account=None, user={})
+        check("and neither does a close that names no account",
+              d.allowed is False and d.reason == "CLOSE_COORDINATION_UNAVAILABLE",
+              f"{d.reason}: {d.detail}")
+    finally:
+        gates._demo_account_confirmed = _real_confirm
     d, _ = gates.authorize_close("77", position_id="123", origin="manual",
                                  user={"paper": True})
     check("while the same close from any other origin is still refused",
           d.allowed is False and d.reason == "CLOSE_COORDINATION_UNAVAILABLE",
           d.reason)
-    d, _ = gates.authorize_platform_demo_close("77", position_id="124",
-                                               account="501",
-                                               user={"paper": False})
-    check("and a REAL-MONEY account is still refused by the adapter (ownership first)",
-          d.allowed is False, f"{d.reason}: {d.detail}")
 finally:
     restore()
 GSRC2 = open(os.path.join(ROOT, "apex", "gates.py"), encoding="utf-8").read()
 check("the policy is one expression, not two code paths",
       "fail_closed=not (emergency or position_keyed)" in GSRC2)
-check("and only the platform's demo adapter asks for the relaxed case",
-      GSRC2.count("position_keyed=True") == 1, str(GSRC2.count("position_keyed=True")))
+check("and only the platform's demo adapter asks for the relaxed case, and only "
+      "once the gate itself has confirmed demo",
+      GSRC2.count("position_keyed=relaxed") == 1
+      and "relaxed = keyed and _demo_account_confirmed(" in GSRC2,
+      str(GSRC2.count("position_keyed=relaxed")))
 check("and both are audited either way", "gates.audit(" in LSRC)
 
 # ── 7 ────────────────────────────────────────────────────

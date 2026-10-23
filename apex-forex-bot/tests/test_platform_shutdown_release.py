@@ -214,6 +214,35 @@ try:
     check("(control) with no shutdown, the same calls do take the lease",
           ownership.acquire("r3") is True and "own:user:r3" in fake.kv,
           str(fake.kv))
+    # ── 5. the same thing, with real threads ────────────────────────────────
+    print("\n[5] concurrent acquires against a shutdown leave no lease behind")
+    # The checks above place the shutdown at one point. With real threads it can
+    # land anywhere: the invariant is what must hold at every point - once the
+    # shutdown has returned and the acquiring threads are done, this process
+    # holds nothing, so the replacement never waits out a TTL.
+    import threading
+    leftovers = []
+    for trial in range(30):
+        restore(); fake = Fake(); install(fake)
+        go = threading.Event()
+
+        def worker(n):
+            go.wait()
+            for k in range(20):
+                ownership.acquire(f"c{trial}-{n}-{k}")
+
+        threads = [threading.Thread(target=worker, args=(n,)) for n in range(6)]
+        for t in threads:
+            t.start()
+        go.set()
+        time.sleep(0.001 * (trial % 5))
+        ownership.begin_shutdown()
+        for t in threads:
+            t.join()
+        mine = [k for k, v in fake.kv.items() if v == ownership.INSTANCE_ID]
+        leftovers.append(len(mine))
+    check("after shutdown nothing is left held, in every one of 30 interleavings",
+          sum(leftovers) == 0, f"leftover leases per trial: {leftovers}")
 finally:
     restore()
 

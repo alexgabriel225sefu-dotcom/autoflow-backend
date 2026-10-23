@@ -331,6 +331,22 @@ try:
     check("the legacy order is not refused as LIVE_CLASSIFY_FAILED",
           d.reason != "LIVE_CLASSIFY_FAILED", f"{d.reason}: {d.detail}")
 
+    print("\n[7e] an order the account itself marks as simulated is not refused over a store blip")
+    user_store.save(TG_USER, {"id": TG_USER, "paper": True})
+    _real_strict3 = PS._read_strict
+
+    def _always_down(key):
+        raise RuntimeError("redis is down")
+
+    PS._read_strict = _always_down
+    try:
+        d, _ = order(TG_USER, units=1700, bound_account="123", bound_env="live")
+    finally:
+        PS._read_strict = _real_strict3
+    check("a paper order with the store down is not LIVE_CLASSIFY_FAILED",
+          d.reason != "LIVE_CLASSIFY_FAILED", f"{d.reason}: {d.detail}")
+    user_store.save(TG_USER, {"id": TG_USER, "paper": False})
+
     print("\n[8] a store that cannot be read, for a live loop")
     _real_strict = PS._read_strict
 

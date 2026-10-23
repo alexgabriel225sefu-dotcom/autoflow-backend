@@ -476,11 +476,6 @@ _PROVIDER_REJECTION_PREFIXES = (
     "ctrader error:", "ctrader order error:", "ctrader token error:",
     "app auth failed", "account auth failed",
 )
-_TOKEN_LIKE = re.compile(r"[A-Za-z0-9_\-\.=+/]{24,}")
-_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
-_KEYED = re.compile(
-    r"(?i)\b(access[_-]?token|refresh[_-]?token|client[_-]?secret|"
-    r"authorization|api[_-]?key|password|secret|token)\b\s*[=:]\s*\S+")
 
 
 def _safe_cause(exc, *secrets):

@@ -258,6 +258,28 @@ check("the helper reads an explicit active=False as a stop",
 user_store.update(uid, {"active": True})
 check("and active=True as no stop", UL._stop_requested(uid) is False)
 
+# ── 8. a start whose two reads of the selection disagree is refused ─────────
+print("\n[8] a start is refused when the broker's answer is for another account")
+uid, rid = fresh_user(8)
+_real_verify = CL.verify_selected_mode
+started = []
+try:
+    CL.verify_selected_mode = lambda u, **kw: {
+        "mode": "demo", "verified": True, "ctid": 999, "recorded": "demo",
+        "changed": False, "reason": None}
+    refused = None
+    try:
+        AU.start(uid, rid, starter=lambda u: started.append(u) or True)
+    except AU.AutomationRefused as e:
+        refused = e.code
+    check("refused by name", refused == "ACCOUNT_CHANGED", str(refused))
+    check("and no loop was started", started == [], str(started))
+finally:
+    CL.verify_selected_mode = _real_verify
+out = AU.start(uid, rid, starter=ok_starter)
+check("(control) with the reads in agreement the same start goes ahead",
+      out.get("started") is True, str(out))
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

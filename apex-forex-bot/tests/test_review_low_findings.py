@@ -74,6 +74,25 @@ check("no refresh token, bearer, keyed secret or long token survives",
 check("the message is still a message", "upstream said" in out, out)
 check("a known secret is still removed", ACCESS not in BR._scrub(f"x {ACCESS}", ACCESS))
 
+print("\n[1b] quoted dumps are redacted; the codes and ids a client needs survive")
+from apex import redact as _R                                # noqa: E402
+for dump in ("{'refresh_token': 'shortsecret123'}",
+             '{"client_secret": "abcDEF123456"}',
+             "pw password=p@ss!w0rd#xyz end",
+             "Authorization: Bearer abc.def.ghi"):
+    got = _R.scrub_for_client(dump)
+    bad = [x for x in ("shortsecret123", "abcDEF123456", "p@ss!w0rd", "abc.def.ghi")
+           if x in got]
+    check(f"{dump[:34]!r}: the value is gone", not bad, f"{bad} in {got!r}")
+for keep in ("errorCode=POSITION_NOT_FOUND", "rejected: CH_CLIENT_AUTH_FAILURE",
+             "orderId: CT_PAPER_1729700000123456 done",
+             "EURUSD position 4567890 closed"):
+    check(f"{keep[:40]!r}: kept as it is", _R.scrub_for_client(keep) == keep,
+          _R.scrub_for_client(keep))
+check("a token-shaped run is still removed even when written in capitals",
+      "ABCDEF0123456789ABCDEF0123456789" not in
+      _R.scrub_for_client("x ABCDEF0123456789ABCDEF0123456789"))
+
 # ── 2. the Emergency close detail ───────────────────────────────────────────
 print("\n[2] the Emergency button's per-position detail is redacted")
 
@@ -189,9 +208,20 @@ b, _ = BR._open("u", ctid="501", connection_fn=lambda uid, ctid=None: conn,
                 broker_fn=lambda: Plain())
 check("a broker with no account to report (a test double) is not judged",
       b is not None)
+# The default positions and orders reads ask about NO account; the broker must
+# then match the connection's own, which is the same threat.
+try:
+    BR._open("u", ctid=None, connection_fn=lambda uid, ctid=None: conn,
+             broker_fn=lambda: Broker(777))
+    refused = None
+except LINK.LinkError as e:
+    refused = e.code
+check("with no account asked about, a broker for another account than the "
+      "connection's is still refused", refused == "ACCOUNT_BINDING_MISMATCH",
+      str(refused))
 b, _ = BR._open("u", ctid=None, connection_fn=lambda uid, ctid=None: conn,
-                broker_fn=lambda: Broker(777))
-check("and with no account asked about there is nothing to compare", b is not None)
+                broker_fn=lambda: Broker(501))
+check("and the connection's own account passes", b is not None)
 
 # ── 6. the start: the broker's answer and the loop's account must agree ─────
 print("\n[6] a start is refused when the selection changed between its two reads")

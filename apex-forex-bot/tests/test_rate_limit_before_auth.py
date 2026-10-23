@@ -141,14 +141,48 @@ check("an unknown bucket or an empty id does not refuse",
       and RL.check_user("emergency_user", "")[0] is True)
 api_src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()
 route = api_src.split('if route == "emergency/stop":', 1)[1].split("# ── automation control", 1)[0]
-_a, _c, _r = (route.find("_authenticate(headers, fresh=True)"),
-              route.find('check_user("emergency_user"'),
-              route.find("_panic.run("))
+_a, _v, _c, _r = (route.find("_authenticate(headers, fresh=True)"),
+                  route.find("closePositions must be true or false"),
+                  route.find('check_user("emergency_user"'),
+                  route.find("_panic.run("))
 check("the route counts the person at all", _c != -1,
       "the per-person Emergency limit is not called")
-check("after authenticating and before doing any work",
-      -1 != _a < _c < _r,
-      "a per-person limit needs the verified id, and must precede the work")
+check("after authenticating and validating, before the closing work",
+      -1 != _a < _v < _c < _r,
+      "a malformed request must not spend the budget, and the id must be verified")
+
+# Behaviour: over the limit the STOP still runs, only the closing sweep is withheld.
+from apex.platform import api as API                         # noqa: E402
+import types as _types                                       # noqa: E402
+_runs = []
+_real_auth, _real_run = API._authenticate, API._panic.run
+API._authenticate = lambda headers, fresh=False: _types.SimpleNamespace(user_id="person-9")
+API._panic.run = lambda uid, **kw: (_runs.append(kw) or
+                                    {"status": "ok", "sentence": "Automation is stopped.",
+                                     "automation": {"stopped": True}})
+RL.LIMITERS["emergency_user"].limit = 1
+RL.LIMITERS["emergency_user"].hits.clear() if hasattr(RL.LIMITERS["emergency_user"], "hits") else None
+RL.LIMITERS["emergency"].limit = 100
+try:
+    hdr = {"Authorization": "Bearer person-9-session-1"}
+    body = b'{"confirm": true, "ctid": "501"}'
+    st1, r1 = API.handle("POST", "/api/v1/emergency/stop", hdr, body)
+    st2, r2 = API.handle("POST", "/api/v1/emergency/stop",
+                         {"Authorization": "Bearer person-9-session-2"}, body)
+    st3, r3 = API.handle("POST", "/api/v1/emergency/stop",
+                         {"Authorization": "Bearer person-9-session-3"}, b'{"confirm": false}')
+finally:
+    API._authenticate, API._panic.run = _real_auth, _real_run
+check("the first press closes as asked", st1 == 200 and _runs[0].get("close_positions", True) is True,
+      f"{st1} {_runs[:1]}")
+check("a second press from another session of the same person still STOPS",
+      st2 == 200 and len(_runs) == 2 and _runs[1].get("close_positions") is False,
+      f"{st2} {_runs}")
+check("and says the closing sweep was withheld, with a wait",
+      (r2.get("data") or r2).get("throttled") is True
+      and "NOT attempted" in str((r2.get("data") or r2).get("sentence")), str(r2)[:300])
+check("an unconfirmed request does not spend the budget (it is refused first)",
+      st3 == 400, f"{st3} {r3}")
 
 print()
 if _fails:

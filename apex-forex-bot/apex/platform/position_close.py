@@ -138,11 +138,13 @@ def close_demo(user_id, *, ctid, position_id, connection_fn=None,
         _ledger.release(rid)
         return result
     if status == "ALREADY_CLOSED":
-        # Nothing was sent, so there is nothing a retry could duplicate. The
-        # claim used to be recorded and held for minutes, and when the broker
-        # had only briefly returned an empty position list that turned "it was
-        # not there a moment ago" into a refused retry (DUPLICATE_CLOSE) of a
-        # position that was still open.
+        # Either nothing was sent (the position was not in the broker's list)
+        # or the broker answered that it no longer exists; in neither case is
+        # there an execution a retry could duplicate, and a position id is
+        # never reused. The claim used to be recorded and held for minutes, and
+        # when the broker had only briefly listed no positions that turned
+        # "it was not there a moment ago" into a refused retry
+        # (DUPLICATE_CLOSE) of a position that was still open.
         _ledger.release(rid)
         return result
     if status == "FILLED":

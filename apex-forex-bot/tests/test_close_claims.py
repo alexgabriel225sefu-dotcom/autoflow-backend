@@ -149,6 +149,31 @@ check("'0123' under account 501 -> '501:123'", seen[0] == "501:123", str(seen))
 check("the same id under account 502 is a different claim", seen[1] == "502:123" and seen[0] != seen[1], str(seen))
 check("without an account the old key is unchanged (other callers)", seen[2] == "123", str(seen))
 
+# ── the gate's own "is this a demo account" ─────────────────────────────────
+print("\n[gate] the relaxed close policy is decided from the link record")
+_real_read = LINK._read_conn
+try:
+    LINK._read_conn = lambda uid: {"accounts": [
+        {"ctid": 501, "mode": "demo"}, {"ctid": 502, "mode": "live"},
+        {"ctid": 503}]}
+    check("a listed demo account is confirmed",
+          gates._demo_account_confirmed("u", "501") is True)
+    check("a listed LIVE account is not",
+          gates._demo_account_confirmed("u", "502") is False)
+    check("an account with no recorded mode is not",
+          gates._demo_account_confirmed("u", "503") is False)
+    check("an account that is not in the list is not",
+          gates._demo_account_confirmed("u", "999") is False)
+
+    def _down(uid):
+        raise RuntimeError("store down")
+
+    LINK._read_conn = _down
+    check("an unreadable record is not (the strict policy stays)",
+          gates._demo_account_confirmed("u", "501") is False)
+finally:
+    LINK._read_conn = _real_read
+
 # The stub above replaced a module-level function for the whole interpreter. A
 # combined pytest session shares that interpreter, so it made a later file's
 # "a live account is refused before the gate" fail. Put the real one back.

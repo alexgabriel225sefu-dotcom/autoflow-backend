@@ -139,10 +139,25 @@ def scrub(text) -> str:
 # refresh token or an app secret that this process never held (it arrived in an
 # upstream error) has no known value or known shape to match on.
 _CLIENT_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
+# The name may be quoted (a JSON or repr dump: 'refresh_token': 'x') and so may
+# the value; the value runs to the next quote, space, comma or closing brace.
 _CLIENT_KEYED = re.compile(
     r"(?i)\b(access[_-]?token|refresh[_-]?token|client[_-]?secret|"
-    r"authorization|api[_-]?key|password|secret|token)\b\s*[=:]\s*\S+")
-_CLIENT_TOKEN_LIKE = re.compile(r"[A-Za-z0-9_\-\.=+/]{24,}")
+    r"authorization|api[_-]?key|password|secret|token)\b[\"']?\s*[=:]\s*"
+    r"[\"']?[^\"'\s,}]+")
+# "=" is not part of the class: a `name=value` pair is split so a short code
+# after it (errorCode=POSITION_NOT_FOUND) is judged on its own, and a long value
+# after it is still caught as a run of its own.
+_CLIENT_TOKEN_LIKE = re.compile(r"[A-Za-z0-9_\-\.+/]{24,}")
+# A broker or API error CODE is not a credential and the client needs it:
+# POSITION_NOT_FOUND, CH_CLIENT_AUTH_FAILURE, an order id such as CT_PAPER_17297...
+# Upper-case words joined by underscores only; a real token carries lower-case
+# letters or hyphens, or has no underscore at all.
+_CLIENT_CODE_LIKE = re.compile(r"[A-Z]+(?:_[A-Z0-9]+)+")
+
+
+def _client_token_sub(m):
+    return m.group(0) if _CLIENT_CODE_LIKE.fullmatch(m.group(0)) else "[redacted]"
 
 
 def scrub_for_client(text, *secrets, limit=160) -> str:
@@ -161,7 +176,7 @@ def scrub_for_client(text, *secrets, limit=160) -> str:
     out = scrub(out)
     out = _CLIENT_BEARER.sub(r"\1 [redacted]", out)
     out = _CLIENT_KEYED.sub(lambda m: f"{m.group(1)}=[redacted]", out)
-    out = _CLIENT_TOKEN_LIKE.sub("[redacted]", out)
+    out = _CLIENT_TOKEN_LIKE.sub(_client_token_sub, out)
     return " ".join(out.split())[:limit]
 
 

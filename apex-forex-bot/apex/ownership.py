@@ -93,6 +93,21 @@ def shared_backed():
     return bool(getattr(user_store, "_USE_REDIS", False))
 
 
+def _register_unless_shutdown(user_id):
+    """Record a freshly claimed lease as held - unless the shutdown has begun.
+
+    The flag is checked and `_held` written under ONE lock, the same lock
+    `release_all` takes its snapshot under after the flag is set, so one of the
+    two sides always sees the other: either the sweep sees this lease and
+    releases it, or this sees the flag and hands the lease back itself.
+    """
+    with _lock:
+        if _shutdown.is_set():
+            return False
+        _held[str(user_id)] = time.time()
+        return True
+
+
 def _give_back_after_shutdown(user_id):
     """Drop a lease that was taken after this process began shutting down.
 
@@ -119,7 +134,7 @@ def acquire(user_id):
         # last seconds of this process would be orphaned the moment it exits.
         return False
     got = user_store.claim_value(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
-    if got is True and _shutdown.is_set():
+    if got is True and not _register_unless_shutdown(user_id):
         # The shutdown began between the check above and the claim. Its sweep
         # may already have run, so this lease would be one nobody releases and
         # the replacement container would stand down for the whole TTL. Hand it
@@ -128,7 +143,6 @@ def acquire(user_id):
         return False
     if got is True:
         with _lock:
-            _held[user_id] = time.time()
             # Holding the lease again makes any previous loss history. Without
             # this the flag survived the restart that fixed it: the loop broke
             # on was_lost() without going through stop(), so nothing cleared
@@ -180,15 +194,13 @@ def heartbeat(user_id):
         if _shutdown.is_set():
             return None             # shutdown began since the check at the top
         again = user_store.claim_value(_key(user_id), INSTANCE_ID, ttl_s=TTL_S)
-        if again is True and _shutdown.is_set():
+        if again is True and not _register_unless_shutdown(user_id):
             # Began between the check and the claim: this is the lease that
             # begin_shutdown() has just released, taken straight back. Give it
             # back again rather than make the replacement wait out the TTL.
             _give_back_after_shutdown(user_id)
             return None
         if again is True:
-            with _lock:
-                _held[user_id] = time.time()
             print(f"[Ownership] lease for {user_id} had lapsed — reacquired")
             return True
         if again is None:

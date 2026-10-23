@@ -205,9 +205,15 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
             # Fails closed, and ONLY for an account nobody has declared
             # simulated. A store that cannot be read cannot rule out a live
             # platform account, and "we could not tell" must never be spent
-            # as "no real money here".
+            # as "no real money here". An account positively declared simulated
+            # (paper) has no real money to protect, so refusing its order over a
+            # store blip is a cost with no matching danger.
             print(f"[Gates] could not classify {user_id}: {e}")
-            return Decision(False, "LIVE_CLASSIFY_FAILED", _exc_text(e)), None
+            if u.get("paper") is True:
+                _pmode = None
+            else:
+                return Decision(False, "LIVE_CLASSIFY_FAILED",
+                                _exc_text(e)), None
         is_platform = _pmode is not None
         if is_platform and _pmode != "demo":
             # live, or a mode the broker would not confirm. Both are real
@@ -245,7 +251,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
                      "selected now")
                     + "; stop it and start it again on the account you "
                       "mean"), None
-        if not is_platform and bound_live:
+        if not is_platform and bound_live and u.get("paper") is not True:
             # An ordinary legacy-bot live order lands here and must pass. A
             # PLATFORM account that was disconnected while its loop kept
             # running lands here too, and must not: the tombstone is what
@@ -538,11 +544,33 @@ def authorize_platform_demo_close(user_id, *, position_id, origin="platform",
     # With an account, the claim is per ACCOUNT and per position (as an integer).
     # Keyed on the position alone, a close sent under the wrong account answered
     # "already closed" and used up the claim the right account then needed.
-    intent = (f"{account}:{int(position_id)}"
-              if account is not None and str(position_id).strip().isdigit()
-              else position_id)
+    keyed = (account is not None and str(position_id).strip().isdigit())
+    intent = f"{account}:{int(position_id)}" if keyed else position_id
+    # The relaxed idempotency policy is for a DEMO account only, and the gate
+    # decides that from the platform's own link record rather than trusting the
+    # caller to have checked: this adapter is a function any future caller can
+    # reach, and "the caller already verified demo" is how a real-money close
+    # ends up skipping the strict policy without anyone noticing.
+    relaxed = keyed and _demo_account_confirmed(user_id, account)
     return authorize_close(user_id, position_id=intent, origin=origin,
-                           user=user, position_keyed=True)
+                           user=user, position_keyed=relaxed)
+
+
+def _demo_account_confirmed(user_id, account):
+    """True only if this user's own link record lists `account` as a DEMO account.
+
+    Anything else - no record, an unreadable store, an account that is not in
+    the list, a live or unknown mode - is False, which keeps the strict policy.
+    """
+    try:
+        from apex.platform import ctrader_link as _ctl
+        rec = _ctl._read_conn(str(user_id))
+    except Exception:
+        return False
+    for a in rec.get("accounts") or []:
+        if str(a.get("ctid")) == str(account):
+            return str(a.get("mode") or "").strip().lower() == "demo"
+    return False
 
 
 def _dash(user_id):

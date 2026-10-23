@@ -142,9 +142,12 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
     # the platform writes those fields today, so this cannot fire now; it is
     # here so that the day something does, a read or a close is refused rather
     # than served - or sent - for a different account than the one asked about.
-    # A broker with no account to report (a test double) is not judged.
+    # With no account asked about (the default positions and orders reads), the
+    # connection's own account is what the broker must match. A broker with no
+    # account to report (a test double) is not judged.
     bound = _bound_account(broker)
-    if ctid is not None and bound is not None and bound != str(ctid):
+    expected = str(ctid if ctid is not None else conn.get("ctid"))
+    if bound is not None and conn.get("ctid") is not None and bound != expected:
         raise _link.LinkError(
             "ACCOUNT_BINDING_MISMATCH",
             "the broker was built for a different account than the one "

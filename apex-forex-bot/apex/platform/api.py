@@ -562,11 +562,6 @@ def _dispatch(method, route, headers, body, query=None):
         if method != "POST":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
         p = _authenticate(headers, fresh=True)
-        # Counted per PERSON now that the session is verified: the pre-auth
-        # limit is per session, and a person can open more sessions.
-        _person_ok, _person_wait = _rl.check_user("emergency_user", p.user_id)
-        if not _person_ok:
-            return _rl.refusal("emergency_user", _person_wait)
         b = _body(body) or {}
         if b.get("confirm") is not True:
             return _err(400, "CONFIRMATION_REQUIRED",
@@ -574,6 +569,22 @@ def _dispatch(method, route, headers, body, query=None):
         close = b.get("closePositions", True)
         if not isinstance(close, bool):
             return _err(400, "BAD_REQUEST", "closePositions must be true or false")
+        # Counted per PERSON now that the session is verified and the request
+        # is well-formed (a malformed one must not spend the budget): the
+        # pre-auth limit is per session, and a person can open more sessions.
+        # OVER THE LIMIT THE STOP STILL RUNS. Refusing the whole request would
+        # leave automation trading for up to a minute because of how often the
+        # button was pressed; what is withheld is only the closing sweep, which
+        # is the part that holds a worker for minutes.
+        _person_ok, _person_wait = _rl.check_user("emergency_user", p.user_id)
+        if not _person_ok:
+            out = _panic.run(p.user_id, ctid="", close_positions=False)
+            out["throttled"] = True
+            out["sentence"] = (
+                out["sentence"] + " Closing positions was NOT attempted: "
+                "Emergency was pressed too many times in the last minute - "
+                f"wait {int(_person_wait or 1)}s and press it again.")
+            return _ok(out)
         # THE STOP RUNS WHATEVER THE ACCOUNT. This used to answer 409
         # NO_ACCOUNT_SELECTED before the stop step, so a client with no
         # selected account - after a disconnect, or when the selection could
