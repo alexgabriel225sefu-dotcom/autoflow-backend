@@ -344,10 +344,25 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
                                 f"the account settings could not be saved "
                                 f"({type(e).__name__})")
 
-    ok = _run_starter(starter, user_id, lock, corr, held)
+    try:
+        ok = _run_starter(starter, user_id, lock, corr, held)
+    except Exception as e:  # noqa: BLE001
+        # A generic "the engine refused" entry leaves the client unable to
+        # distinguish a broker refusal from an internal start failure. Keep
+        # the journal useful without recording credentials or broker payloads:
+        # type plus the provider's short, redacted exception text is enough
+        # to investigate and is what the API returns to the caller as well.
+        detail = f"{type(e).__name__}: {str(e)[:240]}"
+        _jstore.record_error(
+            f"engine start failed — {detail}",
+            correlation_id=corr, user_id=user_id,
+            account_id=str(conn.get("ctid")))
+        raise AutomationRefused(
+            "ENGINE_ERROR",
+            f"the trading engine could not start ({detail})") from e
     if ok is False:
         _jstore.record_error(
-            "the engine refused to start this loop",
+            "the engine refused to start this loop (the starter returned a refusal)",
             correlation_id=corr, user_id=user_id,
             account_id=str(conn.get("ctid")))
         raise AutomationRefused(
