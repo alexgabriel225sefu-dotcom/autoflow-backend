@@ -665,6 +665,35 @@ def selected_mode(user_id):
     return mode if mode in MODES else UNKNOWN
 
 
+def selected_ctid(user_id):
+    """The cTrader account id this client has selected NOW, or None.
+
+    The id on the caller's own link record, for the order gate to compare with
+    the account a running loop was built on. None means no platform connection
+    or nothing selected; a store that cannot be read raises, so the caller
+    refuses rather than reading a fault as "nothing selected".
+    """
+    try:
+        rec = _read_conn(str(user_id))
+    except LinkError:
+        return None
+    ctid = rec.get("selectedCtid")
+    return None if ctid is None else str(ctid)
+
+
+def was_platform_account(user_id) -> bool:
+    """True if this user has EVER connected a platform cTrader account.
+
+    `is_platform_account` answers "is there a usable connection right now", and
+    disconnecting leaves a tombstone that makes it answer no. A loop that was
+    started on a live account keeps its broker session after that, so the order
+    gate needs the other question as well: was this a platform user at all.
+    The tombstone is the evidence. Raises on a store it cannot read.
+    """
+    rec = _store._read_strict(_k_conn(str(user_id)))
+    return bool(rec) and str(rec.get("userId")) == str(user_id)
+
+
 def public_status(user_id):
     """What may be shown in a browser. Carries no token, ever.
 
