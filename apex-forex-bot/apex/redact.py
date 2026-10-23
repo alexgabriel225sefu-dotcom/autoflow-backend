@@ -167,10 +167,15 @@ _CLIENT_CODE_LIKE = re.compile(
     r"(?:_(?:[A-Z]{1,14}[0-9]{0,4}|[0-9]{1,16}))+")
 
 
-def _benign_part(part):
+def _benign_value(part):
     return bool(_CLIENT_CODE_LIKE.fullmatch(part)
-                or (part.isdigit() and len(part) <= 30)
-                or (part.isalpha() and len(part) <= 20))
+                or (part.isdigit() and len(part) <= 30))
+
+
+def _benign_name(part):
+    # An identifier (ctidTraderAccountId). Only the NAME side may be plain
+    # letters: a value of letters alone is as likely to be a secret.
+    return part.isalpha() and len(part) <= 20
 
 
 def _client_token_sub(m):
@@ -182,7 +187,8 @@ def _client_token_sub(m):
     if "=" in text and not text.endswith("="):
         # name=value of two short runs: kept when both sides read as an
         # identifier, a code or a number, not as a credential.
-        if all(_benign_part(part) for part in text.split("=", 1)):
+        name, value = text.split("=", 1)
+        if _benign_name(name) and _benign_value(value):
             return text
     return "[redacted]"
 

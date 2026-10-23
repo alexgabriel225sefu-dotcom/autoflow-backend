@@ -109,11 +109,13 @@ for keep in ("errorDescription=CH_CLIENT_AUTH_FAILURE",
              "ctidTraderAccountId=12345678901234", "positionId=98765432"):
     check(f"{keep!r}: a name=value pair of identifiers is kept",
           _R.scrub_for_client(keep) == keep, _R.scrub_for_client(keep))
-for secret in ("K7Q2M9X4P1Z8R3_T6W0Y5V2N8J4L1_H3F7D9B2C6G0S4",
+for secret in ("AbCdEfGhIjKlMnOpQrSt=UvWxYzAbCdEfGhIjKl",
+               "refreshTokenXY=AbCdEfGhIjKlMnOpQrSt",
+               "K7Q2M9X4P1Z8R3_T6W0Y5V2N8J4L1_H3F7D9B2C6G0S4",
                "X_12345678901234567890_12345678901234567890"):
     got = _R.scrub_for_client(f"id {secret}")
-    check(f"{secret[:20]!r}: an underscore does not make a secret a code",
-          secret[:12] not in got, got)
+    check(f"{secret[:20]!r}: neither an underscore nor a name makes a secret a code",
+          secret[-12:] not in got, got)
 
 # ── 2. the Emergency close detail ───────────────────────────────────────────
 print("\n[2] the Emergency button's per-position detail is redacted")
