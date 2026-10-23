@@ -613,6 +613,44 @@ try:
         check("a list with spaces and several pairs still admits a member",
               v["allowed"] is True, str(v))
 
+        set_pilot(cap="999")
+        reset()
+        v = auth(mode_reader=counted_mode, units=500)
+        check("a cap below the smallest order the instrument allows is no cap",
+              v["allowed"] is False and v["code"] == "OVER_PILOT_SIZE"
+              and v["gate"] == "pilot", str(v))
+        set_pilot()
+
+        # The mode the broker confirms must be the mode of the account the LOOP
+        # holds, not of whatever is selected at the moment of the read.
+        set_pilot(pairs=f"{USER}:{ACCOUNT},{USER}:999")
+        reset()
+        from apex.platform import ctrader_link as _CTL2
+        _real_verify = _CTL2.verify_selected_mode
+        _CTL2._store._write(_CTL2._k_conn(USER), {
+            "userId": USER, "accessToken": "not-a-real-token",
+            "ctid": ACCOUNT, "mode": "live", "accounts": [],
+            "selectedCtid": ACCOUNT})
+        _CTL2.verify_selected_mode = lambda uid, **kw: {
+            "mode": "live", "verified": True, "ctid": ACCOUNT,
+            "recorded": "live", "changed": False, "reason": None}
+        try:
+            g = LX.guard_engine_order(USER, symbol="EURUSD", side="BUY",
+                                      units=1000, origin="loop",
+                                      bound_account="999")
+            check("a verified mode for a DIFFERENT account than the loop holds "
+                  "is not an answer", g.get("code") == LX.MODE_UNVERIFIED,
+                  str(g))
+            g = LX.guard_engine_order(USER, symbol="EURUSD", side="BUY",
+                                      units=1000, origin="loop",
+                                      bound_account=ACCOUNT)
+            check("while the loop's own account passes the mode gate",
+                  g.get("code") != LX.MODE_UNVERIFIED, str(g))
+        finally:
+            _CTL2.verify_selected_mode = _real_verify
+        set_pilot()
+        reset()
+
         # §7: an order whose authorization could not be written down is not sent.
         set_pilot()
         reset()

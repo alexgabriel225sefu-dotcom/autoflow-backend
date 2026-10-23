@@ -38,7 +38,9 @@ taken from a request (spec §4).
 
 THE CAP MUST NOT BE BELOW THE BROKER'S MINIMUM ORDER. The broker raises a
 smaller order to its minimum after this check has passed, and that order would
-exceed the cap. The operator sets the cap at or above the minimum.
+exceed the cap. This module refuses when the cap is below the code's own floor
+(`forex.min_units`); the broker's real per-symbol minimum can be larger, and
+the operator confirms it before setting the cap.
 
 WIDENING IS NOT A CONFIG CHANGE. Step 3 of the rollout (one consenting client)
 needs its own review; it is done by changing this module and its tests, not by
@@ -124,6 +126,19 @@ def check_order(symbol, units):
         return (NOT_PILOT_SYMBOL,
                 "this instrument is not part of the live pilot")
     cap = _max_units()
+    # The broker raises an order below ITS minimum up to that minimum after this
+    # check, so a cap under the minimum is not a cap. The code's own floor is the
+    # smallest the broker could ever demand; the broker's real one may be larger
+    # and is for the operator to confirm. Unknown floor: refuse.
+    try:
+        from apex import forex as _fx
+        floor = _fx.min_units(symbol)
+    except Exception:                                        # noqa: BLE001
+        floor = None
+    if floor is None or floor > cap:
+        return (OVER_PILOT_SIZE,
+                f"the pilot cap ({cap} units) is below the smallest order this "
+                f"instrument allows, so no order of it is sent")
     try:
         if isinstance(units, bool):
             raise TypeError("a bool is not a size")

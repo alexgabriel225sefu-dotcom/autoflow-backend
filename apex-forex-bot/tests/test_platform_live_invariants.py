@@ -362,6 +362,13 @@ for _n, _seg in enumerate(_sites, 1):
           "without it the gate reads only the CURRENT selection")
     check(f"order site {_n} passes the environment its broker is bound to",
           "bound_env=" in _call and "CTRADER_ENV" in _call)
+check("the order gate hands the bound account on to the live guard",
+      "bound_account=bound_account" in _auth,
+      "the pilot and the mode verification must judge the account the loop "
+      "holds, not a fresh read of the selection")
+check("and a live guard with no opinion on a platform account refuses",
+      "PLATFORM_DISCONNECTED" in _auth[_auth.index("_live_exec.guard_engine_order("):],
+      "None from the guard cannot be read as 'not mine' once step 0 said it is")
 _pre = body_src("automation", "_preflight")
 check("a live start is held to the pilot, after the broker confirmed the mode",
       "_pilot.check_identity" in _pre

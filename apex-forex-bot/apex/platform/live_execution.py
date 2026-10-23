@@ -460,7 +460,8 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
     return {"allowed": True, "code": None, "gate": None, "detail": ""}
 
 
-def guard_engine_order(user_id, *, symbol, side, units, origin="unknown"):
+def guard_engine_order(user_id, *, symbol, side, units, origin="unknown",
+                       bound_account=None):
     """The platform's live gates for an engine order, or None if they do not apply.
 
     `gates.authorize_order` calls this for every LIVE order, whoever asked.
@@ -514,13 +515,21 @@ def guard_engine_order(user_id, *, symbol, side, units, origin="unknown"):
         # MODE_UNVERIFIED, which is the correct outcome and the correct code.
         if not v.get("verified"):
             raise RuntimeError(v.get("reason") or "mode not verified")
+        # The broker confirmed the mode of the account SELECTED at this read.
+        # When the caller says which account the loop holds, that is the one
+        # whose mode matters; a different one verified is not an answer.
+        if bound_account is not None and str(v.get("ctid")) != str(bound_account):
+            raise RuntimeError("the account selected now is not the account "
+                               "this loop trades")
         return v.get("mode")
 
-    # The account id is the one on the caller's OWN link record (spec §4),
-    # never one the request supplied: the pilot guard compares it to the list.
+    # The account id is the one the loop is BOUND to (its broker's own), or,
+    # failing that, the one on the caller's own link record (spec §4) - never
+    # one a request supplied. The pilot guard compares it to the list.
     return authorize_order(str(user_id), symbol=symbol, side=side,
                            units=units, mode_reader=mode_reader,
-                           account_id=(_conn or {}).get("selectedCtid"),
+                           account_id=(bound_account if bound_account is not None
+                                       else (_conn or {}).get("selectedCtid")),
                            actor=f"engine:{origin}")
 
 

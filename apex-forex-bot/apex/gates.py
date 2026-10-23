@@ -224,9 +224,12 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
             if _sel is None or str(_sel) != str(bound_account):
                 return Decision(
                     False, "ACCOUNT_CHANGED",
-                    "this loop trades real money on an account that is not "
-                    "the one selected now; stop it and start it again on the "
-                    "account you mean"), None
+                    ("this loop trades real money on an account that is not "
+                     "the one selected now" if bound_live else
+                     "this loop trades an account that is not the one "
+                     "selected now")
+                    + "; stop it and start it again on the account you "
+                      "mean"), None
         if not is_platform and bound_live:
             # An ordinary legacy-bot live order lands here and must pass. A
             # PLATFORM account that was disconnected while its loop kept
@@ -391,14 +394,24 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
             from apex.platform import live_execution as _live_exec
             _pv = _live_exec.guard_engine_order(
                 user_id, symbol=symbol, side=side, units=units,
-                origin=origin)
+                origin=origin, bound_account=bound_account)
         except Exception as e:
             # Fails closed, like every other branch in this function — but
             # only for accounts the platform actually owns. A missing audit
             # backend denying a platform live order is §7 working.
             print(f"[Gates] platform live guard failed for {user_id}: {e}")
             return Decision(False, "LIVE_GUARD_FAILED", str(e)[:120]), None
-        if _pv is not None and not _pv.get("allowed"):
+        if _pv is None:
+            # Step 0 established that this IS a platform account, so "no
+            # platform opinion" can only mean the connection vanished in the
+            # gap between that read and this one - a disconnect. The loop
+            # still holds a broker session, so letting the order through
+            # would send real money past every platform live gate.
+            return Decision(
+                False, "PLATFORM_DISCONNECTED",
+                "this account was disconnected from the platform while the "
+                "order was being checked; no live order is sent"), None
+        if not _pv.get("allowed"):
             return Decision(False, _pv.get("code") or "LIVE_REFUSED",
                             f"{_pv.get('gate')}: {_pv.get('detail')}"), None
 

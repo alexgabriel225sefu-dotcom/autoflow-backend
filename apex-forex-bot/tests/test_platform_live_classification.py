@@ -260,7 +260,40 @@ try:
     user_store.save(TG_USER, {"id": TG_USER, "paper": False})
     d, _ = order(TG_USER, bound_account="123", bound_env="live")
     check("but a legacy Telegram user trading live is not mistaken for one",
-          d.reason != "PLATFORM_DISCONNECTED", f"{d.reason}: {d.detail}")
+          d.reason not in ("PLATFORM_DISCONNECTED", "LIVE_CLASSIFY_FAILED"),
+          f"{d.reason}: {d.detail}")
+
+    print("\n[7b] a disconnect that lands between classification and the guard")
+    # Step 0 saw a connected platform account; by the time the live guard reads
+    # the record the connection is gone, so the guard has "no opinion" (None).
+    # That must not be read as "not mine to answer": the account IS a platform
+    # one, and the loop still holds a broker session.
+    import types as _types
+    connect(LIVE_USER, CTL.LIVE)
+    _pkg = sys.modules.get("apex.platform")
+    _real_mod = sys.modules.get("apex.platform.live_execution")
+    _fake = _types.ModuleType("apex.platform.live_execution")
+    _fake.guard_engine_order = lambda *a, **k: None
+    sys.modules["apex.platform.live_execution"] = _fake
+    _had_attr = hasattr(_pkg, "live_execution")
+    _old_attr = getattr(_pkg, "live_execution", None)
+    setattr(_pkg, "live_execution", _fake)
+    try:
+        d, rid = order(LIVE_USER, units=1300, bound_account="900001",
+                       bound_env="live")
+    finally:
+        if _real_mod is not None:
+            sys.modules["apex.platform.live_execution"] = _real_mod
+        else:
+            sys.modules.pop("apex.platform.live_execution", None)
+        if _had_attr:
+            setattr(_pkg, "live_execution", _old_attr)
+        else:
+            delattr(_pkg, "live_execution")
+    check("a guard with no opinion on a platform account refuses the order",
+          not d.allowed and d.reason == "PLATFORM_DISCONNECTED",
+          f"{d.reason}: {d.detail}")
+    check("and burns no claim", rid is None, str(rid))
 
     print("\n[8] a store that cannot be read, for a live loop")
     _real_strict = PS._read_strict
