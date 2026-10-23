@@ -316,6 +316,36 @@ check("and the broker is called after all of them",
       _place.index("broker or _default_broker") > max(_at.values()),
       "a gate that runs after the order is sent is a report, not a gate")
 
+# The pilot guard (live_pilot) narrows who may trade real money to the
+# operator's own account at a capped size. It is a gate like the others, so it
+# is asserted on BOTH doors and in a fixed place on each: a guard that exists
+# but is not called, or is called after the thing it protects, is decoration.
+print("\n[1b2] the pilot guard is on both doors, in order")
+_auth_door = body_src("live_execution", "authorize_order")
+for _door_name, _door in (("place", _place), ("authorize_order", _auth_door)):
+    check(f"{_door_name} asks the pilot guard who may trade",
+          "_pilot.check_identity" in _door,
+          f"`_pilot.check_identity` is not in {_door_name}()")
+    check(f"{_door_name} asks the pilot guard how much",
+          "_pilot.check_size" in _door,
+          f"`_pilot.check_size` is not in {_door_name}()")
+    _i = _door.index("_pilot.check_identity") if "_pilot.check_identity" in _door else -1
+    check(f"{_door_name}: the pilot identity check follows the entitlement and "
+          f"precedes the broker read of the mode",
+          _door.index("entitlement_of") < _i < _door.index("mode_reader()"),
+          "a refused client must not cost a broker round trip, and a client "
+          "told 'not entitled' should hear that before 'not in the pilot'")
+_s_place = _place.index("_pilot.check_size") if "_pilot.check_size" in _place else -1
+check("place: the size check runs on the built request, before the risk gates",
+      _place.index("_bridge.build") < _s_place < _place.index("_gates.authorize"))
+_s_auth = _auth_door.index("_pilot.check_size") if "_pilot.check_size" in _auth_door else -1
+check("authorize_order: the size check follows the mode and precedes the rate",
+      _auth_door.index("mode_reader()") < _s_auth < _auth_door.index("_rate.authorize"))
+check("and the engine door is handed the account from the link record",
+      'get("selectedCtid")' in body_src("live_execution", "guard_engine_order"),
+      "the pilot account list is compared to the caller's own link record, "
+      "never to a value from a request")
+
 # §6's one rule, asserted on the source: an unknown outcome keeps the claim.
 check("an unknown broker outcome abandons without releasing",
       "_ledger.abandon_unknown" in _place,

@@ -124,6 +124,15 @@ from apex.platform import snapshot as SN                # noqa: E402
 
 USER = "aaaa0000-1111-4222-8333-aaaa44445555"
 ACCOUNT = "9001"
+
+# The pilot guard (apex/platform/live_pilot.py) fails closed unless it is told
+# who may trade, on which account, and the largest order. This file exercises
+# the gates BEHIND it, so it configures the pilot for its own user and account
+# and leaves every assertion about those gates untouched. The guard's own
+# refusals are proven in tests/test_platform_live_pilot.py.
+os.environ["A4T_LIVE_PILOT_USERS"] = USER
+os.environ["A4T_LIVE_PILOT_ACCOUNTS"] = ACCOUNT
+os.environ["A4T_LIVE_PILOT_MAX_UNITS"] = "10000000"
 NOW = 1_760_000_000.0
 BAR = 3600
 
@@ -497,6 +506,104 @@ try:
     check("allowed", v["allowed"] is True, str(v))
     check("with no refusal code", v["code"] is None, str(v["code"]))
 
+    print("\n[19b] the pilot guard: the operator's own account, at a capped size")
+    PILOT_ENV = ("A4T_LIVE_PILOT_USERS", "A4T_LIVE_PILOT_ACCOUNTS",
+                 "A4T_LIVE_PILOT_MAX_UNITS")
+    saved = {k: os.environ.get(k) for k in PILOT_ENV}
+    calls = []
+
+    def counted_mode():
+        calls.append(1)
+        return "live"
+
+    def set_pilot(users=USER, accounts=ACCOUNT, cap="10000"):
+        for k, v in zip(PILOT_ENV, (users, accounts, cap)):
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    try:
+        set_pilot()
+        reset()
+        v = auth(mode_reader=counted_mode, units=10000)
+        check("inside the pilot, at exactly the cap, it is allowed",
+              v["allowed"] is True, str(v))
+
+        # Each of the three values missing on its own closes everything.
+        for missing in range(3):
+            vals = [USER, ACCOUNT, "10000"]
+            vals[missing] = None
+            set_pilot(*vals)
+            reset()
+            v = auth(mode_reader=counted_mode)
+            check(f"without {PILOT_ENV[missing]} nothing is sent",
+                  v["allowed"] is False and v["code"] == "PILOT_UNCONFIGURED"
+                  and v["gate"] == "pilot", str(v))
+        set_pilot(cap="not-a-number")
+        reset()
+        v = auth(mode_reader=counted_mode)
+        check("an unparseable cap closes it too",
+              v["code"] == "PILOT_UNCONFIGURED", str(v))
+        set_pilot(cap="0")
+        reset()
+        v = auth(mode_reader=counted_mode)
+        check("and a cap of zero is no cap at all, not unlimited",
+              v["code"] == "PILOT_UNCONFIGURED", str(v))
+
+        set_pilot()
+        reset()
+        calls.clear()
+        v = auth(mode_reader=counted_mode, units=10001)
+        check("one unit over the cap is refused",
+              v["allowed"] is False and v["code"] == "OVER_PILOT_SIZE"
+              and v["gate"] == "pilot", str(v))
+        for bad in (None, 0, -0.0, float("nan"), float("inf"), "big", True):
+            v = auth(mode_reader=counted_mode, units=bad)
+            check(f"a size that cannot be measured ({bad!r}) is refused",
+                  v["allowed"] is False and v["code"] == "OVER_PILOT_SIZE",
+                  str(v))
+
+        set_pilot(users="someone-else")
+        reset()
+        calls.clear()
+        v = auth(mode_reader=counted_mode)
+        check("a user outside the pilot is refused",
+              v["allowed"] is False and v["code"] == "NOT_PILOT_USER"
+              and v["gate"] == "pilot", str(v))
+        check("before the broker is even asked for the mode", calls == [],
+              f"the mode reader ran {len(calls)} time(s): a refused client "
+              f"must not cost a broker round trip")
+
+        set_pilot(accounts="1234")
+        reset()
+        v = auth(mode_reader=counted_mode)
+        check("an account outside the pilot is refused",
+              v["code"] == "NOT_PILOT_ACCOUNT", str(v))
+        set_pilot()
+        reset()
+        v = auth(mode_reader=counted_mode, account_id=None)
+        check("and so is an order that names no account",
+              v["code"] == "NOT_PILOT_ACCOUNT", str(v))
+        # A list is exact membership, not a substring match.
+        set_pilot(accounts="90010")
+        reset()
+        v = auth(mode_reader=counted_mode)
+        check("account 9001 is not matched by 90010",
+              v["code"] == "NOT_PILOT_ACCOUNT", str(v))
+        set_pilot(users=f"x, {USER} ,y", accounts=f"1,{ACCOUNT}")
+        reset()
+        v = auth(mode_reader=counted_mode)
+        check("a list with spaces and several names still admits a member",
+              v["allowed"] is True, str(v))
+    finally:
+        for k, val in saved.items():
+            if val is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = val
+        reset()
+
     print("\n[20] guard_engine_order has NO opinion on a non-platform account")
     # The Telegram bot's users reach `gates.authorize_order` too and have no
     # platform cTrader connection. None means "not mine to answer" — which is
@@ -517,9 +624,13 @@ try:
         "ctid": ACCOUNT, "mode": "live", "accounts": [],
     })
     reset()
+    # `selectedCtid` is what select_account records for the chosen account; the
+    # pilot guard compares it to the pilot list, so a record that omits it would
+    # stop at the pilot gate instead of reaching the mode gate under test.
     _CTL._store._write(_CTL._k_conn(USER), {
         "userId": USER, "accessToken": "not-a-real-token",
         "ctid": ACCOUNT, "mode": "live", "accounts": [],
+        "selectedCtid": ACCOUNT,
     })
     g = LX.guard_engine_order(USER, symbol="EURUSD", side="BUY",
                               units=1000, origin="loop")
