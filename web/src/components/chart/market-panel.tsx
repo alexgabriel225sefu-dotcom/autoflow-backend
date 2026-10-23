@@ -33,10 +33,15 @@ import { PriceChart, type Overlay } from "./price-chart";
  * How often the chart (and its position lines) are re-read.
  *
  * The broker allows 5 historical requests a second per connection, shared by
- * every client, and the platform meters this route per user. 5 seconds is the
- * floor for one chart; do not lower it.
+ * every client, and the platform meters the candles route per USER, at 30 a
+ * minute across every tab and device they have open. At 5 seconds one chart
+ * used 12 of those, so three open tabs were over the limit — seen on the
+ * owner's phone on 2026-10-23 as "RATE_LIMITED, wait 13s" over the chart. The
+ * candles themselves come through a shared cache, so polling every 5 seconds
+ * bought no fresher bars, only the 429. 15 seconds is 4 a minute per chart:
+ * seven tabs before the limit, and 5 seconds is the floor; do not go below it.
  */
-export const CHART_REFRESH_MS = 5_000;
+export const CHART_REFRESH_MS = 15_000;
 const BARS = 200;
 
 export const PERIOD_MIN = 2;

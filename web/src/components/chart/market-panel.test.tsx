@@ -88,10 +88,10 @@ describe("market panel — what it asks the hook for", () => {
     expect(Number(q.get("limit"))).toBeGreaterThan(0);
   });
 
-  it("refreshes every 5000 ms, and never faster", () => {
-    expect(CHART_REFRESH_MS).toBe(5000);
+  it("refreshes every 15000 ms, and never faster than 5000", () => {
+    expect(CHART_REFRESH_MS).toBe(15000);
     mount();
-    expect(h.useRead).toHaveBeenCalledWith(expect.stringMatching(/^accounts\/501\/candles\?/), 5000);
+    expect(h.useRead).toHaveBeenCalledWith(expect.stringMatching(/^accounts\/501\/candles\?/), 15000);
     // The broker's historical budget is shared; no read on this panel may poll quicker.
     for (const [, interval] of h.useRead.mock.calls) {
       expect(interval).toBeGreaterThanOrEqual(5000);
@@ -100,7 +100,7 @@ describe("market panel — what it asks the hook for", () => {
 
   it("reads open positions for the lines on the chart, at the same cadence", () => {
     mount();
-    expect(h.useRead).toHaveBeenCalledWith("positions", 5000);
+    expect(h.useRead).toHaveBeenCalledWith("positions", CHART_REFRESH_MS);
   });
 
   it("asks for the new timeframe when it is changed", () => {

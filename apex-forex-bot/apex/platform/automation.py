@@ -421,6 +421,29 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     return rule, conn
 
 
+def _note_engine_refused(user_id, corr, ctid, *, revive):
+    """File the engine's refusal to start a loop — unless the supervisor asked.
+
+    The supervisor retries a dead loop every few minutes, and after a deploy
+    the previous instance keeps the loop's lease for up to ten minutes, so the
+    engine refuses each retry ("owned by another instance"). That is the
+    EXPECTED shape of a restart, not a fault — and it was being written to the
+    client's journal as "Broker error", once per retry (four entries after one
+    deploy), none of them about the broker. A journal whose errors include
+    every ordinary handover is one nobody can search for a real error in.
+
+    An interactive Start the client pressed is different: they asked, so the
+    refusal is theirs to see. A revival is the platform's own retry, and its
+    refusal stays in the server log, where `[Automation] not reviving` says
+    why.
+    """
+    if revive:
+        return
+    _jstore.record_error(
+        "the engine refused to start this loop",
+        correlation_id=corr, user_id=user_id, account_id=str(ctid))
+
+
 def start(user_id, rule_doc_id, *, starter=None, now=None,
           mode_lister=None, revive=False):
     """Begin automation for one rule. Idempotent unless `revive`.
@@ -532,10 +555,7 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
 
     ok = _run_starter(starter, user_id, lock, corr, held)
     if ok is False:
-        _jstore.record_error(
-            "the engine refused to start this loop",
-            correlation_id=corr, user_id=user_id,
-            account_id=str(conn.get("ctid")))
+        _note_engine_refused(user_id, corr, conn.get("ctid"), revive=revive)
         raise AutomationRefused(
             "ENGINE_REFUSED",
             "the trading engine refused to start this loop — it may already "

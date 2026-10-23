@@ -28,7 +28,7 @@ vi.mock("lightweight-charts", async () => (await import("@/test/lightweight-char
 
 import { lwc } from "@/test/lightweight-charts-mock";
 import { createChart } from "lightweight-charts";
-import { MarketPanel } from "./market-panel";
+import { CHART_REFRESH_MS, MarketPanel } from "./market-panel";
 
 const T0 = 1_758_542_400;
 const bar = (i: number, close: number) => ({ time: T0 + i * 3600, open: close - 0.001, high: close + 0.002, low: close - 0.002, close });
@@ -69,14 +69,14 @@ async function mount() {
 }
 
 describe("the live loop, with the real hook", () => {
-  it("reads once on mount, then once every 5 seconds — not sooner", async () => {
+  it("reads once on mount, then once every refresh interval — not sooner", async () => {
     await mount();
     expect(candleCalls()).toHaveLength(1);
-    await tick(4_999);
-    expect(candleCalls(), "polled before 5 s").toHaveLength(1);
+    await tick(CHART_REFRESH_MS - 1);
+    expect(candleCalls(), "polled before the interval").toHaveLength(1);
     await tick(1);
     expect(candleCalls()).toHaveLength(2);
-    await tick(5_000);
+    await tick(CHART_REFRESH_MS);
     expect(candleCalls()).toHaveLength(3);
     // The positions behind the lines run on the same clock.
     expect(positionCalls()).toHaveLength(3);
@@ -84,7 +84,7 @@ describe("the live loop, with the real hook", () => {
 
   it("only ever issues GETs", async () => {
     await mount();
-    await tick(10_000);
+    await tick(2 * CHART_REFRESH_MS);
     expect(h.calls.length).toBeGreaterThan(2);
     for (const c of h.calls) expect(c.method ?? "GET").toBe("GET");
   });
@@ -97,12 +97,12 @@ describe("the live loop, with the real hook", () => {
 
     // The last candle moves.
     h.candles = readOf([1.10, 1.11, 1.125]);
-    await tick(5_000);
+    await tick(CHART_REFRESH_MS);
     expect(series.update).toHaveBeenLastCalledWith(asBar(2, 1.125));
 
     // A new candle opens.
     h.candles = readOf([1.10, 1.11, 1.125, 1.13]);
-    await tick(5_000);
+    await tick(CHART_REFRESH_MS);
     expect(series.update).toHaveBeenLastCalledWith(asBar(3, 1.13));
 
     expect(createChart, "the chart was recreated on refresh").toHaveBeenCalledTimes(1);
@@ -135,7 +135,7 @@ describe("the live loop, with the real hook", () => {
     await mount();
     expect(document.querySelector(".price-chart")).not.toBeNull();
     h.candles = { ok: false, status: 0, code: "NETWORK", message: "Failed to fetch" };
-    await tick(5_000);
+    await tick(CHART_REFRESH_MS);
     expect(screen.getByText("NETWORK")).toBeDefined();
     expect(document.querySelector(".price-chart")).toBeNull();
     expect(screen.getByText("stale")).toBeDefined();
@@ -144,10 +144,10 @@ describe("the live loop, with the real hook", () => {
   it("recovers to a live chart when the broker comes back", async () => {
     await mount();
     h.candles = { ok: false, status: 503, code: "BROKER_DOWN", message: "no answer" };
-    await tick(5_000);
+    await tick(CHART_REFRESH_MS);
     expect(document.querySelector(".price-chart")).toBeNull();
     h.candles = readOf([1.10, 1.11, 1.12]);
-    await tick(5_000);
+    await tick(CHART_REFRESH_MS);
     expect(document.querySelector(".price-chart")).not.toBeNull();
     expect(screen.queryByText("stale")).toBeNull();
   });
