@@ -139,7 +139,10 @@ class _StubBroker:
         return 5000.0
 
 
-user_loop._make_broker = lambda user, user_id=None: (_StubBroker(), {})
+# broker_read passes the requested ctid into the factory so the connector
+# cannot accidentally serve a different account. Keep the fixture compatible
+# with that production security boundary.
+user_loop._make_broker = lambda user, user_id=None, ctid=None: (_StubBroker(), {})
 
 bot._start_dashboard_server()
 
