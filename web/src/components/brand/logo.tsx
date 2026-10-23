@@ -76,10 +76,14 @@ export function BrandLockup({
   }
   return (
     <span className={className ? `brand-lockup ${className}` : "brand-lockup"}>
-      <BrandMark size={size} />
-      {/* One text node, so a screen reader reads "Apex4Traders" rather than
-          "Apex", "4", "Traders" as three fragments. */}
-      <span className="word">Apex4Traders</span>
+      <img
+        className="brand-lockup-image"
+        src="/apex4traders-logo.jpg"
+        alt="Apex4Traders"
+        width={Math.round(size * 7.8)}
+        height={size}
+      />
+      <span className="sr-only">Apex4Traders</span>
     </span>
   );
 }
