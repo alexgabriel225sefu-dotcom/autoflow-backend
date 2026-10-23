@@ -158,7 +158,7 @@ export default function Dashboard() {
   }
 
   return (
-    <main>
+    <main className="dashboard-terminal">
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>

@@ -455,6 +455,70 @@ body {
 }
 .workspace > * { min-width: 0; }
 
+/* Dashboard terminal mode. The rest of the product keeps the calm editorial
+   surface, while the primary workspace gets the higher-density dark treatment
+   traders expect from a professional market terminal. The variables are local
+   to the dashboard so public pages and contrast guarantees do not drift. */
+.dashboard-terminal {
+  --a4t-bg: #090c11;
+  --a4t-bg-2: #0e131a;
+  --a4t-surface: #121820;
+  --a4t-surface-2: #171f29;
+  --a4t-surface-3: #202b38;
+  --a4t-line: #283442;
+  --a4t-line-soft: #1e2833;
+  --a4t-text: #f3f6fa;
+  --a4t-muted: #aab6c4;
+  --a4t-dim: #7c8998;
+  --a4t-accent: #f3f6fa;
+  --a4t-accent-strong: #ffffff;
+  --a4t-accent-wash: rgba(243, 246, 250, .08);
+  --a4t-on-accent: #0a0d12;
+  --a4t-link: #7db0ff;
+  --a4t-link-strong: #b5d2ff;
+  --a4t-link-dim: #30496a;
+  --a4t-link-wash: rgba(125, 176, 255, .12);
+  --a4t-long: #4fd39b;
+  --a4t-short: #ff716b;
+  --a4t-neutral: #9aa6b5;
+  --a4t-long-wash: rgba(79, 211, 155, .12);
+  --a4t-short-wash: rgba(255, 113, 107, .12);
+  background: radial-gradient(circle at 85% 0%, rgba(125, 176, 255, .08), transparent 34rem), var(--a4t-bg);
+  border: 1px solid var(--a4t-line);
+  border-radius: 16px;
+  padding: clamp(.8rem, 1.6vw, 1.25rem);
+  color: var(--a4t-text);
+}
+.dashboard-terminal .page-head { margin-bottom: .8rem; }
+.dashboard-terminal .page-head .sub,
+.dashboard-terminal .muted,
+.dashboard-terminal .dim { color: var(--a4t-muted); }
+.dashboard-terminal .card,
+.dashboard-terminal .dock,
+.dashboard-terminal .notice,
+.dashboard-terminal .stat-card {
+  background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 65%), var(--a4t-surface);
+  border-color: var(--a4t-line);
+  box-shadow: 0 12px 32px -24px rgba(0,0,0,.75);
+}
+.dashboard-terminal .card-head,
+.dashboard-terminal .dock-tabs { border-color: var(--a4t-line); }
+.dashboard-terminal .dock-tabs { background: var(--a4t-bg-2); }
+.dashboard-terminal .field select,
+.dashboard-terminal input,
+.dashboard-terminal textarea {
+  background: var(--a4t-bg-2);
+  color: var(--a4t-text);
+  border-color: var(--a4t-line);
+}
+.dashboard-terminal .btn-ghost { color: var(--a4t-muted); border-color: var(--a4t-line); }
+.dashboard-terminal .btn-ghost:hover { background: var(--a4t-accent-wash); color: var(--a4t-text); }
+.dashboard-terminal .btn:not(.btn-ghost) { box-shadow: 0 8px 18px -12px rgba(125,176,255,.8); }
+.dashboard-terminal .label-xs { color: var(--a4t-dim); }
+@media (max-width: 639px) {
+  .dashboard-terminal { border-radius: 12px; padding: .65rem; }
+}
+
 .inspector { display: flex; flex-direction: column; gap: var(--sp-3); }
 @media (min-width: 1180px) {
   .inspector { position: sticky; top: calc(var(--a4t-topbar) + var(--a4t-statusbar) + var(--sp-3)); }
