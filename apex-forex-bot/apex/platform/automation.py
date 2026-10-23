@@ -59,6 +59,12 @@ STATES = (STOPPED, RUNNING, PAUSED)
 DEMO = "demo"
 LIVE = "live"
 _START_LOCK_TTL_S = 30
+# How long stop() waits for a start that is already in flight before it halts a
+# second time. Bounded: the panic button must not wait on a stuck start.
+_STOP_SETTLE_S = 3.0
+_STOPPED_RECORD = {"state": "stopped", "ruleDocId": None, "mode": None,
+                   "startedAt": None, "appliedTerms": None,
+                   "notApplied": None, "engineSnapshot": None}
 
 
 class AutomationRefused(RuntimeError):
@@ -581,6 +587,23 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
             "another start for this account is already in flight")
     held = token is True
 
+    # A REVIVE IS A START THE CLIENT DID NOT ASK FOR, SO IT MUST NOT OUTLIVE A
+    # STOP THE CLIENT DID. `supervise` read RUNNING a moment ago; if the client
+    # pressed Stop (or Emergency) since, bringing the loop back would undo it
+    # and leave a loop trading under a record that says STOPPED. Asked again
+    # now that this start holds the lock, which is the last point where a
+    # concurrent stop is still visible before the engine is touched.
+    if revive and _read(user_id).get("state") != RUNNING:
+        if held:
+            try:
+                user_store.release_claim(lock, corr)
+            except Exception:                               # noqa: BLE001
+                pass
+        raise AutomationRefused(
+            "STOPPED_MEANWHILE",
+            "automation was stopped while it was being restarted, so it was "
+            "not restarted")
+
     if starter is None:
         starter = _engine_starter
     # NOTE WHAT IS ABSENT: `paper`. Exactly one place writes the live/demo
@@ -642,6 +665,20 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
             "ENGINE_REFUSED",
             "the trading engine refused to start this loop — it may already "
             "be owned by another instance")
+
+    # The same question once more, before RUNNING is written over whatever is
+    # there. The engine has just been started; a stop that landed while it came
+    # up has written STOPPED, and writing RUNNING now would erase it. Halt what
+    # was just started rather than leave it trading.
+    if revive and _read(user_id).get("state") != RUNNING:
+        try:
+            _halt(user_id, None)
+        except Exception:                                   # noqa: BLE001
+            pass
+        raise AutomationRefused(
+            "STOPPED_MEANWHILE",
+            "automation was stopped while it was being restarted, so the "
+            "restarted loop was stopped again")
 
     # The mode this loop ACTUALLY runs on, not a constant. It was DEMO here
     # while demo was the only thing that could start, and leaving it would
@@ -1050,7 +1087,25 @@ def stop(user_id, *, stopper=None):
     if rec.get("state") == STOPPED:
         return dict(status(user_id), stopped=False, alreadyStopped=True,
                     **_flatten_answer(rec))
-    stopped_here = _halt(user_id, stopper)
+    # THE INTENT IS WRITTEN BEFORE THE LOOP IS HALTED, not after. It used to be
+    # the last step, so for the length of the halt the record still said RUNNING
+    # over a loop that was gone - which is exactly what the supervisor looks for
+    # and revives. A revive that landed in that gap brought the loop back and
+    # the late STOPPED write then reported "stopped" over a loop that was
+    # trading again. With STOPPED already on the record, the supervisor skips it.
+    prior = dict(rec)
+    _write(user_id, dict(_STOPPED_RECORD))
+    try:
+        stopped_here = _halt(user_id, stopper)
+    except Exception:
+        # The halt failed, so the loop may still be running: put the record
+        # back rather than report a stop that did not happen.
+        _write(user_id, prior)
+        raise
+    # A start that began before the record said STOPPED may still be bringing a
+    # loop up, or about to write RUNNING back. Wait (bounded) for it to finish,
+    # halt once more, and repair the record if it was overwritten.
+    stopped_here = _settle_stop(user_id, stopper) or stopped_here
     _jstore.record_automation(
         _jstore._j.AUTOMATION_STOPPED, correlation_id=uuid.uuid4().hex,
         user_id=user_id, account_id=str(rec.get("accountId") or ""),
@@ -1067,9 +1122,6 @@ def stop(user_id, *, stopper=None):
         # already halted the loop — the loop being stopped is the thing that
         # mattered, and the settings are visible and editable.
         pass
-    _write(user_id, {"state": STOPPED, "ruleDocId": None, "mode": None,
-                     "startedAt": None, "appliedTerms": None,
-                     "notApplied": None, "engineSnapshot": None})
     ans = _flatten_answer(rec)
     _notify.notify(user_id, type=_notify.SYSTEM, title="Automation stopped",
                    body="The trading loop has been stopped. "
@@ -1088,6 +1140,46 @@ def stop(user_id, *, stopper=None):
             "update — it will notice this stop at its next check, within about "
             "five minutes.")
     return out
+
+
+def _settle_stop(user_id, stopper):
+    """After the record says STOPPED: make sure no start still in flight wins.
+
+    Takes the start lock if it can within `_STOP_SETTLE_S` (a start holds it
+    while the engine comes up), halts again, and checks the record still says
+    STOPPED - a start that finished in the gap writes RUNNING over it, in which
+    case the intent is written back and the loop halted once more. Bounded on
+    purpose: an emergency stop does not wait on a stuck start. Returns whether
+    a loop here was stopped by these extra halts.
+    """
+    stopped = False
+    lock, corr = _k_lock(user_id), uuid.uuid4().hex
+    token = None
+    deadline = time.monotonic() + _STOP_SETTLE_S
+    try:
+        while True:
+            token = user_store.claim_value(lock, corr, ttl_s=_START_LOCK_TTL_S)
+            if token is not False or time.monotonic() >= deadline:
+                break
+            time.sleep(0.2)
+    except Exception:                                       # noqa: BLE001
+        token = None
+    try:
+        for _ in range(2):
+            try:
+                stopped = bool(_halt(user_id, stopper)) or stopped
+            except Exception:                               # noqa: BLE001
+                pass
+            if _read(user_id).get("state") == STOPPED:
+                break
+            _write(user_id, dict(_STOPPED_RECORD))
+    finally:
+        if token is True:
+            try:
+                user_store.release_claim(lock, corr)
+            except Exception:                               # noqa: BLE001
+                pass
+    return stopped
 
 
 def _halt(user_id, stopper):

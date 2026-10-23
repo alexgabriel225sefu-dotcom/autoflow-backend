@@ -566,11 +566,26 @@ def _dispatch(method, route, headers, body, query=None):
         close = b.get("closePositions", True)
         if not isinstance(close, bool):
             return _err(400, "BAD_REQUEST", "closePositions must be true or false")
-        ctid = str(b.get("ctid") or "") or _selected_ctid(p.user_id)
-        if close and not ctid:
-            return _err(409, "NO_ACCOUNT_SELECTED",
-                        "select a cTrader account before closing positions")
-        return _ok(_panic.run(p.user_id, ctid=ctid, close_positions=close))
+        # THE STOP RUNS WHATEVER THE ACCOUNT. This used to answer 409
+        # NO_ACCOUNT_SELECTED before the stop step, so a client with no
+        # selected account - after a disconnect, or when the selection could
+        # not be read - pressed the panic button and nothing stopped, while a
+        # loop that still held its broker session went on trading. Not having
+        # an account to CLOSE on is a reason to skip the closing, said in the
+        # answer; it is never a reason to skip the stop.
+        ctid = str(b.get("ctid") or "")
+        no_account = None
+        if not ctid:
+            try:
+                ctid = _selected_ctid_strict(p.user_id)
+            except Exception:                           # noqa: BLE001
+                ctid = ""
+                no_account = ("your selected account could not be read just "
+                              "now")
+        if close and not ctid and no_account is None:
+            no_account = "no cTrader account is selected"
+        return _ok(_panic.run(p.user_id, ctid=ctid, close_positions=close,
+                              no_account_reason=no_account))
 
     # ── automation control (demo only) ──────────────────────────────────
     # Separate from connecting an account, deliberately: linking cTrader to
@@ -840,9 +855,17 @@ def _selected_ctid(user_id):
     selected is a rule that will not run on the account they are looking at.
     """
     try:
-        sel = (_link.public_status(user_id) or {}).get("selected") or {}
+        return _selected_ctid_strict(user_id)
     except Exception:                                   # noqa: BLE001
         return ""
+
+
+def _selected_ctid_strict(user_id):
+    """Like `_selected_ctid`, but a read that FAILS raises instead of reading
+    as "nothing selected". The emergency stop needs the difference: it must
+    still stop, and it must not tell the client no account is selected when
+    the truth is that the selection could not be read."""
+    sel = (_link.public_status(user_id) or {}).get("selected") or {}
     return str(sel.get("ctid") or "")
 
 

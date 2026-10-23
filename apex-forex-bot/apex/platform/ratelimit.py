@@ -65,6 +65,11 @@ _BUCKETS = {
     "preview": ("RL_A4T_PREVIEW_PER_MIN", 20, 60),
     # Anything that changes whether money can move.
     "control": ("RL_A4T_CONTROL_PER_MIN", 20, 60),
+    # The client's own panic button, on a bucket nothing else spends. It shared
+    # "control" with single closes, so a client who had closed twenty positions
+    # by hand got 429 on Emergency. Generous: pressing it again is the right
+    # reaction to a slow answer, and the work it does is bounded elsewhere.
+    "emergency": ("RL_A4T_EMERGENCY_PER_MIN", 30, 60),
     # Freezing a version.
     "activate": ("RL_A4T_ACTIVATE_PER_MIN", 10, 60),
     # The payment provider. Generous: it retries, and being throttled off a
@@ -151,7 +156,7 @@ def classify(method, route):
     if _ACTIVATE_RE.match(route):
         return "activate"
     if route.startswith("emergency/"):
-        return "control"
+        return "emergency"
     if _CLOSE_RE.match(route):
         # Closing a position moves money. It sat in "default" (240 a minute),
         # twelve times looser than a Stop.
@@ -179,6 +184,12 @@ def key_for(client_key, auth_header):
 
 
 # The buckets whose routes change whether, or how, money moves.
+# "emergency" is NOT in this tuple, on purpose. The stricter per-address floor is
+# counted before the token is verified, so anyone behind the same address (a
+# carrier NAT, an office, a VPN) could spend it with invented tokens and leave a
+# real client's panic button answering 429. The emergency route is still under
+# the generic address floor and its own per-token bucket; what it gives up is
+# the tighter per-address ceiling the other money routes carry.
 _MONEY_BUCKETS = ("control", "oauth", "activate")
 
 
