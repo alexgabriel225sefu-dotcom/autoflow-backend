@@ -304,6 +304,18 @@ check("the capability carries the trial for the UI to render",
 
 # This is the inconsistency the trial work closed, stated as its own check.
 from apex import user_loop                               # noqa: E402
+from apex import access as _access                       # noqa: E402
+
+# The two checks below ask "is this user DENIED?", which only has an answer when
+# the access store is reachable. With no access index at all the store reads as
+# degraded, `_entitled` deliberately allows (an outage must not stop a paying
+# client's bot), and the checks failed — on a clean checkout, i.e. in CI. They
+# passed on a developer machine only because a stale, git-ignored
+# apex-forex-bot/access.json happened to exist. Give the test its own empty but
+# readable index so it no longer depends on that file.
+_access._FILE = os.path.join(_TMP, "access.json")
+with open(_access._FILE, "w") as _f:
+    json.dump({"admins": [], "allowed": []}, _f)
 
 check("the UI gate and the ENGINE gate now agree about no licence",
       user_loop._entitled(U3) is False
