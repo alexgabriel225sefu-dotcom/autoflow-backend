@@ -39,7 +39,10 @@ vi.mock("@/lib/api", async (orig) => {
         .sort((a, b) => b.length - a.length)
         .find((k) => path.startsWith(k));
       if (!key) return { ok: false, status: 404, code: "NOT_FOUND", message: "no stub" };
-      return routes[key] as ApiResult<unknown>;
+      const v = routes[key];
+      // A route may be a function, so a test can make a POST change what the
+      // next GET answers — which is the whole question for a control.
+      return (typeof v === "function" ? v(path, init) : v) as ApiResult<unknown>;
     }),
   };
 });
@@ -345,6 +348,7 @@ describe("dashboard — decisions in plain language", () => {
     ["hold", "Conditions not met", "No order placed."],
     ["order_confirmed", "Order placed in demo", null],
     ["broker_error", "Broker error", null],
+    ["engine_error", "Engine error", null],
     ["automation_paused", "Automation paused", null],
   ])("renders %s as %s", async (status, label, detail) => {
     routes.journal = { ok: true, data: {
@@ -490,5 +494,144 @@ describe("dashboard — a setup waiting for approval", () => {
     await renderDash();
     expect(screen.queryByText(/Waiting for your approval/)).toBeNull();
     expect(screen.queryByRole("button", { name: /^Approve$/ })).toBeNull();
+  });
+});
+
+
+describe("dashboard — Start / Pause / Resume / Stop reload the read and say what happened", () => {
+  const RULE = { ruleDocId: "r1", name: "EURUSD trend", state: "active", version: 1,
+                 symbols: ["EURUSD"], timeframe: "1h", updatedAt: 0 };
+  const STOP_SENTENCE =
+    "Stopping ends the trading loop. It does not close positions that are already open.";
+
+  async function pressStop() {
+    await renderDash();
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
+  }
+  const autoGets = () => calls.filter((c) => c.path === "automation" && !c.init?.method);
+  const stopPostIndex = () => calls.findIndex((c) => c.path === "automation/stop");
+
+  function running() {
+    routes.automation = { ok: true, data: { state: "running", ruleDocId: "r1", mode: "demo", startedAt: 0 } };
+    routes.rules = { ok: true, data: { rules: [RULE] } };
+  }
+
+  it("the Stop question says open positions stay at the broker and are not closed", async () => {
+    running();
+    await renderDash();
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    expect(screen.getByText(/Anything already open stays at your broker — this closes nothing/)).toBeDefined();
+  });
+
+  it("REGRESSION: after Stop's POST the automation read is reloaded, immediately", async () => {
+    running();
+    let stopped = false;
+    routes.automation = () => ({ ok: true, data: { state: stopped ? "stopped" : "running", ruleDocId: "r1", mode: "demo", startedAt: 0 } });
+    routes["automation/stop"] = () => {
+      stopped = true;
+      return { ok: true, data: { state: "stopped", stopped: true, flattened: false, flattenDeclined: true, flattenReason: STOP_SENTENCE } };
+    };
+    await pressStop();
+    await waitFor(() => expect(stopPostIndex()).toBeGreaterThan(-1));
+    const post = stopPostIndex();
+    await waitFor(() => expect(calls.slice(post + 1).some((c) => c.path === "automation" && !c.init?.method)).toBe(true));
+    expect(autoGets().length).toBeGreaterThan(1);
+  });
+
+  it("a successful Stop leaves the server's sentence on screen after the Stop button is gone", async () => {
+    running();
+    let stopped = false;
+    routes.automation = () => ({ ok: true, data: { state: stopped ? "stopped" : "running", ruleDocId: "r1", mode: "demo", startedAt: 0 } });
+    routes["automation/stop"] = () => {
+      stopped = true;
+      return { ok: true, data: { state: "stopped", stopped: true, flattened: false, flattenDeclined: true, flattenReason: STOP_SENTENCE } };
+    };
+    await pressStop();
+    await waitFor(() => expect(document.querySelector('[data-control-result="ok"]')).not.toBeNull());
+    expect(document.querySelector('[data-control-result="ok"]')!.textContent).toContain(STOP_SENTENCE);
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+
+  it("a failed Stop shows the API's code and message, and the state stays what the server says", async () => {
+    running();
+    routes["automation/stop"] = { ok: false, status: 503, code: "STORE_UNAVAILABLE", message: "the store did not answer" };
+    await pressStop();
+    await waitFor(() => expect(document.querySelector('[data-control-result="error"]')).not.toBeNull());
+    expect(document.querySelector('[data-control-result="error"]')!.textContent)
+      .toContain("STORE_UNAVAILABLE: the store did not answer");
+    expect(document.querySelector('[role="alert"]')).not.toBeNull();
+  });
+
+  it("a Stop the server accepted but the next read still shows as RUNNING is reported, not hidden", async () => {
+    running();                         // GET automation always answers running
+    routes["automation/stop"] = { ok: true, data: { state: "stopped", stopped: true, flattenReason: STOP_SENTENCE } };
+    await pressStop();
+    await waitFor(() => expect(document.querySelector('[data-control-result="error"]')).not.toBeNull());
+    const t = document.querySelector('[data-control-result="error"]')!.textContent ?? "";
+    expect(t).toContain("still says RUNNING");
+    expect(t).toContain("Refresh");
+  });
+
+  it("a Stop whose confirming read could not be made says it could not be confirmed", async () => {
+    running();
+    let after = false;
+    routes.automation = () => after
+      ? { ok: false, status: 503, code: "STORE_UNAVAILABLE", message: "x" }
+      : { ok: true, data: { state: "running", ruleDocId: "r1", mode: "demo", startedAt: 0 } };
+    routes["automation/stop"] = () => { after = true; return { ok: true, data: { state: "stopped", stopped: true } }; };
+    await pressStop();
+    await waitFor(() => expect(document.querySelector('[data-control-result="error"]')).not.toBeNull());
+    expect(document.querySelector('[data-control-result="error"]')!.textContent).toContain("could not be confirmed");
+  });
+});
+
+
+describe("dashboard — an engine failure is not labelled a broker error", () => {
+  it("shows the engine's own cause and never the word 'Broker'", async () => {
+    routes.journal = { ok: true, data: {
+      status: "ok", total: 1, limit: 8, offset: 0, hasMore: false,
+      entries: [{ entryId: "e1", kind: "error", status: "engine_error", ts: 1758546000,
+                  symbol: null, accountId: "501", ruleDocId: "r1", correlationId: "c1",
+                  error: "the engine failed to start the loop: ValueError: bad timeframe" }],
+    } };
+    await renderDash();
+    await waitFor(() => expect(screen.getAllByText("Engine error").length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/ValueError: bad timeframe/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Broker error")).toBeNull();
+  });
+});
+
+describe("dashboard — the Emergency control is demo-only and opens two separate actions", () => {
+  async function demoDash(mode: "demo" | "live") {
+    routes["ctrader/status"] = { ok: true, data: {
+      connected: true, accounts: [{ ctid: 501, mode }],
+      selected: { ctid: 501, mode }, liveAllowed: mode === "live",
+    } };
+    await renderDash();
+  }
+
+  it("on a selected DEMO account the button opens Stop only and Stop and close positions", async () => {
+    await demoDash("demo");
+    fireEvent.click(await screen.findByRole("button", { name: /Emergency/ }));
+    expect(screen.getByRole("button", { name: "Stop only" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Stop and close positions" })).toBeDefined();
+    // Nothing was sent by opening it.
+    expect(calls.some((c) => c.init?.method === "POST")).toBe(false);
+  });
+
+  it("each action needs its own confirmation, so no single click stops AND closes", async () => {
+    await demoDash("demo");
+    fireEvent.click(await screen.findByRole("button", { name: /Emergency/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Stop and close positions" }));
+    expect(calls.some((c) => c.init?.method === "POST")).toBe(false);
+    expect(screen.getByRole("button", { name: "Yes, stop and close" })).toBeDefined();
+  });
+
+  it("on a LIVE selection there is no Emergency control at all", async () => {
+    await demoDash("live");
+    await waitFor(() => expect(screen.getAllByText(/Live trading is not available in this release/).length).toBeGreaterThan(0));
+    expect(screen.queryByRole("button", { name: /Emergency/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Stop and close positions/ })).toBeNull();
   });
 });

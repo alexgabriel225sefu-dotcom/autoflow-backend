@@ -4,7 +4,8 @@ import { RefreshCw } from "lucide-react";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
-import { api, type ApiResult, type ClosePositionRead, type ClosedTrade, type DealsRead, type Position, type PositionsRead } from "@/lib/api";
+import { PositionDetail } from "@/components/app/position-detail";
+import type { ClosedTrade, DealsRead, Position, PositionsRead } from "@/lib/api";
 
 function currentCell(p: Position) {
   if (p.quoteStale) return <><Num value={null} /> <span className="dim">stale</span></>;
@@ -56,14 +57,17 @@ const dealColumns = [
 ];
 
 export default function PositionsPage() {
-  const [selected, setSelected] = useState<Position | null>(null);
-  const [closing, setClosing] = useState(false);
-  const [closeResult, setCloseResult] = useState<ApiResult<ClosePositionRead> | null>(null);
+  // Only the id is kept. The row itself is looked up in the latest read, so
+  // the detail shows what the broker last said and not a copy from the click.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [lastSeen, setLastSeen] = useState<Position | null>(null);
   const r = useRead<PositionsRead>("positions", 5_000);
   const accountId = r.result?.ok ? r.result.data.accountId : undefined;
   const dealsPath = accountId ? `accounts/${accountId}/deals?days=7` : null;
   const deals = useRead<DealsRead>(dealsPath, 60_000);
   const rows = r.result?.ok ? (r.result.data.positions ?? []) : [];
+  const live = selectedId == null ? null
+    : rows.find((p) => String(p.positionId) === selectedId) ?? null;
   const knownPnl = rows.map((p) => p.pnlAccount).filter((v): v is number => v !== null && v !== undefined);
   const unknownPnl = rows.length - knownPnl.length;
   const totalPnl = unknownPnl === 0 ? knownPnl.reduce((sum, value) => sum + value, 0) : null;
@@ -71,18 +75,9 @@ export default function PositionsPage() {
     ? `${rows.length} positions · ${unknownPnl > 0 ? `${unknownPnl} positions without a current price` : `Total estimated P&L ${totalPnl!.toFixed(2)}`}`
     : "Positions — · Total estimated P&L —";
 
-  async function closeSelected() {
-    const mode = r.result?.ok ? r.result.data.mode : undefined;
-    if (!selected || !accountId || mode !== "demo") return;
-    if (!window.confirm(`Close ${selected.symbol} position ${selected.positionId}?`)) return;
-    setClosing(true);
-    const result = await api<ClosePositionRead>(
-      `accounts/${accountId}/positions/${selected.positionId}/close`,
-      { method: "POST" },
-    );
-    setCloseResult(result);
-    setClosing(false);
-    if (result.ok) void r.reload();
+  function openDetails(p: Position) {
+    setSelectedId(String(p.positionId));
+    setLastSeen(p);
   }
 
   return (
@@ -100,17 +95,20 @@ export default function PositionsPage() {
 
       {r.loading && !r.result ? <Spinner /> : null}
       {r.result && !r.result.ok ? <ErrorNotice error={r.result} onRetry={r.reload} /> : null}
-      {r.result?.ok ? <section className="card"><ReadPanel read={r.result.data}>
-        <DataTable<Position> rows={rows} rowKey={(p) => String(p.positionId)} empty="No open positions." cardTitle={(p) => p.symbol} cardBadge={(p) => <Side side={p.side} />} columns={positionColumns(setSelected)} />
-      </ReadPanel></section> : null}
+      {selectedId != null && lastSeen ? (
+        <PositionDetail
+          position={live ?? lastSeen}
+          accountId={accountId}
+          mode={r.result?.ok ? r.result.data.mode : undefined}
+          stillOpen={live !== null}
+          onBack={() => { setSelectedId(null); setLastSeen(null); }}
+          onClosed={() => void r.reload()}
+        />
+      ) : null}
 
-      {selected ? <section className="card">
-        <div className="card-head"><h2>{selected.symbol} · Position {selected.positionId}</h2><button className="btn btn-ghost btn-sm" onClick={() => { setSelected(null); setCloseResult(null); }}>Back</button></div>
-        <p className="sub">{selected.side} · <Num value={selected.units} /> units · Entry <Num value={selected.entryPrice} /></p>
-        {r.result?.ok && r.result.data.mode === "demo" ? <button className="btn btn-danger" onClick={() => void closeSelected()} disabled={closing}>{closing ? "Closing…" : "Close position"}</button> : <p className="sub">Position close is available only for demo accounts.</p>}
-        {closeResult?.ok ? <p className="sub">{closeResult.data.sentence}</p> : null}
-        {closeResult && !closeResult.ok ? <ErrorNotice error={closeResult} /> : null}
-      </section> : null}
+      {r.result?.ok ? <section className="card"><ReadPanel read={r.result.data}>
+        <DataTable<Position> rows={rows} rowKey={(p) => String(p.positionId)} empty="No open positions." cardTitle={(p) => p.symbol} cardBadge={(p) => <Side side={p.side} />} columns={positionColumns(openDetails)} />
+      </ReadPanel></section> : null}
 
       {deals.result?.ok ? <section className="card"><div className="card-head"><h2>Closed trades · last 7 days</h2></div><ReadPanel read={deals.result.data}>
         <DataTable<ClosedTrade> rows={deals.result.data.deals ?? []} rowKey={(d) => String(d.positionId ?? `${d.symbol}-${d.closedAt}`)} empty="No closed trades in the last 7 days." cardTitle={(d) => d.symbol ?? "—"} cardBadge={(d) => d.side ? <Side side={d.side} /> : null} columns={dealColumns} />

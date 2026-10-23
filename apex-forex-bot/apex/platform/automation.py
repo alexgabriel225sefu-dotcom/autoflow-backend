@@ -33,6 +33,7 @@ derived from a stored record and the second is not. What it never does is
 decide for itself.
 """
 
+import re
 import time
 import uuid
 
@@ -424,24 +425,97 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
 def _note_engine_refused(user_id, corr, ctid, *, revive):
     """File the engine's refusal to start a loop — unless the supervisor asked.
 
-    The supervisor retries a dead loop every few minutes, and after a deploy
-    the previous instance keeps the loop's lease for up to ten minutes, so the
-    engine refuses each retry ("owned by another instance"). That is the
+    The supervisor retries a dead loop every few minutes and, right after a
+    deploy, the previous instance still holds the lease for up to ten minutes,
+    so the engine refuses each retry ("owned by another instance"). That is the
     EXPECTED shape of a restart, not a fault — and it was being written to the
     client's journal as "Broker error", once per retry (four entries after one
     deploy), none of them about the broker. A journal whose errors include
     every ordinary handover is one nobody can search for a real error in.
 
     An interactive Start the client pressed is different: they asked, so the
-    refusal is theirs to see. A revival is the platform's own retry, and its
-    refusal stays in the server log, where `[Automation] not reviving` says
-    why.
+    refusal is theirs to see. It is filed as an ENGINE error, not a broker
+    error: the engine said no, and the provider was never asked.
     """
     if revive:
         return
-    _jstore.record_error(
-        "the engine refused to start this loop",
+    _jstore.record_engine_error(
+        "the engine refused to start this loop — it may already be owned by "
+        "another instance",
         correlation_id=corr, user_id=user_id, account_id=str(ctid))
+
+
+# What the cTrader connector says when the PROVIDER answered with a refusal.
+# Only these count as "the broker rejected it". A timeout, a dropped socket, a
+# KeyError or any other exception from our own code is the engine's or the
+# network's, and is filed as such.
+_PROVIDER_REJECTION_PREFIXES = (
+    "ctrader error:", "ctrader order error:", "ctrader token error:",
+    "app auth failed", "account auth failed",
+)
+_TOKEN_LIKE = re.compile(r"[A-Za-z0-9_\-\.=+/]{24,}")
+_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
+_KEYED = re.compile(
+    r"(?i)\b(access[_-]?token|refresh[_-]?token|client[_-]?secret|"
+    r"authorization|api[_-]?key|password|secret|token)\b\s*[=:]\s*\S+")
+
+
+def _safe_cause(exc, *secrets):
+    """`TypeName: message`, bounded and with anything credential-shaped removed.
+
+    The text of an exception from a provider call can carry what was sent or
+    what came back. It is cut to a sentence, every known secret is replaced,
+    and so is anything that merely LOOKS like a token (a long unbroken run of
+    token characters) or is named like one. Provider payloads are never
+    attached — only this string.
+    """
+    text = str(exc)
+    for sec in secrets:
+        if sec and isinstance(sec, str) and len(sec) >= 8:
+            text = text.replace(sec, "[redacted]")
+    text = _BEARER.sub(r"\1 [redacted]", text)
+    text = _KEYED.sub(lambda m: f"{m.group(1)}=[redacted]", text)
+    text = _TOKEN_LIKE.sub("[redacted]", text)
+    text = " ".join(text.split())[:160]
+    return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
+
+
+def _is_provider_rejection(exc):
+    return str(exc).strip().lower().startswith(_PROVIDER_REJECTION_PREFIXES)
+
+
+def _record_starter_failure(user_id, corr, conn, exc, *, revive):
+    """Journal why the engine could not start, honestly labelled; return the cause.
+
+    A provider's refusal is a BROKER error. Anything else — our own exception,
+    a timeout, a dropped socket — is an ENGINE error: filing it as the broker's
+    sends the client looking for a fault at a provider that did nothing.
+
+    The supervisor's retries are deduplicated per cause for an hour: a fault
+    that persists would otherwise fill the journal at one entry every three
+    minutes, and the entry nobody has read yet is already enough.
+    """
+    cause = _safe_cause(exc, (conn or {}).get("accessToken"),
+                        (conn or {}).get("refreshToken"))
+    print(f"[Automation] starter failed for {user_id}: {cause}")
+    if revive:
+        try:
+            first = user_store.claim(
+                f"revive-err:{user_id}:{abs(hash(cause)) % 10**8}", ttl_s=3600)
+        except Exception:                                    # noqa: BLE001
+            first = None
+        if first is False:
+            return cause
+    ctid = str((conn or {}).get("ctid"))
+    if _is_provider_rejection(exc):
+        _jstore.record_error(
+            f"the broker rejected the request: {cause}",
+            correlation_id=corr, user_id=user_id, account_id=ctid)
+    else:
+        _jstore.record_engine_error(
+            f"the engine failed to start the loop: {cause}",
+            correlation_id=corr, user_id=user_id, account_id=ctid)
+    return cause
 
 
 def start(user_id, rule_doc_id, *, starter=None, now=None,
@@ -553,7 +627,13 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
                                 f"the account settings could not be saved "
                                 f"({type(e).__name__})")
 
-    ok = _run_starter(starter, user_id, lock, corr, held)
+    try:
+        ok = _run_starter(starter, user_id, lock, corr, held)
+    except Exception as e:                                   # noqa: BLE001
+        cause = _record_starter_failure(user_id, corr, conn, e, revive=revive)
+        raise AutomationRefused(
+            "ENGINE_START_FAILED",
+            f"the trading engine could not start this loop ({cause})") from None
     if ok is False:
         _note_engine_refused(user_id, corr, conn.get("ctid"), revive=revive)
         raise AutomationRefused(

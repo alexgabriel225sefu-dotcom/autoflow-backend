@@ -55,6 +55,27 @@ describe("positions read", () => {
     expect(reads.some((r) => r.path === "accounts/501/deals?days=7" && r.interval === 60_000)).toBe(true);
   });
 
+  it("View details opens the detail ABOVE the table, with focus on it", () => {
+    dealsFailure = false;
+    render(<PositionsPage />);
+    expect(screen.queryByRole("region", { name: /Position 7/ })).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "View details" })[0]);
+    const detail = screen.getByRole("region", { name: /Position 7/ });
+    const table = document.querySelector("table, .records");
+    expect(table).not.toBeNull();
+    // DOCUMENT_POSITION_FOLLOWING (4): the table comes after the detail.
+    expect(detail.compareDocumentPosition(table!) & 4).toBe(4);
+    expect(document.activeElement?.textContent).toContain("Position 7");
+  });
+
+  it("Back closes the detail", () => {
+    dealsFailure = false;
+    render(<PositionsPage />);
+    fireEvent.click(screen.getAllByRole("button", { name: "View details" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.queryByRole("region", { name: /Position 7/ })).toBeNull();
+  });
+
   it("shows a broker error when closed trades cannot be read", () => {
     dealsFailure = true;
     render(<PositionsPage />);

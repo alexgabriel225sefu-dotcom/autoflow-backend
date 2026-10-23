@@ -68,3 +68,18 @@ describe("the choice is what is saved and what is read back", () => {
     expect(plainLevel("approval")).toBe("Approval Required");
   });
 });
+
+describe("the rule sentence says who acts on a setup", () => {
+  it("names the chosen level exactly", async () => {
+    const { ruleSentence } = await import("./rule-summary");
+    const s = ruleSentence(toDoc({ ...BLANK, automationLevel: "approval" }));
+    expect(s).toContain("When a setup appears: Approval Required.");
+  });
+
+  it("a rule stored before the field existed reads as Full Automation", async () => {
+    const { ruleSentence } = await import("./rule-summary");
+    const doc = { ...toDoc(BLANK) } as Record<string, unknown>;
+    delete doc.automationLevel;
+    expect(ruleSentence(doc as never)).toContain("When a setup appears: Full Automation.");
+  });
+});

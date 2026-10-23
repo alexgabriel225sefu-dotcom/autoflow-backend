@@ -32,7 +32,9 @@ const ok = (over: Partial<PerformanceRead> = {}) => ({
     byStrategy: [group("trend", "Trend Following"), group("breakout", "Breakout", true)],
     bySymbol: [group("EURUSD", "EURUSD")], minTrades: 3,
     excluded: { unknownMode: 0, otherMode: 0 }, journalTrades: 10,
-    note: "Closed trades the engine recorded.", ...over,
+    note: "Closed trades from your broker's deal history for the last 30 days.",
+    source: { closedTrades: "broker deal history", windowDays: 30, journalReadable: true, attributed: 10, unattributed: 0 },
+    ...over,
   },
 } as ApiResult<unknown>);
 
@@ -89,7 +91,7 @@ describe("PerformancePage", () => {
   });
 
   it("an unreadable journal is NOT shown as no trades", async () => {
-    answer = { ok: true, status: 200, data: { status: "unavailable", reason: "the trade journal could not be read just now" } } as ApiResult<unknown>;
+    answer = { ok: true, status: 200, data: { status: "unavailable", reason: "the broker closed-trade history could not be read just now" } } as ApiResult<unknown>;
     render(<PerformancePage />);
     await waitFor(() => expect(screen.queryByText(/not a statement that there were no trades/)).not.toBeNull());
     expect(screen.queryByText(/No closed trades in this period/)).toBeNull();
@@ -107,6 +109,25 @@ describe("PerformancePage", () => {
     render(<PerformancePage />);
     await waitFor(() => expect(screen.queryByText(/4 older trades with no recorded account type/)).not.toBeNull());
     expect(screen.queryByText(/2 trades from another account type/)).not.toBeNull();
+  });
+
+  it("says how many trades are unlabelled, and why", async () => {
+    answer = ok({ source: { closedTrades: "broker deal history", windowDays: 30, journalReadable: true, attributed: 6, unattributed: 4 } });
+    render(<PerformancePage />);
+    await waitFor(() => expect(screen.queryByText(/4 of 10 trades are\s+unlabelled/)).not.toBeNull());
+  });
+
+  it("an unreadable journal is said, since it costs the strategy labels", async () => {
+    answer = ok({ source: { closedTrades: "broker deal history", windowDays: 30, journalReadable: false, attributed: 0, unattributed: 10 } });
+    render(<PerformancePage />);
+    await waitFor(() => expect(screen.queryByText(/journal could not be read just now/)).not.toBeNull());
+  });
+
+  it("a broker that could not be read is an error, not 'no closed trades'", async () => {
+    answer = { ok: true, status: 200, data: { status: "unavailable", reason: "cTrader did not answer", brokerStatus: "unavailable" } } as ApiResult<unknown>;
+    render(<PerformancePage />);
+    await waitFor(() => expect(screen.queryByText(/cTrader did not answer/)).not.toBeNull());
+    expect(screen.queryByText(/No closed trades in this period/)).toBeNull();
   });
 
   it("a failed request is shown with its code", async () => {

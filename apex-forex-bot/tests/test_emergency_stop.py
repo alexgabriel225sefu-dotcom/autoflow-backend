@@ -103,6 +103,7 @@ class World:
 
 
 def run(w, **kw):
+    kw.setdefault("mode_fn", lambda uid, ctid: "demo")
     return ES.run(USER, ctid="501", stopper=w.stopper, opener=w.opener,
                   closer=w.closer, **kw)
 
@@ -224,10 +225,31 @@ def boom(uid, *, ctid, position_id):
 
 
 w = World(1)
-r = ES.run(USER, ctid="501", stopper=w.stopper, opener=w.opener, closer=boom)
+r = ES.run(USER, ctid="501", stopper=w.stopper, opener=w.opener, closer=boom,
+           mode_fn=lambda uid, ctid: "demo")
 check("outcome failed with the cause", r["closes"][0]["outcome"] == "failed"
       and "kaboom" in r["closes"][0]["detail"], str(r["closes"]))
 check("and flat is not claimed", r["allFlat"] is False)
+
+# ── 10b. a non-demo account is never touched ───────────────────────────────
+print("\n[10b] closing is refused up front on anything that is not a demo account")
+for bad_mode in ("live", "", None, "unknown"):
+    w = World(2)
+    r = run(w, mode_fn=lambda uid, ctid, m=bad_mode: m)
+    check(f"mode {bad_mode!r}: no position was listed or closed",
+          not [x for x in w.log if x.startswith("close:") or x == "read"], str(w.log))
+    check(f"mode {bad_mode!r}: the stop still ran (the client asked for it)",
+          r["automation"]["stopped"] is True)
+    check(f"mode {bad_mode!r}: flat is not claimed, and the reason is demo-only",
+          r["allFlat"] is False and "demo account" in r["sentence"], r["sentence"])
+
+def _mode_boom(uid, ctid):
+    raise RuntimeError("link record unreadable")
+
+w = World(1)
+r = run(w, mode_fn=_mode_boom)
+check("an unreadable account mode is treated as not-demo, not as demo",
+      not [x for x in w.log if x.startswith("close:")] and r["allFlat"] is False, str(w.log))
 
 # ── 11. the route ───────────────────────────────────────────────────────────
 print("\n[11] the API requires explicit confirmation and a selected account")

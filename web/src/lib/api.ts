@@ -93,12 +93,33 @@ function isBrokerSignup(v: unknown): v is { url: string; disclosure: string } {
  * that refreshed in another tab must be the one we send, and a stale one
  * would log the client out of a session that is perfectly alive.
  */
-async function bearer(): Promise<string | null> {
+/** How long the session lookup may take before it is reported, not awaited. */
+export const SESSION_TIMEOUT_MS = 8_000;
+/** How long one API request may take. Reads on a phone moving between WiFi and
+ *  mobile data can otherwise hang with nothing to show but a skeleton. */
+export const REQUEST_TIMEOUT_MS = 25_000;
+
+const TIMED_OUT = Symbol("timed out");
+
+async function bearer(): Promise<string | null | typeof TIMED_OUT> {
+  // THE SESSION LOOKUP HAS A DEADLINE. `getSession` can wait on a storage lock
+  // held by another tab, or on a token refresh over a connection that has
+  // just changed. With no deadline the read never resolved, and an
+  // authenticated page stayed a skeleton for ever — seen on a phone, where
+  // "Account · Loading" never gave way to the selected demo account. A
+  // deadline turns that into an answer the page can show and retry.
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const { data } = await createClient().auth.getSession();
-    return data.session?.access_token ?? null;
+    const lookup = createClient().auth.getSession()
+      .then(({ data }) => data.session?.access_token ?? null);
+    const deadline = new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), SESSION_TIMEOUT_MS);
+    });
+    return await Promise.race([lookup, deadline]);
   } catch {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -126,6 +147,10 @@ export async function api<T>(
   init: { method?: string; body?: unknown; signal?: AbortSignal } = {},
 ): Promise<ApiResult<T>> {
   const token = await bearer();
+  if (token === TIMED_OUT) {
+    return fail(0, CODES.AUTH_UNAVAILABLE,
+      "Your session could not be confirmed in time. Check your connection and try again.");
+  }
   if (!token) {
     return fail(401, CODES.AUTH_REQUIRED, "Sign in to continue.");
   }
@@ -138,10 +163,20 @@ async function request<T>(
   token: string | null,
 ): Promise<ApiResult<T>> {
   let res: Response;
+  // One signal for "the caller gave up" and "this took too long", so a hung
+  // request ends as an error the page can show instead of as nothing.
+  const ctl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, REQUEST_TIMEOUT_MS);
+  const onCallerAbort = () => ctl.abort();
+  if (init.signal) {
+    if (init.signal.aborted) ctl.abort();
+    else init.signal.addEventListener("abort", onCallerAbort, { once: true });
+  }
   try {
     res = await fetch(`${API_BASE}/api/v1/${path.replace(/^\//, "")}`, {
       method: init.method ?? "GET",
-      signal: init.signal,
+      signal: ctl.signal,
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -152,7 +187,14 @@ async function request<T>(
   } catch (e) {
     // A network failure is NOT an empty result. Reported as its own code so
     // no screen can mistake it for "you have nothing".
+    if (timedOut) {
+      return fail(0, CODES.NETWORK,
+        "The request took too long. Check your connection and try again.");
+    }
     return fail(0, CODES.NETWORK, e instanceof Error ? e.message : "Network error");
+  } finally {
+    clearTimeout(timer);
+    init.signal?.removeEventListener("abort", onCallerAbort);
   }
 
   let payload: Record<string, unknown> = {};
@@ -591,12 +633,16 @@ export type PerfSummary = {
 };
 export type PerfGroup = PerfSummary & { id: string; label: string; thin: boolean };
 export type PerformanceRead =
-  | { status: "unavailable"; reason: string }
+  | { status: "unavailable"; reason: string; brokerStatus?: string | null }
   | {
     status: "ok"; period: "today" | "week" | "month" | "all"; mode: "demo" | "live" | "all";
     summary: PerfSummary; byStrategy: PerfGroup[]; bySymbol: PerfGroup[];
     minTrades: number; excluded: { unknownMode: number; otherMode: number };
     journalTrades: number; note: string;
+    /** Where the closed trades come from: the broker's deal history, joined to
+     *  the engine's journal only to learn the strategy. */
+    source: { closedTrades: string; windowDays: number; journalReadable: boolean;
+              attributed: number; unattributed: number };
   };
 
 /** POST emergency/stop. Every claim here is the server's and was measured:

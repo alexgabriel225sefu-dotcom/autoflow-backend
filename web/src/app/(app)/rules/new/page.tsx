@@ -35,9 +35,14 @@ export default function NewRulePage() {
     setDraft((d) => ({ ...d, [k]: v }));
   }, []);
 
+  // Bumped by Retry, so a load that failed (or timed out on a phone) can be
+  // asked again without leaving the page.
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     void api<{ conditions: Record<string, ConditionSpec> }>("conditions").then((r) => {
       if (!r.ok) return setLoadErr(r);
+      setLoadErr(null);
       setSpecs(r.data.conditions);
       // The builder opens with a condition that implies a SIDE.
       //
@@ -60,7 +65,7 @@ export default function NewRulePage() {
         }));
       }
     });
-  }, []);
+  }, [attempt]);
 
   async function save() {
     setBusy(true); setErr(null);
@@ -70,7 +75,14 @@ export default function NewRulePage() {
     router.push(`/rules/${r.data.rule.ruleDocId}`);
   }
 
-  if (loadErr) return <main><h1>New rule</h1><ErrorNotice error={loadErr} /></main>;
+  if (loadErr) {
+    return (
+      <main>
+        <h1>New rule</h1>
+        <ErrorNotice error={loadErr} onRetry={() => { setLoadErr(null); setAttempt((n) => n + 1); }} />
+      </main>
+    );
+  }
   if (!specs) return <main><h1>New rule</h1><Spinner label="Loading the condition library" /></main>;
 
   const index = STEPS.findIndex((s) => s.id === step);

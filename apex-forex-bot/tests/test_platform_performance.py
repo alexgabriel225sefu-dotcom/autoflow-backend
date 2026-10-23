@@ -1,15 +1,23 @@
-"""Performance on the web says what the journal says, and nothing it cannot.
+"""Performance on the web is built from what the BROKER says closed.
+
+THE BUG THIS FILE EXISTS TO KEEP CLOSED
+
+The first version read the engine's trade journal alone. The deployed page said
+"No closed trades in this period" while the Positions page, two taps away,
+listed closed trades from the broker's deal history: the journal only holds
+what the loop recorded, so a trade closed by hand — or before the journal
+labelled it — did not exist for the performance page. A screen asserting a fact
+(none closed) that another screen of the same product contradicted.
 
 WHAT THESE TESTS WILL NOT ACCEPT
 
-* Demo, live and unlabelled trades blended into one headline.
-* Unlabelled trades guessed into demo (they are counted and excluded).
-* `Infinity` in the response: a profit factor with no losing trade is what a
-  screen must handle gracefully, and `json.dumps` would print it as invalid
-  JSON that a browser rejects — the page would break on the best result.
-* An unreadable journal presented as "0 trades".
-* A re-implementation of the maths: the figures must equal
-  `apex.performance.summarize` on the same rows.
+* A zero-trade success when the broker's history was not read.
+* Deals the broker lists being missing because the journal does not know them.
+* A strategy label invented for a deal the journal never opened (it is
+  "unlabelled").
+* Demo, live and unknown-mode trades blended into one headline.
+* `Infinity` in the response (a profit factor with no losing trade).
+* A re-implementation of the maths: figures must equal `apex.performance`.
 * Three lucky trades ranked as evidence.
 
 Run: python3 tests/test_platform_performance.py
@@ -45,119 +53,168 @@ from apex.platform import performance_read as PR            # noqa: E402
 NOW = datetime(2026, 10, 22, 12, 0, 0)
 
 
-def row(day, net, *, mode="demo", strategy="trend", symbol="EURUSD"):
-    return {"time": f"{day} 10:00:00", "symbol": symbol, "side": "BUY",
-            "entry": 1.1000, "exit": 1.1010, "slPips": 10, "netPnl": net,
-            "strategyId": strategy, "mode": mode}
+def ts(day, hh=10):
+    y, m, d = (int(x) for x in day.split("-"))
+    return datetime(y, m, d, hh, 0, 0).timestamp()
 
 
-def read(rows, **kw):
-    return PR.read("u", rows_reader=lambda uid: rows, now=NOW, **kw)
+def deal(day, net, *, pid, symbol="EURUSD", side="BUY"):
+    return {"symbol": symbol, "side": side, "units": 1000, "entry": 1.1000,
+            "exit": 1.1010, "net": net, "closedAt": ts(day), "positionId": pid}
 
 
-# ── 1. mode ─────────────────────────────────────────────────────────────────
-print("\n[1] demo is the default and live/unknown are never blended in")
-rows = [row("2026-10-20", 10), row("2026-10-20", -5),
-        row("2026-10-20", 99, mode="live"),
-        {**row("2026-10-20", 77), "mode": None}]
-r = read(rows)
-check("the headline is demo only", r["summary"]["trades"] == 2
-      and r["summary"]["net"] == 5.0, str(r["summary"]))
-check("the live trade is counted as excluded, not hidden",
-      r["excluded"]["otherMode"] == 1, str(r["excluded"]))
-check("the unlabelled-mode trade is counted, and NOT guessed into demo",
-      r["excluded"]["unknownMode"] == 1, str(r["excluded"]))
-r = read(rows, mode="all")
-check("'all' includes everything", r["summary"]["trades"] == 4, str(r["summary"]))
+def jrow(pid, strategy, *, day="2026-10-20", mode="demo", sl=10, net=0.0):
+    return {"time": f"{day} 10:00:00", "symbol": "EURUSD", "side": "BUY",
+            "entry": 1.1, "exit": 1.101, "slPips": sl, "netPnl": net,
+            "strategyId": strategy, "mode": mode, "positionId": pid}
 
-# ── 2. period ───────────────────────────────────────────────────────────────
-print("\n[2] periods are cut as the bot cut them")
-rows = [row("2026-10-22", 1), row("2026-10-16", 1), row("2026-10-15", 1),
-        row("2026-09-23", 1), row("2026-09-22", 1)]
-check("today = 1", read(rows, period="today")["summary"]["trades"] == 1)
-check("week (today and 6 days back) = 2", read(rows, period="week")["summary"]["trades"] == 2)
-check("month (29 days back) = 4", read(rows, period="month")["summary"]["trades"] == 4)
-check("all = 5", read(rows, period="all")["summary"]["trades"] == 5)
 
-# ── 3. no losing trade must still be valid JSON ─────────────────────────────
-print("\n[3] a profit factor with no losses is null, never Infinity")
-wins = [row("2026-10-20", 10), row("2026-10-21", 20)]
+def broker(deals, *, mode="demo", status="ok", reason=None):
+    def reader(uid, **kw):
+        if status == "boom":
+            raise RuntimeError("socket closed")
+        out = {"connected": True, "status": status, "accountId": 501,
+               "mode": mode}
+        if status == "ok":
+            out["deals"] = deals
+        if reason:
+            out["reason"] = reason
+        return out
+    return reader
+
+
+def read(deals, journal=None, **kw):
+    return PR.read("u", deals_reader=kw.pop("deals_reader", broker(deals)),
+                   rows_reader=lambda uid: journal or [], now=NOW, **kw)
+
+
+# ── 1. the authority is the broker ──────────────────────────────────────────
+print("\n[1] trades the broker closed are counted even if the journal has never heard of them")
+deals = [deal("2026-10-20", 10, pid=1), deal("2026-10-21", -4, pid=2)]
+r = read(deals, journal=[])
+check("both deals are counted with an EMPTY journal", r["summary"]["trades"] == 2, str(r["summary"]))
+check("net is the broker's", r["summary"]["net"] == 6.0, str(r["summary"]["net"]))
+check("they are 'unlabelled', not given a strategy", [s["id"] for s in r["byStrategy"]] == [BASE.UNLABELLED], str(r["byStrategy"]))
+check("and the source says how many are unattributed",
+      r["source"]["unattributed"] == 2 and r["source"]["attributed"] == 0, str(r["source"]))
+
+print("\n[1b] the journal tells us which strategy opened a deal, joined by position id")
+r = read(deals, journal=[jrow(1, "trend"), jrow(2, "breakout")])
+check("strategies come from the journal join",
+      {s["id"] for s in r["byStrategy"]} == {"trend", "breakout"}, str(r["byStrategy"]))
+check("attributed count", r["source"]["attributed"] == 2, str(r["source"]))
+check("a journal row can never change what the broker says closed",
+      read(deals, journal=[jrow(1, "trend", net=9999)])["summary"]["net"] == 6.0)
+r = read(deals, journal=[jrow(99, "ghost")])
+check("a journal row with no matching deal does not add a trade inside the window",
+      r["summary"]["trades"] == 2, str(r["summary"]))
+
+# ── 2. broker failures are errors ───────────────────────────────────────────
+print("\n[2] a broker that cannot be read is 'unavailable', never an empty success")
+for name, rd in (("raises", broker([], status="boom")),
+                 ("unavailable", broker([], status="unavailable", reason="cTrader did not answer")),
+                 ("not connected", broker([], status="not_connected", reason="no account selected")),
+                 ("reauth", broker([], status="reauth_required", reason="reconnect the account"))):
+    r = PR.read("u", deals_reader=rd, rows_reader=lambda uid: [jrow(1, "trend")], now=NOW)
+    check(f"{name}: unavailable, with a reason, and no figures",
+          r["status"] == "unavailable" and r.get("reason") and "summary" not in r, str(r))
+check("the reason carries the broker's own words",
+      "cTrader did not answer" in PR.read("u", deals_reader=broker([], status="unavailable", reason="cTrader did not answer"),
+                                          rows_reader=lambda u: [], now=NOW)["reason"])
+check("the journal alone is never presented as the answer",
+      "summary" not in PR.read("u", deals_reader=broker([], status="boom"),
+                               rows_reader=lambda u: [jrow(1, "trend")] * 5, now=NOW))
+
+print("\n[2b] an unreadable journal costs labels, not trades")
+
+
+def _jboom(uid):
+    raise RuntimeError("redis down")
+
+
+r = PR.read("u", deals_reader=broker(deals), rows_reader=_jboom, now=NOW)
+check("the broker's trades are still shown", r["summary"]["trades"] == 2, str(r.get("summary")))
+check("and the loss of labels is said", r["source"]["journalReadable"] is False, str(r.get("source")))
+
+# ── 3. mode ─────────────────────────────────────────────────────────────────
+print("\n[3] demo is the default; another account type is never blended in")
+r = read(deals, mode="demo", deals_reader=broker(deals, mode="live"))
+check("a LIVE account's deals are not in a demo headline",
+      r["summary"]["trades"] == 0 and r["excluded"]["otherMode"] == 2, str(r))
+r = read(deals, mode="all", deals_reader=broker(deals, mode="live"))
+check("'all' includes them", r["summary"]["trades"] == 2, str(r["summary"]))
+r = read(deals, deals_reader=broker(deals, mode="mystery"))
+check("a mode the broker did not confirm is counted and left out, not guessed",
+      r["summary"]["trades"] == 0 and r["excluded"]["unknownMode"] == 2, str(r["excluded"]))
+
+# ── 4. periods ──────────────────────────────────────────────────────────────
+print("\n[4] periods are cut as the bot cut them")
+dl = [deal("2026-10-22", 1, pid=1), deal("2026-10-16", 1, pid=2),
+      deal("2026-10-15", 1, pid=3), deal("2026-09-23", 1, pid=4)]
+check("today = 1", read(dl, period="today")["summary"]["trades"] == 1)
+check("week = 2", read(dl, period="week")["summary"]["trades"] == 2)
+check("month = 4", read(dl, period="month")["summary"]["trades"] == 4)
+check("all = 4", read(dl, period="all")["summary"]["trades"] == 4)
+
+print("\n[4b] 'all time' adds older trades only the journal remembers, once each")
+old = jrow(50, "trend", day="2026-08-01", net=7.0)
+r = read(dl, journal=[old, jrow(2, "trend", day="2026-10-16")], period="all")
+check("the older journal trade is added", r["summary"]["trades"] == 5, str(r["summary"]))
+check("a journal row that duplicates a deal is not counted twice",
+      sum(1 for s in r["byStrategy"] for _ in range(s["trades"])) == 5)
+check("but 30 days does not include it", read(dl, journal=[old], period="month")["summary"]["trades"] == 4)
+
+# ── 5. valid JSON ───────────────────────────────────────────────────────────
+print("\n[5] a profit factor with no losses is null, never Infinity")
+wins = [deal("2026-10-20", 10, pid=1), deal("2026-10-21", 20, pid=2)]
 r = read(wins)
-check("the base module really does return infinity here (so this guard is needed)",
-      BASE.summarize(wins)["profit_factor"] == float("inf"))
-check("profit_factor is null", r["summary"]["profit_factor"] is None, str(r["summary"]))
-check("and the reason is said", r["summary"]["noLosses"] is True)
+check("the base module returns infinity here (so the guard is needed)",
+      BASE.summarize([{"netPnl": 10}, {"netPnl": 20}])["profit_factor"] == float("inf"))
+check("profit_factor is null with the reason", r["summary"]["profit_factor"] is None and r["summary"]["noLosses"] is True)
 try:
     json.dumps(r, allow_nan=False)
     ok = True
 except ValueError:
     ok = False
-check("the whole response serialises as strict JSON", ok)
-for s in r["byStrategy"] + r["bySymbol"]:
-    check(f"group {s['id']} has no non-finite number",
-          all(not isinstance(v, float) or v == v and abs(v) != float("inf")
-              for v in s.values()), str(s))
+check("the whole response is strict JSON", ok)
 
-# ── 4. figures come from the one definition ────────────────────────────────
-print("\n[4] the numbers equal apex.performance on the same rows")
-mixed = [row("2026-10-20", 10), row("2026-10-20", -4), row("2026-10-21", 6)]
-want = BASE.summarize(mixed)
+# ── 6. one definition of the maths ──────────────────────────────────────────
+print("\n[6] the figures equal apex.performance on the same rows")
+mixed = [deal("2026-10-20", 10, pid=1), deal("2026-10-20", -4, pid=2), deal("2026-10-21", 6, pid=3)]
+want = BASE.summarize([{"netPnl": 10}, {"netPnl": -4}, {"netPnl": 6}])
 got = read(mixed)["summary"]
-for k in ("trades", "wins", "losses", "win_rate", "net", "expectancy",
-          "max_drawdown", "profit_factor", "avg_win", "avg_loss"):
+for k in ("trades", "wins", "losses", "win_rate", "net", "expectancy", "max_drawdown", "profit_factor"):
     check(f"{k} matches", got[k] == want[k], f"{got[k]} vs {want[k]}")
 
-# ── 5. strategy split, thin groups, labels ──────────────────────────────────
-print("\n[5] strategies are split, labelled, and thin ones are not ranked")
-rows = ([row("2026-10-20", 5, strategy="trend")] * 4
-        + [row("2026-10-20", 50, strategy="breakout")] * 2
-        + [row("2026-10-20", -3, strategy="platform_rule")] * 3
-        + [{**row("2026-10-20", 1), "strategyId": None}] * 3)
-r = read(rows)
+# ── 7. groups ───────────────────────────────────────────────────────────────
+print("\n[7] strategy and instrument groups; thin ones are labelled and last")
+dl = ([deal("2026-10-20", 5, pid=i) for i in range(1, 5)]
+      + [deal("2026-10-20", 50, pid=i, symbol="XAUUSD") for i in range(10, 12)])
+jr = ([jrow(i, "trend") for i in range(1, 5)] + [jrow(i, "breakout") for i in range(10, 12)])
+r = read(dl, journal=jr)
 by = {s["id"]: s for s in r["byStrategy"]}
-check("each strategy has its own count",
-      by["trend"]["trades"] == 4 and by["breakout"]["trades"] == 2, str({k: v["trades"] for k, v in by.items()}))
-check("a group under 3 trades is flagged thin", by["breakout"]["thin"] is True)
-check("and is listed after the non-thin ones",
-      [s["thin"] for s in r["byStrategy"]] == sorted(s["thin"] for s in r["byStrategy"]),
-      str([(s["id"], s["thin"]) for s in r["byStrategy"]]))
-check("the rule-built strategy is called 'My conditions'",
-      by["platform_rule"]["label"] == "My conditions", by["platform_rule"]["label"])
-check("older trades are 'Unlabelled', not dropped",
-      by[BASE.UNLABELLED]["label"].startswith("Unlabelled") and by[BASE.UNLABELLED]["trades"] == 3)
-check("a thin group with a huge win does not outrank a real one",
-      r["byStrategy"][0]["thin"] is False, str(r["byStrategy"][0]["id"]))
+check("trend has 4, breakout 2", by["trend"]["trades"] == 4 and by["breakout"]["trades"] == 2)
+check("breakout is thin and listed after trend",
+      by["breakout"]["thin"] is True and r["byStrategy"][0]["id"] == "trend", str(r["byStrategy"]))
+sym = {s["id"]: s for s in r["bySymbol"]}
+check("instruments are split", sym["EURUSD"]["trades"] == 4 and sym["XAUUSD"]["trades"] == 2)
+check("labels: 'platform_rule' is 'My conditions'",
+      PR._label("platform_rule") == "My conditions" and PR._label(BASE.UNLABELLED).startswith("Unlabelled"))
 
-# ── 6. honesty about emptiness and unreadability ────────────────────────────
-print("\n[6] empty is empty; unreadable is not empty")
+# ── 8. emptiness, input, routing ────────────────────────────────────────────
+print("\n[8] a successful empty read is empty; bad input is refused; the route exists")
 r = read([])
-check("no trades is 0 trades with no 'noLosses' claim",
-      r["summary"]["trades"] == 0 and r["summary"]["noLosses"] is False, str(r["summary"]))
-
-
-def _boom(uid):
-    raise RuntimeError("redis down")
-
-
-r = PR.read("u", rows_reader=_boom, now=NOW)
-check("an unreadable journal is 'unavailable', not zeros",
-      r["status"] == "unavailable" and "summary" not in r, str(r))
-check("the note says what the numbers are and are not",
-      "engine recorded" in read([])["note"])
-
-# ── 7. input is validated ───────────────────────────────────────────────────
-print("\n[7] bad input is refused")
+check("a broker that answered with nothing is 0 trades, honestly",
+      r["status"] == "ok" and r["summary"]["trades"] == 0 and r["summary"]["noLosses"] is False)
 for kw in ({"period": "decade"}, {"mode": "paper"}):
     try:
         read([], **kw)
         check(f"{kw} raises ValueError", False)
     except ValueError:
         check(f"{kw} raises ValueError", True)
-
-# ── 8. routed ───────────────────────────────────────────────────────────────
-print("\n[8] GET /performance is routed")
 src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()
-check("api routes it to performance_read", 'route == "performance"' in src and "_perfread.read(" in src)
+check("GET /performance is routed with the selected account", 'route == "performance"' in src and "_perfread.read(" in src)
+check("the note says where the numbers come from", "deal history" in read([])["note"])
 
 print()
 if _fails:

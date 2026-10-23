@@ -159,7 +159,7 @@ def _sentence(out):
 
 
 def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
-        closer=None, connection_fn=None, broker_fn=None):
+        closer=None, connection_fn=None, broker_fn=None, mode_fn=None):
     """Stop automation and, if asked, close every position on `ctid`.
 
     Never raises for a step that failed: each failure is part of the answer.
@@ -187,7 +187,26 @@ def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
         out["sentence"] = _sentence(out)
         return out
 
-    # 2. find and close
+    # 2. the account must be DEMO before a single position is listed or closed.
+    # `close_demo` checks this again per position; asking here as well means a
+    # live selection never even has its positions read by this path, and the
+    # answer says so instead of listing refusals one by one.
+    try:
+        mode = (mode_fn or _close._account_mode)(user_id, ctid)
+    except Exception as e:                                   # noqa: BLE001
+        mode, mode_err = None, _scrub(e)
+    else:
+        mode_err = None
+    if mode != "demo":
+        out["positions"] = {"readable": False, "found": None,
+                            "reason": mode_err or "closing positions from here is available only on a demo account"}
+        out["closes"] = []
+        out["verified"] = {"readable": False, "stillOpen": None}
+        out["allFlat"] = False
+        out["sentence"] = _sentence(out)
+        return out
+
+    # 3. find and close
     rows, reason = _list_positions(user_id, ctid, opener,
                                    connection_fn, broker_fn)
     if rows is None:
@@ -203,7 +222,7 @@ def run(user_id, *, ctid, close_positions=True, stopper=None, opener=None,
                         "notAttempted": max(0, len(rows) - len(attempt))}
     out["closes"] = [_close_one(user_id, ctid, r, closer) for r in attempt]
 
-    # 3. verify by looking again, never by trusting the closes
+    # 4. verify by looking again, never by trusting the closes
     again, why = _list_positions(user_id, ctid, opener, connection_fn, broker_fn)
     if again is None:
         out["verified"] = {"readable": False, "stillOpen": None, "reason": why}

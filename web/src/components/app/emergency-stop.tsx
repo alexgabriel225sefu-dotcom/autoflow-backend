@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { OctagonAlert } from "lucide-react";
-import { api, type ApiError, type EmergencyResult } from "@/lib/api";
+import { api, type ApiError, type ApiResult, type AutomationState, type EmergencyResult } from "@/lib/api";
 import { invalidate } from "@/lib/use-api";
+import { runAutomationControl, type ControlResult } from "./automation-control";
 import { ErrorNotice } from "./state";
 
 /**
@@ -26,19 +27,45 @@ const OUTCOME_WORDS: Record<string, string> = {
   failed: "failed",
 };
 
-export function EmergencyStop({ ctid }: { ctid: number | string | null }) {
+export function EmergencyStop({
+  ctid, reloadAutomation,
+}: {
+  ctid: number | string | null;
+  /** The caller's own read of `automation`, so "Stop only" can verify. */
+  reloadAutomation: () => Promise<ApiResult<AutomationState> | undefined>;
+}) {
   const [step, setStep] = useState<"idle" | "choose" | "close" | "stop">("idle");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<ApiError | null>(null);
   const [result, setResult] = useState<EmergencyResult | null>(null);
+  const [stopOnly, setStopOnly] = useState<ControlResult | null>(null);
 
+  /**
+   * STOP ONLY runs the existing automation stop — the same function as the Stop
+   * button, with the same reload-and-verify — and touches no position.
+   *
+   * STOP AND CLOSE is one server call that stops the loop first and then closes
+   * each open position BY ITS POSITION ID through the demo-only close path (the
+   * route `accounts/{ctid}/positions/{id}/close` calls that same function),
+   * re-reads the account, and only then answers. It is one call rather than a
+   * chain driven from here so that a closed tab halfway cannot leave the loop
+   * stopped and the positions open without anyone being told.
+   */
   async function fire(closePositions: boolean) {
     setBusy(true);
     setErr(null);
     setResult(null);
+    setStopOnly(null);
+    if (!closePositions) {
+      const res = await runAutomationControl("stop", { reload: reloadAutomation });
+      setBusy(false);
+      setStep("idle");
+      setStopOnly(res);
+      return;
+    }
     const r = await api<EmergencyResult>("emergency/stop", {
       method: "POST",
-      body: { confirm: true, closePositions, ...(ctid ? { ctid: String(ctid) } : {}) },
+      body: { confirm: true, closePositions: true, ...(ctid ? { ctid: String(ctid) } : {}) },
     });
     setBusy(false);
     setStep("idle");
@@ -50,7 +77,7 @@ export function EmergencyStop({ ctid }: { ctid: number | string | null }) {
     <div className="notice" style={{ marginTop: "var(--sp-3)" }}>
       <div className="btn-row">
         {step === "idle" ? (
-          <button className="btn btn-danger" onClick={() => { setResult(null); setErr(null); setStep("choose"); }}>
+          <button className="btn btn-danger" onClick={() => { setResult(null); setErr(null); setStopOnly(null); setStep("choose"); }}>
             <OctagonAlert className="ico" aria-hidden /> Emergency
           </button>
         ) : null}
@@ -94,6 +121,13 @@ export function EmergencyStop({ ctid }: { ctid: number | string | null }) {
       </div>
 
       {err ? <ErrorNotice error={err} /> : null}
+
+      {stopOnly ? (
+        <p role={stopOnly.ok ? "status" : "alert"} data-stop-only={stopOnly.ok ? "ok" : "error"}
+           style={{ marginTop: "var(--sp-2)" }}>
+          {stopOnly.text}
+        </p>
+      ) : null}
 
       {result ? (
         <div role="status" style={{ marginTop: "var(--sp-2)" }}>

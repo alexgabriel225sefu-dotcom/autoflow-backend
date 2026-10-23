@@ -136,6 +136,24 @@ check("a PUT about something else does not reset it",
       PS.get(USER, rid).get("automationLevel") == "signals",
       str(PS.get(USER, rid).get("automationLevel")))
 
+# ── 6b. an invalid level is refused AT ACTIVATION, the boundary that matters ─
+print("\n[6b] activation refuses a misspelt level")
+bad = doc("approval")
+bad_id = bad["ruleDocId"]
+PS.create(USER, bad)
+PS.save_draft(USER, {"ruleDocId": bad_id, "automationLevel": "aproval"})
+refused = None
+try:
+    PS.activate(USER, bad_id, known_condition_ids={"rsi"})
+except RD.RuleDocInvalid as e:
+    refused = str(e)
+except Exception as e:                                       # noqa: BLE001
+    refused = f"{type(e).__name__}: {e}"
+check("activation raises", refused is not None)
+check("and names the field", refused is not None and "automationLevel" in refused, str(refused))
+check("the stored rule did not become active",
+      PS.get(USER, bad_id).get("state") == RD.DRAFT, str(PS.get(USER, bad_id).get("state")))
+
 # ── 7. the API copies it on creation ────────────────────────────────────────
 print("\n[7] POST /rules does not drop the field")
 src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()

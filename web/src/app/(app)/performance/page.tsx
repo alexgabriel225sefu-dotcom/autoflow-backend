@@ -95,7 +95,7 @@ export default function PerformancePage() {
 
       {d && d.status === "unavailable" ? (
         <div className="notice" role="alert">
-          <p style={{ fontWeight: 600 }}>The trade journal could not be read</p>
+          <p style={{ fontWeight: 600 }}>Closed trades could not be read</p>
           <p className="muted">{d.reason}. This is not a statement that there were no trades.</p>
         </div>
       ) : null}
@@ -123,6 +123,15 @@ export default function PerformancePage() {
               </div>
             )}
             <p className="muted" style={{ fontSize: ".78rem", marginTop: "var(--sp-3)" }}>{d.note}</p>
+            {d.source.unattributed > 0 ? (
+              <p className="muted" role="note" style={{ fontSize: ".78rem" }}>
+                {d.source.unattributed} of {d.summary.trades} trade{d.summary.trades === 1 ? "" : "s"} are
+                unlabelled
+                {d.source.journalReadable
+                  ? " — the engine did not open them, or they pre-date strategy labels."
+                  : " — the engine's journal could not be read just now, so strategies are missing."}
+              </p>
+            ) : null}
             {d.excluded.unknownMode > 0 || d.excluded.otherMode > 0 ? (
               <p className="muted" role="note" style={{ fontSize: ".78rem" }}>
                 Not included here:

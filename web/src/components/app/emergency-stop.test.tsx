@@ -22,6 +22,9 @@ vi.mock("@/lib/api", async (orig) => {
 
 import { EmergencyStop } from "./emergency-stop";
 
+let reloadState = "stopped";
+const reload = vi.fn(async () => ({ ok: true, status: 200, data: { state: reloadState } }) as never);
+
 const result = (over: Partial<EmergencyResult> = {}): EmergencyResult => ({
   status: "ok",
   automation: { stopped: true, alreadyStopped: false, error: null },
@@ -35,17 +38,17 @@ const result = (over: Partial<EmergencyResult> = {}): EmergencyResult => ({
 const ok = (data: unknown) => ({ ok: true, status: 200, data } as ApiResult<unknown>);
 const click = (name: string | RegExp) => fireEvent.click(screen.getByRole("button", { name }));
 
-afterEach(() => { cleanup(); calls.length = 0; });
+afterEach(() => { cleanup(); calls.length = 0; reload.mockClear(); reloadState = "stopped"; });
 
 describe("EmergencyStop — nothing happens on one click", () => {
   it("opening the panel sends nothing", () => {
-    render(<EmergencyStop ctid={501} />);
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
     click(/Emergency/);
     expect(calls.length).toBe(0);
   });
 
   it("choosing 'stop and close' still sends nothing until the second confirmation", () => {
-    render(<EmergencyStop ctid={501} />);
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
     click(/Emergency/);
     click("Stop and close positions");
     expect(calls.length).toBe(0);
@@ -53,7 +56,7 @@ describe("EmergencyStop — nothing happens on one click", () => {
   });
 
   it("cancel at either step sends nothing and returns to the start", () => {
-    render(<EmergencyStop ctid={501} />);
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
     click(/Emergency/);
     click("Cancel");
     expect(calls.length).toBe(0);
@@ -64,7 +67,7 @@ describe("EmergencyStop — nothing happens on one click", () => {
 describe("EmergencyStop — what it sends", () => {
   it("stop and close: confirm true, closePositions true, the account", async () => {
     answer = ok(result());
-    render(<EmergencyStop ctid={501} />);
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
     click(/Emergency/); click("Stop and close positions"); click("Yes, stop and close");
     await waitFor(() => expect(calls.length).toBe(1));
     expect(calls[0].path).toBe("emergency/stop");
@@ -72,19 +75,32 @@ describe("EmergencyStop — what it sends", () => {
     expect(calls[0].init?.body).toEqual({ confirm: true, closePositions: true, ctid: "501" });
   });
 
-  it("stop only: closePositions false", async () => {
-    answer = ok(result({ closes: null, positions: null, verified: null, allFlat: null,
-                         sentence: "Automation is stopped. Open positions were left as they are." }));
-    render(<EmergencyStop ctid={501} />);
+  it("stop only: runs the EXISTING automation stop, closes nothing, and re-reads the state", async () => {
+    answer = ok({ state: "stopped", stopped: true, flattened: false, flattenDeclined: true,
+                  flattenReason: "Stopping ends the trading loop. It does not close positions that are already open." });
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
     click(/Emergency/); click("Stop only"); click("Yes, stop only");
-    await waitFor(() => expect(calls.length).toBe(1));
-    expect(calls[0].init?.body).toMatchObject({ confirm: true, closePositions: false });
+    await waitFor(() => expect(calls.some((c) => c.path === "automation/stop")).toBe(true));
+    expect(calls.some((c) => c.path === "emergency/stop")).toBe(false);
+    expect(calls.some((c) => /close/.test(c.path))).toBe(false);
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-stop-only="ok"]')).not.toBeNull());
+    expect(document.querySelector('[data-stop-only="ok"]')!.textContent).toContain("does not close positions");
+  });
+
+  it("stop only: a stop the next read contradicts is reported, not shown as success", async () => {
+    reloadState = "running";
+    answer = ok({ state: "stopped", stopped: true });
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
+    click(/Emergency/); click("Stop only"); click("Yes, stop only");
+    await waitFor(() => expect(document.querySelector('[data-stop-only="error"]')).not.toBeNull());
+    expect(document.querySelector('[data-stop-only="error"]')!.textContent).toContain("still says RUNNING");
   });
 });
 
 describe("EmergencyStop — it does not say more than the server measured", () => {
   const run = async () => {
-    render(<EmergencyStop ctid={501} />);
+    render(<EmergencyStop ctid={501} reloadAutomation={reload} />);
     click(/Emergency/); click("Stop and close positions"); click("Yes, stop and close");
     await waitFor(() => expect(calls.length).toBe(1));
   };

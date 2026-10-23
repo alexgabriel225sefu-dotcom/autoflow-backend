@@ -675,7 +675,8 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         q = query or {}
         return _ok(_perfread.read(p.user_id, period=q.get("period") or "all",
-                                  mode=q.get("mode") or "demo"))
+                                  mode=q.get("mode") or "demo",
+                                  ctid=q.get("accountId") or None))
 
     # ── journal ─────────────────────────────────────────────────────────
     if route == "journal" and method == "GET":

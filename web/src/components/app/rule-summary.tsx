@@ -133,7 +133,14 @@ export function ruleSentence(
   if (sched) s += `; only ${sched}`;
   const limits = (doc.limits ?? {}) as Record<string, unknown>;
   if (limits.maxOpenPositions) s += `; at most ${limits.maxOpenPositions} open position${Number(limits.maxOpenPositions) === 1 ? "" : "s"}`;
-  return `${s}.`;
+  s = `${s}.`;
+  // WHO ACTS ON A SETUP, said in words as well as in the terms table. A rule
+  // at "Approval Required" or "Signals Only" does not place a trade by itself,
+  // and a sentence that read "Buy EURUSD when ..." without saying so would
+  // describe a rule that trades. Rules stored before the field existed ran at
+  // full, so absent reads as Full Automation.
+  s += ` When a setup appears: ${plainLevel(doc.automationLevel ?? "full")}.`;
+  return s;
 }
 
 export function RuleSentence({

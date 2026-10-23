@@ -128,6 +128,11 @@ export function plainDecision(e: {
       return { label: "Position closed", tone: "accent" };
     case "broker_error":
       return { label: "Broker error", detail: e.error ?? undefined, tone: "short" };
+    // The engine or the platform failed and the broker rejected nothing. Its
+    // own label: calling it a broker error sends the reader to look for a
+    // fault at a provider that did nothing wrong.
+    case "engine_error":
+      return { label: "Engine error", detail: e.error ?? undefined, tone: "short" };
     case "automation_started":
       return { label: "Automation started", tone: "long" };
     case "automation_paused":
