@@ -105,6 +105,13 @@ two-reviewer rules), and signed-commit enforcement (agents do not hold keys).
 | Claude scheduled task, GitHub trigger | The official page (fetched this session) lists only **pull request** and **release** events. Issue events and issue label filters are **not documented**. A public bug report claims an "Issue opened" trigger exists in the UI and does not fire for issues created by a routine. **Not verifiable from this session**: it needs a look at the claude.ai scheduled-task UI |
 | Codex | The GitHub integration documents `@codex review` and other `@codex` comments **on pull requests** only. Issue, assignment and label triggers are not documented |
 
+One more consequence of the default branch being `main`: GitHub shows issue
+forms from `.github/ISSUE_TEMPLATE/` **on the default branch**. The form added
+here will not appear on the "New issue" page until it exists on `main`. Until
+then it works as a template to copy from, and the owner can open issues by hand.
+Putting it on `main` is the owner's call (`main` is otherwise frozen).
+**Not verified** by opening the page; this is GitHub's documented behaviour.
+
 Conclusion: a **label-driven event trigger is not supported by any documented
 path** today. The workable design is **polling**: a scheduled task reads
 `ready` issues. That is what the protocol assumes.
