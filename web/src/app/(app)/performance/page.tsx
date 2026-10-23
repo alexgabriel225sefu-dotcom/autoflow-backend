@@ -21,7 +21,7 @@ function Group({ title, groups }: { title: string; groups: Record<string, Perfor
   return <section className="card"><div className="card-head"><h2>{title}</h2></div>
     {Object.keys(groups).length === 0 ? <p className="sub">No closed trades in this period.</p> :
       <div className="stack">{Object.entries(groups).map(([name, s]) => <div key={name} className="card-row">
-        <strong>{name}</strong><span className="sub">{s.trades} trades · {money(s.net)} · {s.trades < 3 ? "too few to judge" : `${s.winRate.toFixed(1)}% win rate`}</span>
+        <strong>{name}</strong><span className="sub">{s.trades} trades · {money(s.net)} · {s.trades < 3 ? "too few to judge" : `${s.winPct.toFixed(1)}% positive outcomes`}</span>
       </div>)}</div>}
   </section>;
 }
@@ -43,7 +43,6 @@ export default function PerformancePage() {
         <Metric label="Winning trades" value={`${s.winningTrades} / ${s.trades}`} />
         <Metric label="Net" value={money(s.net)} />
         <Metric label="Profit factor" value={s.profitFactorStatus ?? (s.profitFactor == null ? "—" : s.profitFactor.toFixed(2))} />
-        <Metric label="Win rate" value={`${s.winRate.toFixed(1)}%`} />
       </div>
       <div className="grid grid-2" style={{ marginTop: "1rem" }}><Group title="By strategy" groups={data!.byStrategy} /><Group title="By instrument" groups={data!.byInstrument} /></div>
     </> : null}

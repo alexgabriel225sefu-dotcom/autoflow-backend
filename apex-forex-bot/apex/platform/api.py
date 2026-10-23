@@ -84,7 +84,7 @@ def _performance_summary(rows):
     pf = summary.get("profit_factor")
     out = {
         "trades": summary["trades"], "winningTrades": summary["wins"],
-        "losingTrades": summary["losses"], "winRate": summary["win_rate"],
+        "losingTrades": summary["losses"], "winPct": summary["win_rate"],
         "net": summary["net"],
         "profitFactor": None if pf == float("inf") else pf,
         "profitFactorStatus": "no losing trades" if pf == float("inf") else None,

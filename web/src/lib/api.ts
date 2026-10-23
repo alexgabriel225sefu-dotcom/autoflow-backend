@@ -382,7 +382,7 @@ export type PositionsRead = {
 export type OrdersRead = Omit<PositionsRead, "positions"> & { orders?: Order[] };
 export type DealsRead = Omit<PositionsRead, "positions"> & { deals?: ClosedTrade[] };
 export type PerformanceSummary = {
-  trades: number; winningTrades: number; losingTrades: number; winRate: number;
+  trades: number; winningTrades: number; losingTrades: number; winPct: number;
   net: number; profitFactor?: number; profitFactorStatus?: string;
   expectancy: number; maxDrawdown: number; averageWin: number; averageLoss: number;
   best: number; worst: number;
