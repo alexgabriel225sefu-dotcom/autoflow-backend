@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogOut, MoreHorizontal, User, X } from "lucide-react";
-import { BrandLockup, BrandMark } from "@/components/brand/logo";
+import { BrandLockup } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
 import type { AutomationState, CtraderStatus, Me, NotificationPage } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="main-col">
         <header className="topbar">
           <Link className="topbar-brand" href="/dashboard" aria-label="Apex4Traders — dashboard">
-            <BrandMark size={22} />
+            <BrandLockup size={18} />
           </Link>
           <span className="topbar-title">{titleFor(path)}</span>
           <span className="topbar-spacer" />
