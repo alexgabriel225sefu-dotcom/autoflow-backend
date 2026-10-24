@@ -24,6 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   // One fetch of each, shared with the status strip, rather than every page
   // asking again for the same three facts.
@@ -51,7 +52,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [drawer, menu]);
 
   async function signOut() {
-    await createClient().auth.signOut();
+    setSignOutError(null);
+    try {
+      const result = await createClient().auth.signOut();
+      if (result?.error) {
+        setSignOutError(result.error.message || "Sign out failed.");
+        return;
+      }
+    } catch (e) {
+      setSignOutError(e instanceof Error ? e.message : "Sign out failed.");
+      return;
+    }
     router.push("/login");
     router.refresh();
   }
@@ -134,6 +145,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <StatusBar me={me.result} ct={ct.result} auto={auto.result} />
+
+        {me.result?.ok && me.result.data.user.emailVerified === false ? (
+          <div className="notice notice-warn" role="status">
+            Connecting cTrader and activating a rule are refused until the address is confirmed.{" "}
+            <Link href="/settings">Review it in settings</Link>
+          </div>
+        ) : null}
+        {signOutError ? <div className="notice notice-error" role="alert">{signOutError}</div> : null}
 
         <div className="shell">{children}</div>
       </div>

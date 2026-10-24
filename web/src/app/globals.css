@@ -739,6 +739,12 @@ body {
 .field-inline span { font-size: .85rem; color: var(--a4t-text); }
 
 .seg { display: inline-flex; padding: 4px; gap: 2px; background: var(--a4t-surface-2); border: 1px solid var(--a4t-line); border-radius: 999px; }
+@media (max-width: 720px) {
+  .seg { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; }
+  .page-head > *,
+  .btn-row { min-width: 0; max-width: 100%; }
+  .tbl-kv td { overflow-wrap: anywhere; }
+}
 .seg button {
   border: 0; background: none; cursor: pointer; color: var(--a4t-muted);
   padding: .32rem .9rem; border-radius: 999px; font-size: .78rem; font-weight: 700;
