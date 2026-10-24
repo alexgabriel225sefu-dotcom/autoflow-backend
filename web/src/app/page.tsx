@@ -13,7 +13,7 @@ import { BrandLockup } from "@/components/brand/logo";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
-  title: "Apex4Traders — a control panel for your own trading rules",
+  title: "Apex4Traders: a control panel for your own trading rules",
   description:
     "Connect your cTrader account, write your own rules from named " +
     "conditions, see what they would decide before anything runs, and keep " +
@@ -70,20 +70,6 @@ export default function Landing() {
             <p className="mkt-foot-note">
               No signals. No profit guarantees. Automation runs on demo accounts in this release.
             </p>
-            <div className="mkt-works">
-              <div className="mkt-works-row">
-                <span>WORKS WITH</span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/ctrader-logo-light.svg" alt="cTrader" width={98} height={24} />
-              </div>
-              <div className="mkt-works-row">
-                <span>COMING SOON</span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/metatrader-4-light.png" alt="MetaTrader 4" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/metatrader-5-light.png" alt="MetaTrader 5" />
-              </div>
-            </div>
           </div>
 
           <div className="mkt-rulecard" aria-label="Illustrative preview of a rule check">
@@ -95,6 +81,25 @@ export default function Landing() {
             <div className="rc-foot"><span>● Conditions met</span><b>■ Emergency stop</b></div>
           </div>
         </section>
+
+        {/* Directly under the hero rather than inside it: the hero is the
+            promise, this is the platform list. Kept apart so the first screen
+            carries a headline, one sentence, the buttons and the disclosure,
+            and nothing competing with them. */}
+        <div className="mkt-works mkt-works-band">
+          <div className="mkt-works-row">
+            <span>WORKS WITH</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ctrader-logo-light.svg" alt="cTrader" width={98} height={24} />
+          </div>
+          <div className="mkt-works-row">
+            <span>COMING SOON</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/metatrader-4-light.png" alt="MetaTrader 4" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/metatrader-5-light.png" alt="MetaTrader 5" />
+          </div>
+        </div>
 
         <section className="mkt-section">
           <h2>What it actually does</h2>
@@ -219,7 +224,7 @@ export default function Landing() {
           <div className="mkt-risk">
             <strong style={{ color: "var(--mkt-text)" }}>Risk warning.</strong>{" "}
             Trading carries risk, including the loss of your capital. Automated
-            execution does not reduce that risk — it carries out your
+            execution does not reduce that risk. It carries out your
             instructions faster and without hesitating. You are responsible for
             the rules you run and for the outcomes they produce.
           </div>
