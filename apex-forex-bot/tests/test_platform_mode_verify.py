@@ -187,6 +187,56 @@ check("and does not guess when the mode is unknown",
       f"{AU._account_label(None)!r} {AU._account_label('paper')!r}")
 AU.stop(USER, stopper=lambda uid: True)
 
+print("\n[6b] a live-mode start (switch + pilot stubbed) does not say demo")
+# The words must follow the confirmed connection mode. A live start is
+# refused in this deployment unless the switch and the pilot both pass;
+# those two are stubbed here so the copy can be measured without opening
+# live execution or listing a pilot pair.
+from apex.platform import live_pilot as _pilot                  # noqa: E402
+
+_real_allowed = CL.live_allowed
+_real_req = AU._ent.require_automation
+_real_cap = AU._ent.capability
+_real_pilot = _pilot.check_identity
+_notes = []
+_real_notify = AU._notify.notify
+
+def _allow_live(uid, **kw):
+    return {"canAutomate": True, "reason": None, "message": "stubbed",
+            "licenceState": "active"}
+
+CL.live_allowed = lambda: True
+AU._ent.require_automation = _allow_live
+AU._ent.capability = _allow_live
+_pilot.check_identity = lambda uid, ctid: None
+AU._notify.notify = lambda *a, **kw: _notes.append(kw) or None
+try:
+    select(802, allow_live=True)
+    e = start_with(lambda t: [LIVE_ACC])
+    check("a stubbed live start is allowed so the copy can be read",
+          e is None and "GO" in started, f"{e and getattr(e, 'code', e)} {started}")
+    _live_entries = [x for x in _JS.query(USER, limit=50)["entries"]
+                     if x.get("status") == "automation_started"]
+    check("the journal line for a live start says live account",
+          _live_entries and "live account 802" in str(_live_entries[0]),
+          str(_live_entries[:1]))
+    check("and it does not say demo",
+          _live_entries and "demo account" not in str(_live_entries[0]).lower(),
+          str(_live_entries[:1]))
+    _bodies = " ".join(str(n.get("body", "")) for n in _notes)
+    check("the notification names the live account",
+          "live account 802" in _bodies, _bodies)
+    check("and the notification does not say demo",
+          "demo account" not in _bodies.lower(), _bodies)
+finally:
+    AU._ent.require_automation = _real_req
+    AU._ent.capability = _real_cap
+    _pilot.check_identity = _real_pilot
+    AU._notify.notify = _real_notify
+    CL.live_allowed = _real_allowed
+    AU.stop(USER, stopper=lambda uid: True)
+    select(801)
+
 e = start_with(lambda t: (_ for _ in ()).throw(RuntimeError("down")))
 check("a broker that will not answer refuses the start", e is not None)
 check("with MODE_UNVERIFIED, not with a live refusal",

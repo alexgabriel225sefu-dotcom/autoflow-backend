@@ -476,6 +476,45 @@ _, _block_missed = _ecfg.translate(_block)
 check("a block rule is not told that, because it asked for nothing else",
       "When a limit is hit" not in [m.get("term") for m in _block_missed])
 
+print("\n[limit-b] a new blank writes block; legacy flatten still validates")
+_blank = _rd.blank(user_id=USER, account_id="901", symbols=["EURUSD"],
+                   timeframe="1h")
+check("blank() writes onLimit=block",
+      _blank["limits"]["onLimit"] == "block",
+      str(_blank["limits"].get("onLimit")))
+_legacy = dict(_blank)
+_legacy["limits"] = dict(_blank["limits"], onLimit="flatten")
+_legacy["entry"] = {"combine": "AND",
+                    "conditions": [{"id": "rsi", "params": {
+                        "period": 14, "relation": "below", "value": 30}}]}
+_probs = _rd.validate(_legacy, known_condition_ids={"rsi"})
+check("validate accepts a stored flatten document",
+      not any("onLimit" in str(p) for p in _probs), str(_probs))
+
+print("\n[schedule] only a preset's days/windows are reported as unused")
+_sched = {"timezone": "UTC", "days": [0, 1],
+          "windows": [{"from": "07:00", "to": "16:00"}]}
+_cond = dict(_store.get(USER, rid))
+_cond["strategy"] = None
+_cond["schedule"] = _sched
+_, _cond_miss = _ecfg.translate(_cond)
+check("a condition-rule schedule is not a miss",
+      "Schedule" not in [m.get("term") for m in _cond_miss],
+      str([m.get("term") for m in _cond_miss]))
+_real_preset = _ecfg._preset_strategy
+_ecfg._preset_strategy = lambda doc: "trend"
+try:
+    _, _preset_miss = _ecfg.translate({"strategy": "trend", "schedule": _sched})
+    check("a preset with days/windows misses Schedule",
+          "Schedule" in [m.get("term") for m in _preset_miss],
+          str([m.get("term") for m in _preset_miss]))
+    _, _bare_preset = _ecfg.translate({"strategy": "trend"})
+    check("a preset without a schedule does not miss Schedule",
+          "Schedule" not in [m.get("term") for m in _bare_preset],
+          str([m.get("term") for m in _bare_preset]))
+finally:
+    _ecfg._preset_strategy = _real_preset
+
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()
