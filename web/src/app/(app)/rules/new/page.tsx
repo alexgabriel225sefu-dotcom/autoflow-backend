@@ -6,7 +6,7 @@ import { Check, ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { api, type ApiError, type ConditionSpec, type RuleDoc } from "@/lib/api";
 import { defaultsFor } from "@/components/app/condition-editor";
 import { starterCondition } from "./starter-condition";
-import { BLANK, RuleForm, STEPS, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
+import { BLANK, RuleForm, STEPS, levelMissing, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
 import { RuleSentence, RuleTerms } from "@/components/app/rule-summary";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 
@@ -179,12 +179,19 @@ export default function NewRulePage() {
             <button
               className={index < STEPS.length - 1 ? "btn btn-ghost" : "btn btn-lg"}
               onClick={save}
-              disabled={busy}
+              disabled={busy || levelMissing(draft)}
             >
               <Save className="ico" aria-hidden /> {busy ? "Saving…" : "Save draft"}
             </button>
             <Link className="btn btn-ghost" href="/rules">Cancel</Link>
           </div>
+          {levelMissing(draft) ? (
+            <p className="muted" role="status" style={{ fontSize: ".82rem", marginTop: ".5rem" }}>
+              Choose who acts on a setup (Market step) before saving.{" "}
+              <button type="button" className="link-sm"
+                      onClick={() => setStep("basics")}>Go to it</button>
+            </p>
+          ) : null}
         </div>
 
         <aside className="inspector">

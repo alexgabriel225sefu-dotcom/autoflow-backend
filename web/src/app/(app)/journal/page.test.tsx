@@ -160,3 +160,49 @@ describe("the status filter", () => {
     expect(values).toContain("signal");
   });
 });
+
+describe("a page the server could not fully read", () => {
+  function partial(entries: JournalEntry[], unreadable: number, total: number) {
+    routes = {
+      journal: {
+        ok: true,
+        data: { status: "ok", entries, total, limit: 25, offset: 0,
+                hasMore: false, unreadable },
+      },
+    };
+  }
+
+  it("says the page is incomplete instead of looking complete", async () => {
+    partial([SIGNAL], 2, 3);
+    await show();
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("This page is incomplete");
+    expect(text).toContain("2 entries");
+    expect(text).toContain("Nothing was deleted");
+    // The rows that WERE read are still shown.
+    expect(document.querySelectorAll(".record").length).toBe(1);
+  });
+
+  it("uses the singular for one entry", async () => {
+    partial([SIGNAL], 1, 2);
+    await show();
+    expect(document.body.textContent).toContain("1 entry on this page");
+  });
+
+  it("never says 'nothing recorded' when entries exist but could not be read", async () => {
+    partial([], 3, 3);
+    await show();
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("This page is incomplete");
+    expect(text).not.toContain("Nothing recorded for this filter");
+  });
+
+  it("stays quiet when nothing was missed, and when the server predates the field", async () => {
+    partial([SIGNAL], 0, 1);
+    await show();
+    expect(document.body.textContent).not.toContain("This page is incomplete");
+    page([SIGNAL]); // no `unreadable` key at all
+    await show();
+    expect(document.body.textContent).not.toContain("This page is incomplete");
+  });
+});
