@@ -105,6 +105,30 @@ def _read_strict(key):
     return _decode(key, _raw(key, strict=True))
 
 
+def _read_many_strict(keys):
+    """Decoded documents for several keys, aligned with `keys`.
+
+    One shared-store round trip for the lot. Absent is None in its slot; a
+    corrupt document is the string "unreadable" in its slot, so the caller can
+    COUNT it rather than lose it; an unreachable store raises.
+    """
+    keys = list(keys)
+    if user_store._USE_REDIS:
+        raws = user_store.get_blobs_strict(keys)
+    else:
+        raws = []
+        for k in keys:
+            p = _local_path(k)
+            raws.append(open(p).read() if os.path.exists(p) else None)
+    out = []
+    for k, raw in zip(keys, raws):
+        try:
+            out.append(_decode(k, raw))
+        except ValueError:
+            out.append("unreadable")
+    return out
+
+
 def _write(key, doc):
     raw = json.dumps(doc, separators=(",", ":"))
     if user_store._USE_REDIS:

@@ -103,6 +103,22 @@ def redact(obj, *, _depth=0):
     return obj
 
 
+def clean_error(text):
+    """Error text as it may be stored and shown: no host, IP, URL or path.
+
+    `redact()` above masks values under secret-NAMED keys, which says nothing
+    about a free-text message. A provider error such as "connect to
+    demo.ctraderapi.com:5035 failed" is exactly the kind of string that ends
+    up here, and the journal is returned to the browser as stored. Shared with
+    the read path, so entries written before this existed are cleaned as they
+    are served. Code words and diagnostic ids survive.
+    """
+    if text is None:
+        return None
+    from apex.platform import safe_errors
+    return safe_errors.message(text, fallback="", limit=500) or None
+
+
 class JournalEntry:
     """One link in the chain, already redacted."""
 
@@ -143,7 +159,7 @@ class JournalEntry:
                                   if execution_request else None)
         self.broker_result = redact(broker_result) if broker_result else None
         self.position = redact(position) if position else None
-        self.error = error
+        self.error = clean_error(error)
 
     def as_dict(self):
         return {

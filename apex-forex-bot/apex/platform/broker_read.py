@@ -69,7 +69,12 @@ def _scrub(text, *secrets):
     # redactor masks the secrets this process holds, the SHAPE of the usual
     # ones, and anything else that merely looks like a credential.
     from apex import redact as _redact
-    return _redact.scrub_for_client(text, *secrets, limit=300)
+    from apex.platform import safe_errors as _safe
+    masked = _redact.scrub_for_client(text, *secrets, limit=300)
+    # Then the SHAPES a connector message carries that are not credentials: a
+    # host, an IP, a URL, a path. Naming the provider's endpoint to a client
+    # helps nobody and tells a stranger where to look.
+    return _safe.message(masked, fallback="the broker did not answer", limit=300)
 
 
 def _disconnected(reason="no cTrader account is connected"):

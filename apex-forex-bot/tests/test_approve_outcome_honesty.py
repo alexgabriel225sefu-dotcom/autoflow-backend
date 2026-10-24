@@ -200,6 +200,68 @@ if persisted:
           str(persisted[0].get("stopLoss")))
 check("and nothing was alerted", not alerts, str(alerts))
 
+# ── 6. a Stop that lands before the order is sent is honoured ───────────────
+print("\n[6] Approve and Stop in flight together: nothing is sent after a Stop")
+# The automatic loop re-asks "was a stop recorded?" at the last point before
+# the broker (`_StopBeforeSend`). The approval path did not, so an Approve that
+# had passed its own check could still open a position after Stop returned.
+
+
+def run_stop(origin, *, stopped_at_start=False, stop_after_gate=False,
+             symbol="GBPUSD"):
+    saved = {n: getattr(UL, n) for n in
+             ("_make_broker", "_persist_open_position", "get_dash",
+              "_alert_fn_for")}
+    _ent, _auth = GATES.live_entitlement, GATES.authorize_order
+    br = _Broker("FILLED")
+    user_store.save(USER, {"id": USER, "paper": True,
+                           "active": False if stopped_at_start else True})
+    try:
+        UL._make_broker = lambda user, user_id=None: (br, _REAL_CFG)
+        UL._persist_open_position = lambda uid, cfg, pos: None
+        UL.get_dash = lambda uid: {}
+        UL._alert_fn_for = lambda uid, fn: (lambda u, payload: None)
+        GATES.live_entitlement = lambda uid, u=None: ("allowed", "stubbed")
+        if stop_after_gate:
+            def _gate_then_stop(*a, **k):
+                out = _auth(*a, **k)
+                user_store.update(USER, {"active": False})   # Stop lands HERE
+                return out
+            GATES.authorize_order = _gate_then_stop
+        out = UL.force_trade(USER, "BUY", symbol=symbol, lots=0.01,
+                             sl_override=1.2400, tp_override=1.2800,
+                             origin=origin)
+    finally:
+        for name, fn in saved.items():
+            setattr(UL, name, fn)
+        GATES.live_entitlement, GATES.authorize_order = _ent, _auth
+    return out, br
+
+
+out, br = run_stop("approval", stopped_at_start=True, symbol="GBPUSD")
+check("an approval after a recorded Stop is refused", out.get("ok") is False
+      and out.get("error") == "STOP_REQUESTED", str(out))
+check("and nothing reached the broker", br.calls == [], str(br.calls))
+check("and the refusal says so in words",
+      "stopped" in str(out.get("detail")).lower(), str(out.get("detail")))
+
+out, br = run_stop("approval", stop_after_gate=True, symbol="AUDUSD")
+check("a Stop that lands AFTER the gate and before the broker is honoured",
+      out.get("error") == "STOP_REQUESTED", str(out))
+check("so the broker is never called", br.calls == [], str(br.calls))
+
+out, br = run_stop("rule", stop_after_gate=True, symbol="NZDUSD")
+check("the same holds for a rule's own order",
+      out.get("error") == "STOP_REQUESTED" and br.calls == [], f"{out} {br.calls}")
+
+out, br = run_stop("manual", stopped_at_start=True, symbol="USDCAD")
+check("a MANUAL order is not revoked by stopping automation",
+      out.get("ok") is True and len(br.calls) == 1, f"{out} {br.calls}")
+
+out, br = run_stop("approval", symbol="USDCHF")
+check("and an approval with no Stop in the way still places",
+      out.get("ok") is True and len(br.calls) == 1, f"{out} {br.calls}")
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

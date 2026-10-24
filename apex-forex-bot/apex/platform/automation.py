@@ -729,17 +729,30 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
                            "appliedTerms": applied,
                            "notApplied": not_applied,
                            "engineSnapshot": snapshot})
+    # The journal line and the notification name the mode the loop is ACTUALLY
+    # on, for the same reason the record above does. They said "demo"
+    # unconditionally, which was true while nothing else could start and would
+    # have told a client with a real-money loop that it was on a practice
+    # account. An unrecognised mode is not guessed at.
+    _label = _account_label(conn.get("mode"))
     _jstore.record_automation(
         _jstore._j.AUTOMATION_STARTED, correlation_id=corr, user_id=user_id,
         account_id=str(conn.get("ctid")), rule_doc_id=rule_doc_id,
         rule_doc_version=rule.get("version"),
-        detail=f"demo account {conn.get('ctid')}")
+        detail=f"{_label} {conn.get('ctid')}")
     _notify.notify(user_id, type=_notify.SYSTEM,
                    title="Automation started",
-                   body=f"Running {rule.get('name') or rule_doc_id} on demo "
-                        f"account {conn.get('ctid')}.",
+                   body=f"Running {rule.get('name') or rule_doc_id} on "
+                        f"{_label} {conn.get('ctid')}.",
                    correlation_id=corr)
     return dict(status(user_id), started=True, alreadyRunning=False)
+
+
+def _account_label(mode):
+    """"demo account", "live account", or just "account" when the mode is not
+    one this module knows. Never a guess: the words end up in the journal and
+    in a notification, which a client reads as a statement of fact."""
+    return f"{mode} account" if mode in (DEMO, LIVE) else "account"
 
 
 def _engine_starter(user_id):

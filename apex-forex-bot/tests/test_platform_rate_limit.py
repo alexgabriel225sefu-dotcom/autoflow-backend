@@ -61,6 +61,12 @@ cases = [
     ("GET", "automation", "default"),          # a poll, not a control action
     ("GET", "positions", "default"),
     ("GET", "journal", "default"),
+    # Approving places an order, so it is metered like the other controls.
+    # Rejecting is a "no" and must always be answerable; the pending-list
+    # read is a poll.
+    ("POST", "approvals/approve", "control"),
+    ("POST", "approvals/reject", "default"),
+    ("GET", "approvals", "default"),
 ]
 for method, route, expected in cases:
     got = RL.classify(method, route)
