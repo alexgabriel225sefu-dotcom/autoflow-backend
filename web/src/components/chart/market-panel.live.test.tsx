@@ -141,6 +141,29 @@ describe("the live loop, with the real hook", () => {
     expect(screen.getByText("stale")).toBeDefined();
   });
 
+  it("keeps the last bars, and the stale wording, for the rate-limit wait", async () => {
+    await mount();
+    expect(document.querySelector(".price-chart")).not.toBeNull();
+    const before = candleCalls().length;
+    h.candles = {
+      ok: false, status: 429, code: "RATE_LIMITED",
+      message: "too many requests — wait 30s and try again",
+      retryAfterSec: 30,
+    };
+    await tick(CHART_REFRESH_MS);
+    expect(candleCalls()).toHaveLength(before + 1);
+    expect(document.querySelector(".price-chart")).not.toBeNull();
+    expect(screen.getByText("stale")).toBeDefined();
+    expect(screen.getByText(/Last read failed/)).toBeDefined();
+    expect(screen.getByText(/may no longer match the market/)).toBeDefined();
+    expect(screen.queryByText("RATE_LIMITED")).toBeNull();
+
+    await tick(CHART_REFRESH_MS);
+    expect(candleCalls(), "polled again inside retryAfterSec").toHaveLength(before + 1);
+    await tick(CHART_REFRESH_MS);
+    expect(candleCalls()).toHaveLength(before + 2);
+  });
+
   it("recovers to a live chart when the broker comes back", async () => {
     await mount();
     h.candles = { ok: false, status: 503, code: "BROKER_DOWN", message: "no answer" };

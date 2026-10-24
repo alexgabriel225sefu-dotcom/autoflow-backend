@@ -69,6 +69,8 @@ export default function LiveReviewPage() {
     void loadQueue();
   }
 
+  const operatorOnly = !!error && error.status === 403 && error.code === "NOT_OPERATOR";
+
   return (
     <main>
       <div className="page-head">
@@ -77,6 +79,13 @@ export default function LiveReviewPage() {
           <span className="sub">Review a request. Approval is recorded on the server.</span>
         </div>
       </div>
+      {operatorOnly ? (
+        <section className="notice" role="status">
+          <p style={{ fontWeight: 600 }}>Operators only</p>
+          <p className="muted" style={{ fontSize: ".82rem" }}>{error.message}</p>
+        </section>
+      ) : (
+      <>
       {error ? <ErrorNotice error={error} /> : null}
       <section className="card">
         <div className="btn-row">
@@ -127,6 +136,8 @@ export default function LiveReviewPage() {
           </>
         ) : null}
       </section>
+      </>
+      )}
     </main>
   );
 }

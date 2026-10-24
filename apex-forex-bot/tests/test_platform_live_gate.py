@@ -444,6 +444,40 @@ finally:
     else:
         os.environ[LG.OPERATOR_ENV] = _saved_ops
 
+print("\n[8b] with no operator ids, every review route is refused")
+from apex.platform import ratelimit as _RL                # noqa: E402
+_RL.reset_all()
+_saved_again = os.environ.get(LG.OPERATOR_ENV)
+
+
+def _forbidden(label, method, path, body=None):
+    status, payload = call(method, path, "op", body)
+    err = (payload or {}).get("error") or {}
+    check(label, status == 403 and err.get("code") == "NOT_OPERATOR",
+          str(payload)[:240])
+
+
+try:
+    for _label in ("unset", "empty"):
+        if _label == "unset":
+            os.environ.pop(LG.OPERATOR_ENV, None)
+        else:
+            os.environ[LG.OPERATOR_ENV] = ""
+        check(f"{_label}: nobody is an operator", LG.operators() == set(),
+              str(LG.operators()))
+        _forbidden(f"{_label}: GET live/queue", "GET", "live/queue")
+        _forbidden(f"{_label}: GET live/requests/{{id}}",
+                   "GET", f"live/requests/{CLIENT}")
+        _forbidden(f"{_label}: POST decide approve", "POST",
+                   f"live/requests/{CLIENT}/decide", {"decision": "approved"})
+        _forbidden(f"{_label}: POST decide reject", "POST",
+                   f"live/requests/{CLIENT}/decide", {"decision": "rejected"})
+finally:
+    if _saved_again is None:
+        os.environ.pop(LG.OPERATOR_ENV, None)
+    else:
+        os.environ[LG.OPERATOR_ENV] = _saved_again
+
 print("\n[9] a confirmed payment writes the record; a missing amount does not")
 SECRET = "whsec_test_secret"
 

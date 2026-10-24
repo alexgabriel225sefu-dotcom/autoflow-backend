@@ -3,6 +3,55 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ApiResult } from "./api";
 
 /**
+ * One in-flight GET per path.
+ *
+ * `useRead` used to abort the previous read and start another whenever a poll,
+ * a visibility change or a second subscriber asked again. The aborted request
+ * had already left the browser, so the candles limiter counted both, and the
+ * chart — polling every 15 seconds — answered RATE_LIMITED. A read that is
+ * already on the wire is shared. A forced reload still aborts it: that is a
+ * newer question, not a duplicate of the one in flight.
+ */
+type Flight = {
+  force: boolean;
+  controller: AbortController;
+  promise: Promise<ApiResult<unknown>>;
+  /** Mounted readers currently bound to this request. */
+  readers: number;
+};
+
+const flights = new Map<string, Flight>();
+
+function beginRead(path: string, force: boolean): Flight {
+  const current = flights.get(path);
+  // Join only a request somebody is still waiting on. A flight left behind
+  // by an unmounted reader is a different question's answer — the next
+  // screen has to ask again, or it sits on "loading" forever.
+  if (current && !current.controller.signal.aborted && current.readers > 0) {
+    if (!force || current.force) return current;
+    current.controller.abort();
+  }
+  const controller = new AbortController();
+  const flight: Flight = {
+    force,
+    controller,
+    readers: 0,
+    promise: api(path, { signal: controller.signal }).finally(() => {
+      if (flights.get(path)?.controller === controller) flights.delete(path);
+    }),
+  };
+  flights.set(path, flight);
+  return flight;
+}
+
+function releaseFlight(path: string, flight: Flight) {
+  flight.readers = Math.max(0, flight.readers - 1);
+  if (flight.readers > 0) return;
+  if (!flight.controller.signal.aborted) flight.controller.abort();
+  if (flights.get(path)?.controller === flight.controller) flights.delete(path);
+}
+
+/**
  * A read, with controlled polling.
  *
  * `lastSync` is exposed and shown on screen on purpose. A dashboard that
@@ -59,20 +108,39 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   const [result, setResult] = useState<ApiResult<T> | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [loading, setLoading] = useState(!!path);
-  const abort = useRef<AbortController | null>(null);
+  const seq = useRef(0);
+  /** Automatic polls wait out a RATE_LIMITED answer. A forced reload does not. */
+  const pauseUntil = useRef(0);
+  /** The request this mounted reader is waiting on, so unmount can drop it. */
+  const held = useRef<Flight | null>(null);
 
-  const load = useCallback(async (): Promise<ApiResult<T> | undefined> => {
+  const load = useCallback(async (force = false): Promise<ApiResult<T> | undefined> => {
     if (!path) return undefined;
-    abort.current?.abort();
-    const ctl = new AbortController();
-    abort.current = ctl;
+    // The server said how long to wait. Polling again before that spends the
+    // budget the refusal just told us is empty.
+    if (!force && Date.now() < pauseUntil.current) return undefined;
+    const mine = ++seq.current;
     setLoading(true);
-    const r = await api<T>(path, { signal: ctl.signal });
+    const flight = beginRead(path, force);
+    if (held.current !== flight) {
+      const previous = held.current;
+      held.current = flight;
+      flight.readers += 1;
+      if (previous) releaseFlight(path, previous);
+    }
+    const r = (await flight.promise) as ApiResult<T>;
     // A superseded read resolves to undefined: a newer one is on its way and
-    // is the one whose answer counts.
-    if (ctl.signal.aborted) return undefined;
+    // is the one whose answer counts. An aborted flight is the same thing —
+    // its answer, if it arrives, belongs to a request we gave up on.
+    if (mine !== seq.current || flight.controller.signal.aborted) return undefined;
     setResult(r);
     setLoading(false);
+    if (!r.ok && r.code === "RATE_LIMITED"
+        && typeof r.retryAfterSec === "number" && r.retryAfterSec > 0) {
+      pauseUntil.current = Date.now() + r.retryAfterSec * 1000;
+    } else {
+      pauseUntil.current = 0;
+    }
     // Stamped only on an answer we actually received — including a refusal.
     // Leaving it untouched on failure would show a fresh time over stale data.
     setLastSync(Date.now());
@@ -87,12 +155,26 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     // `loading` before it awaits, and doing that synchronously during commit
     // is a cascading render. One microtask later is invisible to the reader
     // and lets the first paint happen with the initial state.
-    queueMicrotask(() => { void load(); });
+    //
+    // The flag is the other half. Strict-mode remount and a test that
+    // unmounts before the microtask runs would otherwise start a read nobody
+    // is mounted to, and the next reader would join that abandoned request.
+    let alive = true;
+    queueMicrotask(() => { if (alive) void load(); });
+    return () => { alive = false; };
   }, [load]);
 
   useEffect(() => {
+    return () => {
+      const flight = held.current;
+      held.current = null;
+      if (path && flight) releaseFlight(path, flight);
+    };
+  }, [path]);
+
+  useEffect(() => {
     if (!path) return;
-    const fn = () => { void load(); };
+    const fn = () => { void load(true); };
     const subs = subscribers.get(path) ?? new Set<() => void>();
     subs.add(fn);
     subscribers.set(path, subs);
@@ -135,7 +217,7 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     return () => window.removeEventListener("online", onBack);
   }, [path, load]);
 
-  return { result, loading, lastSync, reload: load };
+  return { result, loading, lastSync, reload: () => load(true) };
 }
 
 export function whenSynced(ts: number | null) {

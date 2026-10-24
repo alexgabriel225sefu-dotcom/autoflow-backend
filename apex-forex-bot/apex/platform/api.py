@@ -44,6 +44,7 @@ from apex.platform import notifications as _notify
 from apex.platform import performance_read as _perfread
 from apex.platform import preview as _preview
 from apex.platform import linklog as _log
+from apex.platform import candle_coalesce as _candle_coalesce
 from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
 from apex.platform import live_gate as _live_gate
@@ -251,16 +252,30 @@ def handle(method, path, headers=None, body=None, *, client_key=None):
 def _handle(method, path, headers=None, body=None, *, client_key=None):
     """(status, payload), or None when the path is not ours.
 
+    Returning None rather than a 404 lets this mount inside an existing server
+    whose other routes must keep working.
+
+    Identical candle reads are answered here, before the limiter. A success a
+    moment ago, or the same query already in flight, must not spend another
+    unit of the 30-a-minute candles budget. Failures are not remembered, and
+    every other route is counted exactly as before.
+    """
+    if not path or not path.startswith(PREFIX):
+        return None
+    return _candle_coalesce.coalesce(
+        method, path, headers,
+        lambda: _handle_limited(
+            method, path, headers, body, client_key=client_key))
+
+
+def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
+    """The request after the candle cache has had its say.
+
     `client_key` is the caller's network identity, supplied by the transport
     because only the transport knows it. It is used for rate limiting, and
     only as a fallback: an authenticated request is limited per user so one
     client behind a shared address cannot lock out another.
-
-    Returning None rather than a 404 lets this mount inside an existing server
-    whose other routes must keep working.
     """
-    if not path or not path.startswith(PREFIX):
-        return None
     route = path[len(PREFIX):].split("?", 1)[0].strip("/")
 
     # Before anything else, including authentication. A limiter that runs
