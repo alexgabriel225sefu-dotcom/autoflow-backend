@@ -1949,3 +1949,18 @@ body {
 .record { border-radius: 16px; border-color: var(--a4t-line-soft); background: var(--a4t-surface); padding: .85rem 1rem; }
 .card + .records, .card + .record, .records + .page-nav { margin-top: .75rem; }
 .records > .record:hover { border-color: var(--a4t-line); }
+
+/* ── sign-in: Google button and the brand band on small screens ──────── */
+.auth-alt { margin-top: 1.6rem; }
+.btn-google { width: 100%; gap: .7rem; }
+.auth-or { display: flex; align-items: center; gap: .8rem; margin: 1.2rem 0 -.6rem; font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--a4t-dim); }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--a4t-line); }
+.auth-block .auth-alt + form.card { margin-top: 1.2rem; }
+
+.auth-hero { position: relative; overflow: hidden; margin: 1.4rem 0 0; padding: 1.4rem 1.3rem 1.5rem; border: 1px solid var(--a4t-line); border-radius: 18px; background: #0b0b0e; color: #f7f6f2; }
+@media (min-width: 960px) { .auth-hero { display: none; } }
+.auth-hero-glow { position: absolute; right: -20%; top: -40%; width: 80%; height: 140%; background: radial-gradient(closest-side, rgba(217, 58, 43, .34), rgba(217, 58, 43, 0) 72%); pointer-events: none; }
+.auth-hero .mark { position: relative; display: block; margin-bottom: 1rem; }
+.auth-hero-kicker { position: relative; font-size: .68rem; font-weight: 800; letter-spacing: .18em; color: #ff9484; margin-bottom: .5rem; }
+.auth-hero-head { position: relative; font-size: 1.7rem; line-height: 1; letter-spacing: -.045em; font-weight: 800; max-width: 11ch; }
+.aside-copy .mark { display: block; margin-bottom: 1.6rem; }
