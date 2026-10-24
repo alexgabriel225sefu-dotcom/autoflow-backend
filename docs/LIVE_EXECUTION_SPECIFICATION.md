@@ -1,31 +1,27 @@
 # Apex4Traders — live execution specification
 
 What a live-execution milestone must contain before a single real order is
-placed. **Nothing in this document is implemented, and this document does not
-authorise implementing it.**
+placed. The controller and gates are implemented on the current branch, but
+the release switch is closed and this document does not authorise opening it.
 
 Live execution is a separate milestone with its own review. This exists so that
 review has something to review, and so the current release's refusals are
 understood as design rather than as unfinished work.
 
-**Assessed against:** `d8f03196f` on `claude/apex4traders-platform-v1`.
+**Assessed against:** the security-sweep base `be71810` on
+`claude/apex4traders-platform-v1`.
 
 ---
 
 ## 0. Where the current release actually stands
 
-Not "live trading is disabled". Stronger than that:
+The live controller imports the bridge and routes all live order requests
+through the release switch, entitlement, broker mode, rate, risk, ledger and
+audit gates. The path is still closed in production until those gates and a
+staged broker test have been reviewed.
 
-**`apex/platform/bridge.py` — the only module that can ask a broker to place an
-order — is imported by nothing in production.** Its sole importer is its own
-test. There is no sequence of calls from any request that arrives at
-`bridge.submit`. The path is not gated; it is absent.
-
-`tests/test_platform_live_invariants.py` proves this on the AST rather than by
-grep, including the transitive import closure of `automation` and of the API,
-so a module two hops away is caught as readily as a direct import. When
-somebody wires the bridge up, that test fails. **That failure is the review
-gate**, and it should not be "fixed" by relaxing the test.
+`tests/test_platform_live_invariants.py` proves the current gated shape and
+must remain green. It is a review gate, not a bypass to be weakened.
 
 Three further locks exist and each is tested with the other two disabled,
 because the first time they were written, removing any one of them left every
@@ -37,9 +33,9 @@ test green:
 | 2 | `entitlement.capability()` | Refuses a live account under **both** entitlements. A paid plan unlocks nothing. |
 | 3 | `automation._preflight()` | The resolved connection's own mode, checked again, and lock 2 invoked. |
 
-And `entitlement.live_execution_enabled()` returns a literal `False` — no
-environment read, no call, no name referenced at all. The invariant test
-asserts that on the AST, so it cannot quietly become configurable.
+`entitlement.live_execution_enabled()` reads `A4T_LIVE_EXECUTION`, which is
+closed by default and rejected by production readiness checks unless the
+operator explicitly opens it.
 
 ## 1. What this milestone is not allowed to be
 

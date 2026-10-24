@@ -55,6 +55,7 @@ import time
 
 from apex import user_store
 from apex.platform import store as _store
+from apex.platform.safe_errors import message as _safe_message
 
 # Scopes, widest first. The order is load-bearing: `_widest` compares by index.
 ALL = "all"
@@ -100,6 +101,9 @@ class Halted(RuntimeError):
         self.source = source
         self.reason = reason
         super().__init__(message)
+
+
+_last_store_log = 0.0
 
 
 def _k():
@@ -180,7 +184,16 @@ def state():
         # that reads as "stop"; for practice money it does not. See the module
         # docstring — this asymmetry is the decision, not an accident.
         out["storeReachable"] = False
-        out["storeError"] = f"{type(e).__name__}: {e}"
+        # A stable code and the exception CLASS: enough to tell an operator what
+        # kind of failure it was. The message is never echoed - it is shown to
+        # clients through the status route and the halt refusal - and goes only
+        # to the scrubbed log.
+        global _last_store_log
+        _now = time.time()
+        if _now - _last_store_log >= 30:      # state() runs per order and per check
+            _last_store_log = _now
+            print(f"[Emergency] store read failed: {_safe_message(e)}")
+        out["storeError"] = f"STORE_UNREACHABLE ({type(e).__name__})"
         out["storeScope"] = LIVE
         out["scope"] = _widest(env_scope, LIVE)
         out["source"] = SRC_ENV if env_scope == ALL else SRC_UNCERTAIN

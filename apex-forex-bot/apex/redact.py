@@ -138,7 +138,8 @@ def scrub(text) -> str:
 # trade: nothing that merely LOOKS like a credential is worth showing, and a
 # refresh token or an app secret that this process never held (it arrived in an
 # upstream error) has no known value or known shape to match on.
-_CLIENT_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
+# A real credential is not a short word: prose such as "no bearer token" is left alone.
+_CLIENT_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S{6,}")
 # The name may be quoted (a JSON or repr dump: 'refresh_token': 'x') and so may
 # the value; the value runs to the next quote, space, comma or closing brace.
 _CLIENT_KEYED = re.compile(
@@ -206,6 +207,11 @@ def scrub_for_client(text, *secrets, limit=160) -> str:
     for sec in secrets:
         if sec and isinstance(sec, str) and len(sec) >= 8:
             out = out.replace(sec, "[redacted]")
+    # Bounded BEFORE the shape regexes: some of them are quadratic on a long run
+    # of repeated prefixes, and this text can be chosen by a stranger (a public
+    # callback's `error` parameter). Only the first `limit` characters are kept
+    # anyway, so nothing that survives is left unscrubbed.
+    out = out[:max(limit * 4, 1000)]
     out = scrub(out)
     out = _CLIENT_BEARER.sub(r"\1 [redacted]", out)
     out = _CLIENT_KEYED.sub(lambda m: f"{m.group(1)}=[redacted]", out)
