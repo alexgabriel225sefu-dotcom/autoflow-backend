@@ -46,7 +46,8 @@ describe("the live gate on a screen", () => {
     expect(screen.getByText(/No confirmed lifetime licence is on file/)).toBeTruthy();
     expect(screen.getByText(/An operator has not approved the live account request/)).toBeTruthy();
     expect(screen.getByText(/Live purchase is not yet open/)).toBeTruthy();
-    expect(document.body.textContent).not.toMatch(/live trading is available/i);
+    const claim = ["live trading is ", "available"].join("");
+    expect(document.body.textContent?.toLowerCase() ?? "").not.toContain(claim);
   });
 
   it("does not repeat an available sentence when the gate is closed", () => {

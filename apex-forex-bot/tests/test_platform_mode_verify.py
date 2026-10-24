@@ -197,6 +197,7 @@ from apex.platform import live_pilot as _pilot                  # noqa: E402
 _real_allowed = CL.live_allowed
 _real_req = AU._ent.require_automation
 _real_cap = AU._ent.capability
+_real_ready = AU._ent.live_readiness
 _real_pilot = _pilot.check_identity
 _notes = []
 _real_notify = AU._notify.notify
@@ -205,9 +206,17 @@ def _allow_live(uid, **kw):
     return {"canAutomate": True, "reason": None, "message": "stubbed",
             "licenceState": "active"}
 
+def _ready(_uid):
+    # Same idea as the capability stub above: this section measures the
+    # words a live start writes, and the hard gate is covered on its own.
+    return {"open": True, "status": "open", "summary": "stubbed",
+            "conditions": [], "missing": [],
+            "request": {"status": "approved"}, "checkoutOpen": False}
+
 CL.live_allowed = lambda: True
 AU._ent.require_automation = _allow_live
 AU._ent.capability = _allow_live
+AU._ent.live_readiness = _ready
 _pilot.check_identity = lambda uid, ctid: None
 AU._notify.notify = lambda *a, **kw: _notes.append(kw) or None
 try:
@@ -231,6 +240,7 @@ try:
 finally:
     AU._ent.require_automation = _real_req
     AU._ent.capability = _real_cap
+    AU._ent.live_readiness = _real_ready
     _pilot.check_identity = _real_pilot
     AU._notify.notify = _real_notify
     CL.live_allowed = _real_allowed
