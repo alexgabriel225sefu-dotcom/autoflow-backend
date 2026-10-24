@@ -167,6 +167,10 @@ export default function PrivacyPage() {
 
         <p style={{ marginTop: "var(--sp-6)" }}>
           <Link href="/terms">Terms of Service</Link>
+          {" · "}
+          <Link href="/refunds">Refunds</Link>
+          {" · "}
+          <Link href="/tax">Tax</Link>
         </p>
       </div>
     </main>
