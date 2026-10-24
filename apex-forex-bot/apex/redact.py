@@ -138,7 +138,8 @@ def scrub(text) -> str:
 # trade: nothing that merely LOOKS like a credential is worth showing, and a
 # refresh token or an app secret that this process never held (it arrived in an
 # upstream error) has no known value or known shape to match on.
-_CLIENT_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S+")
+# A real credential is not a short word: prose such as "no bearer token" is left alone.
+_CLIENT_BEARER = re.compile(r"(?i)\b(bearer|basic)\s+\S{6,}")
 # The name may be quoted (a JSON or repr dump: 'refresh_token': 'x') and so may
 # the value; the value runs to the next quote, space, comma or closing brace.
 _CLIENT_KEYED = re.compile(

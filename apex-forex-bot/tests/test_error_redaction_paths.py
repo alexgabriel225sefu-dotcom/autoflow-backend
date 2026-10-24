@@ -223,6 +223,22 @@ for keep in ("POSITION_NOT_FOUND", "CH_CLIENT_AUTH_FAILURE",
              "the position 4567890 is already closed", "use and/or Settings/Trading"):
     check(f"leaves {keep!r} readable", message(keep) == keep, message(keep))
 
+print("\n[5b] the shapes a first pass missed")
+for label, text, gone in (
+        ("an IP with a port", "connect to 10.0.3.14:6379 refused", "10.0.3.14"),
+        ("a short internal host", "lookup db.internal failed", "db.internal"),
+        ("a cluster host", "dial redis.svc.cluster.local timeout", "redis.svc"),
+        ("an email", "user ops@example.com rejected", "ops@example"),
+        ("user:pw@host", "postgres failed for admin:hunter2@db", "hunter2"),
+        ("a relative state file", "cannot read data/users.json", "users.json"),
+        ("a dotted relative path", "open ./data/state.json", "state.json"),
+        ("host='x' leaves no quote", "host='db1.internal' down", "'")):
+    got = message(text)
+    check(f"{label}: removed", gone not in got, got)
+check("prose 'no bearer token' is not mangled", message("no bearer token") == "no bearer token",
+      message("no bearer token"))
+check("a real bearer header still is", "abcdef0123456789" not in message("Bearer abcdef0123456789"))
+
 print("\n[6] hostile input is bounded before the shape regexes run")
 import time as _time                                          # noqa: E402
 for label, hostile in (("sk- x 66000", "sk-" * 66000), ("FORX- x 40000", "FORX-" * 40000),
