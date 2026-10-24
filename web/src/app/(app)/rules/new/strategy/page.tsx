@@ -7,7 +7,7 @@ import {
   api, type ApiError, type RuleDoc, type StrategyCatalogue,
 } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
-import { BLANK, RuleForm, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
+import { BLANK, RuleForm, levelMissing, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { groupByFamily, NoStrategyChosen, presetRuleBody } from "./catalog";
 
@@ -278,12 +278,17 @@ export default function PickStrategyPage() {
             <button
               className="btn"
               onClick={save}
-              disabled={busy || !chosen}
+              disabled={busy || !chosen || levelMissing(draft)}
             >
               <Save className="ico" aria-hidden />{" "}
               {busy ? "Saving…" : "Save draft"}
             </button>
           </div>
+          {chosen && levelMissing(draft) ? (
+            <p className="muted" role="status" style={{ fontSize: ".82rem", marginTop: ".5rem" }}>
+              Choose who acts on a setup (Market section) before saving.
+            </p>
+          ) : null}
         </div>
 
         <aside className="inspector">

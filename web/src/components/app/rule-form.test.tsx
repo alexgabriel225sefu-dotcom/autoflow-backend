@@ -226,9 +226,32 @@ describe("fields that would be refused at execution say so at the input", () => 
     expect(screen.getByText(expected)).toBeDefined();
   });
 
-  it("labels the fields the engine records but does not enforce", () => {
+  // WAS "does not apply these yet" — which was false. The engine DOES switch
+  // trailing on or off from the rule and does use the break-even trigger; only
+  // the trail DISTANCE is its own. The screen now says exactly that, because a
+  // note claiming a working setting does nothing is as wrong as the opposite.
+  it("says what the engine does and does not take from the management terms", () => {
     render(<RuleForm draft={{ ...BLANK, trailEnabled: true }} set={vi.fn()} specs={SPECS} step="management" />);
-    expect(screen.getByText(/does not apply these yet/)).toBeDefined();
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("switched on or off by this rule");
+    expect(text).toContain("break-even trigger is used exactly");
+    expect(text).toContain("trail distance is the engine's own");
+    expect(text).not.toContain("does not apply these yet");
+  });
+
+  it("does not claim the daily cap is unenforced, and says what an empty one means", () => {
+    render(<RuleForm draft={BLANK} set={vi.fn()} specs={SPECS} step="limits" />);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("account's own daily limit still applies");
+    // Max exposure really is not enforced in this release, and still says so.
+    expect(text).toContain("Recorded on the rule; not enforced by the engine yet.");
+  });
+
+  it("does not promise that flatten closes anything", () => {
+    render(<RuleForm draft={{ ...BLANK, onLimit: "flatten" }} set={vi.fn()} specs={SPECS} step="limits" />);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Not applied yet");
+    expect(text).not.toContain("Close open positions as well as refusing new entries");
   });
 });
 

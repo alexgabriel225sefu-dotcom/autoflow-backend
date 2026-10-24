@@ -76,6 +76,23 @@ export default function JournalView() {
 
       {r.loading && !r.result ? <Spinner /> : null}
       {r.result && !r.result.ok ? <ErrorNotice error={r.result} onRetry={r.reload} /> : null}
+      {/* A page that is quietly short looks complete. The server counts the
+          entries it could not read, and this says so instead of showing fewer
+          rows under a total that still includes them. */}
+      {r.result?.ok && (r.result.data.unreadable ?? 0) > 0 ? (
+        <div className="notice notice-warn" role="status">
+          <p style={{ fontWeight: 600 }}>This page is incomplete.</p>
+          <p className="muted" style={{ fontSize: ".82rem" }}>
+            {r.result.data.unreadable === 1
+              ? "1 entry"
+              : `${r.result.data.unreadable} entries`} on this page could not be
+            read just now. Nothing was deleted; try again in a moment.
+          </p>
+          <button className="btn btn-ghost btn-sm" onClick={() => void r.reload()}>
+            Try again
+          </button>
+        </div>
+      ) : null}
       {r.result?.ok ? (
         r.result.data.entries.length ? (
           <>
@@ -171,7 +188,7 @@ export default function JournalView() {
               </span>
             </div>
           </>
-        ) : (
+        ) : (r.result.data.unreadable ?? 0) > 0 ? null : (
           <section className="card">
             <p className="empty">Nothing recorded for this filter.</p>
           </section>

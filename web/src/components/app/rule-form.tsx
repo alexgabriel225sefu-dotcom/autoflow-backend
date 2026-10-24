@@ -56,10 +56,24 @@ export type Draft = {
   expiresAfterSec: string;
 };
 
+/** What a rule stored before the field existed has always run at. Reading one
+ *  back must say so rather than show the form's "nothing chosen yet". */
+export const LEGACY_LEVEL = "full";
+
+/** True while no level has been chosen, which blocks saving a new rule. */
+export function levelMissing(d: Pick<Draft, "automationLevel">): boolean {
+  return !d.automationLevel;
+}
+
 /** The same defaults the server would apply, made visible instead of implied. */
 export const BLANK: Draft = {
   name: "", symbols: "EURUSD", timeframe: "1h", sides: "BOTH", evaluateOn: "bar_close",
-  automationLevel: "full",
+  // NOT PRESELECTED. A new rule starts with no level, and cannot be saved
+  // until the client picks one. "Full Automation" is the stored default for a
+  // rule that never says (see `LEGACY_LEVEL`), and quietly inheriting it meant
+  // a client who never touched the selector got a rule that places orders
+  // without asking. Choosing it is one click, and now it is a click.
+  automationLevel: "",
   entryCombine: "AND", entry: [], exitCombine: "OR", exit: [],
   sizingMode: "risk_percent", riskPercent: "1.0", fixedVolume: "0.1",
   slMode: "atr", slAtrMultiple: "1.5", slPips: "20",
@@ -180,7 +194,7 @@ export function fromDoc(doc: RuleDoc): FromDoc {
       sides: str(doc.sides) || BLANK.sides,
       evaluateOn: str(doc.evaluateOn) || BLANK.evaluateOn,
       // A rule stored before the field existed ran at full; say so.
-      automationLevel: str(doc.automationLevel) || BLANK.automationLevel,
+      automationLevel: str(doc.automationLevel) || LEGACY_LEVEL,
       entryCombine: str(entry.combine) || BLANK.entryCombine,
       entry: (Array.isArray(entry.conditions) ? entry.conditions : []) as ConditionValue[],
       exitCombine: str(exit.combine) || BLANK.exitCombine,
@@ -369,7 +383,8 @@ export function RuleForm({
           <span className="field-note">
             {(() => {
               const l = AUTOMATION_LEVELS.find((x) => x.id === d.automationLevel);
-              return l ? `${l.does} ${l.doesNot}` : "Choose who acts on a setup.";
+              return l ? `${l.does} ${l.doesNot}`
+                : "Choose who acts on a setup. This must be picked before the rule can be saved.";
             })()}
           </span>
         </div>
@@ -481,7 +496,7 @@ export function RuleForm({
     <>
       <Section
         title="Trade management"
-        note="Stored on the rule and shown in its terms. The execution engine does not apply these yet, so they are recorded rather than enforced."
+        note="Trailing and break-even are switched on or off by this rule when automation starts, and the break-even trigger is used exactly. The trail distance is the engine's own, so the number entered here is recorded but not used."
       >
         <label className="field-inline">
           <input type="checkbox" checked={d.trailEnabled}
@@ -522,9 +537,9 @@ export function RuleForm({
                    onChange={(e) => set("maxSpreadPips", e.target.value)} />
             <span className="field-note">Entries are blocked while the spread is wider.</span></label>
           <label className="field"><span>Max trades per day</span>
-            <input type="number" step="1" min="1" placeholder="no cap" value={d.maxDailyTrades}
+            <input type="number" step="1" min="1" placeholder="engine default" value={d.maxDailyTrades}
                    onChange={(e) => set("maxDailyTrades", e.target.value)} />
-            <span className="field-note">Recorded on the rule; not enforced by the engine yet.</span></label>
+            <span className="field-note">Applied when automation starts. Left empty, the account&apos;s own daily limit still applies (10 unless it was changed).</span></label>
           <label className="field"><span>Max exposure <span className="hint">% of balance</span></span>
             <input type="number" step="1" min="1" placeholder="no cap" value={d.maxExposurePercent}
                    onChange={(e) => set("maxExposurePercent", e.target.value)} />
@@ -534,7 +549,7 @@ export function RuleForm({
           <Seg value={d.onLimit} options={["block", "flatten"]} onChange={(v) => set("onLimit", v)} />
           <span className="field-note">
             {d.onLimit === "flatten"
-              ? "Close open positions as well as refusing new entries."
+              ? "Not applied yet: this release only refuses new entries and keeps managing the open ones, whichever you choose."
               : "Refuse new entries and keep managing the open ones."}
           </span>
         </div>

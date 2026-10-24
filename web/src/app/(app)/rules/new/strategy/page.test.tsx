@@ -171,11 +171,23 @@ describe("what a client can read before choosing", () => {
 });
 
 describe("saving a chosen strategy", () => {
-  it("cannot be saved until one is chosen", async () => {
+  // A level nobody chose is a rule that places orders without asking, so the
+  // draft needs one picked as well as a strategy. Both are required, and each
+  // missing one keeps Save off.
+  it("cannot be saved until a strategy AND a level are chosen", async () => {
     await renderPage();
     expect(saveButton().disabled).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: /Trend Following/ }));
+    await waitFor(() => expect(document.body.textContent).toContain("before saving"));
+    expect(saveButton().disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Approval Required" }));
     await waitFor(() => expect(saveButton().disabled).toBe(false));
+  });
+
+  it("a level alone is not enough: a strategy is still needed", async () => {
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Signals Only" }));
+    expect(saveButton().disabled).toBe(true);
   });
 
   it("creates the draft and then writes the strategy onto it", async () => {
@@ -183,6 +195,7 @@ describe("saving a chosen strategy", () => {
     routes["rules"] = { ok: true, data: { rule: { ruleDocId: "r9" } } };
     await renderPage();
     fireEvent.click(screen.getByRole("radio", { name: /Trend Following/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Approval Required" }));
     fireEvent.click(saveButton());
 
     await waitFor(() => expect(pushed).toEqual(["/rules/r9"]));
@@ -215,6 +228,7 @@ describe("saving a chosen strategy", () => {
     routes["rules"] = { ok: true, data: { rule: { ruleDocId: "r9" } } };
     await renderPage();
     fireEvent.click(screen.getByRole("radio", { name: /Trend Following/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Approval Required" }));
     fireEvent.click(saveButton());
 
     expect(await screen.findByText(/cannot be activated as it stands/))
