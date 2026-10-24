@@ -144,7 +144,28 @@ def risk_guard(user_id, *, reader=None):
         return {"state": "unknown", "reasons": []}
 
 
-def status(user_id):
+def _weekend_idle(reader=None):
+    """True while the loop sits out the weekend close window, None if unknown.
+
+    This is the loop's OWN condition (`market.is_weekend_close_window`), not a
+    general "is the market open" guess: inside that window the loop returns
+    to sleep before it reaches the point where it publishes a Risk Guard
+    report, so a loop revived over a weekend has nothing to show until the
+    market reopens. The dashboard needs to say THAT, not "no report yet",
+    which reads as a guard that has failed to start. Never raises, and None —
+    not False — when it cannot be read, so the chip falls back to the honest
+    "no report" wording rather than claiming a closed market it did not check.
+    """
+    try:
+        if reader is None:
+            from apex import market as _market
+            reader = _market.is_weekend_close_window
+        return bool(reader())
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+def status(user_id, *, weekend_reader=None):
     """Safe to hand a browser. Carries no token and no broker credential."""
     rec = _read(user_id)
     level = _level_of(rec)
@@ -179,7 +200,10 @@ def status(user_id):
             "notApplied": rec.get("notApplied") or [],
             # The Risk Guard's last report, so every screen can show it. Only
             # meaningful while a loop runs; the browser shows it then.
-            "riskGuard": risk_guard(user_id)}
+            "riskGuard": risk_guard(user_id),
+            # Why that report may be absent without anything being wrong: the
+            # loop is idle for the weekend close window. See _weekend_idle.
+            "marketClosed": _weekend_idle(weekend_reader)}
 
 
 def why(user_id, *, loop_reader=None, declines_reader=None,
