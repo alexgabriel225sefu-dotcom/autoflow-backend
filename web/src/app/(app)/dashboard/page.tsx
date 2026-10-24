@@ -31,6 +31,7 @@ import { WhyCard } from "@/components/app/why-card";
 import { EmergencyStop } from "@/components/app/emergency-stop";
 import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
+import { OverviewBand, type Tile } from "@/components/app/overview-band";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -104,6 +105,34 @@ export default function Dashboard() {
     execution?.accountMode === "live" && execution.canAutomate === true;
   const runningThis = running && running.state !== "stopped";
 
+  // The first-glance tiles. Each is derived from a read the page makes anyway,
+  // and each is null until that read answers — see OverviewBand.
+  const openPositions = pos.result?.ok && pos.result.data.status === "ok"
+    ? (pos.result.data.positions ?? []).length : null;
+  const overview: Tile[] = [
+    {
+      label: "Broker",
+      value: selected ? `#${selected.ctid}` : account && !account.connected ? "Not connected" : account ? "None chosen" : null,
+      note: selected ? (selected.mode === "demo" ? "Demo account" : "Live account") : null,
+    },
+    {
+      label: "State",
+      value: running ? { running: "Running", paused: "Paused", stopped: "Stopped" }[running.state] : null,
+      note: running && running.state !== "stopped" ? running.levelLabel ?? null : null,
+      tone: running?.state === "running" ? "long" : "neutral",
+    },
+    {
+      label: "Rule",
+      value: activeRule ? (activeRule.name || "(untitled)") : rules.result?.ok ? "None active" : null,
+      note: activeRule ? `${activeRule.timeframe} · v${activeRule.version}` : null,
+    },
+    {
+      label: "Positions",
+      value: openPositions === null ? null : String(openPositions),
+      note: openPositions === null ? null : "open at your broker",
+    },
+  ];
+
   /**
    * Choosing which connected account to use.
    *
@@ -150,6 +179,8 @@ export default function Dashboard() {
           <RefreshCw className="ico" aria-hidden /> Refresh
         </button>
       </div>
+
+      <OverviewBand tiles={overview} />
 
       <div className="workspace">
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
