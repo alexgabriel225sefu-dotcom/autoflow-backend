@@ -58,6 +58,7 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/auth/confirm": "public",          // arrives from a confirmation e-mail
   "/auth/reset": "public",            // arrives from a reset e-mail
   "/configurator": "public",          // arrives from an OLD receipt, no session
+  "/pricing": "public",               // the price, linked from the landing page
 
   "/dashboard": "protected",
   "/accounts": "protected",

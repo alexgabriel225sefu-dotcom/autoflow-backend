@@ -33,14 +33,13 @@ export default function Landing() {
       <div className="mkt-wrap">
         <nav className="mkt-nav">
           <BrandLockup size={24} />
-          {/* The approved design puts the section links in the middle of the
-              bar. They are anchors into this page rather than routes, because
-              inventing a /product and a /features that do not exist would be
-              four dead links on the first screen an advertisement pays for. */}
+          {/* Product, features and resources are sections of this page.
+              Pricing is a route: /pricing used to 404, including for anyone
+              sent here by an advertisement or a shared link. */}
           <span className="mkt-nav-mid">
             <a href="#product">Product</a>
             <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
+            <a href="/pricing">Pricing</a>
             <a href="#resources">Resources</a>
           </span>
           <span className="mkt-nav-links">

@@ -190,17 +190,32 @@ describe("whenSynced says how old the numbers are", () => {
  */
 describe("invalidate reaches every reader of a path", () => {
   it("reloads BOTH copies of the same endpoint, not just the caller's", async () => {
-    const spy = vi.spyOn(apiModule, "api")
-      .mockResolvedValue({ ok: true, data: { state: "stopped" } } as never);
+    // Overlapping reads of one path share a single request. Counting calls
+    // cannot tell "both reloaded" from "one reloaded twice", so the proof is
+    // that BOTH hooks take the answer from the reload.
+    let n = 0;
+    vi.spyOn(apiModule, "api").mockImplementation(async () => {
+      n += 1;
+      return { ok: true, data: { n } } as never;
+    });
 
-    // Two components, same endpoint — the shell and the page.
-    const shell = renderHook(() => useRead("automation"));
-    const page = renderHook(() => useRead("automation"));
-    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+    const shell = renderHook(() => useRead<{ n: number }>("automation"));
+    const page = renderHook(() => useRead<{ n: number }>("automation"));
+    await waitFor(() => {
+      expect(shell.result.current.result?.ok).toBe(true);
+      expect(page.result.current.result?.ok).toBe(true);
+    });
+    const before = n;
 
     await act(async () => { invalidate("automation"); });
-    // Four, not three. Three would be the bug: one of them did not reload.
-    await waitFor(() => expect(spy).toHaveBeenCalledTimes(4));
+    await waitFor(() => {
+      const left = shell.result.current.result;
+      const right = page.result.current.result;
+      expect(left?.ok && left.data.n).toBe(before + 1);
+      expect(right?.ok && right.data.n).toBe(before + 1);
+    });
+    // One shared reload, not one request per subscriber.
+    expect(n).toBe(before + 1);
 
     shell.unmount();
     page.unmount();
@@ -285,6 +300,97 @@ describe("invalidate reaches every reader of a path", () => {
     await act(async () => { window.dispatchEvent(new Event("online")); });
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
     h.unmount();
+  });
+
+  it("asks again after the previous reader unmounts mid-flight", async () => {
+    // The flight map is process-wide. A screen that goes away while its read
+    // is still open must not leave that request for the next screen to join,
+    // or the next screen waits on a promise nobody will resolve.
+    const signals: AbortSignal[] = [];
+    const pending: Array<{ resolve: (v: unknown) => void }> = [];
+    vi.spyOn(apiModule, "api").mockImplementation((_path, opts) => {
+      const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      if (signal) signals.push(signal);
+      const d = deferred<unknown>();
+      pending.push({ resolve: d.resolve });
+      return d.promise as never;
+    });
+
+    const first = renderHook(() => useRead<{ v: number }>("ctrader/status"));
+    await waitFor(() => expect(signals).toHaveLength(1));
+    first.unmount();
+
+    const second = renderHook(() => useRead<{ v: number }>("ctrader/status"));
+    await waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+
+    await act(async () => {
+      pending[1].resolve({ ok: true, data: { v: 2 } });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(second.result.current.result).toEqual({ ok: true, data: { v: 2 } }));
+    second.unmount();
+  });
+
+  it("does not send a second request while the same read is still in flight", async () => {
+    vi.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      let resolveFirst: (value: apiModule.ApiResult<{ v: number }>) => void = () => {};
+      vi.spyOn(apiModule, "api").mockImplementation((_path, opts) => {
+        const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
+        if (signal) signals.push(signal);
+        return new Promise<apiModule.ApiResult<{ v: number }>>((resolve) => {
+          resolveFirst = resolve;
+        });
+      });
+      const { result } = renderHook(() => useRead<{ v: number }>("positions", 5_000));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(signals).toHaveLength(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+      expect(signals, "a poll overlapped the read and aborted it").toHaveLength(1);
+      expect(signals[0].aborted).toBe(false);
+
+      await act(async () => {
+        resolveFirst({ ok: true, data: { v: 1 } });
+        await Promise.resolve();
+      });
+      expect(result.current.result).toEqual({ ok: true, data: { v: 1 } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits out retryAfterSec before the next automatic poll", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      vi.spyOn(apiModule, "api").mockImplementation(async () => {
+        calls += 1;
+        if (calls === 1) return { ok: true, data: { v: 1 } } as never;
+        return {
+          ok: false, status: 429, code: "RATE_LIMITED",
+          message: "too many requests — wait 30s and try again",
+          retryAfterSec: 30,
+        } as never;
+      });
+      renderHook(() => useRead("accounts/9/candles?symbol=EURUSD", 15_000));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls).toBe(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+      expect(calls).toBe(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+      expect(calls, "polled again inside the stated wait").toBe(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+      expect(calls).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops listening once the reader unmounts", async () => {

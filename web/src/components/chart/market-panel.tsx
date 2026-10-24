@@ -109,9 +109,21 @@ export function MarketPanel({
   useEffect(() => { if (read && forThisChart) onLoaded?.(read); }, [read, forThisChart, onLoaded]);
 
   const failed = !!result && !result.ok;
+  const rateLimited = !!result && !result.ok && result.code === "RATE_LIMITED";
+  // A 429 must not throw away the bars we already have. The poll waits out
+  // retryAfterSec; until it may ask again, the chart stays on the last
+  // answer and says so with the same stale wording a late read already uses.
+  // Stored while rendering the successful read. An effect that copied it
+  // would be a second render of data this render already has.
+  const [held, setHeld] = useState<CandlesRead | null>(null);
+  if (read && forThisChart && held !== read) setHeld(read);
+  const heldForChart = !!held && held.status === "ok"
+    && (!held.symbol || sameInstrument(held.symbol, symbol))
+    && (!held.timeframe || held.timeframe.toLowerCase() === tf.toLowerCase());
+  const shown = (read && forThisChart) ? read : (rateLimited && heldForChart ? held : null);
   const stale = isStale({ lastSync: candles.lastSync, now, failed });
   const plain = read && read.status !== "ok" ? plainRead(read.status, read.reason) : null;
-  const last = read?.candles?.[read.candles.length - 1];
+  const last = shown?.candles?.[shown.candles.length - 1];
 
   const period = parsePeriod(periodText);
   const overlay: Overlay | null = overlayKind !== "none" && period !== null ? { kind: overlayKind, period } : null;
@@ -236,9 +248,11 @@ export function MarketPanel({
                 No instrument to chart yet. Activate a rule and start it, and
                 its instrument appears here.
               </p>
-            ) : result && !result.ok ? (
+            ) : result && !result.ok && !shown ? (
               /* A failed request is a failed request. Not an empty market,
-                 and not the last good bars left up as if they were current. */
+                 and not the last good bars left up as if they were current.
+                 RATE_LIMITED is the exception: the last bars stay, marked
+                 stale, and the next poll waits retryAfterSec. */
               <ErrorNotice error={result} onRetry={candles.reload} />
             ) : plain ? (
               <div className={plain.tone === "short" ? "notice notice-warn" : "notice"} role="status">
@@ -256,17 +270,17 @@ export function MarketPanel({
                   <button className="btn btn-ghost btn-sm" onClick={candles.reload}>Try again</button>
                 )}
               </div>
-            ) : !read || !forThisChart ? (
+            ) : !shown ? (
               <div className="chart-skeleton" role="status" aria-label="Loading market data">
                 <span className="skel" style={{ display: "block", height: 280, borderRadius: 10 }} />
               </div>
-            ) : read.candles?.length ? (
+            ) : shown.candles?.length ? (
               <>
                 <div className={stale ? "chart-frame is-stale" : "chart-frame"}>
                   <PriceChart
-                    candles={read.candles}
-                    symbol={read.symbol}
-                    timeframe={read.timeframe}
+                    candles={shown.candles}
+                    symbol={shown.symbol}
+                    timeframe={shown.timeframe}
                     markers={markers}
                     overlay={overlay}
                     showRsi={rsiOn}
@@ -284,9 +298,18 @@ export function MarketPanel({
                 {/* Source and as-of, on screen. Numbers without a time and a
                     source are a screenshot, not data. */}
                 <p className="dim" style={{ fontSize: ".72rem", marginTop: ".35rem" }}>
-                  Source: cTrader account <span className="mono">#{read.accountId}</span> ·{" "}
-                  {read.count} bars of {read.symbol} {read.timeframe}
-                  {read.count !== read.requested ? ` (asked for ${read.requested})` : ""}
+                  Source: cTrader account <span className="mono">#{shown.accountId}</span> ·{" "}
+                  {read && forThisChart ? (
+                    <>
+                      {read.count} bars of {read.symbol} {read.timeframe}
+                      {read.count !== read.requested ? ` (asked for ${read.requested})` : ""}
+                    </>
+                  ) : (
+                    <>
+                      {shown.count} bars of {shown.symbol} {shown.timeframe}
+                      {shown.count !== shown.requested ? ` (asked for ${shown.requested})` : ""}
+                    </>
+                  )}
                   {typeof last?.time === "number" ? (
                     <> · latest bar <span className="mono">
                       {new Date(last.time * 1000).toISOString().replace("T", " ").slice(0, 16)} UTC
