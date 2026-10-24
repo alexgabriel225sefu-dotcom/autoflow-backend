@@ -587,6 +587,20 @@ describe("dashboard — Start / Pause / Resume / Stop reload the read and say wh
 });
 
 
+describe("dashboard refresh", () => {
+  it("reloads orders, rules and me, and asks why again", async () => {
+    await renderDash();
+    const refresh = (await screen.findAllByRole("button", { name: /refresh/i }))[0];
+    calls.length = 0;
+    fireEvent.click(refresh);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    const paths = calls.map((c) => c.path);
+    for (const p of ["orders", "rules", "me", "automation/why", "ctrader/status", "positions"]) {
+      expect(paths, p).toContain(p);
+    }
+  });
+});
+
 describe("dashboard — an engine failure is not labelled a broker error", () => {
   it("shows the engine's own cause and never the word 'Broker'", async () => {
     routes.journal = { ok: true, data: {

@@ -19,7 +19,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Activity, Plug, RefreshCw } from "lucide-react";
 import { api, type ApiError } from "@/lib/api";
-import { invalidate, useRead, whenSynced } from "@/lib/use-api";
+import { invalidate, invalidateBrokerViews, useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
 import {
   AccountLimitNotice, ErrorNotice, ExecutionBadge, PlanNotice, Spinner,
@@ -155,7 +155,7 @@ export default function Dashboard() {
     const r = await api("ctrader/select", { method: "POST", body: { ctid } });
     setBusy(false);
     if (!r.ok) setSelectErr(r);
-    invalidate("ctrader/status", "accounts", "me");
+    invalidateBrokerViews();
   }
 
   async function control(action: ControlAction) {
@@ -175,7 +175,11 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <span className="sub">Last synced {whenSynced(lastSync)}</span>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={() => { void ct.reload(); void auto.reload(); void pos.reload(); void jr.reload(); }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => {
+          void ct.reload(); void auto.reload(); void pos.reload(); void ord.reload();
+          void jr.reload(); void rules.reload(); void me.reload();
+          invalidate("automation/why");
+        }}>
           <RefreshCw className="ico" aria-hidden /> Refresh
         </button>
       </div>

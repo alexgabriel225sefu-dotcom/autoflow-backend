@@ -45,6 +45,16 @@ export function invalidate(...paths: string[]) {
   }
 }
 
+// The shell reads `accounts` while pages read `ctrader/status` (same payload).
+// Reloading one leaves the status strip on the account the client just left.
+// positions/orders have no account id in the path, so they keep the previous
+// account until polled.
+export const BROKER_VIEW_PATHS = ["ctrader/status", "accounts", "me", "positions", "orders", "automation"] as const;
+
+export function invalidateBrokerViews() {
+  invalidate(...BROKER_VIEW_PATHS);
+}
+
 export function useRead<T>(path: string | null, intervalMs = 0) {
   const [result, setResult] = useState<ApiResult<T> | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);

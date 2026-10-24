@@ -19,7 +19,7 @@
  * offered only when the server has actually said there is nothing linked.
  * Loading is not a no. A failed read is not a no either.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiResult } from "@/lib/api";
 
@@ -161,6 +161,8 @@ describe("an attempt started in THIS tab", () => {
     pendingRead = Promise.resolve(NOT_CONNECTED as ApiResult<unknown>);
     render(<ConnectPage />);
     await screen.findByText(/waiting for you to approve access/i);
-    expect(screen.getByRole("button", { name: /cancel/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    expect(sessionStorage.getItem("a4t.ctrader.pending")).toBeNull();
+    expect(await screen.findByRole("button", { name: /^connect ctrader$/i })).toBeTruthy();
   });
 });

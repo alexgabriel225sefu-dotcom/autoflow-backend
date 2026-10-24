@@ -8,11 +8,12 @@
  * one word away from reading as a position — and offer a way through to the
  * record that outlives it.
  */
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiResult, Notification } from "@/lib/api";
 
 let routes: Record<string, unknown> = {};
+let failMark = false;
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/notifications",
@@ -24,6 +25,9 @@ vi.mock("@/lib/api", async (orig) => {
   return {
     ...actual,
     api: vi.fn(async (path: string) => {
+      if (failMark && (path.endsWith("/read") || path.endsWith("read-all"))) {
+        return { ok: false, status: 503, code: "STORE_UNAVAILABLE", message: "could not mark" };
+      }
       const key = Object.keys(routes)
         .sort((a, b) => b.length - a.length)
         .find((k) => path.startsWith(k));
@@ -71,7 +75,7 @@ function row(): string {
   return document.querySelector(".record")?.textContent ?? "";
 }
 
-beforeEach(() => { page([SIGNAL]); });
+beforeEach(() => { failMark = false; page([SIGNAL]); });
 afterEach(() => vi.clearAllMocks());
 
 describe("a signal alert", () => {
@@ -102,6 +106,38 @@ describe("a signal alert", () => {
     page([SYSTEM]);
     await show();
     expect(document.querySelector(".record a")).toBeNull();
+  });
+});
+
+describe("marking a row", () => {
+  it("shows the error and does not reload when the mark fails", async () => {
+    failMark = true;
+    await show();
+    const { api } = await import("@/lib/api");
+    const before = vi.mocked(api).mock.calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /mark read/i }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert").textContent).toContain("could not mark");
+    const after = vi.mocked(api).mock.calls.slice(before).map((c) => String(c[0]));
+    expect(after.some((p) => p.endsWith("/read"))).toBe(true);
+    expect(after.filter((p) => p.startsWith("notifications?"))).toEqual([]);
+  });
+
+  it("shows the error and does not reload when mark-all fails", async () => {
+    failMark = true;
+    await show();
+    const { api } = await import("@/lib/api");
+    const before = vi.mocked(api).mock.calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /mark all read/i }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert").textContent).toContain("could not mark");
+    const after = vi.mocked(api).mock.calls.slice(before).map((c) => String(c[0]));
+    expect(after).toContain("notifications/read-all");
+    expect(after.filter((p) => p.startsWith("notifications?"))).toEqual([]);
   });
 });
 
