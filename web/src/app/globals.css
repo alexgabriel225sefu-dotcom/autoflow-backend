@@ -1,106 +1,1972 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Apex4Traders — operations console
+
+   One accent. Green and red mean a trading state and nothing else, so a
+   green pill is never decoration. Every colour is a token: a literal in a
+   component is how a second palette gets born.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── THE PALETTE INVERTED, AND WHY ────────────────────────────────────────
+   This was black-and-red: a near-black page with a red action fill. The
+   approved design is a warm off-white page with BLACK as the action colour
+   and the red kept as a small brand mark — the dot beside the product name
+   and nothing else.
+
+   That is not a repaint, it is a different decision about what red MEANS.
+   A red fill reads as "the important button"; a red dot beside a wordmark
+   reads as a brand. Using it for both made every destructive control
+   compete with the logo for the same meaning.
+
+   Every value below is measured, not chosen by eye, against the CREAM page
+   rather than white — cream is the stricter of the two backgrounds, so a
+   ratio that clears it clears a card as well. `contrast.test.ts` resolves
+   these through the real cascade and fails the build if any of it drifts.
+
+   `--a4t-accent` keeps its name even though it is now black, because
+   scripts/check_production_health.py looks for that token in the served
+   stylesheet to tell a live chunk from a stale one. Renaming it would make
+   the monitor pass against a stylesheet that no longer exists.
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+  /* ── surfaces ───────────────────────────────────────────────────────
+     A warm cream page with white cards on it. The two are only 1.09:1
+     apart, which is deliberate: the separation is carried by the border
+     and the shadow, and a card that fights its background for attention
+     makes a dashboard of twelve of them unreadable. */
+  --a4t-bg:        #08080A;
+  --a4t-bg-2:      #0D0D10;
+  --a4t-surface:   #131317;
+  --a4t-surface-2: #17171B;
+  --a4t-surface-3: #202026;
+  --a4t-line:      #2A2A31;
+  --a4t-line-soft: #1E1E24;
+
+  /* ── text ───────────────────────────────────────────────────────────
+     Measured on the cream page. */
+  --a4t-text:  #F7F6F2;   /* 18.5:1 on the black page */
+  --a4t-muted: #A9A7A0;   /*  8.4:1 */
+  --a4t-dim:   #8D8B84;   /*  4.60:1 — clears AA at any size, unlike the
+                              #76736B it replaced, which was 4.34 and would
+                              have shipped as "close enough" */
+
+  /* ── interaction ────────────────────────────────────────────────────
+     Black is the action. White on it is 18.86:1, which is the highest
+     contrast anything in the product has, and that is right for the one
+     control a screen is steering towards. */
+  --a4t-accent:        #F7F6F2;   /* the action is a cream pill on black */
+  --a4t-accent-strong: #FFFFFF;
+  --a4t-accent-dim:    #3A3A41;   /* the disabled step, not a dark red */
+  --a4t-accent-wash:   rgba(247, 246, 242, 0.08);
+  --a4t-on-accent:     #111113;
+  --a4t-mark-bar:      #111113;   /* a graphic on the cream fill */
+
+  /* The red that is left. One job: the brand dot. It is 4.19:1 on cream,
+     which is enough for a 10px graphic and NOT enough for text, so it is
+     never used for any. */
+  --a4t-brand: #D93A2B;
+
+  /* ── links ──────────────────────────────────────────────────────────
+     A link has to be distinguishable from body text by more than weight,
+     and on a light page a blue is what readers already know. */
+  --a4t-link:        #8DB8F5;   /* 9.9:1 on the black page */
+  --a4t-link-strong: #B9D4FA;
+  --a4t-link-dim:    #223654;
+  --a4t-link-wash:   rgba(141, 184, 245, 0.10);
+
+  /* ── market semantics ───────────────────────────────────────────────
+     These were a mint and a coral, which are legible on near-black and
+     wash out on cream. Both are now readable AS TEXT on the page, because
+     a P&L figure is text before it is a colour. */
+  --a4t-long:    #18A35C;   /* 4.60:1 */
+  --a4t-short:   #FF9484;   /* 6.45:1 — a first pass used #C2321F, which is
+                               readable on the page and only 1.11:1 from the
+                               green. Two P&L figures that clear AA against
+                               the background and not against EACH OTHER are
+                               the failure that matters on a positions table,
+                               and nothing but a direct comparison catches
+                               it. This is 1.40:1 from the green, and it also
+                               lifts the danger button off its own wash from
+                               4.41:1 to 5.99:1. */
+  --a4t-neutral: #A9A7A0;   /* 6.94:1 */
+  --a4t-long-wash:  rgba(24, 163, 92, 0.18);
+  --a4t-short-wash: rgba(255, 148, 132, 0.14);
+
+  /* Demo and live stay aliases of the two above, so "which mode am I in"
+     and "is this up or down" can never drift into different greens. */
+  --a4t-demo: var(--a4t-long);
+  --a4t-live: var(--a4t-short);
+
+  /* ── type scale ─────────────────────────────────────────────────────
+     Six steps. A scale with more than that stops being a scale.
+     These, the spacing scale and the elevations were LOST when the palette
+     block was rewritten — the whole :root was replaced and only the colours
+     were carried over, so every --fs-* and --sp-* in the stylesheet resolved
+     to nothing. shell.test.tsx caught it by name. */
+  --fs-3xs: .66rem;
+  --fs-2xs: .72rem;
+  --fs-xs:  .78rem;
+  --fs-sm:  .84rem;
+  --fs-md:  .92rem;
+  --fs-lg:  1.05rem;
+  --fs-xl:  1.35rem;
+  --fs-2xl: clamp(1.4rem, 3vw, 1.7rem);
+
+  /* ── spacing scale ──────────────────────────────────────────────────
+     A 4px base. Every gap and pad below is one of these. */
+  --sp-1: .25rem;
+  --sp-2: .5rem;
+  --sp-3: .75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+
+  /* ── elevation ──────────────────────────────────────────────────────
+     Rewritten for a light page. The old pair opened with a near-white
+     inset highlight and closed with an 85-90% black drop — the right
+     recipe for a raised surface on near-black, and on cream it reads as a
+     grey smear under every card. A light surface is lifted by a short,
+     low-opacity shadow and nothing else. */
+  --elev-0: none;
+  --elev-1: 0 0 0 1px rgba(247, 246, 242, .03);
+  --elev-2: 0 24px 60px -24px rgba(0, 0, 0, .85), 0 0 0 1px rgba(247, 246, 242, .05);
+
+  /* ── geometry ───────────────────────────────────────────────────────── */
+  --a4t-radius:    10px;
+  --a4t-radius-sm: 8px;
+  --a4t-radius-lg: 14px;
+  --a4t-border:      1px solid var(--a4t-line);
+  --a4t-border-soft: 1px solid var(--a4t-line-soft);
+  --a4t-sidebar: 232px;
+  --a4t-inspector: 320px;
+  --a4t-topbar:  56px;
+  --a4t-statusbar: 40px;
+  --a4t-bottomnav: 62px;
+  --a4t-shadow: var(--elev-1);
+}
+
+
+/* The shadcn token layer is aliased onto the same palette. The primitives in
+   components/ui are only reachable from code that is not part of the
+   platform, and a second accent living in :root is how amber came back. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-background: var(--a4t-bg);
+  --color-foreground: var(--a4t-text);
+  --color-card: var(--a4t-surface);
+  --color-card-foreground: var(--a4t-text);
+  --color-primary: var(--a4t-accent);
+  --color-primary-foreground: var(--a4t-on-accent);
+  --color-secondary: var(--a4t-surface-2);
+  --color-secondary-foreground: var(--a4t-text);
+  --color-muted: var(--a4t-surface-2);
+  --color-muted-foreground: var(--a4t-muted);
+  --color-accent: var(--a4t-accent-wash);
+  --color-accent-foreground: var(--a4t-accent);
+  --color-destructive: var(--a4t-short);
+  --color-border: var(--a4t-line);
+  --color-input: var(--a4t-surface-2);
+  --color-ring: var(--a4t-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --animate-beam-fade: beam-fade var(--beam-dur,10s) ease-in-out var(--beam-delay,0s) infinite;
-  --animate-border-beam: border-beam calc(var(--duration)*1s) infinite linear;
 }
 
 :root {
-  --background: #03050c;
-  --foreground: #ffffff;
-  --card: #080c17;
-  --card-foreground: #ffffff;
-  --popover: #080c17;
-  --popover-foreground: #ffffff;
-  --primary: #f59e0b;
-  --primary-foreground: #000000;
-  --secondary: #0f1420;
-  --secondary-foreground: rgba(255,255,255,0.7);
-  --muted: #0d1220;
-  --muted-foreground: rgba(255,255,255,0.45);
-  --accent: rgba(245,158,11,0.08);
-  --accent-foreground: #f59e0b;
-  --destructive: #ef4444;
-  --border: rgba(255,255,255,0.08);
-  --input: rgba(255,255,255,0.06);
-  --ring: #f59e0b;
-  --radius: 12px;
+  --background: var(--a4t-bg);
+  --foreground: var(--a4t-text);
+  --card: var(--a4t-surface);
+  --card-foreground: var(--a4t-text);
+  --popover: var(--a4t-surface);
+  --popover-foreground: var(--a4t-text);
+  --primary: var(--a4t-accent);
+  --primary-foreground: var(--a4t-on-accent);
+  --secondary: var(--a4t-surface-2);
+  --secondary-foreground: var(--a4t-text);
+  --muted: var(--a4t-surface-2);
+  --muted-foreground: var(--a4t-muted);
+  --accent: var(--a4t-accent-wash);
+  --accent-foreground: var(--a4t-accent);
+  --destructive: var(--a4t-short);
+  --border: var(--a4t-line);
+  --input: var(--a4t-surface-2);
+  --ring: var(--a4t-accent);
+  --radius: var(--a4t-radius);
 }
 
-*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+/* ── appearance: the Light theme and the personal accents ───────────────
+   Both are redefinitions of the tokens above, selected by attributes on
+   <html> (see src/lib/appearance.ts). `appearance.test.ts` measures every
+   value here: AA text on the page, the action fill with its own foreground,
+   long and short distinguishable from each other, and every accent kept 40
+   degrees or more from the hues that mean profit and loss.
+
+   Redefined on :root itself, not on a descendant, so the aliases above
+   (--a4t-demo, --a4t-live) follow along: a var() alias resolves where it is
+   declared. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --a4t-bg:        #F5F3EC;
+  --a4t-bg-2:      #FBFAF6;
+  --a4t-surface:   #FFFFFF;
+  --a4t-surface-2: #F0EEE6;
+  --a4t-surface-3: #E6E3D9;
+  --a4t-line:      #D2CEC1;
+  --a4t-line-soft: #E4E1D6;
+
+  --a4t-text:  #111113;
+  --a4t-muted: #55534D;
+  --a4t-dim:   #6A675F;
+
+  --a4t-accent:        #111113;
+  --a4t-accent-strong: #000000;
+  --a4t-accent-dim:    #BDB9AD;
+  --a4t-accent-wash:   rgba(17, 17, 19, 0.07);
+  --a4t-on-accent:     #F7F6F2;
+  --a4t-mark-bar:      #F7F6F2;
+
+  --a4t-link:        #1F5FBF;
+  --a4t-link-strong: #174A94;
+  --a4t-link-dim:    #CFE0F8;
+  --a4t-link-wash:   rgba(31, 95, 191, 0.08);
+
+  --a4t-long:    #0B7A3E;
+  --a4t-short:   #A3170A;
+  --a4t-neutral: #5E5B54;
+  --a4t-long-wash:  rgba(11, 122, 62, 0.12);
+  --a4t-short-wash: rgba(163, 23, 10, 0.10);
+
+  --elev-1: 0 1px 2px rgba(17, 17, 19, .06), 0 0 0 1px rgba(17, 17, 19, .03);
+  --elev-2: 0 24px 60px -24px rgba(17, 17, 19, .28), 0 0 0 1px rgba(17, 17, 19, .05);
+}
+
+/* Accents. Each one is a fill, its own foreground, a stronger step, a disabled
+   step and a wash. The Black theme gets a bright fill with dark text, the
+   Light theme a deep fill with white text. `.sw` (the swatch in the picker)
+   carries the same tokens, so what is drawn is what will apply. */
+:root[data-accent="ice"], .sw[data-accent="ice"] {
+  --a4t-accent: #8FD0FF; --a4t-accent-strong: #BFE3FF; --a4t-accent-dim: #2B4256;
+  --a4t-accent-wash: rgba(143, 208, 255, 0.10); --a4t-on-accent: #0A1620; --a4t-mark-bar: #0A1620;
+}
+:root[data-accent="lilac"], .sw[data-accent="lilac"] {
+  --a4t-accent: #BBA6FF; --a4t-accent-strong: #D9CCFF; --a4t-accent-dim: #3A3256;
+  --a4t-accent-wash: rgba(187, 166, 255, 0.10); --a4t-on-accent: #120C26; --a4t-mark-bar: #120C26;
+}
+:root[data-accent="orchid"], .sw[data-accent="orchid"] {
+  --a4t-accent: #F29BD6; --a4t-accent-strong: #F9C5E8; --a4t-accent-dim: #4F2C44;
+  --a4t-accent-wash: rgba(242, 155, 214, 0.10); --a4t-on-accent: #240A1B; --a4t-mark-bar: #240A1B;
+}
+:root[data-accent="volt"], .sw[data-accent="volt"] {
+  --a4t-accent: #D2F55A; --a4t-accent-strong: #E6FA95; --a4t-accent-dim: #444F1C;
+  --a4t-accent-wash: rgba(210, 245, 90, 0.10); --a4t-on-accent: #131A02; --a4t-mark-bar: #131A02;
+}
+.sw[data-accent="cream"] {
+  --a4t-accent: #F7F6F2; --a4t-on-accent: #111113;
+}
+
+:root[data-theme="light"][data-accent="ice"], :root[data-theme="light"] .sw[data-accent="ice"] {
+  --a4t-accent: #0B63B8; --a4t-accent-strong: #084C8E; --a4t-accent-dim: #B9D3EC;
+  --a4t-accent-wash: rgba(11, 99, 184, 0.08); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"][data-accent="lilac"], :root[data-theme="light"] .sw[data-accent="lilac"] {
+  --a4t-accent: #5B3FD1; --a4t-accent-strong: #472FAE; --a4t-accent-dim: #CFC6F0;
+  --a4t-accent-wash: rgba(91, 63, 209, 0.08); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"][data-accent="orchid"], :root[data-theme="light"] .sw[data-accent="orchid"] {
+  --a4t-accent: #B1237E; --a4t-accent-strong: #8E1A65; --a4t-accent-dim: #EBC2DD;
+  --a4t-accent-wash: rgba(177, 35, 126, 0.08); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"][data-accent="volt"], :root[data-theme="light"] .sw[data-accent="volt"] {
+  --a4t-accent: #4F6B00; --a4t-accent-strong: #3D5400; --a4t-accent-dim: #D3DEAE;
+  --a4t-accent-wash: rgba(79, 107, 0, 0.09); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"] .sw[data-accent="cream"] {
+  --a4t-accent: #111113; --a4t-on-accent: #F7F6F2;
+}
+
+/* The few app rules that spelled a cream colour out instead of using a token.
+   Under the Light theme they would be invisible. */
+:root[data-theme="light"] .btn { box-shadow: 0 10px 22px -14px rgba(17, 17, 19, .45); }
+:root[data-theme="light"] .btn-ghost { background: transparent; border-color: rgba(17, 17, 19, .28); box-shadow: none; }
+:root[data-theme="light"] .btn-ghost:hover { background: rgba(17, 17, 19, .06); border-color: rgba(17, 17, 19, .5); }
+:root[data-theme="light"] .btn-danger { box-shadow: 0 12px 24px -16px rgba(163, 23, 10, .6); }
+:root[data-theme="light"] .auth-block .field input:focus { box-shadow: 0 0 0 4px rgba(17, 17, 19, .10); }
+:root[data-theme="light"] .a4t .brand-lockup-image { filter: invert(1); }
+:root[data-theme="light"] .btn-lg:not(.btn-ghost):not(.btn-danger)::after {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111113' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17L17 7M9 7h8v8'/></svg>");
+}
+/* The landing page keeps its own dark palette in every theme; only the page
+   behind it must not turn light. */
+html:has(.mkt) body { background: var(--mkt-bg, #08080A); }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; color-scheme: dark; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--a4t-bg);
+  color: var(--a4t-text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  /* Tabular figures everywhere: a price column that shifts as digits change
+     is unreadable at a glance, which is the only way it gets read. */
+  font-feature-settings: "tnum" 1, "cv01" 1;
 }
 
-/* Grain */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  opacity: .025;
-  pointer-events: none;
-  z-index: 1;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 200px 200px;
-}
-
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(245,158,11,.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb {
+  background: var(--a4t-surface-3);
+  border-radius: 999px;
+  border: 3px solid var(--a4t-bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--a4t-line); }
 
-@keyframes beam-fade {
-  0%,100% { opacity:0; transform:translateY(-60%) rotate(var(--beam-r,35deg)); }
-  15% { opacity:1; }
-  85% { opacity:1; }
+::selection { background: var(--a4t-link-dim); color: var(--a4t-text); }
+
+:focus-visible {
+  outline: 2px solid var(--a4t-link);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-@keyframes ticker { from { transform:translateX(0) } to { transform:translateX(-50%) } }
+@keyframes a4t-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes a4t-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes a4t-sheen { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
-@keyframes border-beam {
-  100% { offset-distance: 100%; }
+/* ── root ──────────────────────────────────────────────────────────── */
+
+.a4t {
+  background: var(--a4t-bg);
+  color: var(--a4t-text);
+  min-height: 100dvh;
 }
 
-@keyframes shimmer-slide {
-  to { transform: translate(calc(100cqw - 100%), 0); }
+/* :where() keeps this at zero specificity, so a link styled as a control
+   takes the control's colour. This exact rule, written without :where(),
+   made every primary call to action in the product unreadable: the label
+   inherited the accent onto an accent fill at 1.00:1. */
+.a4t :where(a) { color: var(--a4t-link); text-decoration: none; }
+.a4t :where(a):hover { color: var(--a4t-link-strong); }
+
+.a4t h1, .a4t h2, .a4t h3 { letter-spacing: -0.021em; margin: 0; font-weight: 600; }
+.a4t h1 { font-size: clamp(1.35rem, 3vw, 1.6rem); line-height: 1.2; }
+.a4t h2 { font-size: .95rem; letter-spacing: .01em; }
+.a4t h3 { font-size: .8rem; }
+
+.muted { color: var(--a4t-muted); }
+.dim   { color: var(--a4t-dim); }
+.mono  { font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.num   { font-variant-numeric: tabular-nums; text-align: right; }
+
+.label-xs {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--a4t-dim); font-weight: 600;
 }
 
-@keyframes spin-around {
-  0% { transform: translateZ(0) rotate(0); }
-  15%, 35% { transform: translateZ(0) rotate(90deg); }
-  65%, 85% { transform: translateZ(0) rotate(270deg); }
-  100% { transform: translateZ(0) rotate(360deg); }
+/* ── application layout ────────────────────────────────────────────── */
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100dvh;
+}
+@media (min-width: 1024px) {
+  .app { grid-template-columns: var(--a4t-sidebar) 1fr; }
 }
 
-@keyframes fade-in {
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0); }
+/* sidebar — desktop only */
+.side {
+  display: none;
+  border-right: 1px solid var(--a4t-line);
+  background: var(--a4t-bg-2);
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  flex-direction: column;
+  padding: .75rem .6rem;
+  gap: .15rem;
+}
+@media (min-width: 1024px) { .side { display: flex; } }
+
+.side-brand {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .5rem .55rem 1.1rem;
+  font-weight: 700; letter-spacing: -.03em; font-size: 1rem;
+  color: var(--a4t-text);
+}
+/* Kept as the fallback block for anything that has not moved to the
+   <BrandMark> component yet. */
+.side-mark {
+  width: 22px; height: 22px; border-radius: 6px; flex: none;
+  background: linear-gradient(145deg, var(--a4t-accent-strong), var(--a4t-accent-dim));
+}
+.side-group { margin-top: .9rem; padding: 0 .55rem .35rem; }
+
+/* The sidebar is a timeline: a rail, a node per destination, one highlight
+   that slides between rows. Rows are one fixed height so the highlight and the
+   rail fill are placed from an index (--hi, --ri) with no measuring. */
+.side-section { --row: 2.35rem; }
+.side-list { position: relative; }
+.side-list ul { list-style: none; position: relative; z-index: 1; }
+.side-list li { height: var(--row); }
+.side-rail {
+  position: absolute; left: calc(.55rem + 4px); top: calc(var(--row) * .5); bottom: calc(var(--row) * .5);
+  width: 2px; border-radius: 2px; background: var(--a4t-line);
+}
+.side-rail i {
+  position: absolute; left: 0; top: 0; width: 100%; border-radius: 2px;
+  height: calc(var(--ri, -1) * var(--row)); background: var(--a4t-accent);
+  transition: height .32s cubic-bezier(.2, .8, .2, 1);
+}
+.side-hl {
+  position: absolute; left: 0; right: 0; top: 0; height: var(--row);
+  border-radius: var(--a4t-radius-sm); background: var(--a4t-surface-2);
+  transform: translateY(calc(var(--hi, 0) * var(--row)));
+  opacity: 0;
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1), opacity .16s;
+}
+.side-list[data-hover="true"] .side-hl { opacity: 1; }
+
+.side-link {
+  display: flex; align-items: center; gap: .6rem; height: 100%;
+  padding: 0 .55rem 0 .55rem; border-radius: var(--a4t-radius-sm);
+  color: var(--a4t-muted); font-size: .875rem; font-weight: 500;
+  position: relative; transition: color .15s;
+}
+.side-link:hover, .side-link:focus-visible { color: var(--a4t-text); }
+.side-link:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: -2px; }
+.side-link[data-active="true"] { color: var(--a4t-text); font-weight: 600; }
+.side-node {
+  width: 10px; height: 10px; flex: none; border-radius: 50%; position: relative; z-index: 1;
+  background: var(--a4t-bg); border: 2px solid var(--a4t-line);
+  transition: background .2s, border-color .2s, transform .25s cubic-bezier(.2, .8, .2, 1);
+}
+.side-list li[data-lit="true"] .side-node { border-color: var(--a4t-accent); }
+.side-link[data-active="true"] .side-node {
+  background: var(--a4t-accent); border-color: var(--a4t-accent);
+  box-shadow: 0 0 0 4px var(--a4t-accent-wash);
+}
+.side-link:hover .side-node, .side-link:focus-visible .side-node { transform: scale(1.25); }
+.side-link .ico { width: 16px; height: 16px; flex: none; opacity: .75; transition: opacity .15s, transform .25s cubic-bezier(.2, .8, .2, 1); }
+.side-link:hover .ico, .side-link[data-active="true"] .ico { opacity: 1; }
+.side-link:hover .ico { transform: translateX(2px); }
+@media (prefers-reduced-motion: reduce) {
+  .side-rail i, .side-hl, .side-node, .side-link, .side-link .ico { transition: none; }
+  .side-link:hover .ico, .side-link:hover .side-node, .side-link:focus-visible .side-node { transform: none; }
 }
 
-@keyframes marquee {
-  0% { transform: translateX(0%); }
-  100% { transform: translateX(-100%); }
+.side-foot { margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--a4t-line-soft); display: flex; flex-direction: column; gap: 2px; }
+.side-out {
+  display: flex; align-items: center; gap: .6rem; width: 100%; height: 2.35rem; padding: 0 .55rem;
+  border: 0; background: none; cursor: pointer; font: inherit; font-size: .875rem; font-weight: 500;
+  color: var(--a4t-muted); border-radius: var(--a4t-radius-sm); text-align: left;
+  transition: background .15s, color .15s;
 }
+.side-out:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.side-out:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: -2px; }
+.side-out .ico { width: 16px; height: 16px; flex: none; }
+.side-appearance .mark { flex: none; transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+.side-appearance:hover .mark, .side-appearance[aria-expanded="true"] .mark { transform: rotate(-8deg) scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .side-appearance .mark { transition: none; } .side-appearance:hover .mark { transform: none; } }
+
+/* appearance: popover from the logo button, and the same controls on Settings */
+.appearance-menu { position: relative; }
+.appearance-pop {
+  position: absolute; left: 0; bottom: calc(100% + .5rem); width: 17.5rem; z-index: 30;
+  background: var(--a4t-surface); border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius);
+  padding: .9rem; box-shadow: var(--elev-2);
+}
+.appearance { display: grid; gap: 1rem; }
+.appearance-row { display: grid; gap: .5rem; }
+.appearance .segc { max-width: 16rem; }
+.appearance-note { font-size: .76rem; line-height: 1.45; }
+
+/* segmented control: a thumb that slides under the chosen option */
+.segc {
+  position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr);
+  padding: 4px; background: var(--a4t-surface-2); border: 1px solid var(--a4t-line); border-radius: 999px;
+}
+.segc-thumb {
+  position: absolute; top: 4px; bottom: 4px; left: 4px;
+  width: calc((100% - 8px) / var(--n)); border-radius: 999px;
+  background: var(--a4t-accent);
+  transform: translateX(calc(var(--i) * 100%));
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1);
+}
+.segc button {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  min-height: 34px; border: 0; background: none; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700;
+  color: var(--a4t-muted); border-radius: 999px; transition: color .2s;
+}
+.segc button .ico { width: 14px; height: 14px; }
+.segc button[aria-checked="true"] { color: var(--a4t-on-accent); }
+.segc button:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .segc-thumb, .segc button { transition: none; } }
+
+/* accent swatches: each one carries the tokens of the accent it shows, so the
+   colour on screen is the real one for the current theme, with no second copy */
+.swatches { display: flex; gap: .55rem; flex-wrap: wrap; }
+.sw {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--a4t-accent); color: var(--a4t-on-accent);
+  border: 2px solid var(--a4t-surface); box-shadow: 0 0 0 1px var(--a4t-line);
+  transition: transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .2s;
+}
+.sw:hover { transform: scale(1.1); }
+.sw .ico { width: 14px; height: 14px; opacity: 0; transform: scale(.4); transition: opacity .15s, transform .2s; }
+.sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--a4t-text); }
+.sw[aria-checked="true"] .ico { opacity: 1; transform: none; }
+.sw:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .sw, .sw .ico { transition: none; } .sw:hover { transform: none; } }
+
+/* main column */
+.main-col { display: flex; flex-direction: column; min-width: 0; }
+
+/* top bar */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--a4t-topbar);
+  display: flex; align-items: center; gap: .6rem;
+  padding: 0 clamp(12px, 3vw, 22px);
+  background: color-mix(in oklab, var(--a4t-bg) 82%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+  border-bottom: 1px solid var(--a4t-line);
+}
+.topbar-brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; letter-spacing: -.03em; }
+@media (min-width: 1024px) { .topbar-brand { display: none; } }
+.topbar-title { font-size: .95rem; font-weight: 600; letter-spacing: -.01em; }
+.topbar-spacer { flex: 1; }
+
+/* status strip — the answer to "what is running, on what, right now" */
+/* The status row. It carries whether an account is connected, whether
+   automation is running, the licence state and the demo/live badge — the
+   four facts that must never be guessed at.
+
+   It used to be `overflow-x: auto` with a hidden scrollbar. Measured on a
+   390px phone: 591px of content in a 390px row, so 201px — the licence chip
+   and the demo/live badge — sat off-screen behind a scrollbar that had been
+   styled away, on the one device where somebody is most likely to be
+   checking whether their automation is running. It wraps instead. Two short
+   lines on a phone is the whole cost. */
+.statusbar {
+  position: sticky; top: var(--a4t-topbar); z-index: 25;
+  min-height: var(--a4t-statusbar);
+  display: flex; align-items: center; gap: .4rem;
+  flex-wrap: wrap;
+  padding: .3rem clamp(12px, 3vw, 22px);
+  background: var(--a4t-bg-2);
+  border-bottom: 1px solid var(--a4t-line);
+}
+
+.stat-chip {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .22rem .55rem; border-radius: 999px;
+  background: var(--a4t-surface);
+  border: 1px solid var(--a4t-line);
+  font-size: .75rem; white-space: nowrap; color: var(--a4t-muted);
+}
+.stat-chip strong { color: var(--a4t-text); font-weight: 600; }
+.stat-chip .dot {
+  width: 6px; height: 6px; border-radius: 999px; flex: none;
+  background: var(--a4t-neutral);
+}
+.stat-chip .dot[data-tone="long"]  { background: var(--a4t-long);  box-shadow: 0 0 8px -1px var(--a4t-long); }
+.stat-chip .dot[data-tone="short"] { background: var(--a4t-short); box-shadow: 0 0 8px -1px var(--a4t-short); }
+.stat-chip .dot[data-tone="accent"]{ background: var(--a4t-link); box-shadow: 0 0 8px -1px var(--a4t-link); }
+.stat-chip .dot[data-live="true"]  { animation: a4t-pulse 2s ease-in-out infinite; }
+
+/* page body */
+.shell {
+  flex: 1;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: clamp(14px, 2.4vw, 22px) clamp(12px, 3vw, 22px) calc(var(--a4t-bottomnav) + 28px);
+  animation: a4t-rise .18s ease-out;
+}
+@media (min-width: 1024px) { .shell { padding-bottom: 48px; } }
+
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.page-head .sub { font-size: .8rem; color: var(--a4t-dim); }
+
+/* bottom navigation — mobile */
+.bottomnav {
+  position: fixed; inset: auto 0 0 0; z-index: 40;
+  height: calc(var(--a4t-bottomnav) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: color-mix(in oklab, var(--a4t-bg-2) 92%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-top: 1px solid var(--a4t-line);
+}
+@media (min-width: 1024px) { .bottomnav { display: none; } }
+
+.bottomnav a, .bottomnav button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .18rem; font-size: .65rem; font-weight: 500;
+  color: var(--a4t-dim); background: none; border: 0; cursor: pointer;
+  position: relative; padding: 0; min-height: 44px;
+}
+.bottomnav a[data-active="true"], .bottomnav button[data-active="true"] { color: var(--a4t-link); }
+.bottomnav .ico { width: 19px; height: 19px; }
+
+/* drawer — the rest of the destinations on mobile */
+.drawer-scrim {
+  position: fixed; inset: 0; z-index: 45;
+  background: rgba(3, 5, 9, .72);
+  backdrop-filter: blur(3px);
+  border: 0; width: 100%; cursor: pointer;
+}
+.drawer {
+  position: fixed; inset: auto 0 0 0; z-index: 46;
+  background: var(--a4t-bg-2);
+  border-top: 1px solid var(--a4t-line);
+  border-radius: 16px 16px 0 0;
+  padding: .6rem .8rem calc(1rem + env(safe-area-inset-bottom));
+  animation: a4t-rise .16s ease-out;
+  max-height: 80dvh; overflow-y: auto;
+}
+.drawer-grip {
+  width: 36px; height: 4px; border-radius: 999px;
+  background: var(--a4t-surface-3); margin: .25rem auto .8rem;
+}
+.drawer-links { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+.drawer-links a {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .75rem .7rem; border-radius: var(--a4t-radius-sm);
+  background: var(--a4t-surface); border: 1px solid var(--a4t-line);
+  color: var(--a4t-text); font-size: .875rem; font-weight: 500;
+  min-height: 48px;
+}
+.drawer-links a[data-active="true"] { border-color: var(--a4t-link-dim); color: var(--a4t-link); }
+.drawer-links .ico { width: 17px; height: 17px; opacity: .8; }
+
+/* ── workspace: main column plus a responsive right inspector ────────
+   The inspector is a column on a wide screen and a stacked panel below
+   the workspace on a narrow one. It is never hidden: a panel that
+   disappears at a breakpoint takes its content with it. */
+
+.workspace { display: grid; gap: var(--sp-3); grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1180px) {
+  .workspace { grid-template-columns: minmax(0, 1fr) var(--a4t-inspector); }
+}
+.workspace > * { min-width: 0; }
+
+.inspector { display: flex; flex-direction: column; gap: var(--sp-3); }
+@media (min-width: 1180px) {
+  .inspector { position: sticky; top: calc(var(--a4t-topbar) + var(--a4t-statusbar) + var(--sp-3)); }
+}
+
+/* ── bottom data tabs ────────────────────────────────────────────────
+   Positions / Orders / Journal under the workspace, the way a terminal
+   docks them. Tabs, not an accordion: the reader is comparing, not
+   browsing. */
+
+.dock { border: var(--a4t-border); border-radius: var(--a4t-radius); background: var(--a4t-surface); box-shadow: var(--elev-1); overflow: hidden; }
+.dock-tabs { display: flex; gap: 0; border-bottom: var(--a4t-border); background: var(--a4t-bg-2); overflow-x: auto; scrollbar-width: none; }
+.dock-tabs::-webkit-scrollbar { display: none; }
+.dock-tabs button {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--a4t-muted); padding: var(--sp-3) var(--sp-4);
+  min-height: 44px; white-space: nowrap; position: relative;
+}
+.dock-tabs button[aria-selected="true"] { color: var(--a4t-text); }
+.dock-tabs button[aria-selected="true"]::after {
+  content: ""; position: absolute; inset: auto .65rem 0 .65rem; height: 2px;
+  border-radius: 999px; background: var(--a4t-link);
+  animation: a4t-tab-in .18s ease-out both;
+}
+@keyframes a4t-tab-in { from { opacity: 0; transform: scaleX(.35); } to { opacity: 1; transform: scaleX(1); } }
+.dock-tabs .count {
+  margin-left: var(--sp-2); font-variant-numeric: tabular-nums;
+  color: var(--a4t-dim); font-weight: 500;
+}
+.dock-body { padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+
+/* ── brand lockup ────────────────────────────────────────────────────
+   Drawn as vectors, not an image: it has to stay crisp at 20px in a
+   sidebar and at 40px on a sign-in screen, and it must inherit colour. */
+
+.brand-lockup { display: inline-flex; align-items: center; gap: .55rem; color: var(--a4t-text); }
+.brand-lockup .mark { flex: none; display: block; }
+.brand-lockup-image {
+  display: block;
+  width: clamp(132px, 10vw, 178px);
+  height: auto;
+  aspect-ratio: 1116 / 152;
+  object-fit: contain;
+  object-position: center;
+}
+.brand-lockup .word {
+  font-weight: 700; letter-spacing: -.028em; line-height: 1;
+  font-size: var(--fs-md); white-space: nowrap;
+}
+.brand-lockup .word b { font-weight: 700; color: var(--a4t-long); }
+
+/* user menu */
+.usermenu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50;
+  min-width: 190px; padding: var(--sp-1);
+  background: var(--a4t-surface); border: var(--a4t-border);
+  border-radius: var(--a4t-radius); box-shadow: var(--elev-2);
+  display: flex; flex-direction: column;
+}
+.usermenu a, .usermenu button {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--a4t-radius-sm);
+  font-size: var(--fs-sm); color: var(--a4t-text); text-align: left;
+  background: none; border: 0; cursor: pointer; font-family: inherit;
+  min-height: 40px;
+}
+.usermenu a:hover, .usermenu button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.usermenu button { color: var(--a4t-short); }
+
+/* ── step rail ─────────────────────────────────────────────────────
+   Navigation, not a gate. Every step is always clickable. */
+
+.steps {
+  display: flex; gap: var(--sp-1); flex-wrap: wrap;
+  margin-bottom: var(--sp-3); padding-bottom: var(--sp-2);
+  border-bottom: var(--a4t-border-soft);
+}
+.steps button {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .32rem .6rem; border-radius: 999px;
+  border: var(--a4t-border); background: var(--a4t-surface);
+  color: var(--a4t-muted); font: inherit; font-size: var(--fs-2xs);
+  font-weight: 600; cursor: pointer; min-height: 34px; white-space: nowrap;
+}
+.steps button:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.steps button[aria-current="step"] {
+  background: var(--a4t-accent); border-color: var(--a4t-accent-strong);
+  color: var(--a4t-on-accent);
+}
+.steps .n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 999px; flex: none;
+  background: var(--a4t-surface-3); color: var(--a4t-muted);
+  font-size: var(--fs-3xs); font-variant-numeric: tabular-nums;
+}
+.steps button[aria-current="step"] .n {
+  background: rgba(244, 240, 232, .22); color: var(--a4t-on-accent);
+}
+
+/* ── chart ─────────────────────────────────────────────────────────── */
+
+.ohlc {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  font-size: var(--fs-2xs); color: var(--a4t-muted);
+  padding-bottom: var(--sp-2); margin-bottom: var(--sp-1);
+  border-bottom: var(--a4t-border-soft);
+}
+.ohlc .sym { font-weight: 700; color: var(--a4t-text); font-size: var(--fs-sm); letter-spacing: -.01em; }
+.ohlc i { font-style: normal; color: var(--a4t-dim); margin-right: .2rem; }
+.ohlc b { font-weight: 600; color: var(--a4t-text); }
+
+/* The canvas is drawn by lightweight-charts, which paints its own background
+   from the same tokens (see chart-theme.ts). This is only the frame. */
+.price-chart {
+  width: 100%; position: relative; overflow: hidden;
+  background: var(--a4t-bg-2);
+  border: var(--a4t-border-soft); border-radius: var(--a4t-radius-sm);
+}
+.chart-legend { margin-top: var(--sp-2); font-size: var(--fs-2xs); }
+.chart-legend p + p { margin-top: .2rem; }
+.chart-legend a { text-decoration: underline; text-underline-offset: 2px; }
+/* An old read is dimmed, not just captioned: bars that may no longer match the
+   market must not look as crisp as ones that do. */
+.chart-frame.is-stale .price-chart { opacity: .55; }
+.chart-skeleton { padding: 0; }
+
+/* ── cards ─────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--a4t-surface);
+  border: 1px solid var(--a4t-line);
+  border-radius: var(--a4t-radius);
+  padding: .9rem 1rem;
+  box-shadow: var(--a4t-shadow);
+}
+.card + .card, .grid + .card, .card + .grid { margin-top: .85rem; }
+/* The sibling margin above is for a vertical stack. Inside a grid the gap
+   already spaces the cards, and the extra margin pushed every column after
+   the first down by 11px — visible as cards that do not line up. */
+.grid > .card + .card, .grid > .card { margin-top: 0; }
+.card-flat { box-shadow: none; background: var(--a4t-bg-2); }
+.card-pad-0 { padding: 0; overflow: hidden; }
+
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .7rem; flex-wrap: wrap; margin-bottom: .7rem;
+}
+.card-head h2 { color: var(--a4t-text); }
+.card-head .link-sm { font-size: .78rem; }
+
+.grid { display: grid; gap: .85rem; grid-template-columns: 1fr; }
+@media (min-width: 640px)  { .grid-2 { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 900px)  { .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1180px) { .grid-4 { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 640px) and (max-width: 1179px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
+/* Four stacked tiles push the first real content below the fold on a phone. */
+@media (max-width: 639px) { .grid-4 { grid-template-columns: 1fr 1fr; gap: .55rem; } }
+@media (max-width: 639px) { .grid-4 .stat-value { font-size: 1.05rem; } }
+.grid-main { display: grid; gap: .85rem; grid-template-columns: 1fr; }
+@media (min-width: 1100px) { .grid-main { grid-template-columns: 1.55fr 1fr; align-items: start; } }
+
+/* stat tile */
+.stat {
+  background: var(--a4t-surface);
+  border: 1px solid var(--a4t-line);
+  border-radius: var(--a4t-radius);
+  padding: .8rem .9rem;
+  display: flex; flex-direction: column; gap: .35rem;
+  position: relative; overflow: hidden;
+  box-shadow: var(--a4t-shadow);
+}
+.stat::after {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--a4t-line), transparent);
+}
+.stat-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.stat-value {
+  font-size: 1.32rem; font-weight: 650; letter-spacing: -.025em; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value-sm { font-size: 1.05rem; }
+.stat-foot { font-size: .75rem; color: var(--a4t-dim); display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.stat .ico { width: 15px; height: 15px; color: var(--a4t-dim); }
+.stat[data-tone="accent"] .stat-value { color: var(--a4t-link); }
+.stat[data-tone="long"]   .stat-value { color: var(--a4t-long); }
+.stat[data-tone="short"]  .stat-value { color: var(--a4t-short); }
+
+/* ── pills ─────────────────────────────────────────────────────────── */
+
+.pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .17rem .5rem; border-radius: 999px;
+  font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+  border: 1px solid var(--a4t-line); color: var(--a4t-muted);
+  background: var(--a4t-surface-2); white-space: nowrap;
+}
+.pill-demo { color: var(--a4t-demo); border-color: color-mix(in oklab, var(--a4t-demo) 38%, transparent); background: var(--a4t-long-wash); }
+.pill-live { color: var(--a4t-live); border-color: color-mix(in oklab, var(--a4t-live) 45%, transparent); background: var(--a4t-short-wash); }
+.pill-ok   { color: var(--a4t-long); border-color: color-mix(in oklab, var(--a4t-long) 35%, transparent); background: var(--a4t-long-wash); }
+.pill-warn { color: var(--a4t-short); border-color: color-mix(in oklab, var(--a4t-short) 35%, transparent); background: var(--a4t-short-wash); }
+.pill-accent { color: var(--a4t-link); border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
+.pill-muted { color: var(--a4t-muted); }
+
+/* ── buttons ───────────────────────────────────────────────────────── */
+
+/* `color` is declared on every variant, never inherited. An <a class="btn">
+   must not be able to pick up a link colour, which is what produced an
+   accent-on-accent label at 1.00:1 contrast. Tests assert this. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+  min-height: 42px; padding: 0 1.15rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--a4t-accent);
+  color: var(--a4t-on-accent);
+  font-weight: 700; font-size: .88rem; letter-spacing: -.005em; cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 14px 30px -18px rgba(247, 246, 242, .45);
+  transition: background .14s, color .14s, transform .14s, box-shadow .14s, border-color .14s;
+  white-space: nowrap;
+}
+.a4t a.btn, a.btn { color: var(--a4t-on-accent); text-decoration: none; }
+.btn:hover { background: var(--a4t-accent-strong); color: var(--a4t-on-accent); transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.97); }
+.btn:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 3px; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn .ico { width: 15px; height: 15px; }
+
+/* The large primary carries an arrow chip. Large is the "go on" button: sign
+   in, get a licence, connect. A chip on every button would be noise. */
+.btn-lg:not(.btn-ghost):not(.btn-danger)::after {
+  content: ""; flex: none; width: 30px; height: 30px; margin: 0 -.55rem 0 .15rem;
+  border-radius: 50%; background-color: var(--a4t-on-accent);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F7F6F2' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17L17 7M9 7h8v8'/></svg>");
+  background-repeat: no-repeat; background-position: center; background-size: 16px;
+  transition: transform .18s;
+}
+.btn-lg:not(.btn-ghost):not(.btn-danger):hover::after { transform: translate(2px, -2px); }
+
+.btn-ghost { background: transparent; color: var(--a4t-text); border-color: rgba(247, 246, 242, .26); box-shadow: none; }
+.a4t a.btn-ghost, a.btn-ghost { color: var(--a4t-text); }
+.btn-ghost:hover { background: rgba(247, 246, 242, .08); border-color: rgba(247, 246, 242, .5); color: var(--a4t-text); }
+
+.btn-danger { background: #C8301F; color: #FFFFFF; border-color: transparent; box-shadow: 0 16px 34px -18px rgba(217, 58, 43, .9); }
+.a4t a.btn-danger, a.btn-danger { color: #FFFFFF; }
+.btn-danger:hover { background: #DA3A28; color: #FFFFFF; }
+
+.btn-sm { min-height: 32px; padding: 0 .8rem; font-size: .78rem; }
+.btn-lg { min-height: 52px; padding: 0 1.5rem; font-size: .98rem; }
+.btn-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+
+/* ── forms ─────────────────────────────────────────────────────────── */
+
+.field { display: block; margin-bottom: .7rem; }
+.field > span {
+  display: block; font-size: .72rem; font-weight: 600; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--a4t-dim); margin-bottom: .3rem;
+}
+.field > span .hint { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--a4t-dim); }
+.field input, .field select, .field textarea {
+  width: 100%; min-height: 42px; padding: .5rem .8rem;
+  border-radius: 12px;
+  background: var(--a4t-bg-2); border: 1px solid var(--a4t-line);
+  color: var(--a4t-text); font-size: .875rem; font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.field input::placeholder { color: var(--a4t-dim); }
+.field input:hover, .field select:hover { border-color: var(--a4t-surface-3); }
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none; border-color: var(--a4t-accent);
+  box-shadow: 0 0 0 3px var(--a4t-accent-wash);
+}
+.field input:read-only { color: var(--a4t-muted); background: var(--a4t-surface); }
+/* A direct child of .field, so it inherits the label's uppercase treatment
+   unless it says otherwise. It is a sentence, not a label. */
+.field > span.field-note, .field-note {
+  font-size: .74rem; color: var(--a4t-dim); margin-top: .25rem; display: block;
+  text-transform: none; letter-spacing: normal; font-weight: 400; line-height: 1.5;
+}
+.field-inline { display: flex; align-items: center; gap: .5rem; margin-bottom: .7rem; }
+.field-inline input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; accent-color: var(--a4t-link); }
+.field-inline span { font-size: .85rem; color: var(--a4t-text); }
+
+.seg { display: inline-flex; padding: 4px; gap: 2px; background: var(--a4t-surface-2); border: 1px solid var(--a4t-line); border-radius: 999px; }
+@media (max-width: 720px) {
+  .seg { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; }
+  .page-head > *,
+  .btn-row { min-width: 0; max-width: 100%; }
+  .tbl-kv td { overflow-wrap: anywhere; }
+}
+.seg button {
+  border: 0; background: none; cursor: pointer; color: var(--a4t-muted);
+  padding: .32rem .9rem; border-radius: 999px; font-size: .78rem; font-weight: 700;
+  font-family: inherit; min-height: 30px;
+}
+.seg button[aria-pressed="true"] { background: var(--a4t-accent); color: var(--a4t-on-accent); }
+.seg button[aria-pressed="true"][data-tone="long"]  { background: var(--a4t-long-wash);  color: var(--a4t-long); }
+.seg button[aria-pressed="true"][data-tone="short"] { background: var(--a4t-short-wash); color: var(--a4t-short); }
+
+/* ── notices ───────────────────────────────────────────────────────── */
+
+.notice {
+  border: 1px solid var(--a4t-line); background: var(--a4t-bg-2);
+  border-radius: var(--a4t-radius-sm); padding: .75rem .85rem;
+  margin: .5rem 0; font-size: .875rem;
+}
+.notice p + .btn, .notice p + .btn-row { margin-top: .6rem; }
+.notice-error { border-color: color-mix(in oklab, var(--a4t-short) 42%, transparent); background: var(--a4t-short-wash); }
+.notice-warn  { border-color: color-mix(in oklab, var(--a4t-short) 30%, transparent); }
+.notice-accent { border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
+.notice-head { font-size: .72rem; margin-bottom: .3rem; letter-spacing: .04em; text-transform: uppercase; color: var(--a4t-muted); }
+.notice-head strong { color: var(--a4t-short); }
+.problems { margin: .4rem 0 0 1.1rem; color: var(--a4t-muted); font-size: .82rem; }
+.problems li { margin-bottom: .15rem; }
+
+.empty {
+  color: var(--a4t-dim); padding: 1.4rem .5rem; text-align: center; font-size: .875rem;
+}
+
+/* ── tables ────────────────────────────────────────────────────────── */
+
+.tbl { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.tbl th {
+  text-align: left; color: var(--a4t-dim); font-weight: 600;
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+  padding: .5rem .6rem; border-bottom: 1px solid var(--a4t-line);
+  white-space: nowrap; background: var(--a4t-bg-2); position: sticky; top: 0;
+}
+.tbl td {
+  padding: .5rem .6rem; border-bottom: 1px solid var(--a4t-line-soft);
+  white-space: nowrap;
+}
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl tbody tr:hover td { background: var(--a4t-surface-2); }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl-kv th { width: 30%; text-transform: none; letter-spacing: .02em; font-size: .72rem; background: none; position: static; font-weight: 500; }
+.tbl-kv td { color: var(--a4t-text); }
+.tbl-kv td, .tbl-kv th { white-space: normal; }
+
+.tbl-wrap { border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius); overflow: hidden; }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.side-long  { color: var(--a4t-long); font-weight: 600; }
+.side-short { color: var(--a4t-short); font-weight: 600; }
+
+/* record cards — the same rows, stacked, on a phone */
+.records { display: grid; gap: .5rem; }
+.record {
+  border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius-sm);
+  background: var(--a4t-bg-2); padding: .65rem .75rem;
+}
+.record-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .45rem; }
+.record-title { font-weight: 600; font-size: .9rem; }
+.record-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem .75rem; }
+.record-grid > div { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.record-grid dt, .record-grid .k { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; color: var(--a4t-dim); font-weight: 600; }
+.record-grid dd, .record-grid .v { font-size: .84rem; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+
+.only-mobile { display: block; }
+.only-desktop { display: none; }
+@media (min-width: 768px) {
+  .only-mobile { display: none; }
+  .only-desktop { display: block; }
+}
+
+/* ── decisions ─────────────────────────────────────────────────────── */
+
+.verdict { font-size: 1.5rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.verdict-buy    { color: var(--a4t-long); }
+.verdict-sell   { color: var(--a4t-short); }
+.verdict-hold   { color: var(--a4t-neutral); }
+.verdict-reject { color: var(--a4t-short); }
+.verdict-close  { color: var(--a4t-link); }
+
+.verdict-banner {
+  display: flex; align-items: center; gap: .85rem;
+  padding: .9rem 1rem; border-radius: var(--a4t-radius);
+  border: 1px solid var(--a4t-line); background: var(--a4t-bg-2);
+}
+.verdict-banner[data-kind="buy"]    { border-color: color-mix(in oklab, var(--a4t-long) 40%, transparent);  background: var(--a4t-long-wash); }
+.verdict-banner[data-kind="sell"]   { border-color: color-mix(in oklab, var(--a4t-short) 40%, transparent); background: var(--a4t-short-wash); }
+.verdict-banner[data-kind="reject"] { border-color: color-mix(in oklab, var(--a4t-short) 32%, transparent); }
+.verdict-banner[data-kind="close"]  { border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
+.verdict-banner .vb-body { min-width: 0; }
+.verdict-banner .vb-note { font-size: .82rem; color: var(--a4t-muted); margin-top: .15rem; }
+
+.cond-pass    { color: var(--a4t-long); }
+.cond-fail    { color: var(--a4t-short); }
+.cond-unknown { color: var(--a4t-neutral); }
+
+.cond-row { display: flex; align-items: flex-start; gap: .6rem; padding: .5rem .1rem; border-bottom: 1px solid var(--a4t-line-soft); }
+.cond-row:last-child { border-bottom: 0; }
+.cond-mark {
+  width: 18px; height: 18px; border-radius: 5px; flex: none; margin-top: 1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 700;
+  background: var(--a4t-surface-2); color: var(--a4t-neutral);
+}
+.cond-mark[data-r="pass"] { background: var(--a4t-long-wash);  color: var(--a4t-long); }
+.cond-mark[data-r="fail"] { background: var(--a4t-short-wash); color: var(--a4t-short); }
+.cond-name { font-size: .85rem; font-weight: 600; }
+.cond-detail { font-size: .78rem; color: var(--a4t-muted); }
+
+/* the rule, restated in a sentence */
+.summary-line {
+  font-size: .9rem; line-height: 1.6; color: var(--a4t-text);
+  background: var(--a4t-bg-2); border: 1px solid var(--a4t-line);
+  border-left: 2px solid var(--a4t-link);
+  border-radius: var(--a4t-radius-sm); padding: .75rem .85rem;
+}
+.summary-line b { color: var(--a4t-link); font-weight: 600; }
+
+/* ── auth pages ────────────────────────────────────────────────────── */
+
+.auth-wrap { max-width: 380px; margin: 0 auto; padding: clamp(2rem, 8vh, 4rem) 16px 3rem; }
+.auth-brand { display: flex; align-items: center; justify-content: center; gap: .55rem; margin-bottom: 1.5rem; font-weight: 700; letter-spacing: -.03em; font-size: 1.05rem; }
+
+/* ── sign-in screens: the form on the calm surface, the product beside it ── */
+.auth-split { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); background: var(--a4t-bg); }
+@media (min-width: 960px) { .auth-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); } }
+.auth-main { display: flex; flex-direction: column; padding: clamp(1.4rem, 3.5vw, 2.6rem) clamp(1.2rem, 5vw, 4.5rem); }
+.auth-logo { display: inline-flex; align-self: flex-start; }
+.auth-block { width: 100%; max-width: 420px; margin: auto; padding: 2.4rem 0 2rem; }
+.auth-block h1 { font-size: clamp(2.1rem, 4.4vw, 3rem); line-height: 1.02; letter-spacing: -.045em; font-weight: 800; }
+.auth-lead { margin-top: .85rem; color: var(--a4t-muted); font-size: 1.02rem; line-height: 1.55; }
+.auth-block > form.card, .auth-block > .card { margin-top: 1.8rem; border: 0; background: transparent; box-shadow: none; padding: 0; }
+.auth-block .field { margin-bottom: 1.05rem; }
+.auth-block .field > span { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--a4t-dim); }
+.auth-block .field input { height: 3.35rem; font-size: 1.05rem; border-radius: 14px; padding: 0 1rem; background: var(--a4t-bg-2); border: 1.5px solid var(--a4t-line); }
+.auth-block .field input:focus { outline: none; border-color: var(--a4t-text); box-shadow: 0 0 0 4px rgba(247, 246, 242, .10); }
+.auth-block .btn-lg { height: 3.4rem; border-radius: 14px; font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; margin-top: .4rem; }
+.auth-foot { margin-top: 1.4rem; display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; font-size: .95rem; color: var(--a4t-muted); }
+.auth-foot a { color: var(--a4t-text); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--a4t-line); padding-bottom: 1px; }
+.auth-foot a:hover { border-color: #d93a2b; }
+.auth-legal { font-size: .76rem; line-height: 1.5; color: var(--a4t-dim); max-width: 420px; }
+
+.auth-aside { display: none; position: relative; overflow: hidden; background: #0b0b0e; color: #f7f6f2; border-left: 1px solid var(--a4t-line); }
+@media (min-width: 960px) { .auth-aside { display: block; } }
+.auth-aside::after { /* film grain, so the dark field is not a flat fill */
+  content: ""; position: absolute; inset: 0; opacity: .09; pointer-events: none; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.aside-glow { position: absolute; left: 8%; top: 38%; width: 90%; height: 70%; background: radial-gradient(closest-side, rgba(217, 58, 43, .34), rgba(217, 58, 43, 0) 72%); animation: aside-breathe 7s ease-in-out infinite alternate; }
+@keyframes aside-breathe { from { opacity: .55; transform: scale(.96); } to { opacity: 1; transform: scale(1.04); } }
+.aside-copy { position: absolute; left: clamp(2rem, 4.5vw, 4rem); right: clamp(2rem, 4.5vw, 4rem); top: clamp(2.4rem, 7vh, 4.6rem); }
+.aside-kicker { font-size: .74rem; font-weight: 800; letter-spacing: .18em; color: #d93a2b; margin-bottom: 1.1rem; }
+.aside-head { font-size: clamp(2.8rem, 5.2vw, 4.9rem); line-height: .94; letter-spacing: -.055em; font-weight: 800; max-width: 11ch; }
+.aside-sub { margin-top: 1.3rem; max-width: 30rem; color: #b9b7b0; font-size: 1.05rem; line-height: 1.6; }
+.aside-card {
+  position: absolute; left: clamp(2rem, 4.5vw, 4rem); bottom: clamp(5.2rem, 12vh, 7.5rem); width: min(30rem, 78%);
+  background: #f7f6f2; color: #111113; border-radius: 26px; padding: 1.5rem 1.7rem;
+  box-shadow: 0 60px 110px -30px rgba(0, 0, 0, .95), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 90px rgba(217, 58, 43, .22);
+  transform: rotate(-1.8deg);
+}
+.ac-bar { display: flex; align-items: center; gap: .45rem; font-size: .72rem; color: #56544e; margin-bottom: .9rem; }
+.ac-bar i { width: 9px; height: 9px; border-radius: 50%; background: #d93a2b; }
+.ac-bar i:nth-child(2) { opacity: .45; } .ac-bar i:nth-child(3) { opacity: .22; }
+.ac-bar span { margin-left: .3rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; }
+.ac-title { font-size: 1.7rem; font-weight: 800; letter-spacing: -.035em; margin-bottom: .55rem; }
+.ac-row { display: flex; align-items: center; gap: .5rem; font-size: 1.02rem; padding: .62rem 0; border-top: 1.5px solid #ebe8e0; }
+.ac-row em { font-style: normal; color: #726f67; }
+.ac-row u { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; background: #1a7f4b; text-decoration: none; position: relative; flex: none; opacity: 0; animation: ac-tick .45s ease-out forwards; }
+.ac-row u::after { content: ""; position: absolute; left: 7px; top: 3.5px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.ac-row:nth-of-type(1) u { animation-delay: .5s; } .ac-row:nth-of-type(2) u { animation-delay: 1.1s; } .ac-row:nth-of-type(3) u { animation-delay: 1.7s; }
+@keyframes ac-tick { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+.ac-foot { display: flex; justify-content: space-between; align-items: center; gap: .6rem; margin-top: .9rem; padding-top: .9rem; border-top: 1.5px solid #ebe8e0; }
+.ac-ok { display: inline-flex; align-items: center; gap: .5rem; font-weight: 800; color: #1a7f4b; font-size: .98rem; }
+.ac-ok i { width: 10px; height: 10px; border-radius: 50%; background: #1a7f4b; animation: ac-pulse 1.6s infinite; }
+@keyframes ac-pulse { 0% { box-shadow: 0 0 0 0 rgba(26, 127, 75, .5); } 100% { box-shadow: 0 0 0 10px rgba(26, 127, 75, 0); } }
+.ac-stop { font-size: .78rem; font-weight: 800; color: #fff; background: #d93a2b; padding: .5rem .9rem; border-radius: 999px; }
+.aside-works { position: absolute; left: clamp(2rem, 4.5vw, 4rem); bottom: clamp(1.6rem, 4vh, 2.6rem); display: flex; align-items: center; gap: .9rem; font-size: .7rem; font-weight: 800; letter-spacing: .18em; color: #8d8b84; }
+@media (prefers-reduced-motion: reduce) { .aside-glow, .ac-ok i { animation: none; } .ac-row u { animation: none; opacity: 1; } }
+
+/* ── marketing surface ─────────────────────────────────────────────── */
+
+/* legacy surfaces: neutral, so nothing reads as a second brand */
+.legacy { max-width: 700px; margin: 0 auto; padding: clamp(2rem, 6vw, 3.5rem) 16px 4rem; }
+.legacy h1 { font-size: 1.5rem; margin-bottom: 1.2rem; }
+.legacy h2 { font-size: .95rem; margin: 1.4rem 0 .35rem; color: var(--a4t-text); }
+.legacy p { color: var(--a4t-muted); font-size: .9rem; line-height: 1.7; }
+/* Every section used to be a single paragraph, so nothing separated two of
+   them and the lack showed the moment one section needed three. A paragraph
+   break the reader cannot see is not a paragraph break. */
+.legacy p + p { margin-top: .7rem; }
+.legacy-flag {
+  border: 1px solid var(--a4t-line); background: var(--a4t-bg-2);
+  border-radius: var(--a4t-radius-sm); padding: .7rem .8rem; margin-bottom: 1.5rem;
+  font-size: .78rem; color: var(--a4t-dim);
+}
+
+.skel {
+  border-radius: 6px; min-height: 1em;
+  background: linear-gradient(90deg, var(--a4t-surface-2) 25%, var(--a4t-surface-3) 50%, var(--a4t-surface-2) 75%);
+  background-size: 200% 100%;
+  animation: a4t-sheen 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   THE MARKETING SURFACE
+   ═══════════════════════════════════════════════════════════════════════
+
+   Scoped to `.mkt` and deliberately NOT the app's palette.
+
+   WHY IT IS SEPARATE, rather than a rebrand
+
+   Red already means something inside the product: --a4t-short is short,
+   loss, and destructive, and the trading UI leans on that being unambiguous.
+   Making red the brand colour app-wide would put the brand in competition
+   with every losing position on the screen, and the reader would have to
+   work out which red they were looking at. So the brand red lives here, on
+   the pages a stranger sees, and the trading semantics are untouched.
+
+   Every value below was computed against the WCAG formula rather than
+   chosen by eye, and contrast.test.ts asserts them the same way it asserts
+   the app's. The fill carries white at 5.88:1; the red used AS TEXT is a
+   different, brighter token at 6.69:1 on the page, because #C81228 as text
+   on near-black is 2.1:1 and unreadable — the same mistake the app's teal
+   avoids by separating fill from foreground. */
+
+.mkt {
+  /* The landing page and the app are one product, and contrast.test.ts
+     compares these two palettes against each other rather than holding each
+     to its own standard — which is how the app once kept a petrol teal while
+     the landing page was rebuilt in red, and nothing failed. So these track
+     the --a4t-* values above, and are written out rather than aliased only
+     where the marketing surface genuinely needs its own step. */
+  --mkt-bg:        #08080A;
+  --mkt-bg-2:      #0D0D10;
+  --mkt-surface:   #131317;
+  --mkt-surface-2: #17171B;
+  --mkt-line:      #2A2A31;
+  --mkt-line-soft: #1E1E24;
+
+  --mkt-text:   #F7F6F2;   /* 18.5:1 on the page */
+  --mkt-muted:  #A9A7A0;   /*  8.4:1 */
+  --mkt-dim:    #8D8B84;   /*  5.8:1 */
+
+  /* The fill is black, as the app's is. On the old near-black page the fill
+     was a red that measured 2.4:1 and therefore could never be used as text,
+     which is why a separate --mkt-accent-text existed at all. A black fill on
+     a cream page does not have that problem — it is the text colour — but the
+     two tokens stay separate anyway, because the thing they protect against
+     is somebody later changing the fill to a colour that cannot be read. */
+  --mkt-accent:      #F7F6F2;
+  --mkt-accent-deep: #FFFFFF;
+  --mkt-on-accent:   #111113;
+  --mkt-accent-text: #FF9484;   /* the brand red used AS TEXT — 6.45:1, and
+                                   the same value as --a4t-short so a tick in
+                                   the feature list and a losing position are
+                                   not two different reds */
+  --mkt-accent-wash: rgba(247, 246, 242, 0.07);
+  --mkt-accent-line: rgba(247, 246, 242, 0.16);
+
+  /* The brand lockup draws itself from --a4t-accent so that one file works
+     on every surface. Redefining those four here lets it wear the marketing
+     red without the component knowing this page exists — and without the
+     app's own accent moving, since this only applies inside .mkt. */
+  --a4t-accent:        var(--mkt-accent);
+  --a4t-accent-strong: var(--mkt-accent-deep);
+  --a4t-on-accent:     var(--mkt-on-accent);
+  /* Was a 55% white, which is a muted foreground on near-black and nothing
+     at all on cream. The marketing surface borrows the app's green so a
+     "connected" tick on this page and in the product are one colour. */
+  --a4t-long:          var(--a4t-demo);
+
+  background: var(--mkt-bg);
+  color: var(--mkt-text);
+  min-height: 100%;
+}
+
+.mkt-wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2rem); }
+
+/* ── nav ─────────────────────────────────────────────────────────────── */
+.mkt-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: 1.25rem 0;
+  border-bottom: 1px solid var(--mkt-line-soft);
+}
+.mkt-nav-links { display: flex; align-items: center; gap: .35rem; }
+
+/* ── controls ────────────────────────────────────────────────────────── */
+.mkt-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .62rem 1.15rem; border-radius: 999px;
+  font-size: .875rem; font-weight: 700; letter-spacing: -0.01em;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+  border: 1px solid transparent; text-decoration: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 14px 30px -18px rgba(247, 246, 242, .45);
+  transition: background .18s ease, transform .18s ease;
+}
+.mkt-btn:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); transform: translateY(-1px); }
+.mkt-btn:active { transform: translateY(1px); }
+.mkt-btn-ghost {
+  background: transparent; color: var(--mkt-text);
+  border-color: var(--mkt-line);
+}
+.mkt-btn-ghost:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+.mkt-btn-lg { padding: .75rem .8rem .75rem 1.6rem; font-size: 1rem; gap: .8rem; }
+.mkt-btn-lg .mkt-ico { box-sizing: content-box; padding: .5rem; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--mkt-on-accent); color: var(--mkt-accent); transition: transform .18s; }
+.mkt-btn-lg:hover .mkt-ico { transform: translate(2px, -2px); }
+.mkt-btn-outline.mkt-btn-lg { padding: .75rem 1.6rem; }
+/* The second call to action. White on the cream page with a real border, so
+   it reads as the quieter of the two without becoming a link. */
+.mkt-btn-outline {
+  background: transparent; color: var(--mkt-text);
+  border-color: rgba(247, 246, 242, .28); box-shadow: none;
+}
+.mkt-btn-outline:hover { background: rgba(247, 246, 242, .08); color: var(--mkt-text); border-color: rgba(247, 246, 242, .5); }
+.mkt-ico { width: 1em; height: 1em; flex: none; }
+
+/* The plain text link in the nav bar, beside the filled button. */
+.mkt-navlink {
+  font-size: .875rem; font-weight: 600; color: var(--mkt-text);
+  text-decoration: none; padding: .5rem .35rem; margin-right: .35rem;
+}
+.mkt-navlink:hover { color: var(--mkt-muted); }
+
+/* The section links in the middle of the bar. Hidden below the width where
+   they would wrap onto their own line and push the logo off centre. */
+.mkt-nav-mid { display: none; gap: 1.6rem; }
+.mkt-nav-mid a {
+  font-size: .9rem; font-weight: 500; color: var(--mkt-text);
+  text-decoration: none;
+}
+.mkt-nav-mid a:hover { color: var(--mkt-muted); }
+@media (min-width: 900px) { .mkt-nav-mid { display: flex; } }
+
+/* ── hero ────────────────────────────────────────────────────────────── */
+.mkt-hero { position: relative; padding: clamp(3.5rem, 11vw, 7rem) 0 clamp(2.5rem, 7vw, 4.5rem); }
+.mkt-hero h1 {
+  /* Capped so the longest of the three lines, "One control panel.", fits the
+     copy column at the widest layout. It was 4.4rem, which wrapped it onto a
+     fourth line and made the deliberate break read as an accident. */
+  font-size: clamp(2.1rem, 4.6vw, 3.15rem);
+  line-height: 1.0; letter-spacing: -0.04em; font-weight: 700;
+  margin: 0;
+}
+.mkt-hero h1 em { font-style: normal; color: var(--mkt-accent-text); }
+/* The one-line statement under the headline, in body colour rather than
+   muted: it is the sentence that says what the product IS, and the grey
+   paragraph below it is the elaboration. */
+.mkt-sub {
+  font-size: clamp(1.1rem, 2.1vw, 1.32rem);
+  font-weight: 500; letter-spacing: -0.015em;
+  color: var(--mkt-text); margin: 1.4rem 0 0; max-width: 32ch;
+}
+.mkt-hero-cta {
+  display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 2.1rem;
+}
+.mkt-foot-note {
+  font-size: .85rem; color: var(--mkt-dim); margin: 1.6rem 0 0;
+}
+/* The brand red, at the only size it is used: a 9px dot. It measures
+   4.19:1 on the page, which is enough for a graphic and not enough for
+   text, so it is never used for any. */
+.mkt-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--a4t-brand); flex: none;
+}
+.mkt-lede {
+  font-size: clamp(1rem, 1.7vw, 1.14rem); color: var(--mkt-muted);
+  max-width: 54ch; margin-top: 1.3rem; line-height: 1.66;
+}
+/* The bloom is GONE, and the element is kept rather than deleted because the
+   markup, the stacking-order fix below it and a test all reference it.
+   A 26% red radial reads as a soft halo on near-black and as a pink wash
+   across a third of the screen on cream — the approved design is a flat
+   page, and the depth comes from the card's shadow instead. */
+.mkt-glow {
+  position: absolute; pointer-events: none; z-index: 0;
+  top: -6vw; left: -14vw; width: min(80vw, 900px); height: min(70vw, 760px);
+  background: radial-gradient(closest-side, rgba(217, 58, 43, .26), rgba(217, 58, 43, 0) 72%);
+}
+/* Lift the content above the glow — but NOT the glow itself.
+   This was `.mkt-hero > *`, written when the hero was a simple stack. It set
+   position:relative on every direct child, and because it comes after
+   .mkt-glow in this file it beat that rule's position:absolute. The glow then
+   stopped being out of flow, became a GRID ITEM when the hero turned into a
+   grid, took the first column, and pushed the copy into the second and the
+   terminal onto its own row — half the hero empty on desktop. The :not() is
+   the whole fix: it stops the rule matching the one child that must stay
+   absolute. */
+.mkt-hero > *:not(.mkt-glow) { position: relative; z-index: 1; }
+
+.mkt-eyebrow {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .42rem .85rem; border-radius: 999px;
+  font-size: .82rem; font-weight: 500; letter-spacing: 0;
+  color: var(--mkt-text);
+  background: var(--mkt-surface);
+  border: 1px solid var(--mkt-line);
+  box-shadow: var(--elev-1);
+  margin-bottom: 1.6rem;
+}
+
+/* ── waitlist form ───────────────────────────────────────────────────── */
+.mkt-cta { margin-top: 2rem; max-width: 30rem; }
+.wl-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.wl-input {
+  flex: 1 1 15rem; min-width: 0;
+  padding: .72rem .95rem; border-radius: 999px;
+  background: var(--mkt-surface); color: var(--mkt-text);
+  border: 1px solid var(--mkt-line); font-size: .92rem;
+  font-family: inherit;
+}
+.wl-input::placeholder { color: var(--mkt-dim); }
+.wl-input:focus-visible {
+  outline: 2px solid var(--mkt-accent-text); outline-offset: 1px;
+  border-color: transparent;
+}
+.wl-submit {
+  display: inline-flex; align-items: center; gap: .45rem; cursor: pointer;
+  padding: .72rem 1.25rem; border-radius: 999px; border: 1px solid transparent;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+  font-size: .9rem; font-weight: 600; font-family: inherit;
+  transition: background .18s ease;
+}
+.wl-submit:hover:not(:disabled) { background: var(--mkt-accent-deep); }
+.wl-submit:disabled { opacity: .55; cursor: not-allowed; }
+.wl-note { font-size: .78rem; color: var(--mkt-dim); margin-top: .7rem; line-height: 1.6; max-width: 44ch; }
+.wl-error { display: flex; align-items: center; gap: .4rem; font-size: .82rem; color: var(--mkt-accent-text); margin-top: .6rem; }
+.wl-done { display: flex; align-items: center; gap: .45rem; font-size: 1rem; font-weight: 600; color: var(--mkt-text); }
+.wl-spin { animation: wl-spin 1s linear infinite; }
+@keyframes wl-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wl-spin { animation: none; } }
+
+/* ── panels ──────────────────────────────────────────────────────────── */
+.mkt-section { padding: clamp(2.5rem, 7vw, 4.5rem) 0; border-top: 1px solid var(--mkt-line-soft); }
+.mkt-section h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem); letter-spacing: -0.025em;
+  font-weight: 700; margin: 0 0 .5rem;
+}
+.mkt-section > p { color: var(--mkt-muted); max-width: 58ch; line-height: 1.68; margin: 0; }
+
+.mkt-cards { display: grid; gap: 1rem; margin-top: 2rem; grid-template-columns: 1fr; }
+@media (min-width: 720px)  { .mkt-cards { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1000px) { .mkt-cards-3 { grid-template-columns: repeat(3, 1fr); } }
+
+.mkt-card {
+  background: var(--mkt-surface); border: 1px solid var(--mkt-line);
+  border-radius: 16px; padding: 1.4rem;
+}
+.mkt-card h3 {
+  font-size: 1rem; font-weight: 650; margin: .9rem 0 .4rem;
+  letter-spacing: -0.01em;
+}
+.mkt-card p { font-size: .875rem; color: var(--mkt-muted); line-height: 1.65; margin: 0; }
+.mkt-card-ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--mkt-accent-wash); border: 1px solid var(--mkt-accent-line);
+  color: var(--mkt-accent-text);
+}
+
+/* The rule, shown as the product writes it. Monospace because it is output,
+   not prose. */
+.mkt-rule {
+  margin-top: 1.6rem; padding: 1.15rem 1.3rem;
+  background: var(--mkt-bg-2); border: 1px solid var(--mkt-line);
+  border-left: 3px solid var(--mkt-accent); border-radius: 12px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .86rem; line-height: 1.8; color: var(--mkt-text);
+}
+
+.mkt-plain { font-size: .875rem; color: var(--mkt-muted); line-height: 1.7; max-width: 66ch; }
+.mkt-plain strong { color: var(--mkt-text); font-weight: 600; }
+
+.mkt-foot {
+  padding: 2.5rem 0 3rem; border-top: 1px solid var(--mkt-line);
+  font-size: .8rem; color: var(--mkt-dim);
+  display: flex; gap: .9rem; flex-wrap: wrap; justify-content: space-between;
+}
+.mkt-foot a { color: var(--mkt-muted); text-decoration: none; }
+.mkt-foot a:hover { color: var(--mkt-text); }
+
+/* The risk statement. Not a footnote in grey 10px — it is a sentence the
+   reader is meant to actually read, so it is sized like one. */
+.mkt-risk {
+  margin-top: 1.4rem; padding: 1rem 1.2rem; border-radius: 12px;
+  background: var(--mkt-surface); border: 1px solid var(--mkt-line);
+  font-size: .82rem; color: var(--mkt-muted); line-height: 1.7; max-width: 70ch;
+}
+
+/* ── the hero: one headline, one product card, the brokers it works with ── */
+.mkt-kicker { font-size: .74rem; font-weight: 800; letter-spacing: .18em; color: var(--mkt-accent-text); margin: 0 0 1.2rem; }
+.mkt-hero2 h1 { font-size: clamp(2.8rem, 7.4vw, 5.4rem); line-height: .92; letter-spacing: -.055em; font-weight: 800; text-wrap: balance; }
+.mkt-hero2 .mkt-lede { max-width: 46ch; }
+.mkt-works { display: grid; gap: 1rem; margin-top: 2.2rem; font-size: .68rem; font-weight: 800; letter-spacing: .16em; color: var(--mkt-dim); }
+.mkt-works-row { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem 1.4rem; }
+.mkt-works-row > span { min-width: 6.4rem; }
+.mkt-works img { display: block; height: 26px; width: auto; }
+/* The band under the hero: the two rows sit side by side on a wide screen and
+   stack on a narrow one, with a hairline above so it reads as its own strip. */
+.mkt-works-band {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 3rem;
+  margin: 0; padding: 1.6rem 0; border-top: 1px solid var(--mkt-line-soft);
+}
+.mkt-rulecard {
+  position: relative; background: #f7f6f2; color: #111113; border-radius: 28px; padding: 1.6rem 1.8rem;
+  box-shadow: 0 60px 110px -30px rgba(0, 0, 0, .95), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 100px rgba(217, 58, 43, .22);
+  transform: rotate(-1.6deg); max-width: 30rem; justify-self: center;
+}
+.mkt-rulecard .rc-bar { display: flex; align-items: center; gap: .45rem; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #56544e; margin-bottom: .9rem; }
+.mkt-rulecard .rc-bar i { width: 9px; height: 9px; border-radius: 50%; background: #d93a2b; } .mkt-rulecard .rc-bar i:nth-child(2) { opacity: .45; } .mkt-rulecard .rc-bar i:nth-child(3) { opacity: .22; }
+.mkt-rulecard .rc-bar span { margin-left: .3rem; }
+.mkt-rulecard h3 { font-size: 1.9rem; font-weight: 800; letter-spacing: -.04em; margin-bottom: .5rem; color: #111113; }
+.mkt-rulecard .rc-row { display: flex; align-items: center; gap: .5rem; font-size: 1rem; padding: .7rem 0; border-top: 1.5px solid #ebe8e0; color: #111113; }
+.mkt-rulecard .rc-row em { font-style: normal; color: #726f67; }
+.mkt-rulecard .rc-row u { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; background: #1a7f4b; position: relative; flex: none; }
+.mkt-rulecard .rc-row u::after { content: ""; position: absolute; left: 8px; top: 4px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.mkt-rulecard .rc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: .8rem; padding-top: .9rem; border-top: 1.5px solid #ebe8e0; font-weight: 800; color: #1a7f4b; font-size: .98rem; }
+.mkt-rulecard .rc-foot b { background: #d93a2b; color: #fff; padding: .45rem .9rem; border-radius: 999px; font-size: .74rem; }
+
+/* ── premium terminal composition for the marketing page ────────────── */
+
+.mkt-hero-terminal {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(1.5rem, 5vw, 3.5rem);
+  align-items: center;
+}
+@media (min-width: 980px) {
+  .mkt-hero-terminal { grid-template-columns: minmax(0, 1fr) minmax(400px, .98fr); }
+}
+.mkt-hero-copy { min-width: 0; }
+
+.mkt-terminal {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid var(--mkt-line);
+  border-radius: 20px;
+  background: var(--mkt-surface);
+  /* One grounded shadow rather than a coloured bloom. The card is the only
+     thing on this page that floats, which is what makes it read as a
+     screenshot of something rather than a panel of the page. */
+  box-shadow:
+    0 0 0 1px rgba(247, 246, 242, .04),
+    0 30px 70px -28px rgba(0, 0, 0, .9);
+  padding: .85rem;
+}
+.mkt-terminal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(247,246,242,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(247,246,242,.03) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(180deg, black, transparent 78%);
+  pointer-events: none;
+}
+.mkt-terminal::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -42% 18%;
+  height: 220px;
+  background: radial-gradient(circle, rgba(255,95,107,.22), transparent 68%);
+  filter: blur(16px);
+  pointer-events: none;
+}
+.mkt-terminal-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .3rem .35rem .8rem;
+  color: var(--mkt-dim);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .72rem;
+}
+.mkt-terminal-top span {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--mkt-accent-text);
+  box-shadow: 0 0 18px rgba(255,95,107,.55);
+}
+.mkt-terminal-top span:nth-child(2) { opacity: .62; }
+.mkt-terminal-top span:nth-child(3) { opacity: .32; }
+.mkt-terminal-top strong { margin-left: .35rem; font-weight: 500; }
+.mkt-terminal-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .65rem;
+}
+
+/* The terminal preview mirrors the product's actual information hierarchy:
+   account state first, then chart/rule context, then risk and journal. It is
+   intentionally labelled as a preview so no illustrative value reads as a
+   broker result. */
+.mkt-terminal-body { display: grid; grid-template-columns: 142px minmax(0, 1fr); gap: .65rem; position: relative; z-index: 1; }
+.mkt-terminal-side { display: flex; flex-direction: column; gap: .18rem; padding: .35rem 0; min-width: 0; }
+.mkt-terminal-brand { display: flex; align-items: center; gap: .4rem; font-size: .7rem; letter-spacing: -.02em; margin: .2rem .45rem .85rem; white-space: nowrap; }
+.mkt-terminal-brand span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: var(--mkt-text); color: var(--mkt-surface); font-size: .57rem; font-weight: 800; }
+.mkt-terminal-side > span { display: flex; align-items: center; gap: .45rem; padding: .43rem .5rem; border-radius: 8px; color: var(--mkt-muted); font-size: .64rem; white-space: nowrap; }
+.mkt-terminal-side > span.is-active { background: var(--mkt-surface-2); color: var(--mkt-text); font-weight: 700; }
+.mkt-terminal-side > span i { width: 13px; color: var(--mkt-dim); font-style: normal; text-align: center; }
+.mkt-terminal-account { border-top: 1px solid var(--mkt-line-soft); margin-top: auto; padding: .75rem .45rem .1rem; font-size: .62rem; }
+.mkt-terminal-account b, .mkt-terminal-account small, .mkt-terminal-account span { display: block; }
+.mkt-terminal-account b { font-size: .61rem; }
+.mkt-terminal-account b .mkt-dot { display: inline-block; width: 6px; height: 6px; margin-right: .22rem; vertical-align: middle; }
+.mkt-terminal-account small { color: var(--mkt-dim); margin: .3rem 0 .55rem 12px; }
+.mkt-terminal-account span { color: var(--mkt-muted); margin-left: 12px; }
+.mkt-terminal-account em { color: var(--a4t-demo); font-style: normal; float: right; }
+.mkt-terminal-main { min-width: 0; }
+.mkt-terminal-heading { display: flex; justify-content: space-between; align-items: center; padding: .35rem .1rem .7rem; }
+.mkt-terminal-heading b, .mkt-terminal-heading small { display: block; }
+.mkt-terminal-heading b { font-size: .9rem; letter-spacing: -.03em; }
+.mkt-terminal-heading small { color: var(--mkt-muted); font-size: .61rem; margin-top: .18rem; }
+.mkt-terminal-avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--mkt-bg-2); color: var(--mkt-muted); font-size: .55rem; font-weight: 700; }
+.mkt-terminal-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin-bottom: .45rem; }
+.mkt-terminal-stats > div { border: 1px solid var(--mkt-line); border-radius: 9px; padding: .55rem; background: var(--mkt-bg); min-width: 0; }
+.mkt-terminal-stats small, .mkt-terminal-stats b, .mkt-terminal-stats span { display: block; }
+.mkt-terminal-stats small { color: var(--mkt-dim); font-size: .53rem; }
+.mkt-terminal-stats b { font-size: .72rem; margin: .2rem 0; }
+.mkt-terminal-stats span { color: var(--mkt-muted); font-size: .54rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkt-terminal-workspace, .mkt-terminal-bottom { display: grid; grid-template-columns: 1.15fr .85fr; gap: .45rem; margin-bottom: .45rem; }
+.mkt-terminal-bottom { grid-template-columns: 1fr 1.15fr; margin-bottom: 0; }
+.mkt-terminal-panel-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .55rem; }
+.mkt-terminal-panel-head b { font-size: .68rem; }
+.mkt-terminal-panel-head span { color: var(--mkt-dim); font-size: .53rem; white-space: nowrap; }
+.mkt-terminal-chart { min-height: 180px; }
+.mkt-chart-area { height: 112px; display: flex; align-items: end; gap: 3px; padding: .5rem .2rem .15rem; border-bottom: 1px solid var(--mkt-line-soft); background: repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(247,246,242,.07) 28px); }
+.mkt-chart-area i { flex: 1; min-width: 3px; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, var(--a4t-brand), color-mix(in oklab, var(--a4t-brand) 35%, var(--mkt-surface))); opacity: .8; }
+.mkt-chart-note { display: block; color: var(--mkt-dim); font-size: .52rem; margin-top: .45rem; }
+.mkt-terminal-chip { border: 1px solid var(--mkt-line); border-radius: 999px; padding: .18rem .35rem; }
+.mkt-terminal-rulebox label { display: block; color: var(--mkt-accent-text); font-size: .57rem; font-weight: 800; margin: .35rem 0; }
+.mkt-terminal-rulebox label span { color: var(--mkt-muted); font-weight: 500; margin-left: .35rem; }
+.mkt-terminal-rulebox p { display: flex; justify-content: space-between; gap: .3rem; border: 1px solid var(--mkt-line-soft); border-radius: 5px; padding: .32rem .38rem; margin: .28rem 0; color: var(--mkt-text); font-size: .56rem; }
+.mkt-terminal-rulebox p em { color: var(--mkt-muted); font-style: normal; }
+.mkt-terminal-rulebox .mkt-terminal-then { margin-top: .65rem; }
+.mkt-terminal-rulebox .mkt-terminal-action { color: var(--mkt-text); border-left: 2px solid var(--a4t-demo); }
+.mkt-terminal-bottom dl { display: grid; grid-template-columns: 1fr auto; gap: .35rem .5rem; margin: 0; font-size: .57rem; }
+.mkt-terminal-bottom dt { color: var(--mkt-muted); }
+.mkt-terminal-bottom dd { color: var(--mkt-text); font-weight: 700; margin: 0; }
+.mkt-terminal-bottom ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .4rem; }
+.mkt-terminal-bottom li { display: grid; grid-template-columns: 7px 1fr auto; gap: .35rem; align-items: center; color: var(--mkt-text); font-size: .56rem; }
+.mkt-terminal-bottom li i { width: 6px; height: 6px; border-radius: 50%; background: var(--a4t-demo); }
+.mkt-terminal-bottom li small { color: var(--mkt-dim); font-size: .5rem; }
+@media (max-width: 639px) { .mkt-terminal-body { grid-template-columns: 1fr; } .mkt-terminal-side { display: none; } }
+@media (max-width: 450px) { .mkt-terminal-stats, .mkt-terminal-workspace, .mkt-terminal-bottom { grid-template-columns: 1fr; } }
+@media (min-width: 640px) {
+  .mkt-terminal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.mkt-terminal-panel {
+  min-height: 116px;
+  border: 1px solid var(--mkt-line);
+  border-radius: 14px;
+  background: var(--mkt-bg);
+  padding: .95rem;
+}
+.mkt-terminal-wide { grid-column: 1 / -1; }
+.mkt-terminal-accent {
+  border-color: color-mix(in oklab, var(--a4t-brand) 34%, var(--mkt-line));
+  background: var(--mkt-surface-2);
+}
+.mkt-terminal-panel small {
+  display: block;
+  color: var(--mkt-dim);
+  font-size: .67rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 700;
+  margin-bottom: .45rem;
+}
+.mkt-terminal-panel b {
+  display: block;
+  color: var(--mkt-text);
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+  line-height: 1.05;
+  letter-spacing: -.025em;
+}
+/* "Demo only" — the one claim on this card a reader must not miss. It was a
+   76% white, which was right on the near-black panel and invisible on the
+   light one. The green is the same token the product uses for demo mode, so
+   the preview and the real status strip agree. */
+.mkt-terminal-safe { color: var(--a4t-demo) !important; }
+.mkt-terminal-panel p {
+  color: var(--mkt-muted);
+  font-size: .78rem;
+  line-height: 1.45;
+  margin: .45rem 0 0;
+}
+.mkt-terminal-rule {
+  color: var(--mkt-text);
+  font-size: .9rem;
+  line-height: 1.55;
+  border-left: 2px solid var(--mkt-accent-text);
+  padding-left: .7rem;
+}
+
+.mkt-bento {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+@media (min-width: 800px) {
+  .mkt-bento { grid-template-columns: repeat(6, 1fr); }
+  .mkt-bento .mkt-card { grid-column: span 2; min-height: 214px; }
+  .mkt-bento .mkt-bento-large { grid-column: span 3; }
+  .mkt-bento .mkt-bento-wide { grid-column: span 6; min-height: 0; }
+}
+.mkt-bento .mkt-card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--elev-1);
+}
+.mkt-bento .mkt-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -20% -42% 18%;
+  height: 150px;
+  background: radial-gradient(circle, rgba(217,58,43,.14), transparent 70%);
+  pointer-events: none;
+}
+
+.mkt-flow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.2rem;
+}
+@media (min-width: 980px) {
+  .mkt-flow { grid-template-columns: .72fr 1.28fr; align-items: start; }
+}
+.mkt-flow h2 { max-width: 13ch; }
+.mkt-flow-steps { display: grid; gap: .6rem; }
+.mkt-flow-step {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: .15rem .75rem;
+  align-items: start;
+  border: 1px solid var(--mkt-line-soft);
+  border-radius: 14px;
+  background: var(--mkt-bg-2);
+  padding: .8rem;
+}
+.mkt-flow-step span {
+  grid-row: span 2;
+  color: var(--mkt-accent-text);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .82rem;
+}
+.mkt-flow-step strong { font-size: .9rem; color: var(--mkt-text); }
+.mkt-flow-step p {
+  color: var(--mkt-muted);
+  font-size: .8rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* The optional question after a sign-up. Quiet on purpose: it is asked of
+   somebody who has already done the thing we wanted, and it must not read
+   like a second hurdle. */
+.wl-ask { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--mkt-line-soft); }
+.wl-ask-q { font-size: .82rem; color: var(--mkt-muted); margin: 0 0 .6rem; }
+.wl-skip {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  font-size: .82rem; color: var(--mkt-dim); padding: .72rem .6rem;
+}
+.wl-skip:hover { color: var(--mkt-text); }
+
+/* ── pricing cards ───────────────────────────────────────────────────────
+   The vendored component arrived with a tint per plan, drawn from a generic
+   palette: teal for one card, amber for the other, each with two coloured
+   blobs and a coloured orb. On a page whose whole identity is black and one
+   red, that rendered a turquoise card beside an orange one, and the lower
+   half of both inherited the APP's surface tokens, which were a blue, rather
+   than the marketing page's (#0A0A0C), so the cards sat on the page as two
+   foreign rectangles at the exact point somebody decides whether to pay.
+
+   The tints are gone. Two treatments remain, and they carry meaning instead
+   of decoration: `neutral` is the free plan, `accent` is the one that costs
+   money. Everything is a --mkt-* token, so contrast.test.ts can read the
+   numbers rather than anybody judging them by eye — which is how the teal
+   shipped in the first place. */
+.mkt {
+  --pc-card:        #131317;   /* same family as --mkt-surface */
+  --pc-card-2:      #17171B;
+  --pc-head:        #0D0D10;
+  --pc-head-accent: #7A2118;   /* the highlighted plan: a dark head on a
+                                  light page, which is the inverse of what it
+                                  was and the same device — one card that
+                                  reads as chosen */
+  --pc-note:        #A9A7A0;   /*  8.0:1 on --pc-head  */
+  --pc-note-accent: #F6DAD4;   /*  9.0:1 on --pc-head-accent */
+  /* The plan name and the price on the dark head. The small print already had
+     its own token here; the HEADINGS did not, and inherited --mkt-text — which
+     was an off-white on the old dark head and is a near-black now. 1.09:1, and
+     the price is the largest thing on the card. */
+  --pc-head-accent-fg: #FFFFFF;   /* 12.0:1 on --pc-head-accent */
+}
+
+.pc { display: grid; gap: 1.6rem; }
+.pc-head-row {
+  display: flex; flex-direction: column; gap: .35rem;
+}
+.pc-head-row h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem); letter-spacing: -0.025em;
+  font-weight: 700; margin: 0;
+}
+.pc-head-row p { color: var(--mkt-muted); font-size: .9rem; margin: 0; }
+
+.pc-card {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--mkt-line); border-radius: 18px;
+  background: var(--pc-card-2); padding: .3rem;
+}
+/* The paid plan is the one the page is arguing for, so it is the one that
+   wears the accent. Not a louder colour — the same red the rest of the page
+   uses, which is what makes it read as the same product. */
+.pc-card-accent { border-color: var(--mkt-accent-line); }
+
+.pc-top {
+  position: relative; overflow: hidden;
+  border-radius: 15px; padding: 1.3rem;
+  background: var(--pc-head); border: 1px solid var(--mkt-line-soft);
+}
+.pc-card-accent .pc-top {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.07), transparent 40%),
+    var(--pc-head-accent);
+  border-color: var(--mkt-accent-line);
+}
+.pc-card-accent .pc-top::after {
+  content: ""; position: absolute; inset: -40% -30% auto auto;
+  width: 240px; height: 240px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(217,58,43,.30), transparent 68%);
+  filter: blur(26px); pointer-events: none;
+}
+.pc-top > * { position: relative; z-index: 1; }
+
+.pc-badge {
+  display: inline-block; font-size: .7rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .2rem .55rem; border-radius: 999px;
+  color: var(--mkt-accent-text);
+  background: var(--mkt-accent-wash);
+  border: 1px solid var(--mkt-accent-line);
+}
+.pc-name {
+  font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em;
+  margin: .75rem 0 .25rem; color: var(--mkt-text);
+}
+.pc-card-accent .pc-name, .pc-card-accent .pc-price,
+.pc-card-accent .pc-badge { color: var(--pc-head-accent-fg); }
+.pc-card-accent .pc-badge {
+  background: rgba(255, 255, 255, .12);
+  border-color: rgba(255, 255, 255, .22);
+}
+.pc-desc { font-size: .84rem; line-height: 1.6; margin: 0; color: var(--pc-note); }
+.pc-card-accent .pc-desc { color: var(--pc-note-accent); }
+
+.pc-price-row { display: flex; align-items: baseline; gap: .5rem; margin-top: 1.1rem; }
+.pc-price {
+  font-size: 2.1rem; font-weight: 700; letter-spacing: -0.03em;
+  color: var(--mkt-text); line-height: 1;
+}
+.pc-was { font-size: .95rem; color: var(--pc-note); text-decoration: line-through; }
+.pc-price-note { font-size: .76rem; margin: .4rem 0 0; color: var(--pc-note); }
+.pc-card-accent .pc-price-note, .pc-card-accent .pc-was { color: var(--pc-note-accent); }
+
+.pc-cta {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; margin-top: 1.15rem; padding: .72rem 1rem;
+  border-radius: 999px; border: 1px solid transparent;
+  font: inherit; font-size: .9rem; font-weight: 600;
+  text-decoration: none; cursor: pointer;
+  background: var(--mkt-accent); color: var(--mkt-on-accent);
+}
+.pc-cta:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); }
+.pc-cta-quiet {
+  background: transparent; color: var(--mkt-text);
+  border-color: var(--mkt-line);
+}
+.pc-cta-quiet:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+/* A plan that cannot be bought yet still shows its button, because hiding it
+   would read as the plan not existing. It must not look clickable. */
+.pc-cta:disabled, .pc-cta[aria-disabled="true"] {
+  background: var(--mkt-surface-2); color: var(--mkt-muted);
+  border-color: var(--mkt-line); cursor: not-allowed;
+}
+.pc-cta-note { font-size: .76rem; line-height: 1.55; margin: .6rem 0 0; color: var(--pc-note); }
+.pc-card-accent .pc-cta-note { color: var(--pc-note-accent); }
+
+.pc-body { padding: 1.2rem 1.1rem .4rem; }
+.pc-features { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.pc-features li {
+  display: flex; align-items: flex-start; gap: .55rem;
+  font-size: .86rem; line-height: 1.5; color: var(--mkt-text);
+}
+.pc-features .ico { color: var(--mkt-accent-text); flex: none; margin-top: .15rem; }
+.pc-foot {
+  margin-top: 1.1rem; padding-top: .9rem;
+  border-top: 1px solid var(--mkt-line-soft);
+}
+.pc-foot strong { display: block; font-size: .8rem; color: var(--mkt-text); }
+.pc-foot p { font-size: .78rem; line-height: 1.6; margin: .2rem 0 0; color: var(--mkt-muted); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Noir bento — the app's cards, headings and first-glance band.
+
+   Same tokens as everywhere else; only the shape changes. Larger radius,
+   hairline borders, a faint top light instead of a drop shadow, and card
+   titles as quiet small-caps labels so the numbers and sentences inside
+   are what the eye lands on.
+   ═══════════════════════════════════════════════════════════════════════ */
+.a4t h1 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.05; }
+.page-head { margin-bottom: 1.4rem; }
+.page-head .sub { margin-top: .4rem; display: block; }
+
+.card {
+  border-radius: 20px;
+  border-color: var(--a4t-line-soft);
+  padding: 1.2rem 1.3rem;
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(247, 246, 242, .045), transparent 60%),
+    var(--a4t-surface);
+  box-shadow: none;
+}
+.card-flat { background: transparent; border-style: dashed; border-color: var(--a4t-line); }
+.card-head { margin-bottom: .9rem; }
+.a4t .card-head h2 {
+  font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--a4t-muted);
+}
+/* The "All →" links: quiet text, not blue. They are navigation, and a column
+   of blue on a black page reads as an error list. */
+.card-head .link-sm, .a4t .link-sm { color: var(--a4t-muted); font-size: .78rem; }
+.card-head .link-sm:hover, .a4t .link-sm:hover { color: var(--a4t-text); }
+
+.verdict-banner[data-kind="buy"] {
+  background: transparent;
+  border-color: var(--a4t-line-soft);
+  box-shadow: inset 3px 0 0 var(--a4t-long);
+  border-radius: 14px;
+}
+
+/* ── the first-glance band ─────────────────────────────────────────── */
+.ovb {
+  display: grid; gap: .75rem; margin-bottom: var(--sp-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 900px) { .ovb { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ovb-tile {
+  display: flex; flex-direction: column; gap: .35rem; min-width: 0;
+  padding: 1.05rem 1.2rem 1rem; border-radius: 20px;
+  border: 1px solid var(--a4t-line-soft);
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(247, 246, 242, .05), transparent 55%),
+    var(--a4t-surface);
+}
+.ovb-label {
+  font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--a4t-dim);
+}
+.ovb-value {
+  font-size: clamp(1.25rem, 2.1vw, 1.7rem); font-weight: 700; letter-spacing: -.03em;
+  line-height: 1.12; color: var(--a4t-text);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere; min-height: 2.24em;
+  font-variant-numeric: tabular-nums;
+}
+.ovb-value[data-empty="true"] { color: var(--a4t-dim); }
+.ovb-tile[data-tone="long"] .ovb-value { color: var(--a4t-long); }
+.ovb-note { font-size: .78rem; color: var(--a4t-muted); min-height: 1.1em; }
+
+/* A name in a card is content, not a link to be noticed. */
+.inspector .card > p > a { color: var(--a4t-text); }
+.inspector .card > p > a:hover { color: var(--a4t-link-strong); }
+
+/* ── Noir polish: the list screens (Rules, Positions, Journal, Accounts) ──
+   They already inherit the card and title treatment above. What is left is
+   the blue that survived inside them: table links, the accent notice and
+   the accent pills. Navigation inside a table is content, not a link to be
+   noticed, and a column of blue reads as an error list on a black page. */
+.tbl td a { color: var(--a4t-text); text-decoration: underline; text-decoration-color: var(--a4t-line); text-underline-offset: 3px; }
+.tbl td a:hover { color: var(--a4t-link-strong); text-decoration-color: currentColor; }
+.tbl th { font-size: .66rem; letter-spacing: .12em; }
+.tbl-wrap, .card .tbl-wrap { border-radius: 16px; }
+
+.notice-accent { border-color: var(--a4t-line); background: rgba(247, 246, 242, .04); border-radius: 14px; }
+.notice-accent a { color: var(--a4t-text); text-decoration: underline; text-underline-offset: 3px; }
+.pill-accent { color: var(--a4t-text); border-color: var(--a4t-line); background: rgba(247, 246, 242, .07); }
+
+.record { border-radius: 16px; border-color: var(--a4t-line-soft); background: var(--a4t-surface); padding: .85rem 1rem; }
+.card + .records, .card + .record, .records + .page-nav { margin-top: .75rem; }
+.records > .record:hover { border-color: var(--a4t-line); }
+
+/* ── sign-in: Google button and the brand band on small screens ──────── */
+.auth-alt { margin-top: 1.6rem; }
+.btn-google { width: 100%; gap: .7rem; }
+.auth-or { display: flex; align-items: center; gap: .8rem; margin: 1.2rem 0 -.6rem; font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--a4t-dim); }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--a4t-line); }
+.auth-block .auth-alt + form.card { margin-top: 1.2rem; }
+
+.auth-hero { position: relative; overflow: hidden; margin: 1.4rem 0 0; padding: 1.4rem 1.3rem 1.5rem; border: 1px solid var(--a4t-line); border-radius: 18px; background: #0b0b0e; color: #f7f6f2; }
+@media (min-width: 960px) { .auth-hero { display: none; } }
+.auth-hero-glow { position: absolute; right: -20%; top: -40%; width: 80%; height: 140%; background: radial-gradient(closest-side, rgba(217, 58, 43, .34), rgba(217, 58, 43, 0) 72%); pointer-events: none; }
+.auth-hero .mark { position: relative; display: block; margin-bottom: 1rem; }
+.auth-hero-kicker { position: relative; font-size: .68rem; font-weight: 800; letter-spacing: .18em; color: #ff9484; margin-bottom: .5rem; }
+.auth-hero-head { position: relative; font-size: 1.7rem; line-height: 1; letter-spacing: -.045em; font-weight: 800; max-width: 11ch; }
+.aside-copy .mark { display: block; margin-bottom: 1.6rem; }

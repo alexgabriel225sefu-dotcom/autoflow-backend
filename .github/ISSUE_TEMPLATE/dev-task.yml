@@ -1,0 +1,108 @@
+name: Development task
+description: A unit of work for Claude Code or Codex (see docs/ORCHESTRATOR_PROTOCOL.md)
+title: "[task] "
+# No `labels:` on purpose. A label is an authorisation (see the protocol): only
+# the owner applies `ready` and an agent label, after reading the issue.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Agents act only on issues the owner has labelled `ready` plus exactly one
+        of `apex-claude` / `apex-codex`. Filling this form does not queue anything.
+        Do not paste secrets, tokens, account numbers or customer data here: the
+        repository is public.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What should change, and why. One task per issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: |
+        Checkable statements, one per line. Each should be verifiable by a test
+        or by a command whose output can be pasted into the PR.
+      placeholder: |
+        - [ ] ...
+        - [ ] The named test fails without the change and passes with it
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 - blocks a release or a running demo account
+        - P1 - needed for launch
+        - P2 - should do
+        - P3 - nice to have
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Assigned agent
+      description: Recorded here for the owner; the label is what an agent reads.
+      options:
+        - Claude Code (label apex-claude)
+        - Codex (label apex-codex)
+        - Owner decides
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      description: |
+        "Money path" means order gates, close gates, ownership leases, the
+        emergency stop, ledgers, broker reads that feed a decision, or anything
+        under apex/platform/gates.py, bridge.py, automation.py, position_close.py,
+        emergency_stop.py, ownership.py. Money-path work needs an independent
+        review by the other agent and an owner merge.
+      options:
+        - Low - docs, copy, tests only
+        - Medium - behaviour change away from the money path
+        - High - touches auth, entitlement, rate limiting, storage or secrets handling
+        - Money path
+    validations:
+      required: true
+
+  - type: dropdown
+    id: base
+    attributes:
+      label: Base branch
+      description: |
+        The branch the PR targets. Never main (stale, divergent) and never the
+        Render deploy branch claude/arcads-external-api-gExX7.
+      options:
+        - claude/apex4traders-platform-v1 (platform + web)
+        - claude/arcads-external-api-gexx7-6n4pr9 (Telegram bot + sales site)
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Files in scope / out of scope
+      description: Paths the agent may change, and paths it must not touch.
+      placeholder: |
+        In scope: web/src/app/(app)/performance/**
+        Out of scope: anything under apex-forex-bot/apex/platform/gates.py
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and links
+      description: Related issues, PRs, docs, prior handoffs. Links only, no secrets.
+    validations:
+      required: false

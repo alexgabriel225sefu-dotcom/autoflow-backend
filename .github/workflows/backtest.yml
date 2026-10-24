@@ -6,49 +6,9 @@ on:
     branches: [claude/arcads-external-api-gExX7]
     paths:
       - '.github/workflows/backtest.yml'
-      - 'apex-trade-bot/src/backtest.js'
       - 'apex-forex-bot/backtest.py'
 
 jobs:
-  crypto:
-    name: Crypto bot backtest
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install deps
-        working-directory: apex-trade-bot
-        run: npm install --omit=dev
-      - name: Backtest SOLUSDT 5m
-        working-directory: apex-trade-bot
-        env:
-          PAPER_TRADING: 'true'
-          BT_SYMBOL: SOLUSDT
-          BT_TIMEFRAME: 5m
-          BT_CANDLES: '1000'
-        run: node src/backtest.js
-      - name: Backtest XRPUSDT 5m
-        if: always()
-        working-directory: apex-trade-bot
-        env:
-          PAPER_TRADING: 'true'
-          BT_SYMBOL: XRPUSDT
-          BT_TIMEFRAME: 5m
-          BT_CANDLES: '1000'
-        run: node src/backtest.js
-      - name: Backtest DOGEUSDT 15m
-        if: always()
-        working-directory: apex-trade-bot
-        env:
-          PAPER_TRADING: 'true'
-          BT_SYMBOL: DOGEUSDT
-          BT_TIMEFRAME: 15m
-          BT_CANDLES: '1000'
-        run: node src/backtest.js
-
   forex:
     name: Forex bot backtest
     runs-on: ubuntu-latest
