@@ -5,14 +5,12 @@ import {
   GaugeCircle,
   Link2,
   ListChecks,
-  Play,
   PlayCircle,
   ShieldCheck,
 } from "lucide-react";
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { PricingSection } from "@/components/blocks/pricing-section";
-import { WaitlistForm } from "@/components/blocks/waitlist-form";
 
 export const metadata: Metadata = {
   title: "Apex4Traders — a control panel for your own trading rules",
@@ -51,94 +49,50 @@ export default function Landing() {
           </span>
         </nav>
 
-        <section className="mkt-hero mkt-hero-terminal">
+        <section className="mkt-hero mkt-hero2 mkt-hero-terminal" id="product">
           <span className="mkt-glow" aria-hidden />
           <div className="mkt-hero-copy">
-            <span className="mkt-eyebrow">
-              <i className="mkt-dot" aria-hidden />
-              cTrader automation platform
-            </span>
-            {/* Three lines, broken deliberately rather than left to wrap. The
-                design sets them as three statements and the rhythm is the
-                point; a wrap at a different width reads as an accident. */}
-            <h1>
-              Your rules.<br />
-              Your broker.<br />
-              One control panel.
-            </h1>
-            <p className="mkt-sub">Build and monitor your own cTrader rules.</p>
+            <p className="mkt-kicker">YOUR RULES · YOUR BROKER</p>
+            <h1>Trade like you planned&nbsp;to.</h1>
             <p className="mkt-lede">
-              Automate your trading logic with a rule builder you drive
-              yourself. Connect your cTrader broker, set your rules, watch
-              every decision as it is made — from one place, on a demo
-              account first.
+              Get your licence, connect your cTrader account, then choose your
+              market, your method and your risk. Automation follows your rules,
+              and you can stop it any time.
             </p>
             <div className="mkt-hero-cta">
               <a className="mkt-btn mkt-btn-lg" href="/signup">
                 Get started <ArrowRight className="mkt-ico" aria-hidden />
               </a>
-              <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#product">
-                <Play className="mkt-ico" aria-hidden /> See how it works
+              <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#features">
+                See how it works
               </a>
             </div>
-            <p className="mkt-foot-note">No signals. No profit guarantees.</p>
-          </div>
-
-          <div className="mkt-terminal" aria-label="Apex4Traders demo terminal preview">
-            <div className="mkt-terminal-top">
-              <span />
-              <span />
-              <span />
-              <strong>Apex4Traders / demo control</strong>
-            </div>
-            <div className="mkt-terminal-body">
-              <aside className="mkt-terminal-side" aria-label="Preview navigation">
-                <strong className="mkt-terminal-brand"><span>A4</span> Apex4Traders</strong>
-                {['Dashboard', 'Rules', 'cTrader Connection', 'Positions', 'Activity Journal', 'Settings'].map((item, index) => (
-                  <span className={index === 0 ? 'is-active' : ''} key={item}>
-                    <i aria-hidden>{['⌂', '□', '↗', '▥', '≡', '⚙'][index]}</i>{item}
-                  </span>
-                ))}
-                <div className="mkt-terminal-account">
-                  <b><i className="mkt-dot" aria-hidden /> cTrader connected</b>
-                  <small>Demo account</small>
-                  <span>cTrader <em>Demo</em></span>
-                </div>
-              </aside>
-              <div className="mkt-terminal-main">
-                <div className="mkt-terminal-heading">
-                  <div><b>Good morning</b><small>Your demo workspace is ready.</small></div>
-                  <span className="mkt-terminal-avatar">JD</span>
-                </div>
-                <div className="mkt-terminal-stats">
-                  <div><small>Connection</small><b className="mkt-terminal-safe">● cTrader</b><span>Demo account</span></div>
-                  <div><small>Rules running</small><b>Preview</b><span>Start is explicit</span></div>
-                  <div><small>Open positions</small><b>Read-only</b><span>No fake balance</span></div>
-                </div>
-                <div className="mkt-terminal-workspace">
-                  <div className="mkt-terminal-chart mkt-terminal-panel">
-                    <div className="mkt-terminal-panel-head"><b>EURUSD</b><span>1m&nbsp;&nbsp; 5m&nbsp;&nbsp; <strong>15m</strong>&nbsp;&nbsp; 1h</span></div>
-                    <div className="mkt-chart-area" aria-label="Illustrative EURUSD chart preview">
-                      {[42, 56, 38, 64, 52, 70, 61, 76, 68, 84, 72, 89, 78, 94, 82, 72, 86, 78].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}
-                    </div>
-                    <small className="mkt-chart-note">Illustrative preview · broker candles appear after connection</small>
-                  </div>
-                  <div className="mkt-terminal-rulebox mkt-terminal-panel">
-                    <div className="mkt-terminal-panel-head"><b>Rule preview</b><span className="mkt-terminal-chip">Not running</span></div>
-                    <label>IF <span>All conditions are met</span></label>
-                    <p>EMA (21) <em>crosses above</em> EMA (50)</p>
-                    <p>RSI (14) <em>greater than</em> 55</p>
-                    <p>Symbol <em>equals</em> EURUSD</p>
-                    <label className="mkt-terminal-then">THEN <span>Execute your action</span></label>
-                    <p className="mkt-terminal-action">Open Buy Position</p>
-                  </div>
-                </div>
-                <div className="mkt-terminal-bottom">
-                  <div className="mkt-terminal-panel"><div className="mkt-terminal-panel-head"><b>Risk guard</b><span>Visible</span></div><dl><dt>Stop required</dt><dd>Yes</dd><dt>Max open positions</dt><dd>5</dd><dt>Daily loss limit</dt><dd>User set</dd></dl></div>
-                  <div className="mkt-terminal-panel"><div className="mkt-terminal-panel-head"><b>Activity journal</b><span>Read-only</span></div><ul><li><i />Rule preview checked <small>No order placed</small></li><li><i />cTrader connected <small>Demo account</small></li><li><i />Automation stopped <small>Awaiting confirmation</small></li></ul></div>
-                </div>
+            <p className="mkt-foot-note">
+              No signals. No profit guarantees. Automation runs on demo accounts in this release.
+            </p>
+            <div className="mkt-works">
+              <div className="mkt-works-row">
+                <span>WORKS WITH</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/ctrader-logo-light.svg" alt="cTrader" width={98} height={24} />
+              </div>
+              <div className="mkt-works-row">
+                <span>COMING SOON</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/metatrader-4-light.png" alt="MetaTrader 4" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/metatrader-5-light.png" alt="MetaTrader 5" />
               </div>
             </div>
+          </div>
+
+          <div className="mkt-rulecard" aria-label="Illustrative preview of a rule check">
+            <div className="rc-bar"><i /><i /><i /><span>Illustrative preview</span></div>
+            <h3>Rule check</h3>
+            <div className="rc-row"><b>EMA (21)</b><em>crosses above</em><b>EMA (55)</b><u /></div>
+            <div className="rc-row"><b>RSI (14)</b><em>greater than</em><b>50</b><u /></div>
+            <div className="rc-row"><b>Stop-loss</b><em>set</em><b>1.0% risk</b><u /></div>
+            <div className="rc-foot"><span>● Conditions met</span><b>■ Emergency stop</b></div>
           </div>
         </section>
 
@@ -160,7 +114,7 @@ export default function Landing() {
               </p>
             </article>
 
-            <article className="mkt-card">
+            <article className="mkt-card mkt-bento-large">
               <span className="mkt-card-ico"><ListChecks size={17} aria-hidden /></span>
               <h3>Write rules in named conditions</h3>
               <p>
@@ -196,7 +150,7 @@ export default function Landing() {
               </p>
             </article>
 
-            <article className="mkt-card mkt-bento-large">
+            <article className="mkt-card mkt-bento-wide">
               <span className="mkt-card-ico"><ShieldCheck size={17} aria-hidden /></span>
               <h3>A journal of every decision</h3>
               <p>
@@ -211,13 +165,13 @@ export default function Landing() {
         <section className="mkt-section mkt-flow">
           <div>
             <span className="mkt-eyebrow">Launch flow</span>
-            <h2>From broker connection to controlled demo automation.</h2>
+            <h2>From licence to controlled automation.</h2>
           </div>
           <div className="mkt-flow-steps">
             {[
-              ["01", "Connect cTrader", "Approve access in cTrader and return to the platform."],
-              ["02", "Select demo account", "The page shows which account is selected before any action."],
-              ["03", "Build your rule", "Use named conditions and visible risk controls."],
+              ["01", "Get your licence", "One licence unlocks the platform for your account."],
+              ["02", "Connect cTrader", "Approve access in cTrader; the page shows which account is selected before any action."],
+              ["03", "Choose market, method, risk", "Named conditions and visible risk controls."],
               ["04", "Preview decision", "Read the decision before starting automation."],
               ["05", "Start, pause, stop", "Controls are explicit and recorded in the journal."],
             ].map(([n, title, body]) => (

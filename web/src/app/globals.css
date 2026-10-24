@@ -877,15 +877,15 @@ body {
 .auth-block > form.card, .auth-block > .card { margin-top: 1.8rem; border: 0; background: transparent; box-shadow: none; padding: 0; }
 .auth-block .field { margin-bottom: 1.05rem; }
 .auth-block .field > span { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--a4t-dim); }
-.auth-block .field input { height: 3.35rem; font-size: 1.05rem; border-radius: 14px; padding: 0 1rem; background: #fff; border: 1.5px solid var(--a4t-line); }
-.auth-block .field input:focus { outline: none; border-color: var(--a4t-text); box-shadow: 0 0 0 4px rgba(17, 17, 19, .08); }
+.auth-block .field input { height: 3.35rem; font-size: 1.05rem; border-radius: 14px; padding: 0 1rem; background: var(--a4t-bg-2); border: 1.5px solid var(--a4t-line); }
+.auth-block .field input:focus { outline: none; border-color: var(--a4t-text); box-shadow: 0 0 0 4px rgba(247, 246, 242, .10); }
 .auth-block .btn-lg { height: 3.4rem; border-radius: 14px; font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; margin-top: .4rem; }
 .auth-foot { margin-top: 1.4rem; display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; font-size: .95rem; color: var(--a4t-muted); }
 .auth-foot a { color: var(--a4t-text); font-weight: 700; text-decoration: none; border-bottom: 2px solid var(--a4t-line); padding-bottom: 1px; }
 .auth-foot a:hover { border-color: #d93a2b; }
 .auth-legal { font-size: .76rem; line-height: 1.5; color: var(--a4t-dim); max-width: 420px; }
 
-.auth-aside { display: none; position: relative; overflow: hidden; background: #08080a; color: #f7f6f2; }
+.auth-aside { display: none; position: relative; overflow: hidden; background: #0b0b0e; color: #f7f6f2; border-left: 1px solid var(--a4t-line); }
 @media (min-width: 960px) { .auth-aside { display: block; } }
 .auth-aside::after { /* film grain, so the dark field is not a flat fill */
   content: ""; position: absolute; inset: 0; opacity: .09; pointer-events: none; mix-blend-mode: overlay;
@@ -1037,27 +1037,31 @@ body {
 /* ── controls ────────────────────────────────────────────────────────── */
 .mkt-btn {
   display: inline-flex; align-items: center; gap: .45rem;
-  padding: .62rem 1.05rem; border-radius: 10px;
-  font-size: .875rem; font-weight: 600; letter-spacing: -0.01em;
+  padding: .62rem 1.15rem; border-radius: 999px;
+  font-size: .875rem; font-weight: 700; letter-spacing: -0.01em;
   background: var(--mkt-accent); color: var(--mkt-on-accent);
   border: 1px solid transparent; text-decoration: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 14px 30px -18px rgba(247, 246, 242, .45);
   transition: background .18s ease, transform .18s ease;
 }
-.mkt-btn:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); }
+.mkt-btn:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); transform: translateY(-1px); }
 .mkt-btn:active { transform: translateY(1px); }
 .mkt-btn-ghost {
   background: transparent; color: var(--mkt-text);
   border-color: var(--mkt-line);
 }
 .mkt-btn-ghost:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
-.mkt-btn-lg { padding: .85rem 1.5rem; font-size: .98rem; }
+.mkt-btn-lg { padding: .75rem .8rem .75rem 1.6rem; font-size: 1rem; gap: .8rem; }
+.mkt-btn-lg .mkt-ico { box-sizing: content-box; padding: .5rem; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--mkt-on-accent); color: var(--mkt-accent); transition: transform .18s; }
+.mkt-btn-lg:hover .mkt-ico { transform: translate(2px, -2px); }
+.mkt-btn-outline.mkt-btn-lg { padding: .75rem 1.6rem; }
 /* The second call to action. White on the cream page with a real border, so
    it reads as the quieter of the two without becoming a link. */
 .mkt-btn-outline {
-  background: var(--mkt-surface); color: var(--mkt-text);
-  border-color: var(--mkt-line); box-shadow: var(--elev-1);
+  background: transparent; color: var(--mkt-text);
+  border-color: rgba(247, 246, 242, .28); box-shadow: none;
 }
-.mkt-btn-outline:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
+.mkt-btn-outline:hover { background: rgba(247, 246, 242, .08); color: var(--mkt-text); border-color: rgba(247, 246, 242, .5); }
 .mkt-ico { width: 1em; height: 1em; flex: none; }
 
 /* The plain text link in the nav bar, beside the filled button. */
@@ -1120,8 +1124,8 @@ body {
    page, and the depth comes from the card's shadow instead. */
 .mkt-glow {
   position: absolute; pointer-events: none; z-index: 0;
-  top: -14vw; left: -10vw; width: min(62vw, 640px); height: min(62vw, 640px);
-  background: none;
+  top: -6vw; left: -14vw; width: min(80vw, 900px); height: min(70vw, 760px);
+  background: radial-gradient(closest-side, rgba(217, 58, 43, .26), rgba(217, 58, 43, 0) 72%);
 }
 /* Lift the content above the glow — but NOT the glow itself.
    This was `.mkt-hero > *`, written when the hero was a simple stack. It set
@@ -1232,6 +1236,30 @@ body {
   background: var(--mkt-surface); border: 1px solid var(--mkt-line);
   font-size: .82rem; color: var(--mkt-muted); line-height: 1.7; max-width: 70ch;
 }
+
+/* ── the hero: one headline, one product card, the brokers it works with ── */
+.mkt-kicker { font-size: .74rem; font-weight: 800; letter-spacing: .18em; color: var(--mkt-accent-text); margin: 0 0 1.2rem; }
+.mkt-hero2 h1 { font-size: clamp(2.8rem, 7.4vw, 5.4rem); line-height: .92; letter-spacing: -.055em; font-weight: 800; text-wrap: balance; }
+.mkt-hero2 .mkt-lede { max-width: 46ch; }
+.mkt-works { display: grid; gap: 1rem; margin-top: 2.2rem; font-size: .68rem; font-weight: 800; letter-spacing: .16em; color: var(--mkt-dim); }
+.mkt-works-row { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem 1.4rem; }
+.mkt-works-row > span { min-width: 6.4rem; }
+.mkt-works img { display: block; height: 26px; width: auto; }
+.mkt-rulecard {
+  position: relative; background: #f7f6f2; color: #111113; border-radius: 28px; padding: 1.6rem 1.8rem;
+  box-shadow: 0 60px 110px -30px rgba(0, 0, 0, .95), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 100px rgba(217, 58, 43, .22);
+  transform: rotate(-1.6deg); max-width: 30rem; justify-self: center;
+}
+.mkt-rulecard .rc-bar { display: flex; align-items: center; gap: .45rem; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #56544e; margin-bottom: .9rem; }
+.mkt-rulecard .rc-bar i { width: 9px; height: 9px; border-radius: 50%; background: #d93a2b; } .mkt-rulecard .rc-bar i:nth-child(2) { opacity: .45; } .mkt-rulecard .rc-bar i:nth-child(3) { opacity: .22; }
+.mkt-rulecard .rc-bar span { margin-left: .3rem; }
+.mkt-rulecard h3 { font-size: 1.9rem; font-weight: 800; letter-spacing: -.04em; margin-bottom: .5rem; color: #111113; }
+.mkt-rulecard .rc-row { display: flex; align-items: center; gap: .5rem; font-size: 1rem; padding: .7rem 0; border-top: 1.5px solid #ebe8e0; color: #111113; }
+.mkt-rulecard .rc-row em { font-style: normal; color: #726f67; }
+.mkt-rulecard .rc-row u { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; background: #1a7f4b; position: relative; flex: none; }
+.mkt-rulecard .rc-row u::after { content: ""; position: absolute; left: 8px; top: 4px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.mkt-rulecard .rc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: .8rem; padding-top: .9rem; border-top: 1.5px solid #ebe8e0; font-weight: 800; color: #1a7f4b; font-size: .98rem; }
+.mkt-rulecard .rc-foot b { background: #d93a2b; color: #fff; padding: .45rem .9rem; border-radius: 999px; font-size: .74rem; }
 
 /* ── premium terminal composition for the marketing page ────────────── */
 
@@ -1425,6 +1453,7 @@ body {
   .mkt-bento { grid-template-columns: repeat(6, 1fr); }
   .mkt-bento .mkt-card { grid-column: span 2; min-height: 214px; }
   .mkt-bento .mkt-bento-large { grid-column: span 3; }
+  .mkt-bento .mkt-bento-wide { grid-column: span 6; min-height: 0; }
 }
 .mkt-bento .mkt-card {
   position: relative;
