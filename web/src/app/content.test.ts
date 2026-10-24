@@ -145,6 +145,19 @@ describe("the statements the product must make", () => {
     expect(terms).toMatch(pattern);
   });
 
+  it("the terms, refund policy and tax notice are marked as unpublished drafts", () => {
+    const shell = FILES.find((f) => f.path === "components/legal/draft-shell.tsx")!.body;
+    for (const token of ["COMPANY_NAME", "REGISTRATION_NUMBER", "ADDRESS", "JURISDICTION", "VAT"]) {
+      expect(shell, `missing {{${token}}}`).toContain(`{{${token}}}`);
+    }
+    for (const path of ["app/terms/page.tsx", "app/refunds/page.tsx", "app/tax/page.tsx"]) {
+      const body = FILES.find((f) => f.path === path)!.body;
+      expect(body, path).toContain("DRAFT - requires legal review");
+      expect(body, path).toContain("not final");
+      expect(body, `${path} does not render the company placeholders`).toContain("CompanyBlock");
+    }
+  });
+
   it("the Privacy policy states that broker tokens never reach the browser", () => {
     expect(privacy).toMatch(/never sent to your\s+browser/i);
   });
@@ -194,7 +207,10 @@ describe("the statements the product must make", () => {
 
 describe("unfinished legal values are visibly unfinished", () => {
   const legal = FILES.filter((f) =>
-    f.path === "app/terms/page.tsx" || f.path === "app/privacy/page.tsx");
+    f.path === "app/terms/page.tsx"
+    || f.path === "app/refunds/page.tsx"
+    || f.path === "app/tax/page.tsx"
+    || f.path === "app/privacy/page.tsx");
 
   it("every placeholder is marked, so it can be found by grep", () => {
     for (const f of legal) {

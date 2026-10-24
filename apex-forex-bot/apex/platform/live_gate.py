@@ -642,6 +642,12 @@ def _http(method, route, principal, body):
         _require_operator(principal)
         publish(body.get("document"), body.get("version"), actor=uid)
         return 200, {"ok": True, "published": True}
+    if route == "live/terms/publish-current" and method == "POST":
+        # The body cannot name a version. Publication stays off until the
+        # owner sets A4T_LEGAL_PUBLISH to the draft version in the repo.
+        _require_operator(principal)
+        from apex.platform import legal_content as _legal
+        return 200, {"ok": True, "publication": _legal.publish_current(uid)}
     if route == "live/licence/grant" and method == "POST":
         _require_operator(principal)
         grant_operator_licence(body.get("userId"), actor=uid)

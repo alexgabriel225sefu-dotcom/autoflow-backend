@@ -13,6 +13,19 @@ Nothing here was guessed. Writing a plausible registered address or a
 plausible refund policy would be worse than leaving the field blank, because a
 blank is visibly unfinished and a plausible invention is not.
 
+The terms, refund policy and tax notice are drafts at version `2026-10-24`.
+Each page is marked `DRAFT - requires legal review`. Company name,
+registration number, address, jurisdiction and VAT are the tokens
+`{{COMPANY_NAME}}`, `{{REGISTRATION_NUMBER}}`, `{{ADDRESS}}`,
+`{{JURISDICTION}}` and `{{VAT}}`. They are not filled in.
+
+Those pages stay unpublished unless `A4T_LEGAL_PUBLISH` is set to exactly
+`2026-10-24`. `true`, `1` and any other value do not publish. After that
+variable is set, an operator calls `POST /api/v1/live/terms/publish-current`
+to record the same version on the live gate. This repository does not set
+the variable and does not make that call. Public pages are `/terms`,
+`/refunds` and `/tax`.
+
 ---
 
 ## What was removed
