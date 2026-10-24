@@ -3,7 +3,9 @@ import { useRead } from "@/lib/use-api";
 import {
   ErrorNotice, ExecutionBadge, LicencePill, PlanNotice, Spinner, TrialNotice,
 } from "@/components/app/state";
+import Link from "next/link";
 import { formatOfferPrice, type Me, type PublicOffer } from "@/lib/api";
+import { liveNotice } from "@/components/app/live-access";
 
 export default function LicensePage() {
   const me = useRead<Me>("me");
@@ -14,6 +16,9 @@ export default function LicensePage() {
   // signed-in customer the old number with nothing to catch it.
   const offer = useRead<PublicOffer>("billing/offer");
   const price = offer.result?.ok ? formatOfferPrice(offer.result.data) : null;
+  const purchaseOpen = offer.result?.ok
+    && offer.result.data.checkoutEnabled
+    && offer.result.data.checkoutImplemented === true;
   return (
     <main>
       <div className="page-head">
@@ -67,9 +72,9 @@ export default function LicensePage() {
               <tr>
                 <th>Live execution</th>
                 <td>
-                  {me.result.data.execution.liveExecutionEnabled
-                    ? "Enabled"
-                    : "Not enabled in this release"}
+                  {liveNotice(me.result.data.execution).lead}
+                  {" "}
+                  <Link href="/live">Review what is missing</Link>
                 </td>
               </tr>
             </tbody>
@@ -89,8 +94,10 @@ export default function LicensePage() {
               Demo accounts require no payment. The planned paid offer is
               Founder Lifetime access
               {price ? <> for <strong>{price}</strong></> : null} as a one-time
-              purchase. Checkout is not enabled yet, and live execution is not
-              available in this release.
+              purchase. {purchaseOpen
+                ? "Checkout is open for this offer."
+                : "Live purchase is not yet open."}{" "}
+              Live trading is not available in this release.
             </p>
           </div>
 

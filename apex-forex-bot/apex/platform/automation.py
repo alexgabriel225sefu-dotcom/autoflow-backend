@@ -441,8 +441,21 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # read it from cTrader just now. Starting a real-money loop on the
     # strength of a record, when the live answer is available and free here,
     # would be the one place in this file worth getting wrong.
-    if check["mode"] == LIVE and not _ent.capability(user_id)["canAutomate"]:
-        raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+    if check["mode"] == LIVE:
+        # The stored verdict can be about a different moment. Ask again now
+        # that the broker has said this account is live, and then ask the
+        # hard gate even if a caller has patched capability to say yes.
+        cap_now = _ent.capability(user_id)
+        if not cap_now["canAutomate"]:
+            raise AutomationRefused(
+                cap_now.get("reason") or "LIVE_NOT_AVAILABLE",
+                cap_now.get("message") or _ent.LIVE_REFUSAL)
+        ready = _ent.live_readiness(user_id)
+        if ready.get("open") is not True:
+            code = ("LIVE_GATE_UNKNOWN" if ready.get("status") == "unknown"
+                    else "LIVE_GATE_CLOSED")
+            raise AutomationRefused(
+                code, ready.get("summary") or _ent.LIVE_REFUSAL)
     # And during the live pilot, only the pilot's own account may start one.
     # Without this a client outside the pilot could start a live loop that shows
     # "Running" while every order is refused, and could then change the selected

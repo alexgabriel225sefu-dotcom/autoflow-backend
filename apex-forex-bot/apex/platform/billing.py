@@ -222,6 +222,9 @@ def public_offer():
         "periodDays": cfg["periodDays"],
         "checkoutEnabled": checkout_enabled()
                             and authenticated_checkout_enabled(),
+        # A fact, not a flag. False until a checkout creator exists, so a
+        # deployment with the flags on still cannot be described as selling.
+        "checkoutImplemented": checkout_implemented(),
     }
 
 
@@ -513,6 +516,16 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                 expires = (time.time() if now is None else now) + cfg["periodDays"] * 86400
             _lic.grant(user_id, plan=cfg["plan"], expires_at=expires,
                        masked_key=None, now=now, payment_ref=ref)
+            # The founder plan and the live paid record are different facts.
+            # A missing amount still grants the plan (see _amount_matches)
+            # and does not write the paid record. A failed write raises, so
+            # the provider retries.
+            from apex.platform import live_gate as _live_gate
+            lifetime = (not cfg.get("periodDays")
+                        and str(cfg.get("purchaseMode") or "").lower()
+                        == "one_time")
+            _live_gate.note_confirmed_payment(
+                user_id, obj, payment_ref=ref, lifetime=lifetime)
             if ref:
                 # Best effort, and deliberately NOT strict: the licence is
                 # written and the buyer is provisioned. Failing the delivery
@@ -542,6 +555,10 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                              "reason": "a partial refund does not withdraw "
                                        "the licence"}
             _lic.revoke(user_id)
+            # The paid record has to go with the licence. Revoke does not
+            # stop a loop that is already running; that is a separate gap.
+            from apex.platform import live_gate as _live_gate
+            _live_gate.clear_paid_licence(user_id)
             notice = ("Licence suspended", _notify.CRITICAL,
                       "A payment was refunded, disputed or failed, so "
                       "the licence on this account was suspended.")
