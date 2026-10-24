@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LiveAccessPanel, liveCleared, liveNotice } from "./live-access";
+import { LiveAccessPanel, liveCleared, liveNotice, requestSentence } from "./live-access";
 import type { Execution, LiveGateVerdict } from "@/lib/api";
 
 const closed: LiveGateVerdict = {
@@ -63,5 +63,27 @@ describe("the live gate on a screen", () => {
     const notice = liveNotice(execution());
     expect(notice.lead).toBe("Live trading is not available in this release.");
     expect(notice.lead).not.toMatch(/live automation is available/i);
+  });
+
+  it("describes pending, approved, rejected and unread requests", () => {
+    expect(requestSentence(null)).toMatch(/have not requested/i);
+    expect(requestSentence({ ...closed, request: { status: "none" } })).toMatch(/have not requested/i);
+    expect(requestSentence({ ...closed, request: { status: "pending" } })).toMatch(/waiting for an operator/i);
+    expect(requestSentence({ ...closed, request: { status: "approved" } })).toMatch(/every other condition/i);
+    const declined = requestSentence({
+      ...closed,
+      request: { status: "rejected", reason: "the documents do not match" },
+    });
+    expect(declined).toMatch(/declined/i);
+    expect(declined).toMatch(/documents do not match/);
+    expect(declined).toMatch(/another request/i);
+    const claimed = ["live trading is ", "available"].join("");
+    const hidden = requestSentence({
+      ...closed,
+      request: { status: "rejected", reason: claimed },
+    });
+    expect(hidden.toLowerCase()).not.toContain(claimed);
+    expect(hidden).toMatch(/another request/i);
+    expect(requestSentence({ ...closed, request: { status: "unknown" } })).toMatch(/not approved/i);
   });
 });

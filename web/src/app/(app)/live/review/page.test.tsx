@@ -52,4 +52,30 @@ describe("live review", () => {
     expect(screen.getByRole("button", { name: "Approve" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
   });
+
+  it("shows the reason on file when a rejected request is loaded", async () => {
+    api.mockResolvedValue({
+      ok: true,
+      data: {
+        status: "rejected",
+        reason: "account documents do not match",
+        verdict: {
+          open: false,
+          status: "closed",
+          summary: "Live trading is not available until every condition below is met.",
+          conditions: [],
+          missing: [],
+          request: { status: "rejected", reason: "account documents do not match" },
+          checkoutOpen: false,
+        },
+      },
+    });
+    render(<LiveReviewPage />);
+    expect(screen.getByRole("button", { name: "Approve" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/User id/i), { target: { value: "client-9" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Load$/ }));
+    expect(await screen.findByText(/Reason on file: account documents do not match/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeTruthy();
+    expect(api).toHaveBeenCalledWith("live/requests/client-9");
+  });
 });

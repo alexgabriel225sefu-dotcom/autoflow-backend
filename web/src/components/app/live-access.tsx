@@ -47,6 +47,27 @@ export function liveNotice(execution: Execution | null | undefined): {
   return { lead: FALLBACK, details: [] };
 }
 
+export function requestSentence(gate: LiveGateVerdict | null | undefined): string {
+  const status = gate?.request?.status || "none";
+  if (status === "pending") {
+    return "Your request is waiting for an operator. It does not connect a broker account.";
+  }
+  if (status === "approved") {
+    return "An operator approved the request. A live order is still sent only when every other condition is met.";
+  }
+  if (status === "rejected") {
+    const reason = (gate?.request?.reason || "").trim();
+    const safe = reason && !claimsLiveAvailable(reason) ? reason : "";
+    return safe
+      ? `An operator declined the request: ${safe} You can send another request.`
+      : "An operator declined the request. You can send another request.";
+  }
+  if (status === "unknown") {
+    return "The request could not be read, so it is treated as not approved.";
+  }
+  return "You have not requested a live account connection.";
+}
+
 export function LiveAccessPanel({
   gate,
 }: {
