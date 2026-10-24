@@ -194,6 +194,111 @@
   --radius: var(--a4t-radius);
 }
 
+/* ── appearance: the Light theme and the personal accents ───────────────
+   Both are redefinitions of the tokens above, selected by attributes on
+   <html> (see src/lib/appearance.ts). `appearance.test.ts` measures every
+   value here: AA text on the page, the action fill with its own foreground,
+   long and short distinguishable from each other, and every accent kept 40
+   degrees or more from the hues that mean profit and loss.
+
+   Redefined on :root itself, not on a descendant, so the aliases above
+   (--a4t-demo, --a4t-live) follow along: a var() alias resolves where it is
+   declared. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --a4t-bg:        #F5F3EC;
+  --a4t-bg-2:      #FBFAF6;
+  --a4t-surface:   #FFFFFF;
+  --a4t-surface-2: #F0EEE6;
+  --a4t-surface-3: #E6E3D9;
+  --a4t-line:      #D2CEC1;
+  --a4t-line-soft: #E4E1D6;
+
+  --a4t-text:  #111113;
+  --a4t-muted: #55534D;
+  --a4t-dim:   #6A675F;
+
+  --a4t-accent:        #111113;
+  --a4t-accent-strong: #000000;
+  --a4t-accent-dim:    #BDB9AD;
+  --a4t-accent-wash:   rgba(17, 17, 19, 0.07);
+  --a4t-on-accent:     #F7F6F2;
+  --a4t-mark-bar:      #F7F6F2;
+
+  --a4t-link:        #1F5FBF;
+  --a4t-link-strong: #174A94;
+  --a4t-link-dim:    #CFE0F8;
+  --a4t-link-wash:   rgba(31, 95, 191, 0.08);
+
+  --a4t-long:    #0B7A3E;
+  --a4t-short:   #A3170A;
+  --a4t-neutral: #5E5B54;
+  --a4t-long-wash:  rgba(11, 122, 62, 0.12);
+  --a4t-short-wash: rgba(163, 23, 10, 0.10);
+
+  --elev-1: 0 1px 2px rgba(17, 17, 19, .06), 0 0 0 1px rgba(17, 17, 19, .03);
+  --elev-2: 0 24px 60px -24px rgba(17, 17, 19, .28), 0 0 0 1px rgba(17, 17, 19, .05);
+}
+
+/* Accents. Each one is a fill, its own foreground, a stronger step, a disabled
+   step and a wash. The Black theme gets a bright fill with dark text, the
+   Light theme a deep fill with white text. `.sw` (the swatch in the picker)
+   carries the same tokens, so what is drawn is what will apply. */
+:root[data-accent="ice"], .sw[data-accent="ice"] {
+  --a4t-accent: #8FD0FF; --a4t-accent-strong: #BFE3FF; --a4t-accent-dim: #2B4256;
+  --a4t-accent-wash: rgba(143, 208, 255, 0.10); --a4t-on-accent: #0A1620; --a4t-mark-bar: #0A1620;
+}
+:root[data-accent="lilac"], .sw[data-accent="lilac"] {
+  --a4t-accent: #BBA6FF; --a4t-accent-strong: #D9CCFF; --a4t-accent-dim: #3A3256;
+  --a4t-accent-wash: rgba(187, 166, 255, 0.10); --a4t-on-accent: #120C26; --a4t-mark-bar: #120C26;
+}
+:root[data-accent="orchid"], .sw[data-accent="orchid"] {
+  --a4t-accent: #F29BD6; --a4t-accent-strong: #F9C5E8; --a4t-accent-dim: #4F2C44;
+  --a4t-accent-wash: rgba(242, 155, 214, 0.10); --a4t-on-accent: #240A1B; --a4t-mark-bar: #240A1B;
+}
+:root[data-accent="volt"], .sw[data-accent="volt"] {
+  --a4t-accent: #D2F55A; --a4t-accent-strong: #E6FA95; --a4t-accent-dim: #444F1C;
+  --a4t-accent-wash: rgba(210, 245, 90, 0.10); --a4t-on-accent: #131A02; --a4t-mark-bar: #131A02;
+}
+.sw[data-accent="cream"] {
+  --a4t-accent: #F7F6F2; --a4t-on-accent: #111113;
+}
+
+:root[data-theme="light"][data-accent="ice"], :root[data-theme="light"] .sw[data-accent="ice"] {
+  --a4t-accent: #0B63B8; --a4t-accent-strong: #084C8E; --a4t-accent-dim: #B9D3EC;
+  --a4t-accent-wash: rgba(11, 99, 184, 0.08); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"][data-accent="lilac"], :root[data-theme="light"] .sw[data-accent="lilac"] {
+  --a4t-accent: #5B3FD1; --a4t-accent-strong: #472FAE; --a4t-accent-dim: #CFC6F0;
+  --a4t-accent-wash: rgba(91, 63, 209, 0.08); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"][data-accent="orchid"], :root[data-theme="light"] .sw[data-accent="orchid"] {
+  --a4t-accent: #B1237E; --a4t-accent-strong: #8E1A65; --a4t-accent-dim: #EBC2DD;
+  --a4t-accent-wash: rgba(177, 35, 126, 0.08); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"][data-accent="volt"], :root[data-theme="light"] .sw[data-accent="volt"] {
+  --a4t-accent: #4F6B00; --a4t-accent-strong: #3D5400; --a4t-accent-dim: #D3DEAE;
+  --a4t-accent-wash: rgba(79, 107, 0, 0.09); --a4t-on-accent: #FFFFFF; --a4t-mark-bar: #FFFFFF;
+}
+:root[data-theme="light"] .sw[data-accent="cream"] {
+  --a4t-accent: #111113; --a4t-on-accent: #F7F6F2;
+}
+
+/* The few app rules that spelled a cream colour out instead of using a token.
+   Under the Light theme they would be invisible. */
+:root[data-theme="light"] .btn { box-shadow: 0 10px 22px -14px rgba(17, 17, 19, .45); }
+:root[data-theme="light"] .btn-ghost { background: transparent; border-color: rgba(17, 17, 19, .28); box-shadow: none; }
+:root[data-theme="light"] .btn-ghost:hover { background: rgba(17, 17, 19, .06); border-color: rgba(17, 17, 19, .5); }
+:root[data-theme="light"] .btn-danger { box-shadow: 0 12px 24px -16px rgba(163, 23, 10, .6); }
+:root[data-theme="light"] .auth-block .field input:focus { box-shadow: 0 0 0 4px rgba(17, 17, 19, .10); }
+:root[data-theme="light"] .a4t .brand-lockup-image { filter: invert(1); }
+:root[data-theme="light"] .btn-lg:not(.btn-ghost):not(.btn-danger)::after {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111113' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17L17 7M9 7h8v8'/></svg>");
+}
+/* The landing page keeps its own dark palette in every theme; only the page
+   behind it must not turn light. */
+html:has(.mkt) body { background: var(--mkt-bg, #08080A); }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; color-scheme: dark; }
@@ -299,25 +404,123 @@ body {
 }
 .side-group { margin-top: .9rem; padding: 0 .55rem .35rem; }
 
+/* The sidebar is a timeline: a rail, a node per destination, one highlight
+   that slides between rows. Rows are one fixed height so the highlight and the
+   rail fill are placed from an index (--hi, --ri) with no measuring. */
+.side-section { --row: 2.35rem; }
+.side-list { position: relative; }
+.side-list ul { list-style: none; position: relative; z-index: 1; }
+.side-list li { height: var(--row); }
+.side-rail {
+  position: absolute; left: calc(.55rem + 4px); top: calc(var(--row) * .5); bottom: calc(var(--row) * .5);
+  width: 2px; border-radius: 2px; background: var(--a4t-line);
+}
+.side-rail i {
+  position: absolute; left: 0; top: 0; width: 100%; border-radius: 2px;
+  height: calc(var(--ri, -1) * var(--row)); background: var(--a4t-accent);
+  transition: height .32s cubic-bezier(.2, .8, .2, 1);
+}
+.side-hl {
+  position: absolute; left: 0; right: 0; top: 0; height: var(--row);
+  border-radius: var(--a4t-radius-sm); background: var(--a4t-surface-2);
+  transform: translateY(calc(var(--hi, 0) * var(--row)));
+  opacity: 0;
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1), opacity .16s;
+}
+.side-list[data-hover="true"] .side-hl { opacity: 1; }
+
 .side-link {
-  display: flex; align-items: center; gap: .6rem;
-  padding: .5rem .55rem; border-radius: var(--a4t-radius-sm);
+  display: flex; align-items: center; gap: .6rem; height: 100%;
+  padding: 0 .55rem 0 .55rem; border-radius: var(--a4t-radius-sm);
   color: var(--a4t-muted); font-size: .875rem; font-weight: 500;
-  position: relative; transition: background .12s, color .12s;
+  position: relative; transition: color .15s;
 }
-.side-link:hover { background: var(--a4t-surface); color: var(--a4t-text); }
-.side-link[data-active="true"] {
-  background: var(--a4t-surface-2); color: var(--a4t-text);
+.side-link:hover, .side-link:focus-visible { color: var(--a4t-text); }
+.side-link:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: -2px; }
+.side-link[data-active="true"] { color: var(--a4t-text); font-weight: 600; }
+.side-node {
+  width: 10px; height: 10px; flex: none; border-radius: 50%; position: relative; z-index: 1;
+  background: var(--a4t-bg); border: 2px solid var(--a4t-line);
+  transition: background .2s, border-color .2s, transform .25s cubic-bezier(.2, .8, .2, 1);
 }
-.side-link[data-active="true"]::before {
-  content: ""; position: absolute; left: -.6rem; top: 50%;
-  transform: translateY(-50%);
-  width: 2px; height: 17px; border-radius: 0 2px 2px 0;
-  background: var(--a4t-link);
+.side-list li[data-lit="true"] .side-node { border-color: var(--a4t-accent); }
+.side-link[data-active="true"] .side-node {
+  background: var(--a4t-accent); border-color: var(--a4t-accent);
+  box-shadow: 0 0 0 4px var(--a4t-accent-wash);
 }
-.side-link .ico { width: 16px; height: 16px; flex: none; opacity: .85; }
-.side-link[data-active="true"] .ico { opacity: 1; color: var(--a4t-link); }
-.side-foot { margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--a4t-line-soft); }
+.side-link:hover .side-node, .side-link:focus-visible .side-node { transform: scale(1.25); }
+.side-link .ico { width: 16px; height: 16px; flex: none; opacity: .75; transition: opacity .15s, transform .25s cubic-bezier(.2, .8, .2, 1); }
+.side-link:hover .ico, .side-link[data-active="true"] .ico { opacity: 1; }
+.side-link:hover .ico { transform: translateX(2px); }
+@media (prefers-reduced-motion: reduce) {
+  .side-rail i, .side-hl, .side-node, .side-link, .side-link .ico { transition: none; }
+  .side-link:hover .ico, .side-link:hover .side-node, .side-link:focus-visible .side-node { transform: none; }
+}
+
+.side-foot { margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--a4t-line-soft); display: flex; flex-direction: column; gap: 2px; }
+.side-out {
+  display: flex; align-items: center; gap: .6rem; width: 100%; height: 2.35rem; padding: 0 .55rem;
+  border: 0; background: none; cursor: pointer; font: inherit; font-size: .875rem; font-weight: 500;
+  color: var(--a4t-muted); border-radius: var(--a4t-radius-sm); text-align: left;
+  transition: background .15s, color .15s;
+}
+.side-out:hover { background: var(--a4t-surface-2); color: var(--a4t-text); }
+.side-out:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: -2px; }
+.side-out .ico { width: 16px; height: 16px; flex: none; }
+.side-appearance .mark { flex: none; transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+.side-appearance:hover .mark, .side-appearance[aria-expanded="true"] .mark { transform: rotate(-8deg) scale(1.08); }
+@media (prefers-reduced-motion: reduce) { .side-appearance .mark { transition: none; } .side-appearance:hover .mark { transform: none; } }
+
+/* appearance: popover from the logo button, and the same controls on Settings */
+.appearance-menu { position: relative; }
+.appearance-pop {
+  position: absolute; left: 0; bottom: calc(100% + .5rem); width: 17.5rem; z-index: 30;
+  background: var(--a4t-surface); border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius);
+  padding: .9rem; box-shadow: var(--elev-2);
+}
+.appearance { display: grid; gap: 1rem; }
+.appearance-row { display: grid; gap: .5rem; }
+.appearance .segc { max-width: 16rem; }
+.appearance-note { font-size: .76rem; line-height: 1.45; }
+
+/* segmented control: a thumb that slides under the chosen option */
+.segc {
+  position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr);
+  padding: 4px; background: var(--a4t-surface-2); border: 1px solid var(--a4t-line); border-radius: 999px;
+}
+.segc-thumb {
+  position: absolute; top: 4px; bottom: 4px; left: 4px;
+  width: calc((100% - 8px) / var(--n)); border-radius: 999px;
+  background: var(--a4t-accent);
+  transform: translateX(calc(var(--i) * 100%));
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1);
+}
+.segc button {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  min-height: 34px; border: 0; background: none; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700;
+  color: var(--a4t-muted); border-radius: 999px; transition: color .2s;
+}
+.segc button .ico { width: 14px; height: 14px; }
+.segc button[aria-checked="true"] { color: var(--a4t-on-accent); }
+.segc button:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .segc-thumb, .segc button { transition: none; } }
+
+/* accent swatches: each one carries the tokens of the accent it shows, so the
+   colour on screen is the real one for the current theme, with no second copy */
+.swatches { display: flex; gap: .55rem; flex-wrap: wrap; }
+.sw {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--a4t-accent); color: var(--a4t-on-accent);
+  border: 2px solid var(--a4t-surface); box-shadow: 0 0 0 1px var(--a4t-line);
+  transition: transform .2s cubic-bezier(.2, .8, .2, 1), box-shadow .2s;
+}
+.sw:hover { transform: scale(1.1); }
+.sw .ico { width: 14px; height: 14px; opacity: 0; transform: scale(.4); transition: opacity .15s, transform .2s; }
+.sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--a4t-text); }
+.sw[aria-checked="true"] .ico { opacity: 1; transform: none; }
+.sw:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .sw, .sw .ico { transition: none; } .sw:hover { transform: none; } }
 
 /* main column */
 .main-col { display: flex; flex-direction: column; min-width: 0; }

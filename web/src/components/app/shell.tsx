@@ -1,14 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogOut, MoreHorizontal, User, X } from "lucide-react";
-import { BrandLockup } from "@/components/brand/logo";
+import { BrandLockup, BrandMark } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
 import type { AutomationState, CtraderStatus, Me, NotificationPage } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { isActive, NAV, PRIMARY, SECONDARY, titleFor } from "./nav";
 import { StatusBar } from "./status-bar";
+import { AppearanceControls } from "./appearance-controls";
+import type { NavItem } from "./nav";
 
 /**
  * The application shell.
@@ -70,26 +72,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLockup size={22} />
         </Link>
 
-        <p className="label-xs side-group" style={{ marginTop: 0 }}>Operations</p>
-        {NAV.slice(0, 5).map(({ href, label, icon: Icon }) => (
-          <Link key={href} className="side-link" href={href} data-active={isActive(path, href)}>
-            <Icon className="ico" aria-hidden />
-            <span style={{ flex: 1 }}>{label}</span>
-            {badge(href)}
-          </Link>
-        ))}
-
-        <p className="label-xs side-group">Account</p>
-        {NAV.slice(5).map(({ href, label, icon: Icon }) => (
-          <Link key={href} className="side-link" href={href} data-active={isActive(path, href)}>
-            <Icon className="ico" aria-hidden />
-            <span style={{ flex: 1 }}>{label}</span>
-            {badge(href)}
-          </Link>
-        ))}
+        <SideGroup label="Operations" items={NAV.slice(0, 5)} path={path} badge={badge} first />
+        <SideGroup label="Account" items={NAV.slice(5)} path={path} badge={badge} />
 
         <div className="side-foot">
-          <button className="side-link" onClick={signOut} style={{ width: "100%" }}>
+          <AppearanceMenu />
+          <button className="side-out" onClick={signOut}>
             <LogOut className="ico" aria-hidden />
             <span>Sign out</span>
           </button>
@@ -199,6 +187,113 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One group of sidebar destinations, drawn as a timeline.
+ *
+ * A rail runs down the left with a node per destination. The node of the page
+ * you are on is filled, and the rail fills from the top down to whichever node
+ * you are pointing at (or the current one, when you are not pointing at
+ * anything), so moving the pointer reads as travelling along the line. A single
+ * highlight slides between rows instead of each row flashing on its own.
+ *
+ * Rows are one fixed height, which is what lets the highlight and the fill be
+ * positioned from an index in CSS with no measuring. Keyboard focus drives the
+ * same state as the pointer, so the animation is not mouse-only. With
+ * `prefers-reduced-motion` the CSS drops every transition and the states
+ * simply change.
+ */
+function SideGroup({
+  label, items, path, badge, first,
+}: {
+  label: string;
+  items: NavItem[];
+  path: string;
+  badge: (href: string) => React.ReactNode;
+  first?: boolean;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const active = items.findIndex((n) => isActive(path, n.href));
+  const lit = hover ?? active;
+  return (
+    <div className="side-section">
+      <p className="label-xs side-group" style={first ? { marginTop: 0 } : undefined}>{label}</p>
+      <div
+        className="side-list"
+        style={{ "--hi": hover ?? 0, "--ri": lit } as React.CSSProperties}
+        data-hover={hover !== null}
+        onPointerLeave={() => setHover(null)}
+        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setHover(null); }}
+      >
+        <span className="side-rail" aria-hidden><i /></span>
+        <span className="side-hl" aria-hidden />
+        <ul>
+        {items.map(({ href, label: text, icon: Icon }, i) => (
+          <li key={href} data-lit={lit >= 0 && i <= lit}>
+            <Link
+              className="side-link"
+              href={href}
+              data-active={i === active}
+              aria-current={i === active ? "page" : undefined}
+              onPointerEnter={() => setHover(i)}
+              onFocus={() => setHover(i)}
+            >
+              <span className="side-node" aria-hidden />
+              <Icon className="ico" aria-hidden />
+              <span style={{ flex: 1 }}>{text}</span>
+              {badge(href)}
+            </Link>
+          </li>
+        ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The logo as a button: opens the appearance popover (theme and accent).
+ * The mark in the button is drawn in the current accent, so it previews the
+ * choice it offers.
+ */
+function AppearanceMenu() {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  return (
+    <div className="appearance-menu" ref={box}>
+      <button
+        type="button"
+        className="side-out side-appearance"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <BrandMark size={20} />
+        <span>Appearance</span>
+      </button>
+      {open ? (
+        <div className="appearance-pop" role="dialog" aria-label="Appearance">
+          <AppearanceControls />
+        </div>
       ) : null}
     </div>
   );
