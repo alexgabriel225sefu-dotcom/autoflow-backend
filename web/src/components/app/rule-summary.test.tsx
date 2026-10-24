@@ -104,3 +104,36 @@ describe("the terms table for a rule built from conditions", () => {
     expect(screen.queryByText(/recorded and not acted on/)).toBeNull();
   });
 });
+
+describe("flatten and management notes", () => {
+  it("does not present flatten as closing positions", () => {
+    const doc = {
+      ...BASE,
+      limits: { maxOpenPositions: 1, onLimit: "flatten" },
+    } as unknown as RuleDoc;
+    render(<RuleTerms doc={doc} />);
+    expect(document.body.textContent).toContain("Block new entries");
+    expect(document.body.textContent).toContain("still stores flatten");
+    expect(document.body.textContent).not.toContain("Close open positions");
+  });
+
+  it("names trailing and break-even from the server notApplied list, not a hardcoded lie", () => {
+    const doc = {
+      ...BASE,
+      trailingStop: { enabled: true, atrMultiple: 2.5 },
+      breakEven: { enabled: true, atR: 1.25 },
+    } as unknown as RuleDoc;
+    render(<RuleTerms
+      doc={doc}
+      notApplied={[{
+        term: "Trailing stop",
+        value: "2.5× ATR",
+        why: "Trailing is switched on, but its distance is not configurable per rule — the engine uses its own.",
+      }]}
+    />);
+    expect(document.body.textContent).toContain("2.5× ATR");
+    expect(document.body.textContent).toContain("distance is not configurable per rule");
+    expect(document.body.textContent).not.toContain("does not apply it yet");
+    expect(document.body.textContent).not.toContain("does not apply these yet");
+  });
+});

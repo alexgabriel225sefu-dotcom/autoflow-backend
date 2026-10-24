@@ -256,9 +256,11 @@ def translate(doc):
     #   watchlist       the basket that rotation draws from.
     #
     # `session_filter` is deliberately NOT written. It is the account's own
-    # setting and it is not this rule's schedule — the schedule is reported
-    # below as a term that does not reach the engine, which is the honest
-    # answer. Clearing it would widen trading past what the client chose.
+    # setting and it is not this rule's schedule. A condition rule's days
+    # and windows are enforced by the evaluator; a preset never goes
+    # through that path, so its schedule is reported below when set.
+    # Clearing the account filter would widen trading past what the client
+    # chose.
     # A PRESET RULE IS POINTED AT ITS PRESET. THIS WAS THE MISSING HAND-OFF,
     # AND WITHOUT IT THE WHOLE STRATEGY PICKER PLACED NOTHING, FOREVER.
     #
@@ -453,11 +455,11 @@ def translate(doc):
          "rounds it to a volume the broker accepts, so the amount risked is "
          "close to the percentage you set rather than exactly it.")
     sched = doc.get("schedule") or {}
-    if sched.get("days") or sched.get("windows"):
+    if _preset and (sched.get("days") or sched.get("windows")):
         miss("Schedule", "set",
-             "The engine filters by trading session, not by the days and "
-             "time windows a rule records, so this rule's schedule is not "
-             "applied.")
+             "A strategy rule is not run by the condition evaluator, so "
+             "its days and time windows are not applied. The engine's own "
+             "session filter is left as the account already had it.")
     order = doc.get("order") or {}
     if order.get("maxSlippagePoints") or order.get("expiresAfterSec"):
         miss("Order constraints", "set",

@@ -546,12 +546,17 @@ export function RuleForm({
             <span className="field-note">Recorded on the rule; not enforced by the engine yet.</span></label>
         </div>
         <div className="field"><span>When a limit is hit</span>
-          <Seg value={d.onLimit} options={["block", "flatten"]} onChange={(v) => set("onLimit", v)} />
-          <span className="field-note">
-            {d.onLimit === "flatten"
-              ? "Not applied yet: this release only refuses new entries and keeps managing the open ones, whichever you choose."
-              : "Refuse new entries and keep managing the open ones."}
-          </span>
+          {d.onLimit === "flatten" ? (
+            <span className="field-note" style={{ color: "var(--a4t-short)" }}>
+              This saved rule still stores flatten. That action is not
+              executed — new entries are refused and open positions stay.
+              Starting the rule reports it as not applied.
+            </span>
+          ) : (
+            <span className="field-note">
+              New entries are refused and open positions stay.
+            </span>
+          )}
         </div>
       </Section>
     </>

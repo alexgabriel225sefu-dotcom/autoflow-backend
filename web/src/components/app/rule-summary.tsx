@@ -313,20 +313,18 @@ export function RuleTerms({
         <Row
           k="Trailing stop"
           v={trail.enabled ? `${trail.atrMultiple ?? "?"}× ATR` : <span className="dim">off</span>}
-          note={trail.enabled ? "Switched on when automation starts. The distance is the engine's own, not this number." : undefined}
         />
         <Row
           k="Break even"
           v={be.enabled ? `at ${be.atR ?? "?"}R` : <span className="dim">off</span>}
-          note={be.enabled ? "Applied when automation starts, at the R multiple shown." : undefined}
         />
         <Row k="Max open positions" v={String(limits.maxOpenPositions ?? "—")} />
         <Row k="Max spread" v={limits.maxSpreadPips ? `${limits.maxSpreadPips} pips` : <span className="dim">no cap</span>} />
         <Row
           k="On limit"
-          v={limits.onLimit === "flatten" ? "Close open positions" : "Block new entries"}
+          v="Block new entries"
           note={limits.onLimit === "flatten"
-            ? "Not applied yet: a limit only refuses new entries. Open positions stay open and managed."
+            ? "This rule still stores flatten. It is not executed — starting the rule reports it as not applied."
             : undefined}
         />
         <Row k="Schedule" v={schedulePhrase(doc) ?? <span className="dim">any time the market is open</span>} />

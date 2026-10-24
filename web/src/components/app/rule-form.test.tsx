@@ -247,11 +247,21 @@ describe("fields that would be refused at execution say so at the input", () => 
     expect(text).toContain("Recorded on the rule; not enforced by the engine yet.");
   });
 
-  it("does not promise that flatten closes anything", () => {
+  it("does not offer flatten as a choice", () => {
+    render(<RuleForm draft={BLANK} set={vi.fn()} specs={SPECS} step="limits" />);
+    const text = document.body.textContent ?? "";
+    expect(screen.queryByRole("button", { name: "flatten" })).toBeNull();
+    expect(text).toContain("New entries are refused and open positions stay");
+    expect(text).not.toContain("Close open positions");
+  });
+
+  it("a stored flatten value is kept, and said to be unused", () => {
     render(<RuleForm draft={{ ...BLANK, onLimit: "flatten" }} set={vi.fn()} specs={SPECS} step="limits" />);
     const text = document.body.textContent ?? "";
-    expect(text).toContain("Not applied yet");
-    expect(text).not.toContain("Close open positions as well as refusing new entries");
+    expect(text).toContain("still stores flatten");
+    expect(text).toContain("not executed");
+    expect(text).not.toContain("Close open positions");
+    expect(screen.queryByRole("button", { name: "flatten" })).toBeNull();
   });
 });
 
