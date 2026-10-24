@@ -418,6 +418,16 @@ def translate(doc):
              "A demo account holds one position at a time in this release, "
              "whatever the rule says.")
 
+    # `onLimit: "flatten"` promises to close open positions when a limit is hit.
+    # Nothing in the loop or the evaluator does that: a limit only refuses NEW
+    # entries (`evaluator._limit_problem`), whichever way this is set. Named
+    # per rule, because it is true only of a rule that asked for it.
+    if limits.get("onLimit") == "flatten":
+        miss("When a limit is hit", "close open positions",
+             "This release only refuses new entries when a limit is hit. It "
+             "does not close positions that are already open: they stay at "
+             "your broker with their stop and target and keep being managed.")
+
     # ── what the engine simply does not take from a rule ────────────────────
     # Entry conditions, exit conditions and sides USED to be reported here:
     # the engine chose entries with its own strategies and a rule's conditions

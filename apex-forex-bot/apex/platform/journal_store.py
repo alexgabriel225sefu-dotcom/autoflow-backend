@@ -59,8 +59,8 @@ def _k_lock(owner):
     return f"{_store._ns()}:{_store._P}:jlock:{owner}"
 
 
-def _read_index(owner):
-    raw = _store._read(_k_index(owner))
+def _read_index(owner, *, strict=False):
+    raw = (_store._read_strict if strict else _store._read)(_k_index(owner))
     return raw if isinstance(raw, list) else []
 
 
@@ -106,7 +106,22 @@ def get(owner_id, entry_id):
         raise JournalNotFound("no such journal entry")
     if str(row.get("userId")) != owner:
         raise JournalNotFound("no such journal entry")
-    return row
+    return _present(row)
+
+
+def _present(row):
+    """A copy of a stored row that is safe to hand to a browser.
+
+    The journal is append-only evidence, so the stored row is never rewritten.
+    Free text in it can predate the write-time cleaning, though, and a host or
+    path in an old error is as exposed as a new one. So the text is cleaned
+    again on the way out, on a copy.
+    """
+    if not isinstance(row, dict) or not row.get("error"):
+        return row
+    out = dict(row)
+    out["error"] = _j.clean_error(row.get("error"))
+    return out
 
 
 def _matches(head, *, account_id, symbol, since, until, rule_doc_id, status):
@@ -141,16 +156,27 @@ def query(owner_id, *, account_id=None, symbol=None, since=None, until=None,
     limit = max(1, min(int(limit or 50), 200))
     offset = max(0, int(offset or 0))
 
-    heads = [h for h in _read_index(owner)
+    # STRICT, both reads. An index that could not be read used to come back as
+    # an empty journal with status "ok", which a client reads as "nothing has
+    # happened"; now the store being down is a 503 like everywhere else.
+    heads = [h for h in _read_index(owner, strict=True)
              if _matches(h, account_id=account_id, symbol=symbol,
                          since=since, until=until, rule_doc_id=rule_doc_id,
                          status=status)]
     page = heads[offset:offset + limit]
+    # ONE round trip for the page, not one per row in series.
+    docs = _store._read_many_strict([_k_entry(owner, h["id"]) for h in page])
     rows = []
-    for h in page:
-        row = _store._read(_k_entry(owner, h["id"]))
-        if row and str(row.get("userId")) == owner:
-            rows.append(row)
+    unreadable = 0
+    for row in docs:
+        if isinstance(row, dict) and str(row.get("userId")) == owner:
+            rows.append(_present(row))
+        else:
+            # The index names it, the store does not hold a usable row. It is
+            # COUNTED and reported, not skipped: a page that is quietly one
+            # entry short looks complete, and "total" would then disagree with
+            # what is on screen with nothing to explain it.
+            unreadable += 1
     return {
         "status": "ok",
         "entries": rows,
@@ -158,6 +184,7 @@ def query(owner_id, *, account_id=None, symbol=None, since=None, until=None,
         "limit": limit,
         "offset": offset,
         "hasMore": offset + len(page) < len(heads),
+        "unreadable": unreadable,
     }
 
 

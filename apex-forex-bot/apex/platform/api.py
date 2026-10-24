@@ -658,15 +658,13 @@ def _dispatch(method, route, headers, body, query=None):
     # every client in.
     #
     # Rate limiting: every route here goes through `_rl.check` before
-    # `_dispatch` is reached, which puts these in the `default` bucket — the
-    # same one the notifications and journal polls use. `approvals` has no
-    # case of its own in `ratelimit.classify`, so approving is metered as a
-    # dashboard read rather than as a control action. That is deliberately
-    # noted rather than quietly left: the thing that stops a double tap
-    # opening two positions is the claim and the clear in `approvals.approve`
-    # plus the idempotency claim inside the order controller, not the
-    # limiter — but a tighter bucket is the right home for an order-producing
-    # POST and belongs in `classify` beside the automation controls.
+    # `_dispatch` is reached. `approvals/approve` is in the `control` bucket
+    # (see `ratelimit.classify`), because approving IS placing an order and it
+    # used to be metered as a dashboard read. Reject and the pending-list poll
+    # stay in `default`: a client must always be able to say no. What stops a
+    # double tap opening two positions is the claim and the clear in
+    # `approvals.approve` plus the idempotency claim inside the order
+    # controller; the limiter is the second layer, not the first.
     if route == "approvals":
         if method != "GET":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")

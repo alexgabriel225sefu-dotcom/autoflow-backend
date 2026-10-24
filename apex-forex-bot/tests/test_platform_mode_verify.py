@@ -38,6 +38,7 @@ from apex.platform import plans as _plans               # noqa: E402
 from apex.platform import ctrader_link as CL            # noqa: E402
 from apex.platform import ruledoc as _rd                # noqa: E402
 from apex.platform import store as _store               # noqa: E402
+from apex.platform import journal_store as _JS          # noqa: E402
 
 _fails = []
 
@@ -171,6 +172,19 @@ def start_with(lister):
 e = start_with(lambda t: [DEMO_ACC, LIVE_ACC])
 check("a verified demo account starts", e is None and "GO" in started,
       f"{e and e.code} {started}")
+# The words the start leaves in the journal and in the notification name the
+# mode the loop is on. They used to say "demo" unconditionally, which would
+# have told a real-money client it was on a practice account.
+_started_entries = [x for x in _JS.query(USER, limit=50)["entries"]
+                    if x.get("status") == "automation_started"]
+check("the journal line for a demo start says demo account",
+      _started_entries and "demo account 801" in str(_started_entries[0]),
+      str(_started_entries[:1]))
+check("the label names live when the mode is live",
+      AU._account_label(AU.LIVE) == "live account", AU._account_label(AU.LIVE))
+check("and does not guess when the mode is unknown",
+      AU._account_label(None) == "account" and AU._account_label("paper") == "account",
+      f"{AU._account_label(None)!r} {AU._account_label('paper')!r}")
 AU.stop(USER, stopper=lambda uid: True)
 
 e = start_with(lambda t: (_ for _ in ()).throw(RuntimeError("down")))
