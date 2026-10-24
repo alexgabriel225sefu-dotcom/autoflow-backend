@@ -370,11 +370,13 @@ describe("Rule Detail — preview cannot trade", () => {
     expect(lwc.charts).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: /Fetch market data/ }));
-    await waitFor(() => expect(container.querySelector(".price-chart")).not.toBeNull());
-    // The chart was given exactly the bars the preview will evaluate.
-    expect(lwc.seriesOf("candlestick")[0].setData).toHaveBeenCalledWith(
-      BARS.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })),
-    );
+    // The node is committed before the chart effect runs. Waiting only for
+    // `.price-chart` lets the next line read a series that does not exist yet.
+    const drawn = BARS.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close }));
+    await waitFor(() => {
+      expect(container.querySelector(".price-chart")).not.toBeNull();
+      expect(lwc.seriesOf("candlestick")[0]?.setData).toHaveBeenCalledWith(drawn);
+    });
     // And no marker until something has actually been evaluated.
     expect(lwc.markerPlugins.flatMap((m) => m.markers)).toHaveLength(0);
 

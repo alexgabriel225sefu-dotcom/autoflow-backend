@@ -62,6 +62,7 @@ export const lwc: {
     markerPlugins.length = 0;
   },
   seriesOf(kind, chart = charts[charts.length - 1]) {
+    if (!chart) return [];
     return chart.series.filter((s) => s.definition.kind === kind && !s.removed);
   },
 };

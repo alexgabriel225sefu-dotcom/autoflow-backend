@@ -6,6 +6,7 @@ import {
 import Link from "next/link";
 import { formatOfferPrice, type Me, type PublicOffer } from "@/lib/api";
 import { liveNotice } from "@/components/app/live-access";
+import { BuyButton } from "@/components/app/buy-button";
 
 export default function LicensePage() {
   const me = useRead<Me>("me");
@@ -99,6 +100,9 @@ export default function LicensePage() {
                 : "Live purchase is not yet open."}{" "}
               Live trading is not available in this release.
             </p>
+            <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>
+              <BuyButton open={purchaseOpen === true} />
+            </div>
           </div>
 
           {me.result.data.licence.state === "revoked" ? (
