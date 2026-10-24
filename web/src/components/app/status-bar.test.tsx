@@ -167,6 +167,41 @@ describe("the Risk Guard chip", () => {
     expect(t).not.toContain("Active");
   });
 
+  // The loop idles through the weekend close window before it publishes a
+  // report, so a loop revived on a Saturday has none. Saying so is honest;
+  // saying "Active" would not be, and "No report yet" reads as a failed guard.
+  const weekend = (marketClosed: unknown) => ({
+    ok: true,
+    data: { state: "running", ruleDocId: "r1", marketClosed,
+            riskGuard: { state: "unknown", reasons: [] } } as unknown as AutomationState,
+  });
+
+  it("says the market is closed when the guard is silent because of the weekend", () => {
+    const t = text(weekend(true));
+    expect(t).toContain("Market closed");
+    expect(t).not.toContain("Active");
+    expect(t).not.toContain("No report yet");
+  });
+
+  it.each([[false], [null], [undefined]])(
+    "keeps 'No report yet' when the server said marketClosed=%s",
+    (value) => {
+      const t = text(weekend(value));
+      expect(t).toContain("No report yet");
+      expect(t).not.toContain("Market closed");
+    },
+  );
+
+  it("never lets a closed market turn a HOLDING guard into a calm one", () => {
+    const t = text({
+      ok: true,
+      data: { state: "running", ruleDocId: "r1", marketClosed: true,
+              riskGuard: { state: "holding", reasons: ["daily loss limit"] } } as unknown as AutomationState,
+    });
+    expect(t).toContain("HOLDING");
+    expect(t).not.toContain("Market closed");
+  });
+
   it("is not shown at all when nothing is running (there is no report to show)", () => {
     expect(text({ ok: true, data: { state: "stopped", riskGuard: { state: "unknown", reasons: [] } } }))
       .not.toContain("Risk Guard");

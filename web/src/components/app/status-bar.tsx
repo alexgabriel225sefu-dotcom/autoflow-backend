@@ -59,6 +59,10 @@ export function StatusBar({
   const autoFailed = auto != null && !auto.ok;
   const selected = account?.selected ?? null;
   const running = auto?.ok ? auto.data : null;
+  // A guard with no report, while the loop is idling through the weekend close
+  // window. Said as such; any other silence keeps the plain "No report yet".
+  const idleForWeekend = running?.riskGuard?.state === "unknown"
+    && running.marketClosed === true;
   const licence = me?.ok ? me.data.licence.state : null;
 
   return (
@@ -135,11 +139,14 @@ export function StatusBar({
           tone={running.riskGuard.state === "holding" ? "short"
             : running.riskGuard.state === "ok" ? "long" : "neutral"}
           value={running.riskGuard.state === "holding" ? "HOLDING"
-            : running.riskGuard.state === "ok" ? "Active" : "No report yet"}
+            : running.riskGuard.state === "ok" ? "Active"
+              : idleForWeekend ? "Market closed" : "No report yet"}
           title={running.riskGuard.state === "holding"
             ? (running.riskGuard.reasons.join("; ") || "A risk limit was hit.")
             : running.riskGuard.state === "unknown"
-              ? "The guard has not reported yet. This is not a statement that it is fine."
+              ? (idleForWeekend
+                ? "The market is closed for the weekend, so the loop is idle and has not reported. It reports again after the market reopens. This is not a statement that the guard is fine."
+                : "The guard has not reported yet. This is not a statement that it is fine.")
               : undefined}
         />
       ) : null}

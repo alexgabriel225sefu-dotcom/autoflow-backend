@@ -721,6 +721,11 @@ export type AutomationState = {
   /** The Risk Guard's last report, as the loop published it. "unknown" is a
    *  guard that has not reported — it is never to be shown as "active". */
   riskGuard?: RiskGuard;
+  /** True while the loop sits out the weekend close window. It idles before it
+   *  publishes a Risk Guard report, so a loop revived on a Saturday has none —
+   *  this says why, so the chip is not read as a guard that failed to start.
+   *  Null when the server could not read its clock. */
+  marketClosed?: boolean | null;
   levelLabel?: string | null;
   levelBlurb?: string | null;
   levelExecutes?: boolean | null;

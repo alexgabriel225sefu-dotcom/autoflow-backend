@@ -212,6 +212,24 @@ check("status() carries the guard so every screen can show it",
       "riskGuard" in AU.status(USER) and AU.status(USER)["riskGuard"]["state"] in ("ok", "holding", "unknown"),
       str(AU.status(USER).get("riskGuard")))
 
+# The loop idles through the weekend close window before it publishes a Risk
+# Guard report, so a loop revived on a Saturday has none. status() says WHY the
+# report may be absent, so the chip need not read as a guard that failed to
+# start. None — not False — when unreadable: never claim a closed market that
+# was not checked.
+check("status() says the weekend window is in force when it is",
+      AU.status(USER, weekend_reader=lambda: True)["marketClosed"] is True)
+check("and that it is not when it is not",
+      AU.status(USER, weekend_reader=lambda: False)["marketClosed"] is False)
+
+
+def _boom():
+    raise RuntimeError("clock unreadable")
+
+
+check("an unreadable clock is None, never a guess",
+      AU.status(USER, weekend_reader=_boom)["marketClosed"] is None)
+
 # ── 6. the route exists and is a GET ────────────────────────────────────────
 print("\n[6] GET /automation/why is routed")
 src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()
