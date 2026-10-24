@@ -3,18 +3,30 @@ import { BrandLockup } from "@/components/brand/logo";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-/** Where Supabase lands after an email confirmation link. */
+type ConfirmState = "checking" | "confirmed" | "signed-out" | "pending";
+
+/**
+ * A signed-in check of whether Supabase has confirmed the address.
+ * The confirmation email itself lands on /auth/callback, not here.
+ */
 export default function ConfirmPage() {
-  const [state, setState] = useState<"checking" | "confirmed" | "pending">("checking");
+  const [state, setState] = useState<ConfirmState>("checking");
   const [email, setEmail] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    createClient().auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? null);
-      // The backend is the authority on whether the address is confirmed;
-      // this only reports what Supabase says, and never claims confirmation
-      // the session does not show.
-      setState(data.user?.email_confirmed_at ? "confirmed" : "pending");
+    createClient().auth.getUser().then(({ data, error: userError }) => {
+      if (userError) {
+        setError(userError.message);
+        setState("signed-out");
+        return;
+      }
+      if (!data.user) {
+        setState("signed-out");
+        return;
+      }
+      setEmail(data.user.email ?? null);
+      setState(data.user.email_confirmed_at ? "confirmed" : "pending");
     });
   }, []);
 
@@ -29,6 +41,17 @@ export default function ConfirmPage() {
             <>
               <p>{email} is confirmed.</p>
               <a className="btn" href="/dashboard">Go to dashboard</a>
+            </>
+          ) : null}
+          {state === "signed-out" ? (
+            <>
+              {error ? <p role="alert">{error}</p> : null}
+              <p>You are signed out.</p>
+              <p className="muted">
+                This page is not the email landing. The confirmation link from
+                sign-up opens /auth/callback.
+              </p>
+              <a href="/login">Sign in</a>
             </>
           ) : null}
           {state === "pending" ? (

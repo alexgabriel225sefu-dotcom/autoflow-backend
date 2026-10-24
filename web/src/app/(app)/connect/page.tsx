@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api, type CtraderStatus } from "@/lib/api";
-import { useRead } from "@/lib/use-api";
+import { invalidateBrokerViews, useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 
 /**
@@ -227,7 +227,7 @@ export default function ConnectPage() {
       return setErr(`${r.code}: ${r.message}`);
     }
     remember(null);
-    void status.reload();
+    invalidateBrokerViews();
   }
 
   return (
@@ -405,7 +405,7 @@ export default function ConnectPage() {
                   {busy ? "Finishing…" : "I have approved — finish"}
                 </button>
               ) : null}
-              <button className="btn btn-ghost" onClick={() => setPending(null)} disabled={busy}>
+              <button className="btn btn-ghost" onClick={() => { setErr(null); remember(null); }} disabled={busy}>
                 Cancel
               </button>
             </div>

@@ -21,7 +21,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { invalidate, useRead, whenSynced } from "./use-api";
+import { invalidate, invalidateBrokerViews, useRead, whenSynced } from "./use-api";
 import * as apiModule from "./api";
 
 /** A pending call whose result the test decides, later. */
@@ -230,6 +230,27 @@ describe("invalidate reaches every reader of a path", () => {
     // A left-over subscription would call api() against a component that no
     // longer exists, and React would warn on the state it tried to set.
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads accounts and positions together, and leaves journal alone", async () => {
+    // The shell reads `accounts` while a page reads `ctrader/status`.
+    // positions has no account id in the path, so it keeps the previous
+    // account until something reloads it. journal is not a broker view.
+    const spy = vi.spyOn(apiModule, "api")
+      .mockResolvedValue({ ok: true, data: {} } as never);
+    const accounts = renderHook(() => useRead("accounts"));
+    const positions = renderHook(() => useRead("positions"));
+    const journal = renderHook(() => useRead("journal"));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(3));
+
+    await act(async () => { invalidateBrokerViews(); });
+    await waitFor(() => expect(spy.mock.calls.filter((c) => c[0] === "accounts").length).toBe(2));
+    expect(spy.mock.calls.filter((c) => c[0] === "positions").length).toBe(2);
+    expect(spy.mock.calls.filter((c) => c[0] === "journal").length).toBe(1);
+
+    accounts.unmount();
+    positions.unmount();
+    journal.unmount();
   });
 
   it("reloads when the network comes back", async () => {

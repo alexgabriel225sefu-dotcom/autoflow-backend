@@ -1,11 +1,13 @@
 "use client";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleButton } from "@/components/auth/google-button";
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -16,12 +18,20 @@ export default function SignUpPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error } = await createClient().auth.signUp({
+    const { data, error } = await createClient().auth.signUp({
       email, password,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setBusy(false);
     if (error) return setError(error.message);
+    // A session means the address is already confirmed, or confirmation is
+    // off. Say nothing about whether the address existed: the no-session
+    // screen is the same either way.
+    if (data.session) {
+      router.push("/dashboard");
+      router.refresh();
+      return;
+    }
     setSent(true);
   }
 

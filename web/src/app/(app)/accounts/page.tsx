@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Check, Plug, RefreshCw } from "lucide-react";
 import { api, type ApiError, type CtraderStatus } from "@/lib/api";
-import { useRead, whenSynced } from "@/lib/use-api";
+import { invalidateBrokerViews, useRead, whenSynced } from "@/lib/use-api";
 import {
   AccountLimitNotice, ErrorNotice, MoreAccountsSection, Spinner, StatusPill,
 } from "@/components/app/state";
@@ -25,7 +25,7 @@ export default function AccountsPage() {
       if (r.code === "ACCOUNT_LIMIT") return setLimit(r);
       return setErr(`${r.code}: ${r.message}`);
     }
-    void status.reload();
+    invalidateBrokerViews();
   }
 
   async function disconnect() {
@@ -33,7 +33,7 @@ export default function AccountsPage() {
     const r = await api("ctrader/disconnect", { method: "POST" });
     setBusy(null);
     if (!r.ok) return setErr(`${r.code}: ${r.message}`);
-    void status.reload();
+    invalidateBrokerViews();
   }
 
   const data = status.result?.ok ? status.result.data : null;
@@ -67,6 +67,9 @@ export default function AccountsPage() {
                   The selected account is the one every read and every order uses.
                 </span>
               </div>
+              {data.accounts.length === 0 ? (
+                <p>Connected, but cTrader returned no accounts.</p>
+              ) : null}
               <div className="records">
                 {data.accounts.map((a) => {
                   const selected = String(data.selected?.ctid) === String(a.ctid);

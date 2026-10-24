@@ -1,5 +1,13 @@
 # Apex4Traders — handoff
 
+## This branch merged origin/claude/apex4traders-platform-v1
+
+This branch merged `origin/claude/apex4traders-platform-v1`, which includes the live hard gate (PR #34, merge `f9daa69`) and the live rule guard (PR #35, `4931d53ef`). This merge does not change or loosen the live gate. Live trading is not available.
+
+## This is the live-gate session's record
+
+The text under this heading is that session's record, written before merge. Its blockers stay as that session wrote them.
+
 ## Current session (2026-10-24)
 
 The sections below this one are historical. Several of them still say live
@@ -35,6 +43,27 @@ are not the current state. This section is.
     - `risk_gates` are not on the engine path. Wiring them was deliberately not part of this change.
 
 **State at:** `94c6c0b` on `claude/apex4traders-platform-v1`
+
+## This is the demo-journey session's record
+
+## This session (2026-10-24) — demo client journey
+
+The ten protocol fields for this session only. The historical body below is unchanged.
+
+1. **Current branch:** `cursor/demo-e2e-audit-37c1` (off `claude/apex4traders-platform-v1`).
+2. **Current commit:** `ea5bcba14` (audit and this section). Code tip underneath is `f17921fc9`. Test counts were taken there; this documentation does not change them. A later commit that only records this SHA does not change the counts either.
+3. **Completed work:** Client fixes for the demo journey: PKCE exchange on `/auth/callback`, sign-up when a session already exists, confirm-page states, unconfirmed-email notice, failed sign-out, settings broker error and confirmation resend, `invalidateBrokerViews` after account changes, dashboard refresh set, failed notification marks, and a 720px wrap rule for `.seg`. Audit: `docs/DEMO_E2E_AUDIT.md`.
+4. **Changed files:** `web/src/app/auth/callback/page.tsx` (+ test), `web/src/app/signup/page.tsx` (+ test), `web/src/app/auth/confirm/page.tsx` (+ test), `web/src/components/app/shell.tsx` (+ test), `web/src/app/globals.css`, `web/src/app/(app)/settings/page.tsx` (+ test), `web/src/lib/use-api.ts` (+ test), `web/src/app/(app)/accounts/page.tsx`, `web/src/app/(app)/connect/page.tsx` (+ test), `web/src/app/(app)/dashboard/page.tsx` (+ test), `web/src/app/(app)/notifications/page.tsx` (+ test), `docs/DEMO_E2E_AUDIT.md`, this file. `.claude/helpers/hook-handler.cjs` was edited locally so Cursor hooks return JSON and was **not** committed.
+5. **Tests and exact results:** `python3 tests/run_all.py` in `apex-forex-bot`: `ALL 218 TEST FILES PASSED`. That script globs `tests/test_*.py` only (not subfolders); every `test_*.py` in the tree is in that directory, so none were skipped. `npm test` in `web`: 50 files, **740 passed, 7 skipped, 0 failed**. The 7 skips are pre-existing cases in `web/src/app/content.test.ts` (privacy-policy statements), not new skips. `npx tsc --noEmit`: exit 0. `npx eslint src`: exit 0, 0 errors (pre-existing warnings only). `npm run build`: compiled, 26 static pages.
+6. **Failures:** none in those commands after Python dependencies from `requirements.txt` were installed. The first `npm test` failed only because `web/src/test/e2e.test.ts` could not import `requests`; after `pip install -r apex-forex-bot/requirements.txt` the suite passed.
+7. **Unverified integrations:** real Supabase SMTP, real cTrader demo OAuth, and any browser render at 390×844 or 1440×900. No screenshots.
+8. **Security concerns:** the local hook file prints `{"permission":"allow"}` for safe commands and `{"permission":"deny",...}` for the existing dangerous patterns. It is uncommitted on purpose. Do not commit it, and do not treat exit code 1 as a deny — Cursor fail-opens on that code; deny has to be JSON on exit 0.
+9. **Next concrete task:** the owner sends one real confirmation email and completes one cTrader demo OAuth, then checks the status strip, positions, and orders on that account at 390px and 1440px.
+10. **Blockers:** SMTP and a cTrader demo app the owner controls. Nothing in this session can send mail or log into the broker.
+
+---
+
+**State at:** `f17921fc9` on `cursor/demo-e2e-audit-37c1` (code). Historical body below still says `94c6c0b`; that line is the old session, not this one.
 **Date:** 2026-10-04 (body written 2026-09-30; corrected in place since)
 
 > **Where this file is NOT the authority.** `docs/RELEASE_READINESS.md` owns

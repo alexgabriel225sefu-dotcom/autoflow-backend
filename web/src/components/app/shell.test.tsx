@@ -17,11 +17,16 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
+const refresh = vi.fn();
 let pathname = "/dashboard";
+const shellState = vi.hoisted(() => ({
+  emailVerified: true as boolean | undefined,
+  signOut: vi.fn(async (): Promise<{ error?: { message: string } }> => ({})),
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
-  useRouter: () => ({ push, refresh: vi.fn() }),
+  useRouter: () => ({ push, refresh }),
 }));
 
 vi.mock("next/link", () => ({
@@ -31,7 +36,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({ auth: { signOut: vi.fn(async () => ({})) } }),
+  createClient: () => ({ auth: { signOut: () => shellState.signOut() } }),
 }));
 
 vi.mock("@/lib/api", async (orig) => {
@@ -44,7 +49,7 @@ vi.mock("@/lib/api", async (orig) => {
       }
       if (path === "me") {
         return { ok: true, data: {
-          user: { userId: "u1", email: "trader@example.test", emailVerified: true },
+          user: { userId: "u1", email: "trader@example.test", emailVerified: shellState.emailVerified },
           licence: { state: "active", expiresAt: null, plan: "demo" },
         } };
       }
@@ -65,7 +70,13 @@ vi.mock("@/lib/api", async (orig) => {
 import { AppShell } from "./shell";
 import { NAV, PRIMARY, SECONDARY, isActive, titleFor } from "./nav";
 
-afterEach(() => { pathname = "/dashboard"; vi.clearAllMocks(); });
+afterEach(() => {
+  pathname = "/dashboard";
+  shellState.emailVerified = true;
+  shellState.signOut.mockReset();
+  shellState.signOut.mockResolvedValue({});
+  vi.clearAllMocks();
+});
 
 const APP_DIR = join(__dirname, "..", "..", "app", "(app)");
 
@@ -190,6 +201,32 @@ describe("application shell", () => {
     expect(active).toContain("/journal");
     expect(active).not.toContain("/dashboard");
   });
+
+  it("warns when the address is not confirmed and links to settings", async () => {
+    shellState.emailVerified = false;
+    render(<AppShell><p>page</p></AppShell>);
+    const note = await screen.findByText(/refused until the address is confirmed/i);
+    expect(note.textContent).toContain("Connecting cTrader and activating a rule");
+    const link = within(note.parentElement as HTMLElement).getByRole("link", { name: /settings/i });
+    expect(link.getAttribute("href")).toBe("/settings");
+  });
+
+  it("does not warn while the address confirmation field is missing", async () => {
+    shellState.emailVerified = undefined;
+    render(<AppShell><p>page</p></AppShell>);
+    await screen.findByRole("status", { name: "Platform status" });
+    expect(screen.queryByText(/refused until the address is confirmed/i)).toBeNull();
+  });
+
+  it("does not leave the app when sign-out fails", async () => {
+    shellState.signOut.mockResolvedValue({ error: { message: "network down" } });
+    render(<AppShell><p>page</p></AppShell>);
+    fireEvent.click(screen.getAllByRole("button", { name: /Sign out/ })[0]);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("network down");
+    expect(push).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });
 
 describe("the sidebar timeline", () => {
@@ -269,6 +306,17 @@ describe("stylesheet obligations", () => {
     for (const t of ["--fs-sm", "--fs-md", "--fs-lg", "--sp-2", "--sp-4"]) {
       expect(CSS, `${t} is not declared`).toContain(t);
     }
+  });
+
+  it("wraps segmented controls on a narrow screen without changing the desktop rule", () => {
+    expect(CSS).toMatch(/\.seg \{ display: inline-flex/);
+    const start = CSS.indexOf("@media (max-width: 720px)");
+    expect(start).toBeGreaterThan(-1);
+    const block = CSS.slice(start, start + 500);
+    expect(block).toContain(".seg { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; }");
+    expect(block).toContain(".page-head > *");
+    expect(block).toContain(".btn-row { min-width: 0; max-width: 100%; }");
+    expect(block).toContain(".tbl-kv td { overflow-wrap: anywhere; }");
   });
 
   it("targets touch-sized controls", () => {

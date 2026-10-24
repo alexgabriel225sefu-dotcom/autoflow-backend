@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { CheckCheck } from "lucide-react";
-import { api, type NotificationPage } from "@/lib/api";
+import { api, type ApiError, type NotificationPage } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { When } from "@/components/app/table";
@@ -20,17 +20,22 @@ export default function NotificationsPage() {
   if (type) qs.set("type", type);
   const r = useRead<NotificationPage>(`notifications?${qs.toString()}`, 60_000);
   const [busy, setBusy] = useState(false);
+  const [markErr, setMarkErr] = useState<ApiError | null>(null);
 
   async function markOne(id: string) {
     setBusy(true);
-    await api(`notifications/${id}/read`, { method: "POST" });
+    setMarkErr(null);
+    const res = await api(`notifications/${id}/read`, { method: "POST" });
     setBusy(false);
+    if (!res.ok) { setMarkErr(res); return; }
     void r.reload();
   }
   async function markAll() {
     setBusy(true);
-    await api("notifications/read-all", { method: "POST" });
+    setMarkErr(null);
+    const res = await api("notifications/read-all", { method: "POST" });
     setBusy(false);
+    if (!res.ok) { setMarkErr(res); return; }
     void r.reload();
   }
 
@@ -59,6 +64,7 @@ export default function NotificationsPage() {
 
       {r.loading && !r.result ? <Spinner /> : null}
       {r.result && !r.result.ok ? <ErrorNotice error={r.result} onRetry={r.reload} /> : null}
+      {markErr ? <ErrorNotice error={markErr} /> : null}
       {r.result?.ok ? (
         r.result.data.notifications.length ? (
           <div className="records">
