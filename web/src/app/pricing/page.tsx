@@ -43,7 +43,8 @@ export default function PricingPage() {
         <footer className="mkt-foot">
           <span>© Apex4Traders</span>
           <span>
-            <Link href="/terms">Terms</Link> · <Link href="/privacy">Privacy</Link> ·{" "}
+            <Link href="/terms">Terms</Link> · <Link href="/refunds">Refunds</Link> ·{" "}
+            <Link href="/tax">Tax</Link> · <Link href="/privacy">Privacy</Link> ·{" "}
             <Link href="/">Home</Link>
           </span>
         </footer>

@@ -238,7 +238,8 @@ export default function Landing() {
         <footer className="mkt-foot">
           <span>© Apex4Traders</span>
           <span>
-            <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·{" "}
+            <a href="/terms">Terms</a> · <a href="/refunds">Refunds</a> ·{" "}
+            <a href="/tax">Tax</a> · <a href="/privacy">Privacy</a> ·{" "}
             <a href="/login">Sign in</a>
           </span>
         </footer>
