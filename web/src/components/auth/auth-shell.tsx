@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BrandLockup } from "@/components/brand/logo";
+import { BrandLockup, BrandMark } from "@/components/brand/logo";
 
 /**
  * The frame of every sign-in screen: the form on the calm surface, the product
@@ -20,6 +20,15 @@ export function AuthShell({
         <Link href="/" className="auth-logo" aria-label="Apex4Traders — home">
           <BrandLockup size={24} />
         </Link>
+        {/* Below 960px the dark panel is not shown, which left a phone with a
+            plain black page and no sign of whose it was. The same promise,
+            smaller, sits above the form instead. */}
+        <div className="auth-hero" aria-hidden="true">
+          <div className="auth-hero-glow" />
+          <BrandMark size={44} />
+          <p className="auth-hero-kicker">YOUR RULES · YOUR BROKER</p>
+          <p className="auth-hero-head">Trade like you planned&nbsp;to.</p>
+        </div>
         <div className="auth-block">
           <h1>{title}</h1>
           {lead ? <p className="auth-lead">{lead}</p> : null}
@@ -34,6 +43,7 @@ export function AuthShell({
       <aside className="auth-aside" aria-hidden="true">
         <div className="aside-glow" />
         <div className="aside-copy">
+          <BrandMark size={52} />
           <p className="aside-kicker">YOUR RULES · YOUR BROKER</p>
           <p className="aside-head">Trade like you planned&nbsp;to.</p>
           <p className="aside-sub">
