@@ -88,6 +88,14 @@ export function plainAutomation(
 
 /* ── one journal entry ────────────────────────────────────────────────── */
 
+/** The sentence the engine's refusal to start a loop was recorded under. */
+const LEGACY_ENGINE_REFUSAL = "the engine refused to start this loop";
+
+function isLegacyEngineRefusal(error: string | null | undefined): boolean {
+  return typeof error === "string"
+    && error.trim().toLowerCase().startsWith(LEGACY_ENGINE_REFUSAL);
+}
+
 /**
  * The verdict is preferred over the status where both exist, because the
  * verdict is what the rule decided and the status is how it was recorded.
@@ -127,6 +135,15 @@ export function plainDecision(e: {
     case "position_closed":
       return { label: "Position closed", tone: "accent" };
     case "broker_error":
+      // Entries written before engine errors had their own status. A handover
+      // refusal ("the engine refused to start this loop") was filed here as a
+      // broker error although the provider was never asked — the journal is
+      // append-only evidence, so the stored status is left alone and only the
+      // WORDS are corrected. Matched on the engine's own opening sentence and
+      // nothing looser: a real provider failure must keep its label.
+      if (isLegacyEngineRefusal(e.error)) {
+        return { label: "Engine error", detail: e.error ?? undefined, tone: "short" };
+      }
       return { label: "Broker error", detail: e.error ?? undefined, tone: "short" };
     // The engine or the platform failed and the broker rejected nothing. Its
     // own label: calling it a broker error sends the reader to look for a
