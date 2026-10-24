@@ -565,6 +565,10 @@ export type JournalEntry = {
 export type JournalPage = {
   status: "ok"; entries: JournalEntry[]; total: number;
   limit: number; offset: number; hasMore: boolean;
+  /** Entries the index names that the store could not produce for this page.
+   *  Absent on a server that predates the field. Never read as zero when
+   *  absent is all that is known. */
+  unreadable?: number;
 };
 
 export type Notification = {

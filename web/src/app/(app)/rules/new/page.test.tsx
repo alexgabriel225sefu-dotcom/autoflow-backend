@@ -61,10 +61,26 @@ async function mount() {
 }
 
 describe("new rule page — who acts on a setup", () => {
-  it("starts on Full Automation, and says so", async () => {
+  // WAS "starts on Full Automation". A level nobody chose is a rule that
+  // places orders without asking, so a new rule starts with NONE selected and
+  // cannot be saved until one is picked. Stored rules that never said still
+  // read back as Full Automation (see rule-form.test), because that is what
+  // they have always run at.
+  it("starts with no level chosen, and says it must be", async () => {
     await mount();
-    expect(pressed("Full Automation")).toBe("true");
+    expect(pressed("Full Automation")).toBe("false");
     expect(pressed("Approval Required")).toBe("false");
+    expect(pressed("Signals Only")).toBe("false");
+    expect(document.body.textContent).toContain("must be picked before the rule can be saved");
+  });
+
+  it("cannot be saved until a level is chosen, and then can", async () => {
+    await mount();
+    const save = () => screen.getByRole("button", { name: /Save draft/ }) as HTMLButtonElement;
+    expect(save().disabled).toBe(true);
+    expect(document.body.textContent).toContain("before saving");
+    fireEvent.click(screen.getByRole("button", { name: "Signals Only" }));
+    expect(save().disabled).toBe(false);
   });
 
   it("clicking Approval Required moves the selection, and ONLY one is pressed", async () => {
