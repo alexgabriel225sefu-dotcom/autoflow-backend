@@ -53,6 +53,8 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/login": "public",
   "/signup": "public",
   "/terms": "public",                 // has to be readable before signing up
+  "/refunds": "public",               // same, and unpublished until the owner says so
+  "/tax": "public",                   // same
   "/privacy": "public",               // same
   "/auth/callback": "public",         // arrives from the identity provider
   "/auth/confirm": "public",          // arrives from a confirmation e-mail
