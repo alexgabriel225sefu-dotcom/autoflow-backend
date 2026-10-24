@@ -456,6 +456,26 @@ check("and it is declared in OWNED_KEYS",
       "automation" in _ecfg.OWNED_KEYS,
       "OWNED_KEYS and snapshot_of have to be the same list")
 
+print("\n[limit] a rule that asks to FLATTEN on a limit is told it will not")
+# The form offered "Close open positions as well as refusing new entries" and
+# nothing in the loop or the evaluator closes anything: a limit only blocks NEW
+# entries. Found by an independent review. The promise is named per rule, and
+# only for the rule that made it.
+_flat = dict(_store.get(USER, rid))
+_flat["limits"] = dict(_flat.get("limits") or {}, onLimit="flatten")
+_, _flat_missed = _ecfg.translate(_flat)
+_flat_terms = [m.get("term") for m in _flat_missed]
+check("a flatten rule names the term as not applied",
+      "When a limit is hit" in _flat_terms, str(_flat_terms))
+_why = " ".join(m.get("why", "") for m in _flat_missed if m.get("term") == "When a limit is hit")
+check("and says positions stay open and managed",
+      "already open" in _why and "managed" in _why, _why)
+_block = dict(_store.get(USER, rid))
+_block["limits"] = dict(_block.get("limits") or {}, onLimit="block")
+_, _block_missed = _ecfg.translate(_block)
+check("a block rule is not told that, because it asked for nothing else",
+      "When a limit is hit" not in [m.get("term") for m in _block_missed])
+
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()

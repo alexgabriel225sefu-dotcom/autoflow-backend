@@ -162,6 +162,14 @@ def classify(method, route):
         return "activate"
     if route.startswith("emergency/"):
         return "emergency"
+    if route == "approvals/approve":
+        # Approving IS placing an order, and it sat in "default" (240 a
+        # minute) next to the journal poll, twelve times looser than a Stop.
+        # Only approve: declining is saying no, and a client must always be
+        # able to say no, so reject and the pending-list poll stay where they
+        # were. The claim and the clear inside `approvals.approve` are what
+        # stop a double tap opening two positions; this is the second layer.
+        return "control"
     if _CLOSE_RE.match(route):
         # Closing a position moves money. It sat in "default" (240 a minute),
         # twelve times looser than a Stop.

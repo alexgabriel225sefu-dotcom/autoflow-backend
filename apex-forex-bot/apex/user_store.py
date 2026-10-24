@@ -465,6 +465,23 @@ def _upstash_post(cmd_parts):
         return None
 
 
+def _upstash_post_strict(cmd_parts):
+    """`_upstash_post`, but a command that could not be sent raises.
+
+    The POST form carries the command as a JSON array, so a command with many
+    keys is not limited by URL length. Like `_upstash_strict`, the raised text
+    names the command and the exception type and nothing else.
+    """
+    try:
+        r = _req.post(_UPD_URL, json=[str(p) for p in cmd_parts],
+                      headers={"Authorization": f"Bearer {_UPD_TOKEN}"}, timeout=8)
+        r.raise_for_status()
+        return r.json().get("result")
+    except Exception as e:
+        raise StoreUnavailable(
+            f"upstash {cmd_parts[0]} failed: {type(e).__name__}") from e
+
+
 def _eval(script, keys, args):
     """Run a Lua script server-side. None means the call itself failed.
 
@@ -680,6 +697,34 @@ def get_blob_strict(key):
     if not _USE_REDIS:
         return None
     return _redis_get_strict(key)
+
+
+def get_blobs_strict(keys):
+    """Raw strings for several keys in ONE round trip, aligned with `keys`.
+
+    A missing key is None in its slot. A store that could not be asked raises
+    StoreUnavailable: it is never read as "none of these exist", which is how
+    a page of records used to lose rows with no sign anything was wrong. One
+    MGET replaces a GET per key, in series, so a page costs one trip however
+    many rows it holds. Without a shared backend there is nothing to ask and
+    every slot is None, as `get_blob_strict` answers.
+    """
+    keys = [str(k) for k in keys]
+    if not keys:
+        return []
+    if not _USE_REDIS:
+        return [None] * len(keys)
+    if _BACKEND == "redis":
+        try:
+            out = _r.mget(keys)
+        except Exception as e:
+            raise StoreUnavailable(
+                f"redis MGET failed: {type(e).__name__}") from e
+    else:
+        out = _upstash_post_strict(["MGET", *keys])
+    if not isinstance(out, (list, tuple)) or len(out) != len(keys):
+        raise StoreUnavailable("MGET returned an answer that does not match the keys")
+    return list(out)
 
 
 def scan_keys(pattern, *, limit=100000):

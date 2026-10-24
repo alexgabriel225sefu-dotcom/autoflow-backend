@@ -5149,6 +5149,20 @@ class _StopBeforeSend(Exception):
     sent. Nothing reached the broker."""
 
 
+# Order origins that are the AUTOMATION's own: a rule's setup and an approval
+# of one. A Stop must be honoured by these right up to the broker call, the way
+# the loop honours it (`_StopBeforeSend`). A "manual" order is a person
+# explicitly asking for one trade, and stopping automation does not revoke it.
+_STOPPABLE_ORIGINS = ("approval", "rule")
+
+
+def _stopped_refusal(user_id, origin, side, sym):
+    print(f"[UserLoop:{user_id}] {origin} {side} {sym} not sent: stop requested")
+    return {"ok": False, "error": "STOP_REQUESTED", "side": side, "symbol": sym,
+            "detail": "automation was stopped before this order was sent, so "
+                      "nothing was placed"}
+
+
 def _stop_requested(user_id):
     """True only when the shared record explicitly says `active: False`.
 
@@ -5545,6 +5559,13 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
                    f"SL={sl_price} TP={tp_price} ({origin})", user_id=user_id)
     except Exception:
         pass
+    # A STOP THAT LANDED WHILE THIS WAS BEING SIZED. Asked here, before the
+    # gate takes its idempotency claim, so a refusal does not consume the key
+    # that protects the next legitimate attempt; asked AGAIN just before the
+    # broker call below, because the gate and the ownership read sit between.
+    if origin in _STOPPABLE_ORIGINS and _stop_requested(user_id):
+        return _stopped_refusal(user_id, origin, side, sym)
+
     # Same ownership gate as the automatic path. A manual order from the
     # control plane is still a real order, and the instance handling the HTTP
     # request is not necessarily the one that owns this user's account.
@@ -5575,6 +5596,14 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         # Pass the gate's own reason up; the caller names it in plain words.
         return {"ok": False, "error": _claim_why or "ORDER_REFUSED",
                 "side": side, "symbol": sym}
+    # THE LAST POINT BEFORE THE BROKER. Approve and Stop are two requests that
+    # can be in flight together: Approve passed its own `active` check, then
+    # Stop wrote `active: False` and cleared the loop, and this call carried on
+    # to open a position AFTER the client had been told automation was
+    # stopped. The claim taken above stands (an identical retry is refused,
+    # which is the safe direction); nothing is sent.
+    if origin in _STOPPABLE_ORIGINS and _stop_requested(user_id):
+        return _stopped_refusal(user_id, origin, side, sym)
     try:
         _res = broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
         ledger.record(_rid, _res)

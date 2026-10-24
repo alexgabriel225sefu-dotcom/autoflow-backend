@@ -252,6 +252,49 @@ API.handle("GET", "/api/v1/ctrader/callback?error=" + "sk-" * 20000)
 check("the public callback with a hostile error parameter answers quickly",
       _time.perf_counter() - t0 < 2.0, f"{_time.perf_counter() - t0:.1f}s")
 
+print("\n[7] the journal and the broker-read reason carry no host, IP or path")
+# Found by an independent review: `/journal` returned an entry's error text as
+# stored, and broker reads were cleaned of credentials only, so "connect to
+# demo.ctraderapi.com:5035 failed" reached the browser intact. Reproduced
+# before the fix; each check below fails if its own path stops cleaning.
+from apex.platform import journal as _J                       # noqa: E402
+from apex.platform import journal_store as _JS                # noqa: E402
+
+_LEAK = "connect to demo.ctraderapi.com:5035 failed (10.0.3.7) at /srv/app/x.py"
+_leaks = ("ctraderapi", "10.0.3.7", "/srv/app")
+
+
+def _clean(text):
+    return not any(k in str(text) for k in _leaks)
+
+
+_u = "journal-user"
+_JS.record_error(_LEAK, correlation_id="c-new", user_id=_u, account_id="1")
+_new = _JS.query(_u)["entries"][0]
+check("a new journal entry is cleaned as it is written", _clean(_new["error"]), _new["error"])
+
+# An entry stored BEFORE the write-time cleaning existed: put the raw text in
+# the store the way the old code did, then read it back through the API.
+_legacy = _J.for_error("x", correlation_id="c-old", user_id=_u, account_id="1")
+_row = dict(_legacy.as_dict(), error=_LEAK)
+_JS._store._write(_JS._k_entry(_u, _legacy.entry_id), _row)
+check("the stored legacy row still holds the raw text (evidence is not rewritten)",
+      _JS._store._read(_JS._k_entry(_u, _legacy.entry_id)).get("error") == _LEAK)
+_got = _JS.get(_u, _legacy.entry_id)
+check("a legacy entry is cleaned when it is read one at a time", _clean(_got["error"]), _got["error"])
+check("and the stored row is the same afterwards",
+      _JS._store._read(_JS._k_entry(_u, _legacy.entry_id)).get("error") == _LEAK)
+
+_msg = _J.clean_error("ENGINE_REFUSED: the engine refused to start this loop")
+check("a code and a plain sentence survive cleaning",
+      _msg == "ENGINE_REFUSED: the engine refused to start this loop", str(_msg))
+check("an absent error stays absent", _J.clean_error(None) is None and _J.clean_error("") is None)
+
+_scrubbed = BR._scrub(_LEAK, "tok-secret-value")
+check("a broker-read reason has no host, IP or path", _clean(_scrubbed), _scrubbed)
+check("and still masks a token it was handed",
+      "tok-secret-value" not in BR._scrub("failed with tok-secret-value", "tok-secret-value"))
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")
