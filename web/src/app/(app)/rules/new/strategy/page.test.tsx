@@ -115,6 +115,9 @@ async function renderPage() {
 const saveButton = () =>
   screen.getByRole("button", { name: /Save draft/ }) as HTMLButtonElement;
 
+const chooseLevel = () =>
+  fireEvent.click(screen.getByRole("button", { name: "Full Automation" }));
+
 beforeEach(() => { calls.length = 0; pushed.length = 0; routes = baseRoutes(); });
 afterEach(() => { vi.clearAllMocks(); });
 
@@ -175,6 +178,8 @@ describe("saving a chosen strategy", () => {
     await renderPage();
     expect(saveButton().disabled).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: /Trend Following/ }));
+    expect(saveButton().disabled).toBe(true);
+    chooseLevel();
     await waitFor(() => expect(saveButton().disabled).toBe(false));
   });
 
@@ -183,6 +188,7 @@ describe("saving a chosen strategy", () => {
     routes["rules"] = { ok: true, data: { rule: { ruleDocId: "r9" } } };
     await renderPage();
     fireEvent.click(screen.getByRole("radio", { name: /Trend Following/ }));
+    chooseLevel();
     fireEvent.click(saveButton());
 
     await waitFor(() => expect(pushed).toEqual(["/rules/r9"]));
@@ -215,6 +221,7 @@ describe("saving a chosen strategy", () => {
     routes["rules"] = { ok: true, data: { rule: { ruleDocId: "r9" } } };
     await renderPage();
     fireEvent.click(screen.getByRole("radio", { name: /Trend Following/ }));
+    chooseLevel();
     fireEvent.click(saveButton());
 
     expect(await screen.findByText(/cannot be activated as it stands/))
