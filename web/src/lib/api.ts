@@ -344,7 +344,7 @@ export type LiveGateVerdict = {
   summary: string;
   conditions: LiveCondition[];
   missing: LiveCondition[];
-  request: { status: string };
+  request: { status: string; reason?: string };
   checkoutOpen: boolean;
 };
 

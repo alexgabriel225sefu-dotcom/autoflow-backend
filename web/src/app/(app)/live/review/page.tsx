@@ -132,6 +132,7 @@ export default function LiveReviewPage() {
         {review ? (
           <>
             <p>Request: {review.status}</p>
+            {review.reason ? <p>Reason on file: {review.reason}</p> : null}
             <LiveAccessPanel gate={review.verdict} />
           </>
         ) : null}

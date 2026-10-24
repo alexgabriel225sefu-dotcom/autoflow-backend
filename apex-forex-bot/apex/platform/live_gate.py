@@ -171,7 +171,11 @@ def _request_status(rec):
 
 
 def public_verdict(user_id, *, release_switch, live_accounts_allowed):
-    """What the client may be shown. No payment reference and no actor."""
+    """What the client may be shown. No payment reference and no actor.
+
+    A rejection may carry the scrubbed reason. The operator id is not on
+    this object.
+    """
     uid = str(user_id or "")
     conditions = [
         _flag("RELEASE_SWITCH", release_switch,
@@ -250,13 +254,17 @@ def public_verdict(user_id, *, release_switch, live_accounts_allowed):
         status, summary, open_ = "closed", _SUMMARY_CLOSED, False
     else:
         status, summary, open_ = "open", _SUMMARY_OPEN, True
+    shown_request = {"status": req_status}
+    if (req_status == "rejected" and isinstance(request, dict)
+            and str(request.get("reason") or "").strip()):
+        shown_request["reason"] = _scrub(request.get("reason"))
     return {
         "open": open_,
         "status": status,
         "summary": summary,
         "conditions": conditions,
         "missing": missing,
-        "request": {"status": req_status},
+        "request": shown_request,
         "checkoutOpen": _checkout_open(),
     }
 
@@ -446,7 +454,33 @@ def decide(user_id, decision, *, actor, reason=None):
                 "actor": str(actor), "reason": clean})
     _store._write_strict(_key(f"request:{uid}"), rec)
     _queue_update(uid, decision)
+    _notify_decision(uid, decision, clean)
     return {"status": decision}
+
+
+def _notify_decision(user_id, decision, reason):
+    """Tell the client. A failed notification does not undo the decision.
+
+    The body is the scrubbed reason, or a fixed sentence. The operator id
+    is not included. A failure is logged as a type name only.
+    """
+    try:
+        from apex.platform import notifications as _notes
+        if decision == "approved":
+            title = "Live access request approved"
+            body = (
+                "The operator recorded an approval. Live trading still runs "
+                "only when every other condition is met.")
+            level = _notes.INFO
+        else:
+            title = "Live access request declined"
+            body = (reason or
+                    "An operator declined the request. You can request again.")
+            level = _notes.WARNING
+        _notes.notify(user_id, type=_notes.SYSTEM, title=title, body=body,
+                      level=level, link="/live")
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[LiveGate] notification skipped ({type(e).__name__})")
 
 
 def _write_paid(user_id, *, source, actor, payment_ref=None):

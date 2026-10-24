@@ -11,7 +11,7 @@ import Link from "next/link";
 import { api, type LiveGateVerdict } from "@/lib/api";
 import { invalidate, useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
-import { LiveAccessPanel } from "@/components/app/live-access";
+import { LiveAccessPanel, requestSentence } from "@/components/app/live-access";
 import type { ApiError } from "@/lib/api";
 
 export default function LiveAccessPage() {
@@ -52,6 +52,7 @@ export default function LiveAccessPage() {
       {error ? <ErrorNotice error={error} /> : null}
       {note ? <p className="muted">{note}</p> : null}
       <LiveAccessPanel gate={gate} />
+      {gate ? <p>{requestSentence(gate)}</p> : null}
       <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>
         <button type="button" disabled={busy !== null} onClick={() => void post("live/accept")}>
           {busy === "live/accept" ? "Saving…" : "Accept current terms"}
@@ -62,6 +63,8 @@ export default function LiveAccessPage() {
       </div>
       <p className="muted" style={{ marginTop: "var(--sp-3)" }}>
         <Link href="/license">Licence</Link>
+        {" · "}
+        <Link href="/notifications">Notifications</Link>
         {" · "}
         <Link href="/live/review">Operator review</Link>
       </p>
