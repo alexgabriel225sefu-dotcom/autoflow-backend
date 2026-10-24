@@ -434,7 +434,8 @@ export function RuleForm({
           {d.sizingMode === "risk_percent" ? (
             <label className="field"><span>Risk per trade <span className="hint">% of balance</span></span>
               <input type="number" step="0.1" min="0.1" max="100" value={d.riskPercent}
-                     onChange={(e) => set("riskPercent", e.target.value)} /></label>
+                     onChange={(e) => set("riskPercent", e.target.value)} />
+              <span className="field-note">A live account is capped at 1% per trade; a rule above that will not start there.</span></label>
           ) : (
             <label className="field"><span>Volume <span className="hint">lots</span></span>
               <input type="number" step="0.01" min="0.01" value={d.fixedVolume}
@@ -543,7 +544,7 @@ export function RuleForm({
           <label className="field"><span>Max exposure <span className="hint">% of balance</span></span>
             <input type="number" step="1" min="1" placeholder="no cap" value={d.maxExposurePercent}
                    onChange={(e) => set("maxExposurePercent", e.target.value)} />
-            <span className="field-note">Recorded on the rule; not enforced by the engine yet.</span></label>
+            <span className="field-note">Recorded on the rule; not enforced by the engine yet. A rule with this set will not start on a live account.</span></label>
         </div>
         <div className="field"><span>When a limit is hit</span>
           {d.onLimit === "flatten" ? (
