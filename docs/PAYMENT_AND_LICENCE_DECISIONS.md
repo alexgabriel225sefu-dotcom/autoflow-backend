@@ -128,3 +128,39 @@ browser could call.
 
 Two mutations were run against them: making the signature comparison return
 `True` fails three checks, and removing the duplicate guard fails two.
+
+## 8. Stripe Checkout and the existing Payment Link
+
+The owner already has a Stripe account and an approved 497 USD product. The
+platform can send a signed-in buyer there. It does not do so unless
+`A4T_CHECKOUT_ENABLED` is on (and `A4T_AUTHENTICATED_CHECKOUT_ENABLED`, the
+second gate the route already required). Both default off. Published legal
+terms are required before live trading, not before this purchase.
+
+Names only. No value below is set by the repository.
+
+| Variable | Meaning |
+|---|---|
+| `A4T_CHECKOUT_ENABLED` | Purchase gate. Off unless explicitly set. The buy button stays "Not on sale yet" while this is off. |
+| `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | Second gate. The checkout route still requires a verified session either way. |
+| `A4T_STRIPE_PAYMENT_LINK` | Stripe Payment Link URL, `https://buy.stripe.com/<id>`. The public example is `https://buy.stripe.com/bJe9AT0EF2gD99Bcii2Ji02`. It is not a default. |
+| `STRIPE_SECRET_KEY` | Secret key for creating a Checkout Session. Server-side only. |
+| `A4T_STRIPE_PRICE_ID` | Stripe Price id of the 497 USD product. The browser never sends an amount. |
+| `A4T_PUBLIC_WEB_ORIGIN` | `https://<host>` of the web app. Success and cancel URLs are `{origin}/license`. |
+| `A4T_STRIPE_WEBHOOK_SECRET` | Verifies webhook deliveries. Unset means the webhook answers 503. |
+| `STRIPE_WEBHOOK_SECRET` | Accepted alias for the same signing secret. |
+
+When the buy button is enabled, `POST /api/v1/billing/checkout` returns the
+Payment Link with `client_reference_id` set to the signed-in user id and
+`prefilled_email` set to that account's email. A user id in the request body
+is ignored. If no Payment Link is configured, the same route creates a
+Checkout Session instead (`mode=payment`, the configured price,
+`client_reference_id` and `metadata.a4tUserId` set to the user id, success
+and cancel on `/license`).
+
+`checkout.session.completed` with `payment_status=paid`, amount `49700` and
+currency `usd` records the `founder_lifetime` licence for `client_reference_id`
+(or `metadata.a4tUserId`). The same event id does not grant twice. A Payment
+Link purchase is that event, provided the link was opened with
+`client_reference_id`. A different amount does not grant. The legacy browser
+route `web/src/app/api/create-payment-intent` still creates nothing.

@@ -458,16 +458,27 @@ def _dispatch(method, route, headers, body, query=None):
         return _ok(_wait.public_result(outcome))
 
     if route == "billing/checkout" and method == "POST":
-        _authenticate(headers, fresh=True)
+        p = _authenticate(headers, fresh=True)
         offer = _billing.public_offer()
         if (not _billing.checkout_enabled()
                 or not _billing.authenticated_checkout_enabled()):
             return _err(503, "CHECKOUT_NOT_ENABLED",
                         "checkout is not enabled for this release",
                         offer=offer)
-        return _err(501, "CHECKOUT_NOT_IMPLEMENTED",
-                    "authenticated checkout is not implemented yet",
-                    offer=offer)
+        # Purchase is A4T_CHECKOUT_ENABLED (and the authenticated gate).
+        # Published legal terms are required for live trading, not for this
+        # route. Stripe configuration is required as well: without a Payment
+        # Link or a price id and secret key this is still not on sale.
+        if not _billing.checkout_implemented():
+            return _err(501, "CHECKOUT_NOT_IMPLEMENTED",
+                        "Not on sale yet",
+                        offer=offer)
+        from apex.platform import stripe_checkout as _stripe
+        try:
+            started = _stripe.start_checkout(p, _body(body) or {})
+        except _stripe.CheckoutError as e:
+            return _err(e.status, e.code, _safe_error(e), offer=offer)
+        return _ok(started, offer=offer)
 
     if route == "ctrader/callback" and method == "GET":
         return _ok(_link.handle_callback(query or {}), pendingOnly=True)

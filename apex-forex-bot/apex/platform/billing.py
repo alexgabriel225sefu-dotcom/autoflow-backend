@@ -78,9 +78,20 @@ def _env(name):
     return v or None
 
 
+def webhook_secret():
+    """The signing secret, from either name. Never a default.
+
+    ``A4T_STRIPE_WEBHOOK_SECRET`` is the name this platform has always read.
+    ``STRIPE_WEBHOOK_SECRET`` is accepted as well, so an owner copying the
+    name from Stripe's dashboard is not silently unverified. Neither value
+    is logged.
+    """
+    return _env("A4T_STRIPE_WEBHOOK_SECRET") or _env("STRIPE_WEBHOOK_SECRET")
+
+
 def configured():
     """Whether a signed webhook can be verified at all."""
-    return bool(_env("A4T_STRIPE_WEBHOOK_SECRET"))
+    return bool(webhook_secret())
 
 
 def product_config():
@@ -186,28 +197,25 @@ def authenticated_checkout_enabled():
 
 
 def checkout_implemented():
-    """Whether anything in this codebase can CREATE a checkout.
+    """Whether this process can send a buyer to Stripe.
 
-    Nothing can. No function here or anywhere else builds a Checkout Session
-    or a PaymentIntent for the platform, so `POST billing/checkout` answers
-    501 whatever the two flags say.
+    The creator is ``stripe_checkout``. It stays false until either
+    ``A4T_STRIPE_PAYMENT_LINK`` is a Stripe Payment Link, or
+    ``STRIPE_SECRET_KEY``, ``A4T_STRIPE_PRICE_ID`` and
+    ``A4T_PUBLIC_WEB_ORIGIN`` are all set. There is no default URL and no
+    default key.
 
-    THIS EXISTS BECAUSE THE FLAGS MADE EVERY CHECK GO GREEN OVER A DEAD END.
+    THIS STAYS FALSE WHEN NOTHING IS SET, ON PURPOSE.
 
-    With both flags on and a webhook secret set, /readyz reported billing
-    "OK: checkout is enabled, authenticated, and serving the approved
-    offer", the pricing page swapped its CTA to "Get Founder access", and
-    the client landed on a page whose own text says checkout is not enabled.
-    Every signal an operator has said the product was selling, and nobody
-    could buy.
-
-    A flag is a statement of intent. This is a statement of fact, which is
-    why it is a constant in code and not another environment variable: an
-    operator cannot turn on something that has not been written. Whoever
-    writes the checkout creator flips this in the same commit, and
-    `tests/test_platform_billing.py` fails until /readyz agrees.
+    With both checkout flags on and a webhook secret set, /readyz used to
+    report billing ready while ``POST billing/checkout`` answered 501. A
+    flag is intent. This function is whether a buyer can actually be sent
+    somewhere. Unset configuration is still "not implemented" for this
+    deployment, so the pricing page keeps "Not on sale yet" and readiness
+    still fails a deploy that has been told to sell and cannot.
     """
-    return False
+    from apex.platform import stripe_checkout as _stripe
+    return _stripe.purchase_ready()
 
 
 def public_offer():
@@ -415,7 +423,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
     Never raises for a bad request: the provider retries on a 5xx, so a
     malformed or unsigned body must be a 4xx and stay one.
     """
-    secret = secret or _env("A4T_STRIPE_WEBHOOK_SECRET")
+    secret = secret or webhook_secret()
     if not secret:
         # 503, not 200. Retries are wanted once the secret is configured.
         return 503, {"ok": False, "error": {
