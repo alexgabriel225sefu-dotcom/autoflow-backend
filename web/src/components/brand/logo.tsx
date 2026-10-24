@@ -78,9 +78,9 @@ export function BrandLockup({
     <span className={className ? `brand-lockup ${className}` : "brand-lockup"}>
       <img
         className="brand-lockup-image"
-        src="/apex4traders-logo.jpg"
-        alt="Apex4Traders"
-        width={Math.round(size * 7.8)}
+        src="/apex4traders-logo.png"
+        alt=""
+        width={Math.round(size * 7.3)}
         height={size}
       />
       <span className="sr-only">Apex4Traders</span>

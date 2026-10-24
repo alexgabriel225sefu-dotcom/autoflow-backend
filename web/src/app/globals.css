@@ -561,10 +561,9 @@ body {
   display: block;
   width: clamp(132px, 10vw, 178px);
   height: auto;
-  aspect-ratio: 1170 / 315;
+  aspect-ratio: 1116 / 152;
   object-fit: contain;
   object-position: center;
-  mix-blend-mode: multiply;
 }
 .dashboard-terminal .brand-lockup-image { width: 170px; }
 .brand-lockup .word {
