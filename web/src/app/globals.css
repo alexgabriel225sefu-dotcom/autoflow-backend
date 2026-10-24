@@ -1722,3 +1722,21 @@ body {
 /* A name in a card is content, not a link to be noticed. */
 .inspector .card > p > a { color: var(--a4t-text); }
 .inspector .card > p > a:hover { color: var(--a4t-link-strong); }
+
+/* ── Noir polish: the list screens (Rules, Positions, Journal, Accounts) ──
+   They already inherit the card and title treatment above. What is left is
+   the blue that survived inside them: table links, the accent notice and
+   the accent pills. Navigation inside a table is content, not a link to be
+   noticed, and a column of blue reads as an error list on a black page. */
+.tbl td a { color: var(--a4t-text); text-decoration: underline; text-decoration-color: var(--a4t-line); text-underline-offset: 3px; }
+.tbl td a:hover { color: var(--a4t-link-strong); text-decoration-color: currentColor; }
+.tbl th { font-size: .66rem; letter-spacing: .12em; }
+.tbl-wrap, .card .tbl-wrap { border-radius: 16px; }
+
+.notice-accent { border-color: var(--a4t-line); background: rgba(247, 246, 242, .04); border-radius: 14px; }
+.notice-accent a { color: var(--a4t-text); text-decoration: underline; text-underline-offset: 3px; }
+.pill-accent { color: var(--a4t-text); border-color: var(--a4t-line); background: rgba(247, 246, 242, .07); }
+
+.record { border-radius: 16px; border-color: var(--a4t-line-soft); background: var(--a4t-surface); padding: .85rem 1rem; }
+.card + .records, .card + .record, .records + .page-nav { margin-top: .75rem; }
+.records > .record:hover { border-color: var(--a4t-line); }
