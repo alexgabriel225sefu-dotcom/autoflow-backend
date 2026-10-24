@@ -304,6 +304,8 @@ export type Execution = {
     | "NOT_CONNECTED"
     | "REAUTH_REQUIRED"
     | "LIVE_NOT_AVAILABLE"
+    | "LIVE_GATE_CLOSED"
+    | "LIVE_GATE_UNKNOWN"
     | "LICENCE_REVOKED"
     /** The free trial ran out. Different next step from NO_LICENCE. */
     | "TRIAL_EXPIRED"
@@ -323,6 +325,27 @@ export type Execution = {
    * real money from a badge that stopped appearing.
    */
   badge: "DEMO" | "LIVE" | "LIVE BLOCKED" | "NOT CONNECTED" | "REAUTH REQUIRED";
+  /**
+   * The hard gate. Missing means the server did not say the gate is open,
+   * which a screen treats as closed. The browser does not recompute it.
+   */
+  liveGate?: LiveGateVerdict;
+};
+
+export type LiveCondition = {
+  code: string;
+  status: "ok" | "missing" | "unknown";
+  detail: string;
+};
+
+export type LiveGateVerdict = {
+  open: boolean;
+  status: "open" | "closed" | "unknown";
+  summary: string;
+  conditions: LiveCondition[];
+  missing: LiveCondition[];
+  request: { status: string };
+  checkoutOpen: boolean;
 };
 
 export type Me = {
@@ -378,6 +401,12 @@ export type PublicOffer = {
   currency: string;
   periodDays: number | null;
   checkoutEnabled: boolean;
+  /**
+   * Whether this build can create a checkout. Absent or false means it
+   * cannot, even when checkoutEnabled is true — that flag is intent, and
+   * the purchase route still answers 501.
+   */
+  checkoutImplemented?: boolean;
 };
 
 /** What the waitlist route answers. It never returns the address. */

@@ -64,6 +64,8 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/connect": "protected",
   "/journal": "protected",
   "/license": "protected",
+  "/live": "protected",
+  "/live/review": "protected",
   "/notifications": "protected",
   "/orders": "protected",
   "/performance": "protected",

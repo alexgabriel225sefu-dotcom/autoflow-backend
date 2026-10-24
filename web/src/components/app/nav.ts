@@ -10,7 +10,7 @@
  */
 import {
   BarChart3, Bell, BookOpen, LayoutDashboard, ListChecks, Receipt, Settings,
-  TrendingUp, Wallet, type LucideIcon,
+  ShieldCheck, TrendingUp, Wallet, type LucideIcon,
 } from "lucide-react";
 
 export type NavItem = {
@@ -30,6 +30,7 @@ export const NAV: NavItem[] = [
   { href: "/journal", label: "Journal", icon: BookOpen, primary: true },
   { href: "/notifications", label: "Alerts", icon: Bell },
   { href: "/accounts", label: "Accounts", icon: Wallet },
+  { href: "/live", label: "Live access", icon: ShieldCheck },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

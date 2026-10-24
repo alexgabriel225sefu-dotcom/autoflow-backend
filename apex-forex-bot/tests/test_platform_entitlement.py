@@ -226,12 +226,23 @@ try:
     check("and it is refused on the PLAN now, not on the release",
           open_rows[(E.FREE_DEMO, E.LIVE)]["reason"] == "LIVE_NOT_ENTITLED",
           open_rows[(E.FREE_DEMO, E.LIVE)]["reason"])
-    check("paid_live + live CAN, and this is the only combination that may",
-          open_rows[(E.PAID_LIVE, E.LIVE)]["canAutomate"] is True,
-          "the paid plan cannot trade live on a deployment that opened it")
-    check("and it is badged LIVE, in its own word",
-          open_rows[(E.PAID_LIVE, E.LIVE)]["badge"] == "LIVE",
-          open_rows[(E.PAID_LIVE, E.LIVE)]["badge"])
+    # The switch and the plan are no longer enough. Terms, a confirmed
+    # lifetime licence and an operator approval are still missing, so this
+    # combination stays closed and says which gate said no.
+    _paid_live = open_rows[(E.PAID_LIVE, E.LIVE)]
+    check("paid_live + live still CANNOT until the live gate is open",
+          _paid_live["canAutomate"] is False,
+          "a paid plan must not skip terms, the confirmed licence, or "
+          "operator approval")
+    check("and the reason is the live gate, not the release",
+          _paid_live["reason"] == "LIVE_GATE_CLOSED",
+          str(_paid_live.get("reason")))
+    check("and it is badged LIVE BLOCKED",
+          _paid_live["badge"] == "LIVE BLOCKED",
+          _paid_live["badge"])
+    check("and the gate names what is missing",
+          bool((_paid_live.get("liveGate") or {}).get("missing")),
+          str(_paid_live.get("liveGate")))
     check("the capability reports the switch as open",
           all(c["liveExecutionEnabled"] is True for c in open_rows.values()))
 finally:

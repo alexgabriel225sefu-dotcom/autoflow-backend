@@ -188,6 +188,11 @@ describe("dashboard — account state", () => {
         accountMode: "live", entitlement: "paid_live", canAutomate: true,
         liveExecutionEnabled: true, badge: "LIVE", reason: null,
         message: "live automation is available on this account",
+        liveGate: {
+          open: true, status: "open", missing: [], conditions: [],
+          summary: "All checked conditions are met. A live order is still sent only when the order gate allows it.",
+          request: { status: "approved" }, checkoutOpen: false,
+        },
       }),
     } };
     await renderDash();
@@ -196,6 +201,39 @@ describe("dashboard — account state", () => {
     // The word, not the absence of a word: a client must never have to infer
     // that they are trading real money from a badge that stopped appearing.
     expect(screen.getAllByText("LIVE").length).toBeGreaterThan(0);
+    // The standing refusal is for an account the server has not cleared.
+    expect(screen.queryByText(/Live trading is not available in this release/)).toBeNull();
+  });
+
+  it("does not offer Start when the server message and the gate disagree", async () => {
+    routes["ctrader/status"] = { ok: true, data: {
+      connected: true, accounts: [{ ctid: 902, mode: "live" }],
+      selected: { ctid: 902, mode: "live" }, liveAllowed: true,
+    } };
+    routes.me = { ok: true, data: {
+      user: { userId: "u1", email: "t@example.test", emailVerified: true },
+      licence: { state: "active", expiresAt: null, plan: "founder_lifetime" },
+      execution: execution({
+        accountMode: "live", entitlement: "paid_live", canAutomate: true,
+        liveExecutionEnabled: true, badge: "LIVE", reason: null,
+        message: "live automation is available on this account",
+        liveGate: {
+          open: false, status: "closed",
+          summary: "Live trading is not available until every condition below is met.",
+          conditions: [],
+          missing: [{
+            code: "PAID_LICENCE", status: "missing",
+            detail: "No confirmed lifetime licence is on file.",
+          }],
+          request: { status: "none" }, checkoutOpen: false,
+        },
+      }),
+    } };
+    await renderDash();
+    await waitFor(() =>
+      expect(screen.getByText(/No confirmed lifetime licence is on file/)).toBeTruthy());
+    expect(screen.queryByRole("button", { name: /^Start$/ })).toBeNull();
+    expect(screen.queryByText(/live automation is available on this account/)).toBeNull();
   });
 
   it("does not unlock live controls on a verdict about the OTHER account", async () => {

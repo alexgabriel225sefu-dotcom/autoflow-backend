@@ -46,6 +46,7 @@ from apex.platform import preview as _preview
 from apex.platform import linklog as _log
 from apex.platform import ratelimit as _rl
 from apex.platform import licence as _lic
+from apex.platform import live_gate as _live_gate
 from apex.platform import plans as _plans
 from apex.platform import referral as _referral
 from apex.platform import ruledoc as _rd
@@ -749,6 +750,18 @@ def _dispatch(method, route, headers, body, query=None):
     if route == "system/status" and method == "GET":
         p = _authenticate(headers)
         return _ok(_health.system_status(p))
+
+    # Live access. The client can read the gate, accept the published
+    # versions, and request a connection. Publishing, granting and deciding
+    # are operator actions; live_gate.http refuses anyone else and writes
+    # nothing. The body cannot choose a mode, a version, or a price.
+    if route == "live" or route.startswith("live/"):
+        fresh = not (method == "GET" and route == "live/status")
+        p = _authenticate(headers, fresh=fresh)
+        if method != "GET":
+            _id.require_verified_email(p)
+        return _live_gate.http(
+            method, route, p, _body(body) if method != "GET" else None)
 
     if route == "me" and method == "GET":
         p = _authenticate(headers)

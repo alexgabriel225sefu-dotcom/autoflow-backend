@@ -26,6 +26,7 @@ import {
   TrialNotice,
 } from "@/components/app/state";
 import { PendingApproval } from "@/components/app/pending-approval";
+import { liveCleared as gateCleared, liveNotice } from "@/components/app/live-access";
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { WhyCard } from "@/components/app/why-card";
 import { EmergencyStop } from "@/components/app/emergency-stop";
@@ -101,8 +102,8 @@ export default function Dashboard() {
   // Both halves matter: `canAutomate` alone could be a verdict about the demo
   // account the client just switched away from, because the picker and `me`
   // refresh on different clocks.
-  const liveCleared =
-    execution?.accountMode === "live" && execution.canAutomate === true;
+  const liveCleared = gateCleared(execution);
+  const liveCopy = liveNotice(execution);
   const runningThis = running && running.state !== "stopped";
 
   // The first-glance tiles. Each is derived from a read the page makes anyway,
@@ -319,10 +320,14 @@ export default function Dashboard() {
                           requiring accountMode === "live" is what rules that
                           out. The fallback sentence is unchanged and still
                           pinned to the Python source by content.test.ts. */}
-                      {execution && execution.accountMode === "live"
-                        && execution.message
-                        ? execution.message
-                        : "Live trading is not available in this release."}
+                      {liveCopy.lead}
+                      {liveCopy.details.length ? (
+                        <ul>
+                          {liveCopy.details.map((detail) => (
+                            <li key={detail}>{detail}</li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>
@@ -523,10 +528,20 @@ export default function Dashboard() {
 
           <section className="card card-flat">
             <p className="muted" style={{ fontSize: ".8rem", lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--a4t-text)" }}>Demo only.</strong>{" "}
-              Live trading is not available in this release. Orders are placed
-              on the cTrader account you connected, and you can disconnect it
-              at any time.
+              {liveCleared ? (
+                <>
+                  <strong style={{ color: "var(--a4t-text)" }}>Live account.</strong>{" "}
+                  The server has cleared this account. A live order is still sent
+                  only when the order gate allows it.
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: "var(--a4t-text)" }}>Demo only.</strong>{" "}
+                  Live trading is not available in this release. Orders are placed
+                  on the cTrader account you connected, and you can disconnect it
+                  at any time.
+                </>
+              )}
             </p>
           </section>
         </aside>
