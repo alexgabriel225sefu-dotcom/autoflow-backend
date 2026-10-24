@@ -6,6 +6,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { safeNext } from "@/lib/supabase/middleware";
 
 const replace = vi.fn();
 let params = new URLSearchParams();
@@ -82,6 +83,29 @@ describe("auth callback", () => {
     getSession.mockResolvedValue({ data: { session: null }, error: null });
     render(<CallbackPage />);
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+  });
+
+  it("sends a code plus a safe next path there, and refuses a protocol-relative next", async () => {
+    params = new URLSearchParams("code=pkce-next&next=/accounts");
+    window.history.replaceState(null, "", "/auth/callback?code=pkce-next&next=/accounts");
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+    getSession.mockResolvedValue({ data: { session: { access_token: "t" } }, error: null });
+    const { unmount } = render(<CallbackPage />);
+    await waitFor(() => expect(exchangeCodeForSession).toHaveBeenCalledWith("pkce-next"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(safeNext("/accounts")));
+    unmount();
+
+    replace.mockReset();
+    exchangeCodeForSession.mockReset();
+    params = new URLSearchParams("code=pkce-evil&next=//evil.example");
+    window.history.replaceState(null, "", "/auth/callback?code=pkce-evil&next=//evil.example");
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+    getSession.mockResolvedValue({ data: { session: { access_token: "t" } }, error: null });
+    render(<CallbackPage />);
+    await waitFor(() => expect(exchangeCodeForSession).toHaveBeenCalledWith("pkce-evil"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(safeNext("//evil.example")));
+    expect(safeNext("//evil.example")).toBe("/dashboard");
+    expect(replace).not.toHaveBeenCalledWith("//evil.example");
   });
 
   it("does not show the password form until a recovery session exists", async () => {

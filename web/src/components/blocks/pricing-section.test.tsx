@@ -89,11 +89,26 @@ describe("the call to action", () => {
   it("becomes a real link once the server opens checkout", async () => {
     // Proves the disabled state above is driven by the flag and is not just
     // how this component always renders.
-    publicApi.mockResolvedValue(answer({ checkoutEnabled: true }));
+    publicApi.mockResolvedValue(answer({
+      checkoutEnabled: true, checkoutImplemented: true,
+    }));
     render(<PricingSection />);
     const cta = await screen.findByRole("link", { name: /get founder access/i });
     expect(cta.getAttribute("href")).toBe("/license");
     expect(screen.queryByText(/not on sale yet/i)).toBeNull();
+  });
+
+  it("stays closed when the flags are on but checkout is not implemented", async () => {
+    // The flags have been true over a route that answers 501. That must not
+    // become a buy link, and the card has to say the purchase is not open.
+    publicApi.mockResolvedValue(answer({
+      checkoutEnabled: true, checkoutImplemented: false,
+    }));
+    render(<PricingSection />);
+    const cta = await screen.findByRole("button", { name: /not on sale yet/i });
+    expect(cta).toHaveProperty("disabled", true);
+    expect(screen.getByText(/Live purchase is not yet open/)).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /get founder access/i })).toBeNull();
   });
 
   it("always offers the free demo, which needs no payment", async () => {

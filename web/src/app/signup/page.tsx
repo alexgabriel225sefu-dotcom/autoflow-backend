@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import { GoogleButton } from "@/components/auth/google-button";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -61,6 +62,10 @@ export default function SignUpPage() {
       {/* Before the form, not after it. Somebody entering an email address
           is entitled to know whether it will end in a payment screen. */}
       <p className="muted" style={{ fontSize: ".84rem", marginTop: "1rem" }}>{PLAN_NOTICE}</p>
+      <div className="auth-alt">
+        <GoogleButton label="Sign up with Google" onError={(m) => setError(m || null)} />
+        <p className="auth-or"><span>or with email</span></p>
+      </div>
       <form onSubmit={onSubmit} className="card">
         <label className="field">
           <span>Email</span>

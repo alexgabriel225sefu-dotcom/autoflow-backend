@@ -441,8 +441,21 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     # read it from cTrader just now. Starting a real-money loop on the
     # strength of a record, when the live answer is available and free here,
     # would be the one place in this file worth getting wrong.
-    if check["mode"] == LIVE and not _ent.capability(user_id)["canAutomate"]:
-        raise AutomationRefused("LIVE_NOT_AVAILABLE", _ent.LIVE_REFUSAL)
+    if check["mode"] == LIVE:
+        # The stored verdict can be about a different moment. Ask again now
+        # that the broker has said this account is live, and then ask the
+        # hard gate even if a caller has patched capability to say yes.
+        cap_now = _ent.capability(user_id)
+        if not cap_now["canAutomate"]:
+            raise AutomationRefused(
+                cap_now.get("reason") or "LIVE_NOT_AVAILABLE",
+                cap_now.get("message") or _ent.LIVE_REFUSAL)
+        ready = _ent.live_readiness(user_id)
+        if ready.get("open") is not True:
+            code = ("LIVE_GATE_UNKNOWN" if ready.get("status") == "unknown"
+                    else "LIVE_GATE_CLOSED")
+            raise AutomationRefused(
+                code, ready.get("summary") or _ent.LIVE_REFUSAL)
     # And during the live pilot, only the pilot's own account may start one.
     # Without this a client outside the pilot could start a live loop that shows
     # "Running" while every order is refused, and could then change the selected
@@ -602,6 +615,24 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
 
     rule, conn = _preflight(user_id, rule_doc_id,
                             mode_lister=mode_lister)
+
+    # REAL MONEY ONLY: terms the engine cannot keep must stop a live start.
+    # Asked here and not in `_preflight`, because this is where both the rule
+    # and the translation are in hand, and BEFORE the lock below so a refusal
+    # leaves nothing held. It runs on a revive as well: a restart is a start.
+    # Fail-closed: a record that cannot be read is a refusal, not a pass.
+    if conn.get("mode") == LIVE:
+        try:
+            _why = _ecfg.live_refusals(rule, user_store.load(user_id))
+        except Exception as e:                               # noqa: BLE001
+            raise AutomationRefused(
+                "LIVE_RULE_UNCHECKED",
+                f"the account settings could not be read to check this rule "
+                f"against the live limits ({type(e).__name__}), so a live "
+                f"loop is not started") from None
+        if _why:
+            raise AutomationRefused(
+                _why[0][0], " ".join(detail for _code, detail in _why))
 
     # Cross-process guard. user_store.claim is SET NX, the only primitive that
     # sees another container; None means no shared backend to ask, which is

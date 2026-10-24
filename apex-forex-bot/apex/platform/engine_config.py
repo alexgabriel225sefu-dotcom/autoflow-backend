@@ -40,6 +40,7 @@ settings on the account for whatever runs next — which was already true of the
 instrument and the timeframe before this file existed.
 """
 
+from apex.platform import risk_gates as _rg
 from apex.platform import ruledoc as _rd
 
 # The strategy module that asks the rule. Declared here, as a plain string,
@@ -488,3 +489,79 @@ def restore_patch(snapshot):
     """
     snapshot = snapshot or {}
     return {k: snapshot.get(k) for k in OWNED_KEYS}
+
+
+# The risk per trade the engine uses when a rule does not state one, which is
+# `user_loop`'s own default for an account that holds no `risk` key.
+ENGINE_DEFAULT_RISK = 0.025
+
+
+def live_refusals(doc, account):
+    """Why a rule must NOT start on a LIVE account, as [(code, detail)].
+
+    `translate` applies what maps and reports the rest, which is the right
+    answer on a practice account: a term that visibly does nothing costs
+    nothing there. On real money it is not enough, for two reasons that this
+    function exists to close.
+
+    1. THE RISK CAP WAS NOT ON THIS PATH. `risk_gates` holds the platform's
+       live ceiling (1% per trade) and enforces it in `live_execution.place`,
+       a door nothing in production calls. A live order from the loop takes the
+       other door, `authorize_order`, which has no rule in hand. So a rule
+       asking for 5% risk, or a rule with a fixed volume (which the engine
+       cannot take, and which falls back to the ACCOUNT's own risk, 2.5% by
+       default), reached a live broker at that size. The cap is therefore
+       asked here, once, where the rule and the account are both in hand.
+
+    2. A TERM THAT DOES NOTHING IS A PROMISE THAT IS NOT KEPT. An exposure
+       ceiling, a slippage ceiling, an order expiry, or "close positions when a
+       limit is hit" are recorded and not applied. Reporting that is honest on
+       demo. A client who set a ceiling on real money is relying on it, and the
+       loop would run without it.
+
+    Refusing is the fail-closed answer, and the message names what to change so
+    the client can start. Pure: no I/O, so it can be asked on every start,
+    including a revive.
+    """
+    out = []
+    doc = doc if isinstance(doc, dict) else {}
+    account = account if isinstance(account, dict) else {}
+
+    applied, _ = translate(doc)
+    risk = applied.get("risk")
+    source, fix = "this rule", "Lower the risk percentage"
+    if not _num(risk):
+        raw = account.get("risk")
+        risk = float(raw) if _num(raw) else ENGINE_DEFAULT_RISK
+        source = "this account's own setting (the rule has no risk percentage)"
+        fix = "Size the rule by risk percentage"
+    pct = round(float(risk) * 100.0, 6)
+    cap = float(_rg.PLATFORM["maxRiskPercentLive"])
+    if pct > cap:
+        out.append((
+            "LIVE_RISK_OVER_CAP",
+            f"{source} risks {pct:g}% per trade and a live account is capped "
+            f"at {cap:g}%. {fix} at {cap:g}% or less to start on a live "
+            f"account."))
+
+    limits = doc.get("limits") if isinstance(doc.get("limits"), dict) else {}
+    order = doc.get("order") if isinstance(doc.get("order"), dict) else {}
+    if _num(limits.get("maxExposurePercent")) and limits["maxExposurePercent"] > 0:
+        out.append((
+            "LIVE_TERM_NOT_ENFORCED",
+            "The maximum exposure limit is recorded on the rule and is not "
+            "enforced by the engine, so it cannot protect a live account. "
+            "Clear it to start."))
+    if _num(order.get("maxSlippagePoints")) or _num(order.get("expiresAfterSec")):
+        out.append((
+            "LIVE_TERM_NOT_ENFORCED",
+            "The slippage ceiling and the order expiry are recorded on the "
+            "rule and are not applied to orders, so they cannot protect a "
+            "live account. Clear them to start."))
+    if limits.get("onLimit") == "flatten":
+        out.append((
+            "LIVE_TERM_NOT_ENFORCED",
+            "\"Close open positions when a limit is hit\" is not something "
+            "the engine does: a limit only stops new entries. Set the limit "
+            "action to block to start on a live account."))
+    return out

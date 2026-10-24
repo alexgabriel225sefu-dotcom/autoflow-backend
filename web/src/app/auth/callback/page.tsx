@@ -3,6 +3,7 @@ import { BrandLockup } from "@/components/brand/logo";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/supabase/middleware";
 
 /**
  * Supabase email confirmation and password recovery land here with `?code=`
@@ -63,11 +64,11 @@ function CallbackPageInner() {
         if (!session) setError("This link did not sign you in.");
         return;
       }
-      if (session) router.replace("/dashboard");
+      if (session) router.replace(safeNext(params.get("next")));
       else router.replace("/login");
     })();
     return () => { cancelled = true; };
-  }, [code, queryError, recovery, router]);
+  }, [code, queryError, recovery, router, params]);
 
   async function setNewPassword(e: React.FormEvent) {
     e.preventDefault();

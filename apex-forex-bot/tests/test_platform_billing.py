@@ -449,6 +449,9 @@ check("a one-time purchase carries no expiry",
 # component has to know there are two — or get the AND wrong.
 check("checkout is reported off, because it is off in this release",
       _b.get("checkoutEnabled") is False, str(_b.get("checkoutEnabled")))
+check("and the build still cannot create a checkout",
+      _b.get("checkoutImplemented") is False,
+      str(_b.get("checkoutImplemented")))
 
 # Nothing a provider could use. This body is served to anyone.
 _blob = json.dumps(_b).lower()

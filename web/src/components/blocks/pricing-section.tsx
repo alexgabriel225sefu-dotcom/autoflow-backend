@@ -45,6 +45,9 @@ const DEMO_FEATURES = [
 
 function planFor(offer: PublicOffer): PricingPlan[] {
   const lifetime = offer.periodDays === null;
+  // Both have to be true. checkoutEnabled alone has meant "the flags are
+  // on" while POST billing/checkout still answers 501.
+  const purchaseOpen = offer.checkoutEnabled && offer.checkoutImplemented === true;
   return [
     {
       id: "demo",
@@ -72,15 +75,15 @@ function planFor(offer: PublicOffer): PricingPlan[] {
       priceNote: lifetime
         ? "One-time payment, no renewal"
         : `One-time payment, access for ${offer.periodDays} days`,
-      ctaQuiet: !offer.checkoutEnabled,
+      ctaQuiet: !purchaseOpen,
       featuredLabel: lifetime ? "Lifetime access" : undefined,
-      ctaLabel: offer.checkoutEnabled ? "Get Founder access" : "Not on sale yet",
-      ctaHref: offer.checkoutEnabled ? "/license" : undefined,
-      ctaDisabled: !offer.checkoutEnabled,
+      ctaLabel: purchaseOpen ? "Get Founder access" : "Not on sale yet",
+      ctaHref: purchaseOpen ? "/license" : undefined,
+      ctaDisabled: !purchaseOpen,
       // Said on the card rather than discovered at a checkout that refuses.
-      ctaNote: offer.checkoutEnabled
+      ctaNote: purchaseOpen
         ? undefined
-        : "Live execution is not enabled in this release, so this plan is not on sale yet.",
+        : "Live purchase is not yet open. Live execution is not enabled in this release, so this plan is not on sale yet.",
       features: FOUNDER_FEATURES,
       footerNote: lifetime ? "No renewal, ever" : "Renewal terms apply",
       footerDesc:

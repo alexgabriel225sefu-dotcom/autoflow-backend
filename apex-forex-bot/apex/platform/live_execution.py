@@ -78,6 +78,7 @@ from apex.platform import bridge as _bridge
 from apex.platform import decision as _dec
 from apex.platform import emergency as _emerg
 from apex.platform import entitlement as _ent
+from apex.platform import live_gate as _gate
 from apex.platform import live_pilot as _pilot
 from apex.platform import live_ledger as _ledger
 from apex.platform import order_rate as _rate
@@ -185,6 +186,13 @@ def place(rule_doc, decision, snapshot, *, user_id, account_id,
             NOT_ENTITLED,
             "this account does not hold the plan that covers real-money "
             "trading", gate="entitlement", **aud)
+
+    # ── 3a. terms, confirmed licence, operator approval ────────────────────
+    # The same check authorize_order runs. place() has no production caller;
+    # the check is here so this door is not a hole with a different policy.
+    _blocked = _gate.order_block(user_id)
+    if _blocked:
+        return _refused(_blocked[0], _blocked[1], gate="live_gate", **aud)
 
     # ── 3b. the pilot: the operator's own account only ─────────────────────
     _p = _pilot.check_identity(user_id, account_id)
@@ -406,6 +414,13 @@ def authorize_order(user_id, *, symbol, side, units, account_id=None,
         return no(NOT_ENTITLED,
                   "this account does not hold the plan that covers "
                   "real-money trading", gate="entitlement")
+
+    # ── 3a. terms, confirmed licence, operator approval ────────────────────
+    # This is the door gates.authorize_order actually calls. The thirteen
+    # rule-level risk gates stay in place(); they are not wired here.
+    _blocked = _gate.order_block(user_id)
+    if _blocked:
+        return no(_blocked[0], _blocked[1], gate="live_gate")
 
     # ── 3b. the pilot: the operator's own account only ─────────────────────
     _p = _pilot.check_identity(user_id, account_id)

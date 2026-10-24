@@ -43,6 +43,7 @@ import os
 
 from apex.platform import ctrader_link as _link
 from apex.platform import licence as _lic
+from apex.platform import live_gate as _live_gate
 from apex.platform import plans as _plans
 
 # §1, the release switch. One variable, one value that opens it, and that
@@ -195,6 +196,20 @@ def _reauth_needed(user_id, *, now=None):
     return False
 
 
+def live_readiness(user_id):
+    """The live gate, for a screen or a start. Never raises.
+
+    Unknown is closed. The browser is shown this object; it does not decide it.
+    """
+    try:
+        return _live_gate.public_verdict(
+            user_id,
+            release_switch=live_execution_enabled(),
+            live_accounts_allowed=_link.live_allowed())
+    except Exception:                                        # noqa: BLE001
+        return _live_gate.unreadable_verdict()
+
+
 def _no_refresh(*_a, **_k):
     """A refresher that refuses to perform network I/O.
 
@@ -251,6 +266,7 @@ def capability(user_id, *, now=None):
         "reason": None,
         "message": "",
         "badge": BADGE_NOT_CONNECTED,
+        "liveGate": live_readiness(user_id),
     }
 
     # Withdrawal outranks everything. It is how support stops a client, and a
@@ -322,11 +338,20 @@ def capability(user_id, *, now=None):
             return dict(out, reason="LIVE_NOT_ENTITLED",
                         badge=BADGE_LIVE_BLOCKED,
                         message=LIVE_NOT_ENTITLED_MESSAGE)
-        # Both locks open. This is the only return in this function that
-        # permits an order against real money, and it is still not the last
-        # word: `gates.authorize_order` re-asks every one of these questions
-        # at the order itself, where the broker's own answer about the account
-        # is available and this one is a screen's worth of state.
+        # The release and the plan are open. The hard gate is the rest:
+        # published terms the client accepted, a confirmed lifetime licence,
+        # and an operator approval. Unknown is closed, and it is named.
+        gate = out["liveGate"]
+        if gate.get("status") == "unknown" or gate.get("open") is not True:
+            reason = ("LIVE_GATE_UNKNOWN" if gate.get("status") == "unknown"
+                      else "LIVE_GATE_CLOSED")
+            return dict(out, canAutomate=False, badge=BADGE_LIVE_BLOCKED,
+                        reason=reason,
+                        message=gate.get("summary") or LIVE_REFUSAL)
+        # Both locks open and the gate is open. This is the only return in
+        # this function that permits an order against real money, and it is
+        # still not the last word: `gates.authorize_order` re-asks every one
+        # of these questions at the order itself.
         return dict(out, canAutomate=True, badge=BADGE_LIVE,
                     message="live automation is available on this account")
 

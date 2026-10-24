@@ -223,6 +223,22 @@ def entitle():
     LIC.grant(USER, plan=PLANS.FOUNDER_LIVE, expires_at=None)
 
 
+def _satisfy_live_gate():
+    """Terms, the confirmed licence and an operator approval, through the real gate.
+
+    The order path now refuses before the broker read unless these are on
+    file. This uses the gate's own writes. It does not set a release switch.
+    """
+    from apex.platform import live_gate as _lg
+    actor = "operator-test"
+    for doc in ("terms", "refund", "tax"):
+        _lg.publish(doc, "v1", actor=actor)
+    _lg.accept_current(USER)
+    _lg.grant_operator_licence(USER, actor=actor)
+    _lg.request_live(USER)
+    _lg.decide(USER, "approved", actor=actor, reason="test fixture")
+
+
 def reset():
     """A clean store, with the paid plan back on the account.
 
@@ -232,6 +248,7 @@ def reset():
     """
     FAKE.data.clear()
     entitle()
+    _satisfy_live_gate()
 
 
 def unentitle():
@@ -263,6 +280,10 @@ def restore_switch():
 
 
 try:
+    from apex.platform import ctrader_link as _CTL
+    _real_live_allowed = _CTL.live_allowed
+    _CTL.live_allowed = lambda: True
+    _satisfy_live_gate()
     print("\n[2] §8 the emergency stop is checked first")
     os.environ[EM.ENV_VAR] = "all"
     try:
@@ -440,6 +461,7 @@ try:
           "nothing was sent, so holding the key would strand the decision")
 
 finally:
+    _CTL.live_allowed = _real_live_allowed
     restore_switch()
 
 print("\n[14] the switch is back off, and refuses again")
@@ -474,6 +496,8 @@ check("at the release switch", v["code"] == LX.LIVE_NOT_ENABLED, str(v["code"]))
 
 LX._ent.live_execution_enabled = lambda: True
 try:
+    _real_live_allowed_2 = _CTL.live_allowed
+    _CTL.live_allowed = lambda: True
     print("\n[16] §8 the emergency stop outranks even the switch")
     os.environ[EM.ENV_VAR] = "all"
     try:
@@ -715,6 +739,7 @@ try:
     check("with the mode gate named",
           g.get("code") in (LX.MODE_UNVERIFIED, LX.MODE_NOT_LIVE), str(g))
 finally:
+    _CTL.live_allowed = _real_live_allowed_2
     restore_switch()
 
 print("\n[21] and with the switch back off, the engine door is shut again")

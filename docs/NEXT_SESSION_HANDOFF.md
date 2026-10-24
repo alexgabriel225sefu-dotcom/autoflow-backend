@@ -1,5 +1,51 @@
 # Apex4Traders — handoff
 
+## This branch merged origin/claude/apex4traders-platform-v1
+
+This branch merged `origin/claude/apex4traders-platform-v1`, which includes the live hard gate (PR #34, merge `f9daa69`) and the live rule guard (PR #35, `4931d53ef`). This merge does not change or loosen the live gate. Live trading is not available.
+
+## This is the live-gate session's record
+
+The text under this heading is that session's record, written before merge. Its blockers stay as that session wrote them.
+
+## Current session (2026-10-24)
+
+The sections below this one are historical. Several of them still say live
+trading is not implemented and that the founder price is 499 USD. Those lines
+are not the current state. This section is.
+
+1. **Branch:** `cursor/live-trading-hard-gate-fa29`, opened off `claude/apex4traders-platform-v1` at `89e040e177d14e7be242fb4b14d8d26b539e123f`. Not merged. Not deployed.
+2. **Commit assessed:** `4c2b53e73395796a82b83f9dd3070eee67349683`. The commit that adds this section is documentation only.
+3. **Completed:** A fail-closed live gate. A live order is refused unless the existing locks still allow it and the server has all of: published legal, refund and tax terms that the client accepted at the current versions; a confirmed lifetime licence (49700 cents, `founder_lifetime`) written by a confirmed payment or an operator; and an operator approval of that client's live-account request. Unknown reads are closed. The checks run in `live_execution.authorize_order` (the door `gates.authorize_order` already calls), in `place()`, in `entitlement.capability` (`me.execution.liveGate`), and in `automation._preflight` when the broker says the account is live. Checkout still returns 501. `public_offer().checkoutImplemented` is false. A client can accept terms and request a connection at `/live`. An operator listed in `A4T_OPERATOR_USER_IDS` (empty by default) can publish, decide and record a licence at `/live/review`. Consent uses `audit.record_consent_change`.
+4. **Changed files:**
+   - `apex-forex-bot/apex/platform/live_gate.py` — the gate, the records, and the HTTP routes.
+   - `apex-forex-bot/apex/platform/live_execution.py` — `order_block` on both doors, after entitlement and before the pilot.
+   - `apex-forex-bot/apex/platform/entitlement.py` — `live_readiness` and `liveGate` on every capability. Live `canAutomate` requires the gate.
+   - `apex-forex-bot/apex/platform/automation.py` — a live start asks the gate after the broker mode.
+   - `apex-forex-bot/apex/platform/billing.py` — `checkoutImplemented`; a signed 49700 usd lifetime charge writes the paid record; a missing amount does not; a full revoke clears it.
+   - `apex-forex-bot/apex/platform/api.py` — authenticated `/live` routes.
+   - `apex-forex-bot/tests/test_platform_live_gate.py` — each condition alone, default closed, existing founder licence, redaction, operator versus client, payment.
+   - `apex-forex-bot/tests/test_platform_entitlement.py`, `test_platform_live_execution.py`, `test_platform_billing.py`, `test_platform_mode_verify.py` — the new refusal, and the harnesses that already walk past it.
+   - `web/src/lib/api.ts`, `web/src/components/app/live-access.tsx`, `web/src/app/(app)/live/page.tsx`, `web/src/app/(app)/live/review/page.tsx`, dashboard, licence, pricing, nav, routes — the server verdict, and "Live purchase is not yet open" while checkout is 501.
+5. **Tests:** `python3 apex-forex-bot/tests/run_all.py` — `ALL 219 TEST FILES PASSED` (exit 0). `cd web && npm test` — `Test Files 47 passed (47)`, `Tests 722 passed | 7 skipped (729)` (exit 0). `npx tsc --noEmit` — exit 0. `npx eslint src` — exit 0, `5 problems (0 errors, 5 warnings)` in files this change did not touch (`connect/page.tsx`, `starter-condition.test.ts`, `logo.tsx`, `e2e.test.ts`). `npm run build` — exit 0, Next.js 16.4.2, routes include `/live` and `/live/review`.
+6. **Failures:** none in that run.
+7. **Unverified:** no browser walk of `/live` or `/live/review`. No real cTrader order. No real Stripe charge. No Render env. `A4T_LIVE_EXECUTION` and `APEX_ALLOW_LIVE_ACCOUNTS` were not set.
+8. **Security:** live stays closed by default. `licence.revoke` does not stop a loop that is already running. The thirteen `risk_gates` still run only in `place()`, which has no production caller; the engine path does not run them. Checkout cannot charge. Operator ids are an env list, empty means nobody.
+9. **Next task:** do not open live. The next owner decision is the legal text (L1–L8) and the tax position (D5–D6), not another code path.
+10. **Blockers before live can be switched on,** each owner-only unless noted:
+    - Legal pages L1–L8 are still drafts with `[TO BE CONFIRMED]`. Unblocks when the owner publishes real text and an operator records those versions.
+    - Tax D5–D6 is not settled. Unblocks when the owner confirms the tax position and an operator publishes the tax terms.
+    - No payment provider. Checkout is 501. Unblocks when a real provider is wired and `checkout_implemented()` becomes true in that same change.
+    - Real-broker smoke X1 has not been run for a live order. Unblocks with a smoke on the operator's own live account at minimum size, after the gate is actually open.
+    - Monitoring X7 and a restore drill X8 are not done.
+    - The release switch and `APEX_ALLOW_LIVE_ACCOUNTS` stay off until the owner flips them, on the operator's own account first.
+    - `licence.revoke` does not stop a running loop. A kill that reaches the loop is still separate work.
+    - `risk_gates` are not on the engine path. Wiring them was deliberately not part of this change.
+
+**State at:** `94c6c0b` on `claude/apex4traders-platform-v1`
+
+## This is the demo-journey session's record
+
 ## This session (2026-10-24) — demo client journey
 
 The ten protocol fields for this session only. The historical body below is unchanged.
