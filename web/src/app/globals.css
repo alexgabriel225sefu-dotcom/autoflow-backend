@@ -455,6 +455,70 @@ body {
 }
 .workspace > * { min-width: 0; }
 
+/* Dashboard terminal mode. The rest of the product keeps the calm editorial
+   surface, while the primary workspace gets the higher-density dark treatment
+   traders expect from a professional market terminal. The variables are local
+   to the dashboard so public pages and contrast guarantees do not drift. */
+.dashboard-terminal {
+  --a4t-bg: #f7f6f2;
+  --a4t-bg-2: #fbfaf7;
+  --a4t-surface: #ffffff;
+  --a4t-surface-2: #f3f1eb;
+  --a4t-surface-3: #e8e4db;
+  --a4t-line: #dedbd2;
+  --a4t-line-soft: #ebe8e0;
+  --a4t-text: #111113;
+  --a4t-muted: #56544e;
+  --a4t-dim: #726f67;
+  --a4t-accent: #111113;
+  --a4t-accent-strong: #000000;
+  --a4t-accent-wash: rgba(17, 17, 19, .07);
+  --a4t-on-accent: #ffffff;
+  --a4t-link: #1a5fb4;
+  --a4t-link-strong: #10407d;
+  --a4t-link-dim: #cbd9ec;
+  --a4t-link-wash: rgba(26, 95, 180, .08);
+  --a4t-long: #1a7f4b;
+  --a4t-short: #a62b19;
+  --a4t-neutral: #56544e;
+  --a4t-long-wash: rgba(26, 127, 75, .10);
+  --a4t-short-wash: rgba(166, 43, 25, .10);
+  background: radial-gradient(circle at 85% 0%, rgba(217, 58, 43, .06), transparent 34rem), var(--a4t-bg);
+  border: 1px solid var(--a4t-line);
+  border-radius: 16px;
+  padding: clamp(.8rem, 1.6vw, 1.25rem);
+  color: var(--a4t-text);
+}
+.dashboard-terminal .page-head { margin-bottom: .8rem; }
+.dashboard-terminal .page-head .sub,
+.dashboard-terminal .muted,
+.dashboard-terminal .dim { color: var(--a4t-muted); }
+.dashboard-terminal .card,
+.dashboard-terminal .dock,
+.dashboard-terminal .notice,
+.dashboard-terminal .stat-card {
+  background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 65%), var(--a4t-surface);
+  border-color: var(--a4t-line);
+  box-shadow: 0 12px 32px -24px rgba(0,0,0,.75);
+}
+.dashboard-terminal .card-head,
+.dashboard-terminal .dock-tabs { border-color: var(--a4t-line); }
+.dashboard-terminal .dock-tabs { background: var(--a4t-bg-2); }
+.dashboard-terminal .field select,
+.dashboard-terminal input,
+.dashboard-terminal textarea {
+  background: var(--a4t-bg-2);
+  color: var(--a4t-text);
+  border-color: var(--a4t-line);
+}
+.dashboard-terminal .btn-ghost { color: var(--a4t-muted); border-color: var(--a4t-line); }
+.dashboard-terminal .btn-ghost:hover { background: var(--a4t-accent-wash); color: var(--a4t-text); }
+.dashboard-terminal .btn:not(.btn-ghost) { box-shadow: 0 8px 18px -12px rgba(125,176,255,.8); }
+.dashboard-terminal .label-xs { color: var(--a4t-dim); }
+@media (max-width: 639px) {
+  .dashboard-terminal { border-radius: 12px; padding: .65rem; }
+}
+
 .inspector { display: flex; flex-direction: column; gap: var(--sp-3); }
 @media (min-width: 1180px) {
   .inspector { position: sticky; top: calc(var(--a4t-topbar) + var(--a4t-statusbar) + var(--sp-3)); }
@@ -476,9 +540,11 @@ body {
 }
 .dock-tabs button[aria-selected="true"] { color: var(--a4t-text); }
 .dock-tabs button[aria-selected="true"]::after {
-  content: ""; position: absolute; inset: auto 0 0 0; height: 2px;
-  background: var(--a4t-link);
+  content: ""; position: absolute; inset: auto .65rem 0 .65rem; height: 2px;
+  border-radius: 999px; background: var(--a4t-link);
+  animation: a4t-tab-in .18s ease-out both;
 }
+@keyframes a4t-tab-in { from { opacity: 0; transform: scaleX(.35); } to { opacity: 1; transform: scaleX(1); } }
 .dock-tabs .count {
   margin-left: var(--sp-2); font-variant-numeric: tabular-nums;
   color: var(--a4t-dim); font-weight: 500;
@@ -491,6 +557,16 @@ body {
 
 .brand-lockup { display: inline-flex; align-items: center; gap: .55rem; color: var(--a4t-text); }
 .brand-lockup .mark { flex: none; display: block; }
+.brand-lockup-image {
+  display: block;
+  width: clamp(132px, 10vw, 178px);
+  height: auto;
+  aspect-ratio: 1170 / 315;
+  object-fit: contain;
+  object-position: center;
+  mix-blend-mode: multiply;
+}
+.dashboard-terminal .brand-lockup-image { width: 170px; }
 .brand-lockup .word {
   font-weight: 700; letter-spacing: -.028em; line-height: 1;
   font-size: var(--fs-md); white-space: nowrap;
