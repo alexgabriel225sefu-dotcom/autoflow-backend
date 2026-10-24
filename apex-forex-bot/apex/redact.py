@@ -206,6 +206,11 @@ def scrub_for_client(text, *secrets, limit=160) -> str:
     for sec in secrets:
         if sec and isinstance(sec, str) and len(sec) >= 8:
             out = out.replace(sec, "[redacted]")
+    # Bounded BEFORE the shape regexes: some of them are quadratic on a long run
+    # of repeated prefixes, and this text can be chosen by a stranger (a public
+    # callback's `error` parameter). Only the first `limit` characters are kept
+    # anyway, so nothing that survives is left unscrubbed.
+    out = out[:max(limit * 4, 1000)]
     out = scrub(out)
     out = _CLIENT_BEARER.sub(r"\1 [redacted]", out)
     out = _CLIENT_KEYED.sub(lambda m: f"{m.group(1)}=[redacted]", out)

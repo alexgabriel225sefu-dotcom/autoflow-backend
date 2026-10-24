@@ -131,9 +131,7 @@ jobs:
           echo "allowlist is current"
 
   web:
-    # The Next.js app in web/. Lint is deliberately not run here yet: two
-    # pre-existing ESLint errors (connect/page.tsx, pending-approval.tsx) are
-    # tracked separately and would turn every run red for unrelated reasons.
+    # The Next.js app in web/: tests, ESLint, type check and production build.
     name: web
     runs-on: ubuntu-latest
     timeout-minutes: 20

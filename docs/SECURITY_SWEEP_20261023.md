@@ -46,6 +46,8 @@ The API wrapper catches unhandled exceptions and does not return stack traces.
 
 ## Findings
 
+_As reported at the time of the sweep, against `be71810`. The "Reported only" status and the missing-file notes below are resolved in the Resolution section at the end._
+
 | Severity | Location | Scenario | Status |
 |---|---|---|---|
 | P1 | `apex-forex-bot/apex/platform/broker_read.py:74,85,91,108` | A connector/link exception whose detail contains a URL, header or token can be copied into the response because `_scrub` only removes the known access token. | Reported only; the branch does not contain the authorised `automation._safe_cause` helper. |

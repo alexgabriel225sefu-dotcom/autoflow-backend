@@ -12,7 +12,7 @@ import re
 
 from apex import redact
 
-_URL = re.compile(r"\b[a-z][a-z0-9+.\-]*://[^\s\"']+", re.IGNORECASE)
+_URL = re.compile(r"\b[a-z][a-z0-9+.\-]{0,20}://[^\s\"']+", re.IGNORECASE)
 # `host='api.example.com'` in a connection-pool message names a provider too.
 _HOST = re.compile(
     r"(?i)\b(host|hostname|server|endpoint)\b[\"']?\s*[=:]\s*[\"']?[^\s\"',)]+")
@@ -28,6 +28,9 @@ def message(exc, *, fallback="request failed", limit=300):
     """Bounded diagnostic prose with no URL, path, header or credential in it."""
     raw = str(exc).strip() if exc is not None else ""
     raw = raw or fallback
+    # Bounded first: this text can be chosen by a stranger, and every regex
+    # below runs over all of it. Only `limit` characters are returned.
+    raw = raw[:max(limit * 4, 1000)]
     raw = _URL.sub("[redacted-url]", raw)
     raw = _HOST.sub(lambda m: f"{m.group(1)}=[redacted-host]", raw)
     raw = _PATH.sub("[redacted-path]", raw)

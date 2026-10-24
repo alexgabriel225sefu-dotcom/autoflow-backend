@@ -223,6 +223,19 @@ for keep in ("POSITION_NOT_FOUND", "CH_CLIENT_AUTH_FAILURE",
              "the position 4567890 is already closed", "use and/or Settings/Trading"):
     check(f"leaves {keep!r} readable", message(keep) == keep, message(keep))
 
+print("\n[6] hostile input is bounded before the shape regexes run")
+import time as _time                                          # noqa: E402
+for label, hostile in (("sk- x 66000", "sk-" * 66000), ("FORX- x 40000", "FORX-" * 40000),
+                       ("query_id= x 18000", "query_id=a&" * 18000)):
+    t0 = _time.perf_counter()
+    message(hostile)
+    took = _time.perf_counter() - t0
+    check(f"{label}: scrubbed in well under a second", took < 1.0, f"{took:.1f}s")
+t0 = _time.perf_counter()
+API.handle("GET", "/api/v1/ctrader/callback?error=" + "sk-" * 20000)
+check("the public callback with a hostile error parameter answers quickly",
+      _time.perf_counter() - t0 < 2.0, f"{_time.perf_counter() - t0:.1f}s")
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

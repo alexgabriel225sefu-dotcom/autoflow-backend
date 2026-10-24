@@ -103,6 +103,9 @@ class Halted(RuntimeError):
         super().__init__(message)
 
 
+_last_store_log = 0.0
+
+
 def _k():
     return f"{_store.namespace_prefix()}emergency"
 
@@ -185,7 +188,11 @@ def state():
         # kind of failure it was. The message is never echoed - it is shown to
         # clients through the status route and the halt refusal - and goes only
         # to the scrubbed log.
-        print(f"[Emergency] store read failed: {_safe_message(e)}")
+        global _last_store_log
+        _now = time.time()
+        if _now - _last_store_log >= 30:      # state() runs per order and per check
+            _last_store_log = _now
+            print(f"[Emergency] store read failed: {_safe_message(e)}")
         out["storeError"] = f"STORE_UNREACHABLE ({type(e).__name__})"
         out["storeScope"] = LIVE
         out["scope"] = _widest(env_scope, LIVE)
