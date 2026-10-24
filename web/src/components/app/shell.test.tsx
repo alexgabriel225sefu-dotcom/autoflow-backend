@@ -192,6 +192,63 @@ describe("application shell", () => {
   });
 });
 
+describe("the sidebar timeline", () => {
+  const sidebarLinks = () => [...document.querySelectorAll("aside.side a.side-link")] as HTMLAnchorElement[];
+  const list = (el: Element) => el.closest(".side-list") as HTMLElement;
+
+  it("lights the rail down to the current page when nothing is hovered", () => {
+    pathname = "/positions";
+    render(<AppShell><p>page</p></AppShell>);
+    const links = sidebarLinks();
+    const here = links.findIndex((a) => a.getAttribute("href") === "/positions");
+    expect(list(links[here]).style.getPropertyValue("--ri")).toBe(String(here));
+    expect(links[here].getAttribute("aria-current")).toBe("page");
+    expect(links[here].closest("li")!.getAttribute("data-lit")).toBe("true");
+    expect(links[here + 1].closest("li")!.getAttribute("data-lit")).toBe("false");
+  });
+
+  it("follows the pointer and the keyboard, and goes back when they leave", () => {
+    pathname = "/dashboard";
+    render(<AppShell><p>page</p></AppShell>);
+    const links = sidebarLinks();
+    const rules = links.findIndex((a) => a.getAttribute("href") === "/rules");
+    const ul = list(links[rules]);
+    expect(ul.getAttribute("data-hover")).toBe("false");
+
+    fireEvent.pointerEnter(links[3]);
+    expect(ul.getAttribute("data-hover")).toBe("true");
+    expect(ul.style.getPropertyValue("--hi")).toBe("3");
+    expect(ul.style.getPropertyValue("--ri")).toBe("3");
+
+    fireEvent.focus(links[rules]);              // keyboard drives the same state
+    expect(ul.style.getPropertyValue("--hi")).toBe(String(rules));
+
+    fireEvent.pointerLeave(ul);
+    expect(ul.getAttribute("data-hover")).toBe("false");
+    expect(ul.style.getPropertyValue("--ri")).toBe("0");     // back to /dashboard
+  });
+
+  it("a page in no group lights nothing instead of a wrong node", () => {
+    pathname = "/connect";
+    render(<AppShell><p>page</p></AppShell>);
+    for (const a of sidebarLinks()) expect(a.closest("li")!.getAttribute("data-lit")).toBe("false");
+  });
+});
+
+describe("the logo button", () => {
+  it("opens the appearance controls, and Escape closes them", () => {
+    render(<AppShell><p>page</p></AppShell>);
+    const btn = screen.getByRole("button", { name: /appearance/i });
+    expect(btn.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(btn);
+    const dialog = screen.getByRole("dialog", { name: "Appearance" });
+    expect(within(dialog).getByRole("radiogroup", { name: "Theme" })).toBeDefined();
+    expect(within(dialog).getAllByRole("radio", { name: /cream|ice|lilac|orchid|volt/i }).length).toBe(5);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Appearance" })).toBeNull();
+  });
+});
+
 describe("stylesheet obligations", () => {
   const CSS = readFileSync(join(__dirname, "..", "..", "app", "globals.css"), "utf8");
 

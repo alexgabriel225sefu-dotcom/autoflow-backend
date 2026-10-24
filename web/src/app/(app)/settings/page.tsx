@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, LicencePill, Spinner } from "@/components/app/state";
 import type { CtraderStatus, Me } from "@/lib/api";
+import { AppearanceControls } from "@/components/app/appearance-controls";
 
 export default function SettingsPage() {
   const me = useRead<Me>("me");
@@ -36,6 +37,11 @@ export default function SettingsPage() {
           </table>
         </section>
       ) : null}
+
+      <section className="card">
+        <div className="card-head"><h2>Appearance</h2></div>
+        <AppearanceControls />
+      </section>
 
       <section className="card">
         <div className="card-head"><h2>Broker</h2></div>
