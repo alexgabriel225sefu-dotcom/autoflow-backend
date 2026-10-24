@@ -1650,3 +1650,75 @@ body {
 }
 .pc-foot strong { display: block; font-size: .8rem; color: var(--mkt-text); }
 .pc-foot p { font-size: .78rem; line-height: 1.6; margin: .2rem 0 0; color: var(--mkt-muted); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Noir bento — the app's cards, headings and first-glance band.
+
+   Same tokens as everywhere else; only the shape changes. Larger radius,
+   hairline borders, a faint top light instead of a drop shadow, and card
+   titles as quiet small-caps labels so the numbers and sentences inside
+   are what the eye lands on.
+   ═══════════════════════════════════════════════════════════════════════ */
+.a4t h1 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.05; }
+.page-head { margin-bottom: 1.4rem; }
+.page-head .sub { margin-top: .4rem; display: block; }
+
+.card {
+  border-radius: 20px;
+  border-color: var(--a4t-line-soft);
+  padding: 1.2rem 1.3rem;
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(247, 246, 242, .045), transparent 60%),
+    var(--a4t-surface);
+  box-shadow: none;
+}
+.card-flat { background: transparent; border-style: dashed; border-color: var(--a4t-line); }
+.card-head { margin-bottom: .9rem; }
+.a4t .card-head h2 {
+  font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--a4t-muted);
+}
+/* The "All →" links: quiet text, not blue. They are navigation, and a column
+   of blue on a black page reads as an error list. */
+.card-head .link-sm, .a4t .link-sm { color: var(--a4t-muted); font-size: .78rem; }
+.card-head .link-sm:hover, .a4t .link-sm:hover { color: var(--a4t-text); }
+
+.verdict-banner[data-kind="buy"] {
+  background: transparent;
+  border-color: var(--a4t-line-soft);
+  box-shadow: inset 3px 0 0 var(--a4t-long);
+  border-radius: 14px;
+}
+
+/* ── the first-glance band ─────────────────────────────────────────── */
+.ovb {
+  display: grid; gap: .75rem; margin-bottom: var(--sp-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 900px) { .ovb { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ovb-tile {
+  display: flex; flex-direction: column; gap: .35rem; min-width: 0;
+  padding: 1.05rem 1.2rem 1rem; border-radius: 20px;
+  border: 1px solid var(--a4t-line-soft);
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(247, 246, 242, .05), transparent 55%),
+    var(--a4t-surface);
+}
+.ovb-label {
+  font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--a4t-dim);
+}
+.ovb-value {
+  font-size: clamp(1.25rem, 2.1vw, 1.7rem); font-weight: 700; letter-spacing: -.03em;
+  line-height: 1.12; color: var(--a4t-text);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere; min-height: 2.24em;
+  font-variant-numeric: tabular-nums;
+}
+.ovb-value[data-empty="true"] { color: var(--a4t-dim); }
+.ovb-tile[data-tone="long"] .ovb-value { color: var(--a4t-long); }
+.ovb-note { font-size: .78rem; color: var(--a4t-muted); min-height: 1.1em; }
+
+/* A name in a card is content, not a link to be noticed. */
+.inspector .card > p > a { color: var(--a4t-text); }
+.inspector .card > p > a:hover { color: var(--a4t-link-strong); }
