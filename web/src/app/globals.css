@@ -1245,6 +1245,12 @@ body {
 .mkt-works-row { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem 1.4rem; }
 .mkt-works-row > span { min-width: 6.4rem; }
 .mkt-works img { display: block; height: 26px; width: auto; }
+/* The band under the hero: the two rows sit side by side on a wide screen and
+   stack on a narrow one, with a hairline above so it reads as its own strip. */
+.mkt-works-band {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 3rem;
+  margin: 0; padding: 1.6rem 0; border-top: 1px solid var(--mkt-line-soft);
+}
 .mkt-rulecard {
   position: relative; background: #f7f6f2; color: #111113; border-radius: 28px; padding: 1.6rem 1.8rem;
   box-shadow: 0 60px 110px -30px rgba(0, 0, 0, .95), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 100px rgba(217, 58, 43, .22);
