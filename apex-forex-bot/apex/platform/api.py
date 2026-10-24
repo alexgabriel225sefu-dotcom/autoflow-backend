@@ -657,16 +657,14 @@ def _dispatch(method, route, headers, body, query=None):
     # apex/platform/approvals.py, and commit 6f984dfe9 for the state it left
     # every client in.
     #
-    # Rate limiting: every route here goes through `_rl.check` before
-    # `_dispatch` is reached, which puts these in the `default` bucket — the
-    # same one the notifications and journal polls use. `approvals` has no
-    # case of its own in `ratelimit.classify`, so approving is metered as a
-    # dashboard read rather than as a control action. That is deliberately
-    # noted rather than quietly left: the thing that stops a double tap
-    # opening two positions is the claim and the clear in `approvals.approve`
-    # plus the idempotency claim inside the order controller, not the
-    # limiter — but a tighter bucket is the right home for an order-producing
-    # POST and belongs in `classify` beside the automation controls.
+    # Rate limiting: `_rl.check` runs before `_dispatch`. POST under
+    # `approvals` is classified as `control` (approve and reject decide
+    # whether a proposed order is placed). GET `approvals` stays in
+    # `default`, the same poll bucket as notifications and the journal.
+    # The claim and the clear in `approvals.approve` plus the idempotency
+    # claim inside the order controller still stop a double tap opening
+    # two positions; the tighter bucket is the matching home for an
+    # order-producing POST.
     if route == "approvals":
         if method != "GET":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")

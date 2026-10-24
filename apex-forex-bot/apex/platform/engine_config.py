@@ -256,9 +256,10 @@ def translate(doc):
     #   watchlist       the basket that rotation draws from.
     #
     # `session_filter` is deliberately NOT written. It is the account's own
-    # setting and it is not this rule's schedule — the schedule is reported
-    # below as a term that does not reach the engine, which is the honest
-    # answer. Clearing it would widen trading past what the client chose.
+    # setting and it is not this rule's schedule. Condition-rule schedules
+    # are enforced by the evaluator; a preset's days/windows do not reach
+    # the engine and are reported below when they are set. Clearing the
+    # account filter would widen trading past what the client chose.
     # A PRESET RULE IS POINTED AT ITS PRESET. THIS WAS THE MISSING HAND-OFF,
     # AND WITHOUT IT THE WHOLE STRATEGY PICKER PLACED NOTHING, FOREVER.
     #
@@ -407,6 +408,9 @@ def translate(doc):
     limits = doc.get("limits") or {}
     if _num(limits.get("maxDailyTrades")):
         applied["max_trades_day"] = int(limits["maxDailyTrades"])
+    else:
+        # Empty or missing is unlimited. The engine treats 0 as no daily cap.
+        applied["max_trades_day"] = 0
     if _num(limits.get("maxSpreadPips")):
         applied["max_spread_pips"] = float(limits["maxSpreadPips"])
     mop = limits.get("maxOpenPositions")
@@ -417,6 +421,10 @@ def translate(doc):
         miss("Max open positions", str(int(mop)),
              "A demo account holds one position at a time in this release, "
              "whatever the rule says.")
+    if str(limits.get("onLimit") or "").strip().lower() == "flatten":
+        miss("On limit", "flatten",
+             "flatten is stored on the rule but is not executed: new entries "
+             "are refused and open positions stay.")
 
     # ── what the engine simply does not take from a rule ────────────────────
     # Entry conditions, exit conditions and sides USED to be reported here:
@@ -443,10 +451,10 @@ def translate(doc):
          "rounds it to a volume the broker accepts, so the amount risked is "
          "close to the percentage you set rather than exactly it.")
     sched = doc.get("schedule") or {}
-    if sched.get("days") or sched.get("windows"):
+    if _preset and (sched.get("days") or sched.get("windows")):
         miss("Schedule", "set",
              "The engine filters by trading session, not by the days and "
-             "time windows a rule records, so this rule's schedule is not "
+             "time windows a rule records, so this preset's schedule is not "
              "applied.")
     order = doc.get("order") or {}
     if order.get("maxSlippagePoints") or order.get("expiresAfterSec"):

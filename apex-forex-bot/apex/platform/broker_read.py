@@ -66,10 +66,9 @@ def _scrub(text, *secrets):
     """An error message with every known secret removed."""
     # Only the access token was known here, so a refresh token, the app secret
     # or a bearer header in the same message went out in the clear. The shared
-    # redactor masks the secrets this process holds, the SHAPE of the usual
-    # ones, and anything else that merely looks like a credential.
-    from apex import redact as _redact
-    return _redact.scrub_for_client(text, *secrets, limit=300)
+    # helper also strips URLs and IPs before the client-shape redactor runs.
+    from apex.platform import safe_errors
+    return safe_errors.message(text, *secrets)
 
 
 def _disconnected(reason="no cTrader account is connected"):

@@ -94,6 +94,25 @@ def _read(key):
     return _decode(key, _raw(key, strict=False))
 
 
+def _read_many(keys):
+    """Decode many keys. Missing → None. Store down or file IO error raises."""
+    keys = list(keys or [])
+    if not keys:
+        return []
+    if user_store._USE_REDIS:
+        raws = user_store.get_blobs(keys)
+    else:
+        raws = []
+        try:
+            for key in keys:
+                p = _local_path(key)
+                raws.append(open(p).read() if os.path.exists(p) else None)
+        except OSError as e:
+            raise user_store.StoreUnavailable(
+                f"local store read failed: {type(e).__name__}") from e
+    return [_decode(key, raw) for key, raw in zip(keys, raws)]
+
+
 def _read_strict(key):
     """`_read`, but a store that could not be reached raises.
 

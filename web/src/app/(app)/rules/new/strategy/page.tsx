@@ -7,7 +7,7 @@ import {
   api, type ApiError, type RuleDoc, type StrategyCatalogue,
 } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
-import { BLANK, RuleForm, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
+import { NEW_BLANK, RuleForm, levelChosen, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { groupByFamily, NoStrategyChosen, presetRuleBody } from "./catalog";
 
@@ -61,7 +61,7 @@ export default function PickStrategyPage() {
   const cat = useRead<StrategyCatalogue>("strategies");
   const [chosen, setChosen] = useState<string>("");
   const [open, setOpen] = useState<string>("");
-  const [draft, setDraft] = useState<Draft>(BLANK);
+  const [draft, setDraft] = useState<Draft>(NEW_BLANK);
   const [err, setErr] = useState<ApiError | null>(null);
   const [failed, setFailed] = useState<string>("");
   const [busy, setBusy] = useState(false);
@@ -72,6 +72,7 @@ export default function PickStrategyPage() {
   }, []);
 
   async function save() {
+    if (!levelChosen(draft)) return;
     setBusy(true); setErr(null); setFailed("");
     let body;
     try {
@@ -278,7 +279,7 @@ export default function PickStrategyPage() {
             <button
               className="btn"
               onClick={save}
-              disabled={busy || !chosen}
+              disabled={busy || !chosen || !levelChosen(draft)}
             >
               <Save className="ico" aria-hidden />{" "}
               {busy ? "Saving…" : "Save draft"}

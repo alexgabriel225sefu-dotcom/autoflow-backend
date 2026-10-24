@@ -146,9 +146,9 @@ def query(owner_id, *, account_id=None, symbol=None, since=None, until=None,
                          since=since, until=until, rule_doc_id=rule_doc_id,
                          status=status)]
     page = heads[offset:offset + limit]
+    loaded = _store._read_many([_k_entry(owner, h["id"]) for h in page])
     rows = []
-    for h in page:
-        row = _store._read(_k_entry(owner, h["id"]))
+    for row in loaded:
         if row and str(row.get("userId")) == owner:
             rows.append(row)
     return {

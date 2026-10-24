@@ -226,9 +226,22 @@ describe("fields that would be refused at execution say so at the input", () => 
     expect(screen.getByText(expected)).toBeDefined();
   });
 
-  it("labels the fields the engine records but does not enforce", () => {
+  it("says trailing and break-even are applied, and the ATR multiple is not configurable", () => {
     render(<RuleForm draft={{ ...BLANK, trailEnabled: true }} set={vi.fn()} specs={SPECS} step="management" />);
-    expect(screen.getByText(/does not apply these yet/)).toBeDefined();
+    expect(screen.getByText(/trailing-stop switch and break-even are applied/i)).toBeDefined();
+    expect(screen.getByText(/trailing ATR multiple is not configurable per rule/i)).toBeDefined();
+  });
+
+  it("does not offer flatten as a choice", () => {
+    render(<RuleForm draft={BLANK} set={vi.fn()} specs={SPECS} step="limits" />);
+    expect(screen.queryByRole("button", { name: /flatten/i })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Close open positions as well as refusing new entries/);
+  });
+
+  it("daily trades field does not say not enforced", () => {
+    render(<RuleForm draft={BLANK} set={vi.fn()} specs={SPECS} step="limits" />);
+    const label = screen.getByText("Max trades per day").closest("label");
+    expect(label?.textContent).not.toMatch(/not enforced/i);
   });
 });
 

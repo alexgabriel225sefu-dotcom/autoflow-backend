@@ -214,6 +214,18 @@ check("and the reason is redacted", not leaked(json.dumps(other)),
       json.dumps(other)[:300])
 
 # ── 5. the helper itself ────────────────────────────────────────────────────
+print("\n[4b] a journal error is redacted on the way in")
+from apex.platform import journal as J                       # noqa: E402
+je = J.for_error(
+    "broker failed at https://broker.example.test/v2 "
+    "connect 10.0.3.14:6379",
+    correlation_id="c1", user_id="u1")
+check("journal for_error redacts the URL",
+      "broker.example.test" not in str(je.error)
+      and "https://" not in str(je.error), str(je.error))
+check("journal for_error redacts the IP",
+      "10.0.3.14" not in str(je.error), str(je.error))
+
 print("\n[5] the shared helper")
 from apex.platform.safe_errors import message                # noqa: E402
 out = message(POISON)

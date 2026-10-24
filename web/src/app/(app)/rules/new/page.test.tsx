@@ -61,10 +61,19 @@ async function mount() {
 }
 
 describe("new rule page — who acts on a setup", () => {
-  it("starts on Full Automation, and says so", async () => {
+  it("starts with NO level pressed", async () => {
     await mount();
-    expect(pressed("Full Automation")).toBe("true");
+    expect(pressed("Full Automation")).toBe("false");
     expect(pressed("Approval Required")).toBe("false");
+    expect(pressed("Signals Only")).toBe("false");
+  });
+
+  it("Save draft does not POST until a level is chosen", async () => {
+    await mount();
+    const save = screen.getByRole("button", { name: /Save draft/ });
+    expect(save).toHaveProperty("disabled", true);
+    fireEvent.click(save);
+    expect(calls.some((c) => c.path === "rules" && c.init?.method === "POST")).toBe(false);
   });
 
   it("clicking Approval Required moves the selection, and ONLY one is pressed", async () => {

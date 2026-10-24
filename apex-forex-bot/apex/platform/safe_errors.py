@@ -36,7 +36,7 @@ _PATH = re.compile(
 )
 
 
-def message(exc, *, fallback="request failed", limit=300):
+def message(exc, *secrets, fallback="request failed", limit=300):
     """Bounded diagnostic prose with no URL, path, header or credential in it."""
     raw = str(exc).strip() if exc is not None else ""
     raw = raw or fallback
@@ -51,4 +51,4 @@ def message(exc, *, fallback="request failed", limit=300):
     raw = _RELPATH.sub("[redacted-path]", raw)
     raw = _HOST.sub(lambda m: f"{m.group(1)}=[redacted-host]", raw)
     raw = _PATH.sub("[redacted-path]", raw)
-    return redact.scrub_for_client(raw, limit=limit)
+    return redact.scrub_for_client(raw, *secrets, limit=limit)

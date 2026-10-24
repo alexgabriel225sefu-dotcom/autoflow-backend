@@ -18,6 +18,8 @@ support screenshot.
 import time
 import uuid
 
+from apex.platform import safe_errors
+
 # What produced the entry.
 EVALUATION = "evaluation"
 EXECUTION = "execution"
@@ -143,7 +145,7 @@ class JournalEntry:
                                   if execution_request else None)
         self.broker_result = redact(broker_result) if broker_result else None
         self.position = redact(position) if position else None
-        self.error = error
+        self.error = safe_errors.message(error) if error else error
 
     def as_dict(self):
         return {

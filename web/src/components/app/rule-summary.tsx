@@ -313,16 +313,15 @@ export function RuleTerms({
         <Row
           k="Trailing stop"
           v={trail.enabled ? `${trail.atrMultiple ?? "?"}× ATR` : <span className="dim">off</span>}
-          note={trail.enabled ? "Stored on the rule. The execution engine does not apply it yet." : undefined}
+          note={trail.enabled ? "Distance is not configurable per rule — the engine uses its own." : undefined}
         />
         <Row
           k="Break even"
           v={be.enabled ? `at ${be.atR ?? "?"}R` : <span className="dim">off</span>}
-          note={be.enabled ? "Stored on the rule. The execution engine does not apply it yet." : undefined}
         />
         <Row k="Max open positions" v={String(limits.maxOpenPositions ?? "—")} />
         <Row k="Max spread" v={limits.maxSpreadPips ? `${limits.maxSpreadPips} pips` : <span className="dim">no cap</span>} />
-        <Row k="On limit" v={limits.onLimit === "flatten" ? "Close open positions" : "Block new entries"} />
+        <Row k="On limit" v={limits.onLimit === "flatten" ? "Stored — not executed" : "Block new entries"} />
         <Row k="Schedule" v={schedulePhrase(doc) ?? <span className="dim">any time the market is open</span>} />
         <Row
           k="Order type"

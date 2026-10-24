@@ -169,6 +169,10 @@ def classify(method, route):
     if route.startswith("automation"):
         # A GET of the automation state is a poll, not a control action.
         return "control" if method != "GET" else "default"
+    if route.startswith("approvals"):
+        # Approve and reject decide whether a proposed order is placed.
+        # Listing pending proposals is a poll, like GET automation.
+        return "control" if method != "GET" else "default"
     return "default"
 
 

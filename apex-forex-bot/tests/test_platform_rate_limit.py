@@ -61,6 +61,9 @@ cases = [
     ("GET", "automation", "default"),          # a poll, not a control action
     ("GET", "positions", "default"),
     ("GET", "journal", "default"),
+    ("POST", "approvals/approve", "control"),
+    ("POST", "approvals/reject", "control"),
+    ("GET", "approvals", "default"),
 ]
 for method, route, expected in cases:
     got = RL.classify(method, route)

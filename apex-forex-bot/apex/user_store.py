@@ -670,6 +670,30 @@ def get_blob(key):
     return _redis_get(key)
 
 
+def get_blobs(keys):
+    """Raw strings at `keys` via MGET. Empty keys → []. Unreachable store raises.
+
+    Never collapses a store failure into a list of Nones — that would look
+    like every key being missing, and a journal page would return a shorter
+    but still status-ok response.
+    """
+    keys = list(keys or [])
+    if not keys:
+        return []
+    if not _USE_REDIS:
+        raise StoreUnavailable("no shared store")
+    if _BACKEND == "redis":
+        try:
+            return list(_r.mget(keys))
+        except Exception as e:
+            raise StoreUnavailable(
+                f"redis MGET failed: {type(e).__name__}") from e
+    res = _upstash_post(["MGET", *keys])
+    if not isinstance(res, list):
+        raise StoreUnavailable("upstash MGET failed")
+    return res
+
+
 def get_blob_strict(key):
     """`get_blob`, but an unreachable store raises instead of reading empty.
 

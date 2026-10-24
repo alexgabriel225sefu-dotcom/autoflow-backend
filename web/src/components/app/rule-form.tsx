@@ -72,6 +72,13 @@ export const BLANK: Draft = {
   orderType: "MARKET", maxSlippagePoints: "", expiresAfterSec: "",
 };
 
+/** New rules start with no level so the client has to choose who acts. */
+export const NEW_BLANK: Draft = { ...BLANK, automationLevel: "" };
+
+export function levelChosen(d: Pick<Draft, "automationLevel">): boolean {
+  return AUTOMATION_LEVELS.some((l) => l.id === d.automationLevel);
+}
+
 const num = (v: string): number | undefined => {
   const t = v.trim();
   if (t === "") return undefined;
@@ -481,7 +488,7 @@ export function RuleForm({
     <>
       <Section
         title="Trade management"
-        note="Stored on the rule and shown in its terms. The execution engine does not apply these yet, so they are recorded rather than enforced."
+        note="The trailing-stop switch and break-even are applied. The trailing ATR multiple is not configurable per rule — the engine uses its own."
       >
         <label className="field-inline">
           <input type="checkbox" checked={d.trailEnabled}
@@ -523,19 +530,17 @@ export function RuleForm({
             <span className="field-note">Entries are blocked while the spread is wider.</span></label>
           <label className="field"><span>Max trades per day</span>
             <input type="number" step="1" min="1" placeholder="no cap" value={d.maxDailyTrades}
-                   onChange={(e) => set("maxDailyTrades", e.target.value)} />
-            <span className="field-note">Recorded on the rule; not enforced by the engine yet.</span></label>
+                   onChange={(e) => set("maxDailyTrades", e.target.value)} /></label>
           <label className="field"><span>Max exposure <span className="hint">% of balance</span></span>
             <input type="number" step="1" min="1" placeholder="no cap" value={d.maxExposurePercent}
                    onChange={(e) => set("maxExposurePercent", e.target.value)} />
             <span className="field-note">Recorded on the rule; not enforced by the engine yet.</span></label>
         </div>
         <div className="field"><span>When a limit is hit</span>
-          <Seg value={d.onLimit} options={["block", "flatten"]} onChange={(v) => set("onLimit", v)} />
-          <span className="field-note">
+          <span className="field-note" style={d.onLimit === "flatten" ? { color: "var(--a4t-short)" } : undefined}>
             {d.onLimit === "flatten"
-              ? "Close open positions as well as refusing new entries."
-              : "Refuse new entries and keep managing the open ones."}
+              ? "Flatten is stored on this rule but is not executed. New entries are refused; open positions stay."
+              : "New entries are refused and open positions stay."}
           </span>
         </div>
       </Section>

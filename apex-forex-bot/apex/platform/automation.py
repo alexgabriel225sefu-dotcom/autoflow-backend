@@ -718,8 +718,9 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
     # `conn["mode"]` is safe to use as the answer: _preflight refused unless
     # the broker confirmed a mode, and refused again if the broker's answer
     # differed from this record.
+    _mode = conn.get("mode")
     out = _write(user_id, {"state": RUNNING, "ruleDocId": rule_doc_id,
-                           "mode": conn.get("mode"), "startedAt": now,
+                           "mode": _mode, "startedAt": now,
                            "accountId": conn.get("ctid"),
                            "correlationId": corr,
                            # Kept on the automation record, not recomputed on
@@ -733,10 +734,10 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
         _jstore._j.AUTOMATION_STARTED, correlation_id=corr, user_id=user_id,
         account_id=str(conn.get("ctid")), rule_doc_id=rule_doc_id,
         rule_doc_version=rule.get("version"),
-        detail=f"demo account {conn.get('ctid')}")
+        detail=f"{_mode} account {conn.get('ctid')}")
     _notify.notify(user_id, type=_notify.SYSTEM,
                    title="Automation started",
-                   body=f"Running {rule.get('name') or rule_doc_id} on demo "
+                   body=f"Running {rule.get('name') or rule_doc_id} on {_mode} "
                         f"account {conn.get('ctid')}.",
                    correlation_id=corr)
     return dict(status(user_id), started=True, alreadyRunning=False)

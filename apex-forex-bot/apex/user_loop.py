@@ -5575,6 +5575,10 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         # Pass the gate's own reason up; the caller names it in plain words.
         return {"ok": False, "error": _claim_why or "ORDER_REFUSED",
                 "side": side, "symbol": sym}
+    # An approval that lands after Stop must not place. Telegram /buy keeps
+    # the default origin "manual" and is not gated on the loop being active.
+    if origin == "approval" and _stop_requested(user_id):
+        return {"ok": False, "error": "NOT_RUNNING", "side": side, "symbol": sym}
     try:
         _res = broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
         ledger.record(_rid, _res)

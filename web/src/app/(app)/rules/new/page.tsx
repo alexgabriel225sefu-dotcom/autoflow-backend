@@ -6,7 +6,7 @@ import { Check, ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { api, type ApiError, type ConditionSpec, type RuleDoc } from "@/lib/api";
 import { defaultsFor } from "@/components/app/condition-editor";
 import { starterCondition } from "./starter-condition";
-import { BLANK, RuleForm, STEPS, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
+import { NEW_BLANK, RuleForm, STEPS, levelChosen, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
 import { RuleSentence, RuleTerms } from "@/components/app/rule-summary";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 
@@ -26,7 +26,7 @@ export default function NewRulePage() {
   const router = useRouter();
   const [specs, setSpecs] = useState<Record<string, ConditionSpec> | null>(null);
   const [loadErr, setLoadErr] = useState<ApiError | null>(null);
-  const [draft, setDraft] = useState<Draft>(BLANK);
+  const [draft, setDraft] = useState<Draft>(NEW_BLANK);
   const [step, setStep] = useState<StepId>("basics");
   const [err, setErr] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,6 +68,7 @@ export default function NewRulePage() {
   }, [attempt]);
 
   async function save() {
+    if (!levelChosen(draft)) return;
     setBusy(true); setErr(null);
     const r = await api<{ rule: RuleDoc }>("rules", { method: "POST", body: toDoc(draft) });
     setBusy(false);
@@ -179,7 +180,7 @@ export default function NewRulePage() {
             <button
               className={index < STEPS.length - 1 ? "btn btn-ghost" : "btn btn-lg"}
               onClick={save}
-              disabled={busy}
+              disabled={busy || !levelChosen(draft)}
             >
               <Save className="ico" aria-hidden /> {busy ? "Saving…" : "Save draft"}
             </button>
