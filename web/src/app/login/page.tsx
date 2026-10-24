@@ -1,5 +1,5 @@
 "use client";
-import { BrandLockup } from "@/components/brand/logo";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeNext } from "@/lib/supabase/middleware";
@@ -32,31 +32,28 @@ function LoginPageInner() {
   }
 
   return (
-    <main className="a4t">
-      <div className="auth-wrap">
-        <div className="auth-brand"><BrandLockup size={26} /></div>
-        <h1>Sign in</h1>
-        <form onSubmit={onSubmit} className="card" style={{ marginTop: "1rem" }}>
-          <label className="field">
-            <span>Email</span>
-            <input type="email" required value={email} autoComplete="email"
-                   onChange={(e) => setEmail(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Password</span>
-            <input type="password" required value={password} autoComplete="current-password"
-                   onChange={(e) => setPassword(e.target.value)} />
-          </label>
-          {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-          <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-        <p className="muted">
-          <a href="/auth/reset">Forgot your password?</a> · <a href="/signup">Create an account</a>
-        </p>
-      </div>
-    </main>
+    <AuthShell
+      title="Welcome back."
+      lead="Sign in to your control panel."
+      footer={<><a href="/auth/reset">Forgot your password?</a><a href="/signup">Create an account</a></>}
+    >
+      <form onSubmit={onSubmit} className="card">
+        <label className="field">
+          <span>Email</span>
+          <input type="email" required value={email} autoComplete="email"
+                 onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>Password</span>
+          <input type="password" required value={password} autoComplete="current-password"
+                 onChange={(e) => setPassword(e.target.value)} />
+        </label>
+        {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
+        <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
+          {busy ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }
 

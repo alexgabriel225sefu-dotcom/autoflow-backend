@@ -1,5 +1,5 @@
 "use client";
-import { BrandLockup } from "@/components/brand/logo";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -22,32 +22,31 @@ export default function ResetPage() {
   }
 
   return (
-    <main className="a4t">
-      <div className="auth-wrap">
-        <div className="auth-brand"><BrandLockup size={26} /></div>
-        <h1>Reset your password</h1>
-        {sent ? (
-          <div className="card">
-            {/* Deliberately the same message whether or not the address is
-                registered: a different one would tell a stranger which email
-                addresses have accounts here. */}
-            <p>If that address has an account, a reset link is on its way.</p>
-            <a className="btn btn-ghost" href="/login">Back to sign in</a>
-          </div>
-        ) : (
-          <form onSubmit={onSubmit} className="card">
-            <label className="field">
-              <span>Email</span>
-              <input type="email" required value={email}
-                     onChange={(e) => setEmail(e.target.value)} />
-            </label>
-            {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-            <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
-              {busy ? "Sending…" : "Send reset link"}
-            </button>
-          </form>
-        )}
-      </div>
-    </main>
+    <AuthShell
+      title="Reset your password."
+      lead="We will email you a link to choose a new one."
+      footer={<a href="/login">Back to sign in</a>}
+    >
+      {sent ? (
+        <div className="card">
+          {/* Deliberately the same message whether or not the address is
+              registered: a different one would tell a stranger which email
+              addresses have accounts here. */}
+          <p className="auth-lead">If that address has an account, a reset link is on its way.</p>
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} className="card">
+          <label className="field">
+            <span>Email</span>
+            <input type="email" required value={email} autoComplete="email"
+                   onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
+          <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
+            {busy ? "Sending…" : "Send reset link"}
+          </button>
+        </form>
+      )}
+    </AuthShell>
   );
 }
