@@ -11,6 +11,8 @@ function CallbackPageInner() {
   const params = useSearchParams();
   const recovery = params.get("mode") === "recovery";
   const next = safeNext(params.get("next"));
+  const code = params.get("code");
+  const providerError = params.get("error_description") || params.get("error");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -18,8 +20,11 @@ function CallbackPageInner() {
   useEffect(() => {
     if (!recovery) {
       const client = createClient();
-      const code = params.get("code");
       const finish = async () => {
+        if (providerError) {
+          setError(providerError);
+          return;
+        }
         if (code) {
           const { error: exchangeError } = await client.auth.exchangeCodeForSession(code);
           if (exchangeError) {
@@ -32,7 +37,7 @@ function CallbackPageInner() {
       };
       void finish();
     }
-  }, [next, params, recovery, router]);
+  }, [code, next, params, providerError, recovery, router]);
 
   async function setNewPassword(e: React.FormEvent) {
     e.preventDefault();
