@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import {
   ArrowRight,
+  ArrowUpRight,
+  Check,
+  Construction,
   Eye,
   GaugeCircle,
   Link2,
@@ -51,7 +54,7 @@ export default function Landing() {
           </span>
         </nav>
 
-        <section className="mkt-hero mkt-hero-terminal">
+        <section id="product" className="mkt-hero mkt-hero-terminal">
           <span className="mkt-glow" aria-hidden />
           <div className="mkt-hero-copy">
             <span className="mkt-eyebrow">
@@ -142,6 +145,34 @@ export default function Landing() {
           </div>
         </section>
 
+        <section id="features" className="mkt-section">
+          <div className="mkt-section-kicker">
+            <span className="mkt-eyebrow"><i className="mkt-dot" aria-hidden /> Broker ecosystem</span>
+            <span className="mkt-section-note">One workspace, provider by provider.</span>
+          </div>
+          <div className="mkt-broker-grid" aria-label="Broker integrations">
+            <article className="mkt-broker-card mkt-broker-live">
+              <div className="mkt-broker-brand"><span className="mkt-broker-logo ctrader-logo">c</span><strong>cTrader</strong></div>
+              <span className="mkt-broker-status"><i className="mkt-status-dot" aria-hidden /> Available now</span>
+              <p>Connect your own cTrader demo account through the broker's secure authorisation flow.</p>
+              <a href="/signup">Connect cTrader <ArrowUpRight size={15} aria-hidden /></a>
+            </article>
+            <article className="mkt-broker-card mkt-broker-soon">
+              <div className="mkt-broker-brand"><span className="mkt-broker-logo mt-logo">4</span><strong>MetaTrader 4</strong></div>
+              <span className="mkt-broker-status"><Construction size={14} aria-hidden /> Coming soon</span>
+              <p>We are evaluating a managed connector so traders will not need to install a local bridge.</p>
+              <span className="mkt-broker-note">No install path promised yet</span>
+            </article>
+            <article className="mkt-broker-card mkt-broker-soon">
+              <div className="mkt-broker-brand"><span className="mkt-broker-logo mt-logo">5</span><strong>MetaTrader 5</strong></div>
+              <span className="mkt-broker-status"><Construction size={14} aria-hidden /> Coming soon</span>
+              <p>Planned after the cTrader demo flow is proven and the connector can meet our safety bar.</p>
+              <span className="mkt-broker-note">Demo-first roadmap</span>
+            </article>
+          </div>
+          <p className="mkt-plain mkt-broker-footnote"><Check size={15} aria-hidden /> Provider capabilities are shown honestly. A coming-soon card is not an available connection.</p>
+        </section>
+
         <section className="mkt-section">
           <h2>What it actually does</h2>
           <p>
@@ -208,7 +239,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="mkt-section mkt-flow">
+        <section id="resources" className="mkt-section mkt-flow">
           <div>
             <span className="mkt-eyebrow">Launch flow</span>
             <h2>From broker connection to controlled demo automation.</h2>
@@ -248,7 +279,7 @@ export default function Landing() {
           </p>
         </section>
 
-        <section className="mkt-section">
+        <section id="pricing" className="mkt-section">
           <PricingSection />
         </section>
 

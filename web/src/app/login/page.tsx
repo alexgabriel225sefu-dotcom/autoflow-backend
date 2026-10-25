@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeNext } from "@/lib/supabase/middleware";
 import { createClient } from "@/lib/supabase/client";
+import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -36,6 +37,8 @@ function LoginPageInner() {
       <div className="auth-wrap">
         <div className="auth-brand"><BrandLockup size={26} /></div>
         <h1>Sign in</h1>
+        <SocialAuthButtons next={safeNext(params.get("next"))} />
+        <div className="auth-divider"><span>or use email</span></div>
         <form onSubmit={onSubmit} className="card" style={{ marginTop: "1rem" }}>
           <label className="field">
             <span>Email</span>

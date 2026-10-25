@@ -3,6 +3,7 @@ import { BrandLockup } from "@/components/brand/logo";
 import { useState } from "react";
 import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -54,6 +55,8 @@ export default function SignUpPage() {
         {/* Before the form, not after it. Somebody entering an email address
             is entitled to know whether it will end in a payment screen. */}
         <p className="muted" style={{ fontSize: ".82rem" }}>{PLAN_NOTICE}</p>
+        <SocialAuthButtons />
+        <div className="auth-divider"><span>or create with email</span></div>
         <form onSubmit={onSubmit} className="card" style={{ marginTop: "1rem" }}>
           <label className="field">
             <span>Email</span>
