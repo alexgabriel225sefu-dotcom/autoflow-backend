@@ -272,7 +272,15 @@ def floor_risk_ok(units: float, instrument: str, price: float,
 
 
 def required_margin(units: int, instrument: str, price: float, leverage: float = 30) -> float:
-    notional = units * (1.0 if instrument.upper().startswith("USD_") else price)
+    # USD-base pairs (USDJPY, USDCHF, USDCAD) are worth ONE dollar per unit; the
+    # rest are worth `price` dollars per unit. The test used to be
+    # startswith("USD_"), which only matched the underscore spelling, so USDJPY
+    # (the spelling the platform stores) was valued at units x 150 dollars and
+    # a $3,000 account was told it was too small for a 1,000-unit lot that needs
+    # about $33 of margin. `calc_units` has always used this same rule.
+    s = _norm(instrument)
+    usd_base = s.startswith("USD") and not s.endswith("USD")
+    notional = units * (1.0 if usd_base else price)
     return notional / leverage if leverage else notional
 
 
