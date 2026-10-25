@@ -8,7 +8,7 @@ import {
 } from "@/lib/api";
 import { invalidate, useRead } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
-import { StartedCard } from "@/components/app/started-card";
+import { fireStartConfetti } from "@/components/app/start-confetti";
 import { runAutomationControl } from "@/components/app/automation-control";
 import { AUTOMATION_LEVELS } from "@/components/app/plain";
 import { ErrorNotice, Spinner } from "@/components/app/state";
@@ -53,7 +53,6 @@ export default function TradePage() {
   const [family, setFamily] = useState<string>("all");
   const [open, setOpen] = useState<string>("");
   const [err, setErr] = useState<ApiError | null>(null);
-  const [started, setStarted] = useState(false);
   const [orphan, setOrphan] = useState<string>("");
   const [pickErr, setPickErr] = useState<ApiError | null>(null);
   const [query, setQuery] = useState("");
@@ -129,7 +128,7 @@ export default function TradePage() {
       ruleDocId: id, reload: auto.reload,
     });
     if (!res.ok) setOrphan(id);
-    else setStarted(true);
+    else fireStartConfetti();
     return res.text;
   }
 
@@ -437,7 +436,6 @@ export default function TradePage() {
           <Link className="btn" href="/connect">{start.label}</Link>
         )}
       </div>
-      {started ? <StartedCard summary={summary} onClose={() => setStarted(false)} /> : null}
     </main>
   );
 }
