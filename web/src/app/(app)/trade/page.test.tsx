@@ -263,6 +263,11 @@ describe("Start on demo", () => {
     expect(body.limits.maxDailyLossPercent).toBe(3);
     expect(body.entry.conditions).toEqual([]);
     expect(calls.find((c) => c.path === "automation/start")!.init!.body).toEqual({ ruleDocId: "r1" });
+    // The server accepted Start, so the confirmation card appears, and it
+    // does not claim a trade was placed.
+    const card = await screen.findByRole("dialog", { name: "Automation started" });
+    expect(within(card).getByText(/only if the rule fires/i)).toBeDefined();
+    expect(card.textContent).not.toMatch(/trade (was|has been) placed/i);
   });
 
   it("stops at activation, says so, and never reaches automation/start", async () => {
@@ -274,6 +279,7 @@ describe("Start on demo", () => {
     await screen.findByText("NOT_ACTIVATABLE");
     expect(calls.some((c) => c.path === "automation/start")).toBe(false);
     expect(screen.getByText(/saved but did not start/i)).toBeDefined();
+    expect(screen.queryByRole("dialog", { name: "Automation started" })).toBeNull();
   });
 
   it("is disabled with the reason while automation is already running", async () => {
