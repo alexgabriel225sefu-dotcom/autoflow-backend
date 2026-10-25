@@ -23,6 +23,8 @@ type Call = { path: string; init?: { method?: string; body?: unknown } };
 const calls: Call[] = [];
 let routes: Record<string, unknown | ((init?: Call["init"]) => unknown)> = {};
 
+const fireStartConfetti = vi.hoisted(() => vi.fn());
+vi.mock("@/components/app/start-confetti", () => ({ fireStartConfetti }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/trade",
@@ -126,7 +128,7 @@ function chooseEverything() {
   choose(/Approval Required/);
 }
 
-beforeEach(() => { calls.length = 0; baseRoutes(); });
+beforeEach(() => { calls.length = 0; fireStartConfetti.mockClear(); baseRoutes(); });
 afterEach(() => { vi.clearAllMocks(); });
 
 describe("the choices", () => {
@@ -263,11 +265,8 @@ describe("Start on demo", () => {
     expect(body.limits.maxDailyLossPercent).toBe(3);
     expect(body.entry.conditions).toEqual([]);
     expect(calls.find((c) => c.path === "automation/start")!.init!.body).toEqual({ ruleDocId: "r1" });
-    // The server accepted Start, so the confirmation card appears, and it
-    // does not claim a trade was placed.
-    const card = await screen.findByRole("dialog", { name: "Automation started" });
-    expect(within(card).getByText(/only if the rule fires/i)).toBeDefined();
-    expect(card.textContent).not.toMatch(/trade (was|has been) placed/i);
+    // The server accepted Start, so the confetti fires, once.
+    await waitFor(() => expect(fireStartConfetti).toHaveBeenCalledTimes(1));
   });
 
   it("stops at activation, says so, and never reaches automation/start", async () => {
@@ -279,7 +278,7 @@ describe("Start on demo", () => {
     await screen.findByText("NOT_ACTIVATABLE");
     expect(calls.some((c) => c.path === "automation/start")).toBe(false);
     expect(screen.getByText(/saved but did not start/i)).toBeDefined();
-    expect(screen.queryByRole("dialog", { name: "Automation started" })).toBeNull();
+    expect(fireStartConfetti).not.toHaveBeenCalled();
   });
 
   it("is disabled with the reason while automation is already running", async () => {

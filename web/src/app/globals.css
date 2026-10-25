@@ -2226,33 +2226,3 @@ body {
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
-
-/* ── the card shown after Start is accepted ───────────────────────────── */
-.started-backdrop {
-  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
-  padding: 1rem; background: rgba(0, 0, 0, .62);
-}
-.started-card {
-  width: min(26rem, 100%); padding: 1.8rem 1.5rem 1.5rem; text-align: center;
-  border: 1px solid var(--a4t-line); border-radius: 20px; background: var(--a4t-surface);
-  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .8);
-}
-.started-mark {
-  position: relative; display: grid; place-items: center; width: 84px; height: 84px;
-  margin: 0 auto 1rem; color: var(--a4t-long);
-}
-.started-ring {
-  position: absolute; inset: 0; border-radius: 50%;
-  border: 2px solid currentColor; background: var(--a4t-long-wash);
-}
-.started-mark svg { position: relative; }
-.started-dot {
-  position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
-  border-radius: 50%; background: var(--a4t-long);
-}
-.started-dot.big { width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; background: var(--a4t-accent); }
-.started-card h2 { font-size: 1.35rem; letter-spacing: -.02em; margin: 0; }
-.started-summary { margin: .55rem 0 0; font-weight: 600; font-size: .92rem; }
-.started-note { margin: .7rem 0 0; font-size: .84rem; line-height: 1.55; }
-.started-actions { display: flex; gap: .6rem; justify-content: center; margin-top: 1.3rem; flex-wrap: wrap; }
-.started-actions .btn:not(.btn-primary) { background: transparent; color: var(--a4t-text); border: 1px solid var(--a4t-line); box-shadow: none; }
