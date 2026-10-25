@@ -2086,22 +2086,27 @@ body {
    SpotlightGrid; without a pointer (touch, reduced motion) it never shows. */
 .mkt-hero-mark { overflow: visible; min-height: min(68vh, 600px); display: flex; align-items: center; padding-top: clamp(2rem, 6vw, 3.5rem); padding-bottom: clamp(2rem, 5vw, 3rem); }
 .mkt-hero-mark .mkt-hero-copy { max-width: 40rem; }
-/* The hero photograph: the A4 monogram carved in stone, full width of the
-   viewport, darkest on the left where the copy sits. */
+/* The hero background: a quiet generated light sweep over a dark grid floor,
+   no logo in it. Full width of the viewport, darkest where the copy sits. */
 .mkt-hero > .mkt-hero-photo {
   position: absolute; z-index: 0; pointer-events: none;
   top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%);
+  background: url("/hero-bg.webp") no-repeat 62% 18% / cover;
+  filter: brightness(1.4) contrast(1.06);
+}
+/* The edges fade to the page colour; kept off the filtered layer so the fade
+   stays exactly the page background. */
+.mkt-hero > .mkt-hero-photo::after {
+  content: ""; position: absolute; inset: 0;
   background:
-    linear-gradient(90deg, var(--mkt-bg) 0, rgba(8, 8, 10, .55) 34%, transparent 62%),
-    linear-gradient(180deg, var(--mkt-bg) 0, transparent 14%, transparent 80%, var(--mkt-bg) 100%),
-    url("/hero-a4.webp") no-repeat 72% 50% / cover;
+    linear-gradient(90deg, #08080A 0, rgba(8, 8, 10, .4) 30%, transparent 58%),
+    linear-gradient(180deg, #08080A 0, transparent 26%, transparent 66%, #08080A 100%);
 }
 @media (max-width: 760px) {
   .mkt-hero-mark { min-height: 0; }
-  .mkt-hero > .mkt-hero-photo {
-    background:
-      linear-gradient(180deg, var(--mkt-bg) 0, rgba(8, 8, 10, .6) 30%, rgba(8, 8, 10, .45) 60%, var(--mkt-bg) 100%),
-      url("/hero-a4-sm.webp") no-repeat 78% 100% / auto 75%;
+  .mkt-hero > .mkt-hero-photo { background: url("/hero-bg-sm.webp") no-repeat 70% 100% / cover; }
+  .mkt-hero > .mkt-hero-photo::after {
+    background: linear-gradient(180deg, #08080A 0, rgba(8, 8, 10, .4) 30%, rgba(8, 8, 10, .35) 60%, #08080A 100%);
   }
 }
 
