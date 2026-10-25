@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Familjen_Grotesk } from "next/font/google";
 import "./globals.css";
 import { NO_FLASH_SCRIPT } from "@/lib/appearance";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+});
+
+// The marketing page's own face. The app keeps Geist; the landing page is the
+// one place a visitor judges the product by its look, and Geist at heavy
+// weights with tight tracking is the default of every template.
+const mktSans = Familjen_Grotesk({
+  variable: "--font-mkt",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -34,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${mktSans.variable} h-full antialiased`}
       // The theme attributes are written by the script below before first
       // paint, so the server's markup and the browser's differ on purpose.
       suppressHydrationWarning

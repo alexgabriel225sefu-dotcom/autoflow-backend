@@ -1493,7 +1493,7 @@ body {
 
 /* ── the hero: one headline, one product card, the brokers it works with ── */
 .mkt-kicker { font-size: .74rem; font-weight: 800; letter-spacing: .18em; color: var(--mkt-accent-text); margin: 0 0 1.2rem; }
-.mkt-hero2 h1 { font-size: clamp(2.8rem, 7.4vw, 5.4rem); line-height: .92; letter-spacing: -.055em; font-weight: 800; text-wrap: balance; }
+.mkt-hero2 h1 { font-size: clamp(2.8rem, 7.2vw, 5.2rem); line-height: .96; letter-spacing: -.03em; font-weight: 600; text-wrap: balance; }
 .mkt-hero2 .mkt-lede { max-width: 46ch; }
 .mkt-works { display: grid; gap: 1rem; margin-top: 2.2rem; font-size: .68rem; font-weight: 800; letter-spacing: .16em; color: var(--mkt-dim); }
 .mkt-works-row { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem 1.4rem; }
@@ -2169,3 +2169,13 @@ body {
   .mkt-rail-5 { grid-column: span 5; }
   .mkt-rail { padding: 2rem 2rem 2.2rem; }
 }
+
+/* The landing page's typeface (Familjen Grotesk, loaded in layout.tsx). It
+   replaces Geist here only; weights are lighter and tracking looser than the
+   template default of 800 at -.055em. */
+.mkt { font-family: var(--font-mkt), var(--font-geist-sans), system-ui, sans-serif; }
+.mkt h2 { font-weight: 600; letter-spacing: -.025em; }
+.mkt h3 { font-weight: 600; letter-spacing: -.015em; }
+.mkt-kicker { font-weight: 600; letter-spacing: .14em; }
+.mkt-rail h3 { font-weight: 600; letter-spacing: -.015em; }
+.mkt-lede, .mkt-rail p { text-wrap: pretty; }
