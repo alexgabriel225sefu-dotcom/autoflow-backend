@@ -297,7 +297,7 @@
 }
 /* The landing page keeps its own dark palette in every theme; only the page
    behind it must not turn light. */
-html:has(.mkt) body { background: var(--mkt-bg, #08080A); }
+html:has(.mkt) body { background: var(--mkt-bg, #08080A); overflow-x: clip; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2084,22 +2084,25 @@ body {
    Pointer-spotlight cells follow the pattern of the 21st.dev feature grids.
    The light is two custom properties set on the hovered cell by
    SpotlightGrid; without a pointer (touch, reduced motion) it never shows. */
-.mkt-hero-mark { overflow: hidden; min-height: min(62vh, 520px); display: flex; align-items: center; padding-top: clamp(2rem, 6vw, 3.5rem); padding-bottom: clamp(2rem, 5vw, 3rem); }
+.mkt-hero-mark { overflow: visible; min-height: min(68vh, 600px); display: flex; align-items: center; padding-top: clamp(2rem, 6vw, 3.5rem); padding-bottom: clamp(2rem, 5vw, 3rem); }
 .mkt-hero-mark .mkt-hero-copy { max-width: 40rem; }
-/* The A4 monogram cut from the lockup (the first 170 of its 1116 px), scaled
-   to the hero and faded in from the left so the copy never sits on a hard edge. */
-.mkt-hero > .mkt-mark-bg {
+/* The hero photograph: the A4 monogram carved in stone, full width of the
+   viewport, darkest on the left where the copy sits. */
+.mkt-hero > .mkt-hero-photo {
   position: absolute; z-index: 0; pointer-events: none;
-  right: 0; top: 50%; transform: translateY(-50%);
-  height: min(100%, 430px); aspect-ratio: 170 / 152;
-  background: url("/apex4traders-logo-light.png") no-repeat left center / auto 100%;
-  opacity: .16;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 38%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 38%);
+  top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%);
+  background:
+    linear-gradient(90deg, var(--mkt-bg) 0, rgba(8, 8, 10, .55) 34%, transparent 62%),
+    linear-gradient(180deg, var(--mkt-bg) 0, transparent 14%, transparent 80%, var(--mkt-bg) 100%),
+    url("/hero-a4.webp") no-repeat 72% 50% / cover;
 }
 @media (max-width: 760px) {
   .mkt-hero-mark { min-height: 0; }
-  .mkt-hero > .mkt-mark-bg { right: -24vw; height: 80%; opacity: .1; }
+  .mkt-hero > .mkt-hero-photo {
+    background:
+      linear-gradient(180deg, var(--mkt-bg) 0, rgba(8, 8, 10, .6) 30%, rgba(8, 8, 10, .45) 60%, var(--mkt-bg) 100%),
+      url("/hero-a4-sm.webp") no-repeat 78% 100% / auto 75%;
+  }
 }
 
 .mkt-partners { padding: 0 0 clamp(2rem, 6vw, 3.5rem); }

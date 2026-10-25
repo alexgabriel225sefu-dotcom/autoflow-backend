@@ -51,8 +51,9 @@ export default function Landing() {
         </nav>
 
         <section className="mkt-hero mkt-hero2 mkt-hero-mark" id="product">
-          {/* The brand mark, large, behind the copy. Decoration only. */}
-          <span className="mkt-mark-bg" aria-hidden />
+          {/* The brand mark as a stone monolith, generated from the logo.
+              Decoration only; the copy never sits on the lit part. */}
+          <span className="mkt-hero-photo" aria-hidden />
           <div className="mkt-hero-copy">
             <p className="mkt-kicker">YOUR RULES, YOUR BROKER</p>
             <h1>Trade like you planned&nbsp;to.</h1>
