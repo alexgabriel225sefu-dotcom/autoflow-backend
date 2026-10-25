@@ -138,14 +138,14 @@ describe("application shell", () => {
     const sidebar = document.querySelector("aside.side")!;
     for (const n of NAV) {
       expect(
-        within(sidebar as HTMLElement).getByRole("link", { name: new RegExp(n.label) }),
+        within(sidebar as HTMLElement).getByRole("link", { name: new RegExp(`^${n.label}`) }),
         `${n.label} missing from the sidebar`,
       ).toBeDefined();
     }
 
     const bottom = screen.getByRole("navigation", { name: "Primary" });
     for (const n of PRIMARY) {
-      expect(within(bottom).getByRole("link", { name: new RegExp(n.label) })).toBeDefined();
+      expect(within(bottom).getByRole("link", { name: new RegExp(`^${n.label}`) })).toBeDefined();
     }
     // The overflow control is the promise that the other four still exist.
     expect(within(bottom).getByRole("button", { name: /More destinations/ })).toBeDefined();
@@ -158,7 +158,7 @@ describe("application shell", () => {
     const drawer = screen.getByRole("dialog", { name: /More destinations/ });
     for (const n of NAV) {
       expect(
-        within(drawer).getByRole("link", { name: new RegExp(n.label) }),
+        within(drawer).getByRole("link", { name: new RegExp(`^${n.label}`) }),
         `${n.label} is not reachable from the drawer`,
       ).toBeDefined();
     }

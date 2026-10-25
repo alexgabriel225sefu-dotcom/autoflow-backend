@@ -63,6 +63,7 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/pricing": "public",               // the price, linked from the landing page
 
   "/dashboard": "protected",
+  "/trade": "protected",
   "/accounts": "protected",
   "/connect": "protected",
   "/journal": "protected",

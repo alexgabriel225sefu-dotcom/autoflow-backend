@@ -45,6 +45,7 @@ export type Draft = {
   beAtR: string;
   maxOpenPositions: string;
   maxDailyTrades: string;
+  maxDailyLossPercent: string;
   maxExposurePercent: string;
   maxSpreadPips: string;
   onLimit: string;
@@ -80,7 +81,7 @@ export const BLANK: Draft = {
   tpMode: "rr", tpRr: "2.0", tpPips: "40",
   trailEnabled: false, trailAtrMultiple: "2.0",
   beEnabled: false, beAtR: "1.0",
-  maxOpenPositions: "1", maxDailyTrades: "", maxExposurePercent: "", maxSpreadPips: "",
+  maxOpenPositions: "1", maxDailyTrades: "", maxDailyLossPercent: "", maxExposurePercent: "", maxSpreadPips: "",
   onLimit: "block",
   days: [], windowFrom: "", windowTo: "",
   orderType: "MARKET", maxSlippagePoints: "", expiresAfterSec: "",
@@ -126,6 +127,7 @@ export function toDoc(d: Draft): Partial<RuleDoc> {
     limits: {
       maxOpenPositions: num(d.maxOpenPositions) ?? 1,
       maxDailyTrades: num(d.maxDailyTrades) ?? null,
+      maxDailyLossPercent: num(d.maxDailyLossPercent) ?? null,
       maxExposurePercent: num(d.maxExposurePercent) ?? null,
       maxSpreadPips: num(d.maxSpreadPips) ?? null,
       onLimit: d.onLimit,
@@ -217,6 +219,7 @@ export function fromDoc(doc: RuleDoc): FromDoc {
       beAtR: str(be.atR),
       maxOpenPositions: str(limits.maxOpenPositions),
       maxDailyTrades: str(limits.maxDailyTrades),
+      maxDailyLossPercent: str(limits.maxDailyLossPercent),
       maxExposurePercent: str(limits.maxExposurePercent),
       maxSpreadPips: str(limits.maxSpreadPips),
       onLimit: str(limits.onLimit) || BLANK.onLimit,
@@ -541,6 +544,10 @@ export function RuleForm({
             <input type="number" step="1" min="1" placeholder="engine default" value={d.maxDailyTrades}
                    onChange={(e) => set("maxDailyTrades", e.target.value)} />
             <span className="field-note">Applied when automation starts. Left empty, the account&apos;s own daily limit still applies (10 unless it was changed).</span></label>
+          <label className="field"><span>Max daily loss <span className="hint">% of the day&apos;s opening balance</span></span>
+            <input type="number" step="0.1" min="0.1" max="4" placeholder="account default" value={d.maxDailyLossPercent}
+                   onChange={(e) => set("maxDailyLossPercent", e.target.value)} />
+            <span className="field-note">Applied when automation starts: once the day is down this far, no new entries. The platform&apos;s own ceiling is 4%, and left empty the account&apos;s own limit applies.</span></label>
           <label className="field"><span>Max exposure <span className="hint">% of balance</span></span>
             <input type="number" step="1" min="1" placeholder="no cap" value={d.maxExposurePercent}
                    onChange={(e) => set("maxExposurePercent", e.target.value)} />

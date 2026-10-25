@@ -1970,3 +1970,65 @@ body {
 .auth-hero-kicker { position: relative; font-size: .68rem; font-weight: 800; letter-spacing: .18em; color: #ff9484; margin-bottom: .5rem; }
 .auth-hero-head { position: relative; font-size: 1.7rem; line-height: 1; letter-spacing: -.045em; font-weight: 800; max-width: 11ch; }
 .aside-copy .mark { display: block; margin-bottom: 1.6rem; }
+
+/* ── Trade: the front door ─────────────────────────────────────────────
+   Chips for single choices, a card grid for the strategies, and a summary
+   bar that stays in view so the Start button is never a scroll away. */
+.trade { padding-bottom: calc(var(--sp-7) + 4rem); }
+.step-no {
+  display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; margin-right: .45rem;
+  border-radius: 50%; background: var(--a4t-accent); color: var(--a4t-on-accent);
+  font-size: .75rem; font-weight: 800;
+}
+.chips { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+.chip {
+  min-height: 38px; padding: 0 .95rem; border-radius: 999px; cursor: pointer; font: inherit;
+  font-size: .85rem; font-weight: 600; color: var(--a4t-muted);
+  background: transparent; border: 1px solid var(--a4t-line);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.chip:hover { color: var(--a4t-text); border-color: var(--a4t-muted); }
+.chip[aria-checked="true"] { background: var(--a4t-accent); color: var(--a4t-on-accent); border-color: transparent; }
+.chip[data-mode="live"][aria-checked="true"] { background: var(--a4t-live); color: var(--a4t-bg); }
+.chip:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 2px; }
+.chips .chip-input { width: 6.5rem; min-height: 38px; height: 38px; border-radius: 999px; padding: 0 .9rem; flex: none; }
+.trade-note { font-size: .78rem; line-height: 1.55; margin-top: var(--sp-3); }
+.trade-est { margin-top: var(--sp-3); font-size: .88rem; }
+
+.strat-grid { display: grid; gap: var(--sp-3); margin-top: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
+.strat {
+  display: flex; flex-direction: column; gap: .5rem; padding: .85rem;
+  border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius); background: var(--a4t-bg-2);
+  transition: border-color .15s, background .15s;
+}
+.strat[data-chosen="true"] { border-color: var(--a4t-accent); background: var(--a4t-accent-wash); }
+.strat-pick { all: unset; display: flex; flex-direction: column; gap: .45rem; cursor: pointer; border-radius: var(--a4t-radius-sm); }
+.strat-pick:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 3px; }
+.strat-title { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.strat-title .ico { width: 16px; height: 16px; color: var(--a4t-accent); }
+.strat-what { font-size: .83rem; line-height: 1.55; color: var(--a4t-text); }
+.strat-refuses { font-size: .78rem; line-height: 1.5; color: var(--a4t-muted); }
+.strat-refuses strong { color: var(--a4t-text); }
+.strat-decides { font-size: .78rem; line-height: 1.6; color: var(--a4t-muted); }
+.strat .btn { align-self: flex-start; }
+
+.level-grid { display: grid; gap: var(--sp-2); grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+.level {
+  display: flex; flex-direction: column; gap: .3rem; text-align: left; cursor: pointer; font: inherit;
+  padding: .75rem .85rem; border-radius: var(--a4t-radius); color: var(--a4t-muted);
+  background: transparent; border: 1px solid var(--a4t-line);
+}
+.level strong { color: var(--a4t-text); font-size: .88rem; }
+.level span { font-size: .78rem; line-height: 1.45; }
+.level[aria-checked="true"] { border-color: var(--a4t-accent); background: var(--a4t-accent-wash); }
+.level:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 2px; }
+
+.trade-bar {
+  position: sticky; bottom: var(--sp-3); z-index: 5; display: flex; gap: var(--sp-3);
+  align-items: center; justify-content: space-between; flex-wrap: wrap;
+  margin-top: var(--sp-4); padding: .8rem 1rem; border-radius: var(--a4t-radius-lg);
+  background: var(--a4t-surface); border: 1px solid var(--a4t-line); box-shadow: var(--elev-2);
+}
+.trade-bar-sum { display: flex; flex-direction: column; gap: .15rem; min-width: 0; font-size: .86rem; }
+@media (max-width: 1023px) { .trade-bar { bottom: calc(var(--a4t-bottomnav) + var(--sp-3)); } }
+@media (prefers-reduced-motion: reduce) { .chip, .strat { transition: none; } }
