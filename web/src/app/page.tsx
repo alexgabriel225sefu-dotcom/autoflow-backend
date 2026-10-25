@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import {
   ArrowRight,
+  ArrowUpRight,
+  Check,
+  Construction,
   Eye,
   GaugeCircle,
   Link2,
@@ -81,24 +84,33 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Directly under the hero rather than inside it: the hero is the
-            promise, this is the platform list. Kept apart so the first screen
-            carries a headline, one sentence, the buttons and the disclosure,
-            and nothing competing with them. */}
-        <div className="mkt-works mkt-works-band">
-          <div className="mkt-works-row">
-            <span>WORKS WITH</span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/ctrader-logo-light.svg" alt="cTrader" width={98} height={24} />
+        <section id="features" className="mkt-section">
+          <div className="mkt-section-kicker">
+            <span className="mkt-eyebrow"><i className="mkt-dot" aria-hidden /> Broker ecosystem</span>
+            <span className="mkt-section-note">One workspace, provider by provider.</span>
           </div>
-          <div className="mkt-works-row">
-            <span>COMING SOON</span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/metatrader-4-light.png" alt="MetaTrader 4" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/metatrader-5-light.png" alt="MetaTrader 5" />
+          <div className="mkt-broker-grid" aria-label="Broker integrations">
+            <article className="mkt-broker-card mkt-broker-live">
+              <div className="mkt-broker-brand"><span className="mkt-broker-logo ctrader-logo">c</span><strong>cTrader</strong></div>
+              <span className="mkt-broker-status"><i className="mkt-status-dot" aria-hidden /> Available now</span>
+              <p>Connect your own cTrader demo account through the broker&apos;s secure authorisation flow.</p>
+              <a href="/signup">Connect cTrader <ArrowUpRight size={15} aria-hidden /></a>
+            </article>
+            <article className="mkt-broker-card mkt-broker-soon">
+              <div className="mkt-broker-brand"><span className="mkt-broker-logo mt-logo">4</span><strong>MetaTrader 4</strong></div>
+              <span className="mkt-broker-status"><Construction size={14} aria-hidden /> Coming soon</span>
+              <p>We are evaluating a managed connector so traders will not need to install a local bridge.</p>
+              <span className="mkt-broker-note">No install path promised yet</span>
+            </article>
+            <article className="mkt-broker-card mkt-broker-soon">
+              <div className="mkt-broker-brand"><span className="mkt-broker-logo mt-logo">5</span><strong>MetaTrader 5</strong></div>
+              <span className="mkt-broker-status"><Construction size={14} aria-hidden /> Coming soon</span>
+              <p>Planned after the cTrader demo flow is proven and the connector can meet our safety bar.</p>
+              <span className="mkt-broker-note">Demo-first roadmap</span>
+            </article>
           </div>
-        </div>
+          <p className="mkt-plain mkt-broker-footnote"><Check size={15} aria-hidden /> Provider capabilities are shown honestly. A coming-soon card is not an available connection.</p>
+        </section>
 
         <section className="mkt-section">
           <h2>What it actually does</h2>
@@ -166,7 +178,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="mkt-section mkt-flow">
+        <section id="resources" className="mkt-section mkt-flow">
           <div>
             <span className="mkt-eyebrow">Launch flow</span>
             <h2>From licence to controlled automation.</h2>
@@ -206,7 +218,7 @@ export default function Landing() {
           </p>
         </section>
 
-        <section className="mkt-section">
+        <section id="pricing" className="mkt-section">
           <PricingSection />
         </section>
 
