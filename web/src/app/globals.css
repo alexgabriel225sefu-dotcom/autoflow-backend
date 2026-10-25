@@ -297,7 +297,7 @@
 }
 /* The landing page keeps its own dark palette in every theme; only the page
    behind it must not turn light. */
-html:has(.mkt) body { background: var(--mkt-bg, #08080A); }
+html:has(.mkt) body { background: var(--mkt-bg, #08080A); overflow-x: clip; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2079,3 +2079,88 @@ body {
 .trade-bar-sum { display: flex; flex-direction: column; gap: .15rem; min-width: 0; font-size: .86rem; }
 @media (max-width: 1023px) { .trade-bar { bottom: calc(var(--a4t-bottomnav) + var(--sp-3)); } }
 @media (prefers-reduced-motion: reduce) { .chip, .strat { transition: none; } }
+
+/* ── landing: the mark behind the hero, the partner strip, hairline rails ─
+   Pointer-spotlight cells follow the pattern of the 21st.dev feature grids.
+   The light is two custom properties set on the hovered cell by
+   SpotlightGrid; without a pointer (touch, reduced motion) it never shows. */
+.mkt-hero-mark { overflow: visible; min-height: min(68vh, 600px); display: flex; align-items: center; padding-top: clamp(2rem, 6vw, 3.5rem); padding-bottom: clamp(2rem, 5vw, 3rem); }
+.mkt-hero-mark .mkt-hero-copy { max-width: 40rem; }
+/* The hero photograph: the A4 monogram carved in stone, full width of the
+   viewport, darkest on the left where the copy sits. */
+.mkt-hero > .mkt-hero-photo {
+  position: absolute; z-index: 0; pointer-events: none;
+  top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%);
+  background:
+    linear-gradient(90deg, var(--mkt-bg) 0, rgba(8, 8, 10, .55) 34%, transparent 62%),
+    linear-gradient(180deg, var(--mkt-bg) 0, transparent 14%, transparent 80%, var(--mkt-bg) 100%),
+    url("/hero-a4.webp") no-repeat 72% 50% / cover;
+}
+@media (max-width: 760px) {
+  .mkt-hero-mark { min-height: 0; }
+  .mkt-hero > .mkt-hero-photo {
+    background:
+      linear-gradient(180deg, var(--mkt-bg) 0, rgba(8, 8, 10, .6) 30%, rgba(8, 8, 10, .45) 60%, var(--mkt-bg) 100%),
+      url("/hero-a4-sm.webp") no-repeat 78% 100% / auto 75%;
+  }
+}
+
+.mkt-partners { padding: 0 0 clamp(2rem, 6vw, 3.5rem); }
+.mkt-partner-grid {
+  display: grid; grid-template-columns: 1fr;
+  border: 1px solid var(--mkt-line); border-radius: 16px; overflow: hidden;
+}
+@media (min-width: 760px) { .mkt-partner-grid { grid-template-columns: 1.25fr 1fr 1fr; } }
+.mkt-partner {
+  position: relative; display: flex; flex-direction: column; justify-content: space-between;
+  gap: 1.6rem; min-height: 148px; padding: 1.4rem 1.5rem;
+  background: var(--mkt-bg-2);
+}
+.mkt-partner + .mkt-partner { border-top: 1px solid var(--mkt-line); }
+@media (min-width: 760px) {
+  .mkt-partner + .mkt-partner { border-top: 0; border-left: 1px solid var(--mkt-line); }
+}
+.mkt-partner img { display: block; height: 34px; width: auto; max-width: 100%; align-self: flex-start; }
+.mkt-partner-soon img { opacity: .5; filter: grayscale(.55); }
+.mkt-partner-status { font-size: .82rem; font-weight: 650; color: var(--mkt-muted); }
+.mkt-partner-live .mkt-partner-status { color: var(--mkt-text); }
+.mkt-partner-soon .mkt-partner-status {
+  align-self: flex-start; padding: .3rem .7rem; border-radius: 999px;
+  border: 1px solid var(--mkt-line); color: var(--mkt-muted);
+}
+.mkt-partner a {
+  display: inline-flex; align-items: center; gap: .35rem; color: var(--mkt-text);
+  font-size: .86rem; font-weight: 650; text-decoration: none;
+}
+.mkt-partner a:hover { color: var(--mkt-accent-text); }
+.mkt-partner-live { box-shadow: inset 0 2px 0 var(--mkt-accent-text); }
+.mkt-partner-note { margin: 1rem 0 0; font-size: .82rem; color: var(--mkt-dim); max-width: 64ch; }
+
+/* The pointer light. */
+.mkt-spot [data-spot] { --mx: 50%; --my: 0%; isolation: isolate; }
+.mkt-spot [data-spot]::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(260px circle at var(--mx) var(--my), rgba(247, 246, 242, .07), transparent 70%);
+  opacity: 0; transition: opacity .25s ease;
+}
+@media (hover: hover) { .mkt-spot [data-spot]:hover::before { opacity: 1; } }
+
+/* Hairline rails: six cells on a 12-column grid, 7+5, 5+7, 6+6, divided by
+   rules rather than boxed in cards. */
+.mkt-rails {
+  display: grid; grid-template-columns: 1fr; margin-top: 2rem;
+  border-top: 1px solid var(--mkt-line); border-left: 1px solid var(--mkt-line);
+}
+.mkt-rail {
+  position: relative; padding: 1.6rem 1.5rem 1.8rem;
+  border-right: 1px solid var(--mkt-line); border-bottom: 1px solid var(--mkt-line);
+}
+.mkt-rail h3 { font-size: 1.12rem; font-weight: 700; letter-spacing: -.02em; margin: 1rem 0 .5rem; }
+.mkt-rail p { font-size: .9rem; color: var(--mkt-muted); line-height: 1.65; margin: 0; max-width: 46ch; }
+@media (min-width: 860px) {
+  .mkt-rails { grid-template-columns: repeat(12, 1fr); }
+  .mkt-rail-7 { grid-column: span 7; }
+  .mkt-rail-6 { grid-column: span 6; }
+  .mkt-rail-5 { grid-column: span 5; }
+  .mkt-rail { padding: 2rem 2rem 2.2rem; }
+}
