@@ -410,8 +410,11 @@ export default function Dashboard() {
               <span className="mobile-context-icon mobile-context-violet"><Shield size={22} aria-hidden /></span>
               <span className="mobile-context-body">
                 <span className="mobile-context-kicker">RISK GUARD</span>
-                <strong>{running?.state === "paused" ? "Trading paused" : "Risk controls active"}</strong>
-                <span>{execution?.message || "Risk checks are evaluated before any action."}</span>
+                <strong>
+                  {running?.state === "paused" ? "Trading paused"
+                    : running?.state === "running" ? "Risk checks on" : "Automation is not running"}
+                </strong>
+                <span>Your risk limits are checked before every action. Open rules to change them.</span>
               </span>
               <ChevronRight size={19} aria-hidden />
             </Link>
