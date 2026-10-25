@@ -515,6 +515,40 @@ try:
 finally:
     _ecfg._preset_strategy = _real_preset
 
+print("\n[daily loss] the day's loss ceiling reaches the engine, and only as far as the platform allows")
+_dl = _rd.blank(user_id="u", account_id="1", symbols=["EURUSD"], timeframe="1h")
+_a, _m = _ecfg.translate(_dl)
+check("left empty, nothing is written (the account's own ceiling stays)",
+      "max_daily_loss_pct" not in _a, str(_a.get("max_daily_loss_pct")))
+_dl["limits"]["maxDailyLossPercent"] = 2.5
+_a, _m = _ecfg.translate(_dl)
+check("a ceiling under the platform's reaches the engine exactly",
+      _a.get("max_daily_loss_pct") == 2.5, str(_a.get("max_daily_loss_pct")))
+check("and is not reported as unapplied",
+      "Max daily loss" not in [x.get("term") for x in _m])
+_dl["limits"]["maxDailyLossPercent"] = 9
+_a, _m = _ecfg.translate(_dl)
+check("above the platform's ceiling the platform's number is written",
+      _a.get("max_daily_loss_pct") == 4.0, str(_a.get("max_daily_loss_pct")))
+check("and the cap is SAID, not applied silently",
+      "Max daily loss" in [x.get("term") for x in _m],
+      str([x.get("term") for x in _m]))
+check("the key is owned, so a stop puts the account's own number back",
+      "max_daily_loss_pct" in _ecfg.OWNED_KEYS)
+_snap = _ecfg.snapshot_of({"max_daily_loss_pct": 3.0, "risk": 0.01})
+check("and the snapshot captures it", _snap.get("max_daily_loss_pct") == 3.0,
+      str(_snap))
+for _bad in (0, -1, 101, "5", True):
+    _bd = _rd.blank(user_id="u", account_id="1", symbols=["EURUSD"],
+                    timeframe="1h")
+    _bd["limits"]["maxDailyLossPercent"] = _bad
+    _probs = [p for p in _rd.validate(_bd) if "maxDailyLossPercent" in p]
+    check(f"validate refuses {_bad!r}", bool(_probs), str(_probs))
+_ok = _rd.blank(user_id="u", account_id="1", symbols=["EURUSD"], timeframe="1h")
+_ok["limits"]["maxDailyLossPercent"] = 2
+check("validate accepts a sane value",
+      not [p for p in _rd.validate(_ok) if "maxDailyLossPercent" in p])
+
 shutil.rmtree(_TMP, ignore_errors=True)
 
 print()

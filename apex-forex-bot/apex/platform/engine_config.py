@@ -61,6 +61,9 @@ OWNED_KEYS = (
     "symbol", "timeframe",
     "risk", "sl_pips", "tp_pips", "tp_target_pct", "atr_stops",
     "trailing", "breakeven_r", "max_trades_day", "max_spread_pips",
+    # The day's loss ceiling. Owned so a rule that tightened it gives the
+    # account's own number back when it stops.
+    "max_daily_loss_pct",
     "strategy", "ai_confirm", "min_confidence", "htf", "autopilot",
     "watchlist", "session_filter",
     # Owned for the same reason as the rest: whatever level the account held
@@ -412,6 +415,18 @@ def translate(doc):
         applied["max_trades_day"] = int(limits["maxDailyTrades"])
     if _num(limits.get("maxSpreadPips")):
         applied["max_spread_pips"] = float(limits["maxSpreadPips"])
+    # The day's loss ceiling: the engine stops entering once today's result is
+    # this far below the day's opening balance (`strategies.should_stop`). The
+    # platform's own ceiling still holds, so a rule asking for more than it is
+    # held to it and says so, rather than being told a number it will not get.
+    dl = limits.get("maxDailyLossPercent")
+    if _num(dl) and dl > 0:
+        ceiling = float(_rg.PLATFORM["maxDailyLossPercent"])
+        applied["max_daily_loss_pct"] = min(float(dl), ceiling)
+        if float(dl) > ceiling:
+            miss("Max daily loss", f"{float(dl):g}%",
+                 f"The platform stops a day at {ceiling:g}% whatever a rule "
+                 f"asks for, so {ceiling:g}% is what applies.")
     mop = limits.get("maxOpenPositions")
     if _num(mop) and int(mop) > 1:
         # user_loop forces one open position on a practice account. Writing a

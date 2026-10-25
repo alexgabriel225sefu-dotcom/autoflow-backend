@@ -83,8 +83,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLockup size={22} />
         </Link>
 
-        <SideGroup label="Operations" items={NAV.slice(0, 5)} path={path} badge={badge} first />
-        <SideGroup label="Account" items={NAV.slice(5)} path={path} badge={badge} />
+        <SideGroup label="Operations" items={NAV.slice(0, 6)} path={path} badge={badge} first />
+        <SideGroup label="Account" items={NAV.slice(6)} path={path} badge={badge} />
 
         <div className="side-foot">
           <AppearanceMenu />

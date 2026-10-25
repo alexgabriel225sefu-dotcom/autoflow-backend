@@ -206,6 +206,7 @@ def blank(*, user_id, account_id, symbols=None, timeframe="1h"):
         "breakEven": {"enabled": False, "atR": None},
 
         "limits": {"maxOpenPositions": 1, "maxDailyTrades": None,
+                   "maxDailyLossPercent": None,
                    "maxExposurePercent": None, "maxSpreadPips": None,
                    "onLimit": "block"},
 
@@ -456,6 +457,10 @@ def validate(doc, *, known_condition_ids=None, known_strategy_ids=None):
         _err(problems, "limits.maxOpenPositions", "must be an integer >= 1")
     if limits.get("onLimit") not in ON_LIMIT:
         _err(problems, "limits.onLimit", f"must be one of {', '.join(ON_LIMIT)}")
+    dl = limits.get("maxDailyLossPercent")
+    if dl is not None and (not _pos_num(dl) or dl > 100):
+        _err(problems, "limits.maxDailyLossPercent",
+             "must be a number above 0 and at most 100, or empty")
 
     if known_condition_ids is not None:
         known = set(known_condition_ids)

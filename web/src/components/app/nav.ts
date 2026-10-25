@@ -9,7 +9,7 @@
  * discoverable.
  */
 import {
-  BarChart3, Bell, BookOpen, LayoutDashboard, ListChecks, Receipt, Settings,
+  BarChart3, Bell, BookOpen, Crosshair, LayoutDashboard, ListChecks, Receipt, Settings,
   ShieldCheck, TrendingUp, Wallet, type LucideIcon,
 } from "lucide-react";
 
@@ -23,7 +23,11 @@ export type NavItem = {
 
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, primary: true },
-  { href: "/rules", label: "Rules", icon: ListChecks, primary: true },
+  // The front door: pick an instrument and a strategy, set the risk, start.
+  { href: "/trade", label: "Trade", icon: Crosshair, primary: true },
+  // Rules is the builder for people who want their own conditions, so it
+  // leaves the phone's bottom bar (four slots) for Trade and stays in the drawer.
+  { href: "/rules", label: "Rules", icon: ListChecks },
   { href: "/positions", label: "Positions", icon: TrendingUp, primary: true },
   { href: "/orders", label: "Orders", icon: Receipt },
   { href: "/performance", label: "Performance", icon: BarChart3 },

@@ -36,7 +36,7 @@ const FULL = {
   trailingStop: { enabled: true, atrMultiple: 2.5 },
   breakEven: { enabled: true, atR: 1.25 },
   limits: {
-    maxOpenPositions: 4, maxDailyTrades: 6, maxExposurePercent: 12,
+    maxOpenPositions: 4, maxDailyTrades: 6, maxDailyLossPercent: 2.5, maxExposurePercent: 12,
     maxSpreadPips: 3, onLimit: "flatten",
   },
   schedule: { timezone: "UTC", days: [1, 2, 5], windows: [{ from: "08:00", to: "17:30" }] },
