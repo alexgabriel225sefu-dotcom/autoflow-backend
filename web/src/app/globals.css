@@ -147,6 +147,20 @@
   --a4t-shadow: var(--elev-1);
 }
 
+/* Personal appearance preferences. They only override interaction and
+   surface tokens; long/short colours remain trading semantics. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --a4t-bg: #0D0E11; --a4t-bg-2: #14161B; --a4t-surface: #17191F;
+  --a4t-surface-2: #1D2027; --a4t-surface-3: #292D36;
+  --a4t-line: #30343E; --a4t-line-soft: #252932;
+  --a4t-text: #F5F6F8; --a4t-muted: #B8BDC8; --a4t-dim: #9299A7;
+  --a4t-on-accent: #071015;
+}
+:root[data-accent="cyan"] { --a4t-accent: #12B8D4; --a4t-accent-strong: #07849A; --a4t-link: #007A99; --a4t-link-strong: #005A72; --a4t-link-wash: rgba(18,184,212,.12); --a4t-accent-wash: rgba(18,184,212,.12); }
+:root[data-accent="blue"] { --a4t-accent: #1769D1; --a4t-accent-strong: #104A9A; --a4t-link: #155FBA; --a4t-link-strong: #10407D; --a4t-link-wash: rgba(23,105,209,.10); --a4t-accent-wash: rgba(23,105,209,.10); }
+:root[data-accent="violet"] { --a4t-accent: #6339D7; --a4t-accent-strong: #4524A8; --a4t-link: #5732C1; --a4t-link-strong: #3C218D; --a4t-link-wash: rgba(99,57,215,.10); --a4t-accent-wash: rgba(99,57,215,.10); }
+
 
 /* The shadcn token layer is aliased onto the same palette. The primitives in
    components/ui are only reachable from code that is not part of the
@@ -515,6 +529,17 @@ body {
 .dashboard-terminal .btn-ghost:hover { background: var(--a4t-accent-wash); color: var(--a4t-text); }
 .dashboard-terminal .btn:not(.btn-ghost) { box-shadow: 0 8px 18px -12px rgba(125,176,255,.8); }
 .dashboard-terminal .label-xs { color: var(--a4t-dim); }
+.mobile-dashboard-cards { display: grid; gap: .7rem; }
+.mobile-context-card { display: flex; align-items: center; gap: .75rem; padding: 1rem; border: 1px solid var(--a4t-line); border-radius: 16px; background: var(--a4t-surface); color: var(--a4t-text); text-decoration: none; box-shadow: var(--elev-1); }
+.mobile-context-card:hover { border-color: var(--a4t-link); color: var(--a4t-text); }
+.mobile-context-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 42px; height: 42px; border-radius: 50%; }
+.mobile-context-blue { color: var(--a4t-link); background: var(--a4t-link-wash); }
+.mobile-context-violet { color: var(--a4t-accent); background: var(--a4t-accent-wash); }
+.mobile-context-lilac { color: var(--a4t-link-strong); background: color-mix(in srgb, var(--a4t-link) 12%, transparent); }
+.mobile-context-body { display: grid; gap: .18rem; min-width: 0; flex: 1; }
+.mobile-context-body strong { font-size: .95rem; letter-spacing: -.015em; }
+.mobile-context-body > span:last-child { color: var(--a4t-muted); font-size: .8rem; line-height: 1.45; }
+.mobile-context-kicker { color: var(--a4t-dim); font-size: .68rem !important; font-weight: 750; letter-spacing: .14em; }
 @media (max-width: 639px) {
   .dashboard-terminal { border-radius: 12px; padding: .65rem; }
 }
@@ -926,6 +951,23 @@ body {
 .social-auth-apple { color: var(--a4t-text); font-size: .7rem; }
 .auth-divider { display: flex; align-items: center; gap: .7rem; color: var(--a4t-dim); font-size: .75rem; margin: 1rem 0; }
 .auth-divider::before, .auth-divider::after { content: ""; height: 1px; flex: 1; background: var(--a4t-line); }
+
+.appearance-card { overflow: hidden; }
+.appearance-card .card-head { align-items: center; }
+.appearance-card .card-head .mark { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--a4t-accent) 60%, transparent)); }
+.appearance-copy { max-width: 58ch; line-height: 1.55; font-size: .84rem; }
+.appearance-group { margin-top: 1.25rem; }
+.appearance-group > .label-xs { display: block; margin-bottom: .55rem; }
+.appearance-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem; padding: .25rem; max-width: 360px; border: 1px solid var(--a4t-line); border-radius: 999px; background: var(--a4t-surface-2); }
+.appearance-toggle button { display: inline-flex; justify-content: center; align-items: center; gap: .45rem; min-height: 38px; border: 0; border-radius: 999px; background: transparent; color: var(--a4t-muted); font: inherit; font-size: .82rem; font-weight: 650; cursor: pointer; }
+.appearance-toggle button[aria-pressed="true"] { background: var(--a4t-accent); color: var(--a4t-on-accent); box-shadow: 0 0 18px color-mix(in srgb, var(--a4t-accent) 32%, transparent); }
+.accent-swatches { display: flex; gap: .8rem; align-items: center; }
+.accent-swatch { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid var(--a4t-surface); outline: 1px solid var(--a4t-line); color: #fff; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
+.accent-swatch:hover { transform: translateY(-2px); }
+.accent-swatch[aria-pressed="true"] { outline: 2px solid var(--a4t-text); box-shadow: 0 0 0 3px var(--a4t-surface), 0 0 18px color-mix(in srgb, currentColor 55%, transparent); }
+.accent-cyan { background: #12B8D4; color: #06353D; }
+.accent-blue { background: #1769D1; color: #fff; }
+.accent-violet { background: #6339D7; color: #fff; }
 
 /* ── marketing surface ─────────────────────────────────────────────── */
 

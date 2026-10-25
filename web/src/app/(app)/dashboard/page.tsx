@@ -17,7 +17,7 @@
  */
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, Plug, RefreshCw } from "lucide-react";
+import { Activity, ChevronRight, Clock3, FileText, Plug, RefreshCw, Shield } from "lucide-react";
 import { api, type ApiError } from "@/lib/api";
 import { invalidate, useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
@@ -382,6 +382,35 @@ export default function Dashboard() {
             symbols={(activeRule?.symbols as string[] | undefined) ?? []}
             timeframe={activeRule?.timeframe}
           />
+
+          <section className="mobile-dashboard-cards" aria-label="Trading context">
+            <Link className="mobile-context-card" href="/journal">
+              <span className="mobile-context-icon mobile-context-blue"><Clock3 size={22} aria-hidden /></span>
+              <span className="mobile-context-body">
+                <strong>Why no trade right now?</strong>
+                <span>{autoPlain.detail || (running?.state === "running" ? "The strategy is watching for a setup." : "Automation is not watching for a setup yet.")}</span>
+              </span>
+              <ChevronRight size={19} aria-hidden />
+            </Link>
+            <Link className="mobile-context-card" href="/rules">
+              <span className="mobile-context-icon mobile-context-violet"><Shield size={22} aria-hidden /></span>
+              <span className="mobile-context-body">
+                <span className="mobile-context-kicker">RISK GUARD</span>
+                <strong>{running?.state === "paused" ? "Trading paused" : "Risk controls active"}</strong>
+                <span>{execution?.message || "Risk checks are evaluated before any action."}</span>
+              </span>
+              <ChevronRight size={19} aria-hidden />
+            </Link>
+            <Link className="mobile-context-card" href={activeRule ? `/rules/${activeRule.ruleDocId}` : "/rules/new"}>
+              <span className="mobile-context-icon mobile-context-lilac"><FileText size={22} aria-hidden /></span>
+              <span className="mobile-context-body">
+                <span className="mobile-context-kicker">ACTIVE RULE</span>
+                <strong>{activeRule?.name || "No active rule"}</strong>
+                <span>{activeRule ? `${(activeRule.symbols ?? []).join(", ") || "No symbol"} · ${activeRule.timeframe}` : "Create a rule to see its status here."}</span>
+              </span>
+              <ChevronRight size={19} aria-hidden />
+            </Link>
+          </section>
 
           {/* ── 4 + 5: what did it decide, and was anything placed ──── */}
           <section className="card">
