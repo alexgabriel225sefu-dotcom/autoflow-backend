@@ -2,8 +2,8 @@
 
 WHAT THIS MODULE MAY DO IS BOUNDED BY WHAT IT CALLS
 
-Four connector methods: get_all_positions, get_pending_orders, get_balance
-and get_candles.
+Five connector methods: get_all_positions, get_pending_orders, get_balance,
+get_candles and list_symbols (the broker's own symbol list).
 No place_order, no close_position, no amend_sltp. A test asserts that by
 walking this file's AST, so the boundary is a property of the code rather
 than a promise in a comment.
@@ -347,6 +347,18 @@ def deals(user_id, *, days=7, **kw):
 
 def orders(user_id, **kw):
     return _read(user_id, "orders", lambda b: b.get_pending_orders(), **kw)
+
+
+def symbols(user_id, **kw):
+    """Every instrument the selected account's broker lists, each classified
+    by whether the engine can trade it today and, if not, why.
+
+    A read: the connector is asked for its symbol list and nothing is sent.
+    The data key is absent unless the broker answered, like every read here.
+    """
+    from apex.platform import instruments as _instruments
+    return _read(user_id, "symbols",
+                 lambda b: _instruments.describe(b.list_symbols()), **kw)
 
 
 def account(user_id, **kw):

@@ -574,6 +574,12 @@ def _dispatch(method, route, headers, body, query=None):
                 timeframe=q.get("timeframe"), limit=q.get("limit")))
         return _ok(_read.account(p.user_id, ctid=ctid))
 
+    if route == "symbols" and method == "GET":
+        # Everything the selected account's broker lists, classified by what
+        # the engine can trade today. Read-only, like positions and orders.
+        p = _authenticate(headers)
+        return _ok(_read.symbols(p.user_id))
+
     if route in ("positions", "orders") and method == "GET":
         p = _authenticate(headers)
         fn = _read.positions if route == "positions" else _read.orders

@@ -558,6 +558,16 @@ class CtraderBroker:
             # symbol digits live on the detailed symbol; default 5 (3 for JPY)
         # store nothing else here — digits resolved lazily from name
 
+    def list_symbols(self):
+        """The symbol names this account's broker lists, normalised and sorted.
+
+        Read-only. It asks the broker for its symbol list and nothing else;
+        the platform shows the whole list and says which of it the engine can
+        trade (`apex.platform.instruments`).
+        """
+        self._load_symbols()
+        return sorted(self._sym_id)
+
     def _vol_rules(self, sid):
         """(minVolume, stepVolume) in hundredths-of-a-unit, from the symbol's
         full details. FX is 0.01 lots = 100k hundredths, but gold is 1 oz and
