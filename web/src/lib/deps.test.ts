@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { contentSecurityPolicy } from "../../next.config";
 
 const WEB = join(__dirname, "..", "..");
 const pkg = JSON.parse(readFileSync(join(WEB, "package.json"), "utf8")) as {
@@ -29,7 +30,7 @@ function exact(spec: string): [number, number, number] {
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
-function atLeast(spec: string, floor: [number, number, number]): boolean {
+function atLeast(spec: string, floor: readonly [number, number, number]): boolean {
   const v = exact(spec);
   for (let i = 0; i < 3; i++) {
     if (v[i] > floor[i]) return true;
@@ -122,5 +123,107 @@ describe("the build knows which of the two products it is", () => {
   it("and the reason is written down next to it", () => {
     // A path with no explanation is a path somebody deletes while tidying.
     expect(config).toMatch(/lockfile/i);
+  });
+});
+
+describe("responses carry a browser security policy", () => {
+  const config = readFileSync(join(WEB, "next.config.ts"), "utf8");
+
+  it("names every header the browser is supposed to receive", () => {
+    for (const header of [
+      "Strict-Transport-Security",
+      "X-Frame-Options",
+      "X-Content-Type-Options",
+      "Referrer-Policy",
+      "Permissions-Policy",
+      "Content-Security-Policy",
+    ]) {
+      expect(config, header).toContain(header);
+    }
+    expect(config).toContain('value: "DENY"');
+    expect(config).toContain("nosniff");
+    expect(config).toContain("strict-origin-when-cross-origin");
+    expect(config).toContain("max-age=63072000; includeSubDomains");
+    expect(config).toContain("frame-ancestors 'none'");
+  });
+
+  it("allows Supabase and Stripe and does not open framing", () => {
+    // Supabase is a fetch and a websocket. Stripe checkout is a navigation
+    // to one of these two hosts. Framing the app is refused twice: the CSP
+    // directive and X-Frame-Options.
+    expect(config).toContain("https://*.supabase.co");
+    expect(config).toContain("wss://*.supabase.co");
+    expect(config).toContain("https://buy.stripe.com");
+    expect(config).toContain("https://checkout.stripe.com");
+    expect(config).toContain("frame-src 'none'");
+  });
+
+  it("puts the configured API and Supabase origins on connect-src", () => {
+    const prevApi = process.env.NEXT_PUBLIC_API_BASE_URL;
+    const prevSb = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.example.test/v1";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://custom.example.test";
+    try {
+      const csp = contentSecurityPolicy();
+      expect(csp).toContain("https://api.example.test");
+      expect(csp).toContain("wss://api.example.test");
+      expect(csp).toContain("https://custom.example.test");
+      expect(csp).toContain("https://*.supabase.co");
+      expect(csp).toContain("https://buy.stripe.com");
+      expect(csp).toContain("frame-ancestors 'none'");
+      // Production-only. Under the test runner this must not upgrade the
+      // local http API to https.
+      expect(csp).not.toContain("upgrade-insecure-requests");
+    } finally {
+      if (prevApi === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL;
+      else process.env.NEXT_PUBLIC_API_BASE_URL = prevApi;
+      if (prevSb === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      else process.env.NEXT_PUBLIC_SUPABASE_URL = prevSb;
+    }
+  });
+});
+
+describe("known dependency holes stay closed", () => {
+  /**
+   * Transitive floors. package.json cannot name these directly, so the
+   * lockfile (via overrides, or a direct bump that pulls them) is the floor.
+   * Dropping under one of them puts a known advisory back.
+   *
+   *   zod < 4.6.6            GHSA-mrhx-c7xc-m3w5  memory exhaustion
+   *   undici < 8.12.2        DoS via content-encodings, EventSource, SRI
+   *   vite 8.3.0–8.3.2       launch-editor and server.fs advisories
+   *   source-map-js < 1.2.2  event-loop DoS via source-map offsets
+   *   vitest < 5.0.3         @vitest/mocker code injection and path traversal
+   */
+  const lock = JSON.parse(readFileSync(join(WEB, "package-lock.json"), "utf8")) as {
+    packages: Record<string, { version?: string }>;
+  };
+
+  function versions(name: string): string[] {
+    const found: string[] = [];
+    for (const [pkgPath, meta] of Object.entries(lock.packages)) {
+      if (pkgPath === `node_modules/${name}` || pkgPath.endsWith(`/node_modules/${name}`)) {
+        if (meta.version) found.push(meta.version);
+      }
+    }
+    return found;
+  }
+
+  it.each([
+    ["zod", [4, 6, 6]],
+    ["undici", [8, 12, 2]],
+    ["vite", [8, 3, 3]],
+    ["source-map-js", [1, 2, 2]],
+    ["vitest", [5, 0, 3]],
+    ["@vitest/mocker", [5, 0, 3]],
+  ] as const)("%s is at or above the patched release", (name, floor) => {
+    const found = versions(name);
+    expect(found.length, `${name} is not in the lockfile`).toBeGreaterThan(0);
+    for (const spec of found) {
+      expect(
+        atLeast(spec, floor),
+        `${name}@${spec} is below ${floor.join(".")}`,
+      ).toBe(true);
+    }
   });
 });

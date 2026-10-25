@@ -1,4 +1,16 @@
-.env
+# Environment files. Real values never belong in the tree. A tracked
+# *.env.example that is already committed stays tracked; this stops any new
+# .env, .env.local, or .env.production from being added.
+.env*
+
+# Local agent/session files. .project-config.json has carried live cloud
+# credentials (cloud keys, Stripe secrets). .manus-logs/ has carried session
+# cookies and tokens. They are not in the current tree. History still has the
+# old copies; these rules only stop them from coming back. Do not rewrite
+# history to drop them — revoke the credentials instead.
+.project-config.json
+.manus-logs/
+
 node_modules/
 outputs/
 logs/
