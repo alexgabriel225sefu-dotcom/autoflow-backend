@@ -2193,3 +2193,36 @@ body {
 .mobile-context-body strong { font-size: .95rem; letter-spacing: -.015em; }
 .mobile-context-body > span:last-child { color: var(--a4t-muted); font-size: .8rem; line-height: 1.45; }
 .mobile-context-kicker { color: var(--a4t-dim); font-size: .68rem !important; font-weight: 750; letter-spacing: .14em; }
+
+/* 21st-inspired spotlight treatment for real dashboard facts. The light follows
+   the pointer only on devices that support hover; it never changes content or
+   creates a false metric, and touch/reduced-motion users keep the quiet card. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ovb-tile {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    transition: border-color .22s ease, transform .22s ease, box-shadow .22s ease;
+  }
+  .ovb-tile::before {
+    content: "";
+    position: absolute;
+    inset: -35%;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--a4t-link) 20%, transparent), transparent 48%);
+    transform: translate3d(0, 12px, 0) scale(.82);
+    transition: opacity .22s ease, transform .35s ease;
+  }
+  .ovb-tile:hover {
+    border-color: color-mix(in srgb, var(--a4t-link) 42%, var(--a4t-line-soft));
+    box-shadow: 0 16px 34px -24px color-mix(in srgb, var(--a4t-link) 55%, transparent);
+    transform: translateY(-2px);
+  }
+  .ovb-tile:hover::before,
+  .ovb-tile:focus-within::before {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
