@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeNext } from "@/lib/supabase/middleware";
 import { createClient } from "@/lib/supabase/client";
+import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -37,6 +38,8 @@ function LoginPageInner() {
       lead="Sign in to your control panel."
       footer={<><a href="/auth/reset">Forgot your password?</a><a href="/signup">Create an account</a></>}
     >
+      <SocialAuthButtons next={safeNext(params.get("next"))} />
+      <div className="auth-divider"><span>or use email</span></div>
       <form onSubmit={onSubmit} className="card">
         <label className="field">
           <span>Email</span>
@@ -50,7 +53,7 @@ function LoginPageInner() {
         </label>
         {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
         <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
-          {busy ? "Signing inâ€¦" : "Sign in"}
+          {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </AuthShell>

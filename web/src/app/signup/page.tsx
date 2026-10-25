@@ -3,6 +3,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { useState } from "react";
 import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import { SocialAuthButtons } from "@/components/auth/social-auth-buttons";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -48,9 +49,9 @@ export default function SignUpPage() {
       lead="Rule-based automation on your own cTrader account."
       footer={<a href="/login">Already have an account?</a>}
     >
-      {/* Before the form, not after it. Somebody entering an email address
-          is entitled to know whether it will end in a payment screen. */}
       <p className="muted" style={{ fontSize: ".84rem", marginTop: "1rem" }}>{PLAN_NOTICE}</p>
+      <SocialAuthButtons />
+      <div className="auth-divider"><span>or create with email</span></div>
       <form onSubmit={onSubmit} className="card">
         <label className="field">
           <span>Email</span>
@@ -65,7 +66,7 @@ export default function SignUpPage() {
         </label>
         {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
         <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
-          {busy ? "Creatingâ€¦" : "Create account"}
+          {busy ? "Creating…" : "Create account"}
         </button>
       </form>
       <p className="muted" style={{ fontSize: ".8rem", marginTop: "1.2rem" }}>
