@@ -136,6 +136,21 @@ api_src = open(os.path.join(ROOT, "apex", "platform", "api.py"), encoding="utf-8
 block = api_src[api_src.index('if route == "symbols"'):][:400]
 check("the route authenticates before it reads", "_authenticate(headers)" in block, block)
 
+print("\n[7] the rules list says which rules are the client's own methods")
+from apex.platform import api as API                      # noqa: E402
+own = API._summary({"ruleDocId": "r1", "name": "mine", "strategy": None,
+                    "entry": {"conditions": [{"id": "rsi"}, {"id": "ema"}]},
+                    "exit": {"conditions": [{"id": "rsi"}]}})
+check("a rule built from conditions has no strategy and counts them",
+      own["strategy"] == "" and own["entryConditions"] == 2 and own["exitConditions"] == 1,
+      str(own))
+preset = API._summary({"ruleDocId": "r2", "name": "p", "strategy": "trend",
+                       "entry": {"conditions": []}, "exit": {"conditions": []}})
+check("a preset rule names its strategy and holds no conditions",
+      preset["strategy"] == "trend" and preset["entryConditions"] == 0, str(preset))
+junk = API._summary({"ruleDocId": "r3", "entry": "x", "exit": None})
+check("a malformed document does not raise", junk["entryConditions"] == 0)
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

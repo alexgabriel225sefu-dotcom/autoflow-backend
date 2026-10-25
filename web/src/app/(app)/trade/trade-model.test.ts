@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CtraderStatus, Execution, StrategyPreset } from "@/lib/api";
 import {
-  EMPTY_CHOICE, missingChoices, riskAmounts, startState, SYMBOLS, tradeBody,
-  type TradeChoice,
+  EMPTY_CHOICE, missingChoices, riskAmounts, ROW_LIMIT, startState, SYMBOLS,
+  symbolView, tradeBody, type TradeChoice,
 } from "./trade-model";
 
 const STRAT: StrategyPreset = {
@@ -60,7 +60,7 @@ describe("riskAmounts", () => {
 describe("missingChoices", () => {
   it("asks for the choices nobody should make for the client, in order", () => {
     expect(missingChoices(EMPTY_CHOICE))
-      .toEqual(["an instrument", "a strategy", "who acts on a setup"]);
+      .toEqual(["an instrument", "a strategy or a method of your own", "who acts on a setup"]);
   });
   it("is empty only when everything is chosen", () => {
     expect(missingChoices(READY)).toEqual([]);
@@ -137,5 +137,80 @@ describe("startState", () => {
     expect(startState({ status: liveSel, execution: exec({
       liveGate: { request: { status: "none" }, status: "unknown", summary: "" } }) }))
       .toMatchObject({ label: "Live status unknown" });
+  });
+});
+
+describe("symbolView", () => {
+  const read = (symbols: { id: string; class: string; tradeable: boolean }[]) => ({
+    connected: true, status: "ok", accountId: 7, mode: "demo",
+    symbols: symbols.map((s) => ({ ...s, reason: s.tradeable ? null : "why not" })),
+  });
+  const MIX = read([
+    { id: "EURUSD", class: "forex", tradeable: true },
+    { id: "XAUUSD", class: "metal", tradeable: true },
+    { id: "GBPJPY", class: "forex_cross", tradeable: false },
+    { id: "US30", class: "index", tradeable: false },
+    { id: "AAPL", class: "stock", tradeable: false },
+  ]);
+
+  it("lists what can be traded first and hides nothing in the counts", () => {
+    const v = symbolView(MIX, "", "all", false);
+    expect(v.source).toBe("broker");
+    expect(v.rows.map((r) => r.id)).toEqual(["EURUSD", "XAUUSD"]);
+    expect(v.total).toBe(5);
+    expect(v.unsupported).toBe(3);
+  });
+  it("shows the unsupported ones, with their reason, when asked", () => {
+    const v = symbolView(MIX, "", "all", true);
+    expect(v.rows.map((r) => r.id)).toEqual(["EURUSD", "XAUUSD", "GBPJPY", "US30", "AAPL"]);
+    expect(v.rows.find((r) => r.id === "US30")).toMatchObject({ tradeable: false, reason: "why not" });
+  });
+  it("a search looks across everything, so AAPL is found and explained", () => {
+    const v = symbolView(MIX, "aapl", "all", false);
+    expect(v.rows.map((r) => r.id)).toEqual(["AAPL"]);
+    expect(v.rows[0].tradeable).toBe(false);
+  });
+  it("a search ignores slashes and case", () => {
+    expect(symbolView(MIX, "eur/usd", "all", false).rows.map((r) => r.id)).toEqual(["EURUSD"]);
+  });
+  it("filters by class and counts each class", () => {
+    const v = symbolView(MIX, "", "metal", false);
+    expect(v.rows.map((r) => r.id)).toEqual(["XAUUSD"]);
+    expect(v.classes.find((k) => k.id === "forex_cross")).toMatchObject({ label: "Forex crosses", count: 1 });
+  });
+  it("caps what is drawn and says how many matched", () => {
+    const many = read(Array.from({ length: ROW_LIMIT + 40 }, (_, i) => (
+      { id: `SYM${i}`, class: "forex", tradeable: true })));
+    const v = symbolView(many, "", "all", false);
+    expect(v.rows.length).toBe(ROW_LIMIT);
+    expect(v.matches).toBe(ROW_LIMIT + 40);
+  });
+  it("falls back to the engine's own list when the broker was not read, and says so", () => {
+    for (const bad of [null, { connected: true, status: "unavailable" },
+      { connected: false, status: "disconnected" }, { connected: true, status: "ok" }]) {
+      const v = symbolView(bad as never, "", "all", false);
+      expect(v.source).toBe("engine");
+      expect(v.rows.length).toBe(SYMBOLS.length);
+      expect(v.rows.every((r) => r.tradeable)).toBe(true);
+    }
+  });
+});
+
+describe("a method of your own", () => {
+  const CUSTOM = { ruleDocId: "m1", name: "My RSI dip",
+    entry: { combine: "AND", conditions: [{ id: "rsi" }] },
+    exit: { combine: "OR", conditions: [] }, sides: "BUY" };
+  const MINE: TradeChoice = { ...EMPTY_CHOICE, symbol: "XAUUSD", level: "approval", custom: CUSTOM };
+  it("counts as a chosen method", () => {
+    expect(missingChoices(MINE)).toEqual([]);
+  });
+  it("is built from the client's own conditions, with no strategy field", () => {
+    const b = tradeBody(MINE) as unknown as Record<string, unknown>;
+    expect(b.strategy).toBeUndefined();
+    expect(b.entry).toEqual(CUSTOM.entry);
+    expect(b.exit).toEqual(CUSTOM.exit);
+    expect(b.sides).toBe("BUY");
+    expect(b.name).toBe("My RSI dip · XAUUSD");
+    expect(b.symbols).toEqual(["XAUUSD"]);
   });
 });

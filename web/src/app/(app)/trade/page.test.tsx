@@ -21,7 +21,7 @@ import type { ApiResult, StrategyCatalogue } from "@/lib/api";
 
 type Call = { path: string; init?: { method?: string; body?: unknown } };
 const calls: Call[] = [];
-let routes: Record<string, unknown | (() => unknown)> = {};
+let routes: Record<string, unknown | ((init?: Call["init"]) => unknown)> = {};
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -47,7 +47,7 @@ vi.mock("@/lib/api", async (orig) => {
         .find((k) => path === k || path.startsWith(k));
       if (!key) return { ok: false, status: 404, code: "NOT_FOUND", message: "no stub" };
       const v = routes[key];
-      return (typeof v === "function" ? (v as () => unknown)() : v) as ApiResult<unknown>;
+      return (typeof v === "function" ? (v as (i?: Call["init"]) => unknown)(init) : v) as ApiResult<unknown>;
     }),
   };
 });
@@ -83,16 +83,33 @@ const demo = ok({ connected: true, accounts: [{ ctid: 7, mode: "demo" }],
 const live = ok({ connected: true, accounts: [{ ctid: 9, mode: "live" }],
   selected: { ctid: 9, mode: "live" }, liveAllowed: true });
 
+const BROKER = ok({ connected: true, status: "ok", accountId: 7, mode: "demo", symbols: [
+  { id: "EURUSD", class: "forex", tradeable: true, reason: null },
+  { id: "XAUUSD", class: "metal", tradeable: true, reason: null },
+  { id: "GBPJPY", class: "forex_cross", tradeable: false, reason: "A cross has no USD leg." },
+  { id: "US30", class: "index", tradeable: false, reason: "Indices need exchange trading calendars." },
+] });
+const RULES = ok({ rules: [
+  { ruleDocId: "m1", name: "My RSI dip", state: "draft", version: 1, symbols: ["EURUSD"],
+    timeframe: "1h", updatedAt: 1, strategy: "", entryConditions: 2, exitConditions: 1 },
+  { ruleDocId: "p1", name: "Trend Following · EURUSD", state: "active", version: 1, symbols: ["EURUSD"],
+    timeframe: "1h", updatedAt: 1, strategy: "trend", entryConditions: 0, exitConditions: 0 },
+] });
+
 let autoState = "stopped";
 function baseRoutes() {
   autoState = "stopped";
   routes = {
     strategies: ok(CATALOGUE),
+    symbols: BROKER,
+    rules: (init?: Call["init"]) =>
+      init?.method === "POST" ? ok({ rule: { ruleDocId: "r1" } }) : RULES,
     "ctrader/status": demo,
     me: me(),
     automation: () => ok({ state: autoState, ruleDocId: null, mode: "demo" }),
     "automation/start": () => { autoState = "running"; return ok({ state: "running", ruleDocId: "r1", mode: "demo" }); },
-    rules: ok({ rule: { ruleDocId: "r1" } }),
+    "rules/m1": ok({ rule: { ruleDocId: "m1", entry: { combine: "AND", conditions: [{ id: "rsi" }, { id: "ema" }] },
+      exit: { combine: "OR", conditions: [{ id: "rsi" }] }, sides: "BUY" } }),
     "rules/r1/activate": ok({}),
     "rules/r1": ok({ rule: { ruleDocId: "r1" } }),
   };
@@ -104,7 +121,7 @@ async function loaded() {
 }
 const choose = (name: RegExp) => fireEvent.click(screen.getByRole("radio", { name }));
 function chooseEverything() {
-  choose(/EUR\/USD/);
+  choose(/^EURUSD$/);
   choose(/Trend Following/);
   choose(/Approval Required/);
 }
@@ -120,10 +137,9 @@ describe("the choices", () => {
     expect(screen.getByText(/Nothing beyond the setup not being there/)).toBeDefined();
   });
 
-  it("offers no index and shows no performance number", async () => {
+  it("shows no performance number", async () => {
     await loaded();
     const text = document.body.textContent ?? "";
-    for (const idx of ["US30", "NAS100", "SPX500", "GER40"]) expect(text).not.toContain(idx);
     expect(text).toMatch(/no result is shown here/i);
     expect(text).not.toMatch(/win rate|profit factor|backtest result/i);
   });
@@ -132,7 +148,7 @@ describe("the choices", () => {
     await loaded();
     for (const r of screen.getAllByRole("radio")) {
       const name = r.textContent ?? "";
-      if (/EUR\/USD|Trend Following|Signals Only|Approval Required|Full Automation/.test(name)) {
+      if (/^EURUSD$|Trend Following|Signals Only|Approval Required|Full Automation/.test(name)) {
         expect(r.getAttribute("aria-checked"), name).toBe("false");
       }
     }
@@ -142,7 +158,7 @@ describe("the choices", () => {
     await loaded();
     const start = await screen.findByRole("button", { name: "Start on demo" });
     expect((start as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/Still to choose: an instrument, a strategy, who acts on a setup/)).toBeDefined();
+    expect(screen.getByText(/Still to choose: an instrument, a strategy or a method of your own, who acts on a setup/)).toBeDefined();
     chooseEverything();
     await waitFor(() =>
       expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(false));
@@ -154,6 +170,73 @@ describe("the choices", () => {
     expect(screen.getByText("$100.00")).toBeDefined();
     expect(screen.getByText("$200.00")).toBeDefined();
     expect(screen.getByText(/not a forecast/)).toBeDefined();
+  });
+});
+
+describe("the broker's own instruments", () => {
+  it("lists what can be traded and says how many of the broker's the rest are", async () => {
+    await loaded();
+    expect(screen.getByRole("radio", { name: "EURUSD" })).toBeDefined();
+    expect(screen.queryByRole("radio", { name: "US30" })).toBeNull();
+    expect(screen.getByText(/Your broker lists 4 instruments\. 2 can be traded now/)).toBeDefined();
+  });
+
+  it("shows the unsupported ones disabled, with the reason, when asked", async () => {
+    await loaded();
+    fireEvent.click(screen.getByLabelText(/Also list the 2 the engine cannot trade yet/));
+    const us30 = screen.getByRole("radio", { name: "US30" }) as HTMLButtonElement;
+    expect(us30.disabled).toBe(true);
+    expect(us30.getAttribute("title")).toMatch(/exchange trading calendars/);
+    expect(screen.getAllByText(/Indices need exchange trading calendars/).length).toBeGreaterThan(0);
+    fireEvent.click(us30);
+    expect(us30.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("a search finds an instrument the engine cannot trade and explains it", async () => {
+    await loaded();
+    fireEvent.change(screen.getByLabelText("Search instruments"), { target: { value: "gbpjpy" } });
+    const chip = screen.getByRole("radio", { name: "GBPJPY" }) as HTMLButtonElement;
+    expect(chip.disabled).toBe(true);
+    expect(screen.getByText(/A cross has no USD leg/)).toBeDefined();
+  });
+
+  it("falls back to the engine's list and says the broker's could not be read", async () => {
+    routes.symbols = { ok: false, status: 503, code: "UNAVAILABLE", message: "down" };
+    await loaded();
+    expect(screen.getByText(/Your broker's list could not be read/)).toBeDefined();
+    expect(screen.getByRole("radio", { name: "EURUSD" })).toBeDefined();
+    expect(screen.getByRole("radio", { name: "XAUUSD" })).toBeDefined();
+  });
+});
+
+describe("my methods", () => {
+  it("lists only methods built from conditions, not the preset rules the page made", async () => {
+    await loaded();
+    fireEvent.click(screen.getByRole("tab", { name: /My methods/ }));
+    expect(screen.getByRole("radio", { name: /My RSI dip/ })).toBeDefined();
+    expect(screen.queryByText(/Trend Following · EURUSD/)).toBeNull();
+    expect(screen.getByText(/2 entry and 1 exit conditions/)).toBeDefined();
+    expect(screen.getByRole("link", { name: "Build a new method" }).getAttribute("href")).toBe("/rules/new");
+  });
+
+  it("starts from the client's own conditions, with no strategy field", async () => {
+    await loaded();
+    fireEvent.click(screen.getByRole("tab", { name: /My methods/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /My RSI dip/ }));
+    await waitFor(() => expect(
+      screen.getByRole("radio", { name: /My RSI dip/ }).getAttribute("aria-checked")).toBe("true"));
+    choose(/^XAUUSD$/);
+    choose(/Approval Required/);
+    fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
+    await waitFor(() => expect(calls.some((c) => c.path === "automation/start")).toBe(true));
+    const body = calls.find((c) => c.path === "rules" && c.init?.method === "POST")!
+      .init!.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(body.strategy).toBeUndefined();
+    expect(body.entry.conditions.map((x: { id: string }) => x.id)).toEqual(["rsi", "ema"]);
+    expect(body.exit.conditions.length).toBe(1);
+    expect(body.sides).toBe("BUY");
+    expect(body.symbols).toEqual(["XAUUSD"]);
   });
 });
 

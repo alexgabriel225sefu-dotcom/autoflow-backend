@@ -1,5 +1,5 @@
 import type {
-  CtraderStatus, Execution, RuleDoc, StrategyPreset,
+  BrokerSymbol, CtraderStatus, Execution, RuleDoc, StrategyPreset, SymbolsRead,
 } from "@/lib/api";
 import { BLANK, toDoc } from "@/components/app/rule-form";
 import { presetRuleBody } from "../rules/new/strategy/catalog";
@@ -39,6 +39,79 @@ export const SYMBOLS = [
   { id: "XAGUSD", label: "Silver", group: "Metals" },
 ] as const;
 
+/** The class names a client reads. A class not named here is shown under the
+ *  server's own id, capitalised, so the list never hides one it has not heard of. */
+export const CLASS_LABELS: Record<string, string> = {
+  forex: "Forex", metal: "Metals", forex_cross: "Forex crosses",
+  index: "Indices", stock: "Stocks", other: "Other",
+};
+
+/** How many rows are drawn at once. A broker lists hundreds or thousands. */
+export const ROW_LIMIT = 80;
+
+export type SymbolView = {
+  /** Where the list came from: the broker's own, or the engine's fallback. */
+  source: "broker" | "engine";
+  rows: BrokerSymbol[];
+  /** Matches before the row limit, so "showing 80 of 412" can be said. */
+  matches: number;
+  /** Everything the broker lists, and how much of it the engine cannot trade yet. */
+  total: number;
+  unsupported: number;
+  classes: { id: string; label: string; count: number }[];
+};
+
+/**
+ * The instrument list the Market block draws.
+ *
+ * The broker's own list when it was read, with every entry shown (the ones the
+ * engine cannot trade yet are marked, not hidden). When the read did not
+ * succeed the fallback is the engine's own allowlist and the page says so: an
+ * empty menu would read as "your broker offers nothing".
+ *
+ * With no search and "show all" off, only what can be traded is listed, so a
+ * client is not scrolling a thousand disabled stocks to find EUR/USD. A search
+ * always looks across everything, because "AAPL" typed in should find AAPL and
+ * say why it is not available yet.
+ */
+export function symbolView(
+  read: SymbolsRead | null, query: string, cls: string, showAll: boolean,
+): SymbolView {
+  const fromBroker = !!read && read.status === "ok" && Array.isArray(read.symbols);
+  const all: BrokerSymbol[] = fromBroker
+    ? (read!.symbols as BrokerSymbol[])
+    : SYMBOLS.map((s) => ({
+        id: s.id, class: s.group === "Metals" ? "metal" : "forex",
+        tradeable: true, reason: null,
+      }));
+  const q = query.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const counts = new Map<string, number>();
+  for (const s of all) counts.set(s.class, (counts.get(s.class) ?? 0) + 1);
+  const matching = all.filter((s) =>
+    (cls === "all" || s.class === cls)
+    && (q === "" || s.id.includes(q))
+    && (showAll || q !== "" || s.tradeable));
+  return {
+    source: fromBroker ? "broker" : "engine",
+    rows: matching.slice(0, ROW_LIMIT),
+    matches: matching.length,
+    total: all.length,
+    unsupported: all.filter((s) => !s.tradeable).length,
+    classes: [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, count]) => ({ id, label: CLASS_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1), count })),
+  };
+}
+
+/** A method the client built from conditions, loaded from their own rule. */
+export type CustomMethod = {
+  ruleDocId: string;
+  name: string;
+  entry: unknown;
+  exit: unknown;
+  sides: string;
+};
+
 export const TIMEFRAME_CHOICES = ["15m", "1h", "4h", "1d"] as const;
 
 /** Risk per trade, as quick picks. Anything else is typed. */
@@ -52,7 +125,11 @@ export const DAILY_LOSS_CEILING = 4;
 export type TradeChoice = {
   symbol: string;
   timeframe: string;
+  /** One of the engine's ready-made strategies, or null. */
   strategy: StrategyPreset | null;
+  /** The client's own method (entry and exit conditions), or null. Exactly
+   *  one of `strategy` and `custom` is set once a method is chosen. */
+  custom: CustomMethod | null;
   /** Percent of balance risked on one trade, as typed. */
   riskPercent: string;
   /** Percent of the day's opening balance at which the day stops. */
@@ -64,7 +141,7 @@ export type TradeChoice = {
 };
 
 export const EMPTY_CHOICE: TradeChoice = {
-  symbol: "", timeframe: "1h", strategy: null,
+  symbol: "", timeframe: "1h", strategy: null, custom: null,
   riskPercent: "1", dailyLossPercent: "2", level: "", accountSize: "",
 };
 
@@ -103,7 +180,7 @@ export function riskAmounts(c: Pick<TradeChoice,
 export function missingChoices(c: TradeChoice): string[] {
   const out: string[] = [];
   if (!c.symbol) out.push("an instrument");
-  if (!c.strategy) out.push("a strategy");
+  if (!c.strategy && !c.custom) out.push("a strategy or a method of your own");
   const risk = num(c.riskPercent);
   if (risk === null || risk <= 0 || risk > 100) out.push("a risk per trade");
   const day = num(c.dailyLossPercent);
@@ -121,10 +198,10 @@ export function missingChoices(c: TradeChoice): string[] {
  * decides entries and exits, so the conditions are emptied (`presetRuleBody`).
  */
 export function tradeBody(c: TradeChoice): Partial<RuleDoc> {
-  if (!c.strategy) throw new Error("a strategy is required");
+  if (!c.strategy && !c.custom) throw new Error("a strategy or method is required");
   const draft = {
     ...BLANK,
-    name: `${c.strategy.label} · ${c.symbol}`,
+    name: `${c.strategy ? c.strategy.label : c.custom!.name} · ${c.symbol}`,
     symbols: c.symbol,
     timeframe: c.timeframe,
     automationLevel: c.level,
@@ -132,7 +209,17 @@ export function tradeBody(c: TradeChoice): Partial<RuleDoc> {
     riskPercent: c.riskPercent.trim(),
     maxDailyLossPercent: c.dailyLossPercent.trim(),
   };
-  return presetRuleBody(toDoc(draft), c.strategy.id);
+  if (c.strategy) return presetRuleBody(toDoc(draft), c.strategy.id);
+  // The client's own method: its entry and exit conditions and the sides it
+  // trades, written over the shared terms. No `strategy` field, so the rule
+  // runs from the conditions exactly as the builder's own rules do.
+  const m = c.custom!;
+  return {
+    ...toDoc(draft),
+    sides: m.sides,
+    entry: m.entry,
+    exit: m.exit,
+  } as Partial<RuleDoc>;
 }
 
 export type StartState =
