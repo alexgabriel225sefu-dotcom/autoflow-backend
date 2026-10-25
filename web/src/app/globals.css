@@ -2179,3 +2179,17 @@ body {
 .mkt-kicker { font-weight: 600; letter-spacing: .14em; }
 .mkt-rail h3 { font-weight: 600; letter-spacing: -.015em; }
 .mkt-lede, .mkt-rail p { text-wrap: pretty; }
+
+/* Dashboard context cards for phones: Risk guard and the active rule, one tap
+   from their pages. The wide layout already shows both in the inspector. */
+.mobile-dashboard-cards { display: grid; gap: .7rem; }
+@media (min-width: 900px) { .mobile-dashboard-cards { display: none; } }
+.mobile-context-card { display: flex; align-items: center; gap: .75rem; padding: 1rem; border: 1px solid var(--a4t-line); border-radius: 16px; background: var(--a4t-surface); color: var(--a4t-text); text-decoration: none; box-shadow: var(--elev-1); }
+.mobile-context-card:hover { border-color: var(--a4t-link); color: var(--a4t-text); }
+.mobile-context-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 42px; height: 42px; border-radius: 50%; }
+.mobile-context-violet { color: var(--a4t-accent); background: var(--a4t-accent-wash); }
+.mobile-context-lilac { color: var(--a4t-link-strong); background: color-mix(in srgb, var(--a4t-link) 12%, transparent); }
+.mobile-context-body { display: grid; gap: .18rem; min-width: 0; flex: 1; }
+.mobile-context-body strong { font-size: .95rem; letter-spacing: -.015em; }
+.mobile-context-body > span:last-child { color: var(--a4t-muted); font-size: .8rem; line-height: 1.45; }
+.mobile-context-kicker { color: var(--a4t-dim); font-size: .68rem !important; font-weight: 750; letter-spacing: .14em; }

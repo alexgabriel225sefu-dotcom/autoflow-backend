@@ -17,7 +17,7 @@
  */
 import { useState } from "react";
 import Link from "next/link";
-import { Activity, Plug, RefreshCw } from "lucide-react";
+import { Activity, ChevronRight, FileText, Plug, RefreshCw, Shield } from "lucide-react";
 import { api, type ApiError } from "@/lib/api";
 import { invalidate, invalidateBrokerViews, useRead, whenSynced } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
@@ -404,6 +404,30 @@ export default function Dashboard() {
           />
 
           <WhyCard />
+
+          <section className="mobile-dashboard-cards" aria-label="Trading context">
+            <Link className="mobile-context-card" href="/rules">
+              <span className="mobile-context-icon mobile-context-violet"><Shield size={22} aria-hidden /></span>
+              <span className="mobile-context-body">
+                <span className="mobile-context-kicker">RISK GUARD</span>
+                <strong>
+                  {running?.state === "paused" ? "Trading paused"
+                    : running?.state === "running" ? "Risk checks on" : "Automation is not running"}
+                </strong>
+                <span>Your risk limits are checked before every action. Open rules to change them.</span>
+              </span>
+              <ChevronRight size={19} aria-hidden />
+            </Link>
+            <Link className="mobile-context-card" href={activeRule ? `/rules/${activeRule.ruleDocId}` : "/rules/new"}>
+              <span className="mobile-context-icon mobile-context-lilac"><FileText size={22} aria-hidden /></span>
+              <span className="mobile-context-body">
+                <span className="mobile-context-kicker">ACTIVE RULE</span>
+                <strong>{activeRule?.name || "No active rule"}</strong>
+                <span>{activeRule ? `${(activeRule.symbols ?? []).join(", ") || "No symbol"} · ${activeRule.timeframe}` : "Create a rule to see its status here."}</span>
+              </span>
+              <ChevronRight size={19} aria-hidden />
+            </Link>
+          </section>
 
           {/* ── 4 + 5: what did it decide, and was anything placed ──── */}
           <section className="card">
