@@ -498,6 +498,28 @@ export type CandlesRead = Omit<PositionsRead, "positions"> & {
 export type RuleSummary = {
   ruleDocId: string; name: string; state: "draft" | "active" | "paused" | "archived";
   version: number; symbols: string[]; timeframe: string; updatedAt: number;
+  /** A preset's id, or "" for a method the client built from conditions. */
+  strategy?: string;
+  entryConditions?: number;
+  exitConditions?: number;
+};
+
+/** One instrument the client's broker lists, classified by the engine's own
+ *  allowlist: tradeable now, or the reason it is not. */
+export type BrokerSymbol = {
+  id: string;
+  class: string;
+  tradeable: boolean;
+  reason: string | null;
+};
+export type SymbolsRead = {
+  connected: boolean;
+  status: string;
+  accountId?: string | number;
+  mode?: string;
+  /** Absent unless the broker answered. An absent list is not an empty one. */
+  symbols?: BrokerSymbol[];
+  reason?: string;
 };
 export type RuleDoc = RuleSummary & Record<string, unknown>;
 

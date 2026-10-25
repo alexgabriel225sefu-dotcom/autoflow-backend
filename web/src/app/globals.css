@@ -1988,7 +1988,9 @@ body {
   transition: background .15s, color .15s, border-color .15s;
 }
 .chip:hover { color: var(--a4t-text); border-color: var(--a4t-muted); }
-.chip[aria-checked="true"] { background: var(--a4t-accent); color: var(--a4t-on-accent); border-color: transparent; }
+.chip[aria-checked="true"], .chip[aria-selected="true"] { background: var(--a4t-accent); color: var(--a4t-on-accent); border-color: transparent; }
+.chips-symbols { max-height: 15rem; overflow: auto; padding: 2px; }
+.chip:disabled { opacity: .45; cursor: not-allowed; }
 .chip[data-mode="live"][aria-checked="true"] { background: var(--a4t-live); color: var(--a4t-bg); }
 .chip:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 2px; }
 .chips .chip-input { width: 6.5rem; min-height: 38px; height: 38px; border-radius: 999px; padding: 0 .9rem; flex: none; }

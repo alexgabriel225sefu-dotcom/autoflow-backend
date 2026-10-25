@@ -574,6 +574,12 @@ def _dispatch(method, route, headers, body, query=None):
                 timeframe=q.get("timeframe"), limit=q.get("limit")))
         return _ok(_read.account(p.user_id, ctid=ctid))
 
+    if route == "symbols" and method == "GET":
+        # Everything the selected account's broker lists, classified by what
+        # the engine can trade today. Read-only, like positions and orders.
+        p = _authenticate(headers)
+        return _ok(_read.symbols(p.user_id))
+
     if route in ("positions", "orders") and method == "GET":
         p = _authenticate(headers)
         fn = _read.positions if route == "positions" else _read.orders
@@ -912,7 +918,19 @@ def _summary(doc):
             "state": doc.get("state"), "version": doc.get("version"),
             "symbols": doc.get("symbols"), "timeframe": doc.get("timeframe"),
             "updatedAt": doc.get("updatedAt"),
-            "accountId": doc.get("accountId")}
+            "accountId": doc.get("accountId"),
+            # What decides this rule's entries: a preset's id, or "" for a
+            # method the client built from conditions. The Trade page lists
+            # the second kind as "my methods", and counts what they hold.
+            "strategy": doc.get("strategy") or "",
+            "entryConditions": _count_conditions(doc, "entry"),
+            "exitConditions": _count_conditions(doc, "exit")}
+
+
+def _count_conditions(doc, half):
+    part = doc.get(half)
+    conds = part.get("conditions") if isinstance(part, dict) else None
+    return len(conds) if isinstance(conds, list) else 0
 
 
 def _selected_ctid(user_id):

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import {
   api, type ApiError, type AutomationState, type CtraderStatus, type Me,
-  type RuleDoc, type StrategyCatalogue,
+  type RuleDoc, type RuleSummary, type StrategyCatalogue, type SymbolsRead,
 } from "@/lib/api";
 import { invalidate, useRead } from "@/lib/use-api";
 import { ConfirmAction } from "@/components/app/shell";
@@ -13,9 +13,9 @@ import { AUTOMATION_LEVELS } from "@/components/app/plain";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { groupByFamily } from "../rules/new/strategy/catalog";
 import {
-  DAILY_LOSS_CEILING, EMPTY_CHOICE, LIVE_RISK_CAP, RISK_PICKS, SYMBOLS,
-  TIMEFRAME_CHOICES, missingChoices, riskAmounts, startState, tradeBody,
-  type TradeChoice,
+  DAILY_LOSS_CEILING, EMPTY_CHOICE, LIVE_RISK_CAP, RISK_PICKS, ROW_LIMIT,
+  TIMEFRAME_CHOICES, missingChoices, riskAmounts, startState, symbolView,
+  tradeBody, type TradeChoice,
 } from "./trade-model";
 
 /**
@@ -45,6 +45,8 @@ export default function TradePage() {
   const accounts = useRead<CtraderStatus>("ctrader/status");
   const me = useRead<Me>("me");
   const auto = useRead<AutomationState>("automation", 30_000);
+  const broker = useRead<SymbolsRead>("symbols");
+  const myRules = useRead<{ rules: RuleSummary[] }>("rules");
 
   const [c, setC] = useState<TradeChoice>(EMPTY_CHOICE);
   const [family, setFamily] = useState<string>("all");
@@ -52,6 +54,11 @@ export default function TradePage() {
   const [err, setErr] = useState<ApiError | null>(null);
   const [orphan, setOrphan] = useState<string>("");
   const [pickErr, setPickErr] = useState<ApiError | null>(null);
+  const [query, setQuery] = useState("");
+  const [symClass, setSymClass] = useState("all");
+  const [showAll, setShowAll] = useState(false);
+  const [tab, setTab] = useState<"ready" | "mine">("ready");
+  const [methodErr, setMethodErr] = useState<ApiError | null>(null);
   const set = <K extends keyof TradeChoice>(k: K, v: TradeChoice[K]) =>
     setC((x) => ({ ...x, [k]: v }));
 
@@ -66,6 +73,25 @@ export default function TradePage() {
   const groups = useMemo(() => groupByFamily(strategies), [strategies]);
   const shown = family === "all" ? groups : groups.filter((g) => g.family === family);
   const overLiveCap = Number(c.riskPercent) > LIVE_RISK_CAP;
+  const view = symbolView(broker.result?.ok ? broker.result.data : null,
+                          query, symClass, showAll);
+  const myMethods = (myRules.result?.ok ? myRules.result.data.rules : [])
+    .filter((r) => !r.strategy && (r.entryConditions ?? 0) > 0);
+  const shownReasons = [...new Set(view.rows.filter((r) => !r.tradeable && r.reason)
+    .map((r) => r.reason as string))];
+
+  /** Load the client's own rule and take its conditions as the method. */
+  async function pickMethod(r: RuleSummary) {
+    setMethodErr(null);
+    const res = await api<{ rule: RuleDoc }>(`rules/${encodeURIComponent(r.ruleDocId)}`);
+    if (!res.ok) return setMethodErr(res);
+    const d = res.data.rule as Record<string, unknown>;
+    setC((x) => ({
+      ...x, strategy: null,
+      custom: { ruleDocId: r.ruleDocId, name: r.name, entry: d.entry, exit: d.exit,
+                sides: String(d.sides ?? "BOTH") },
+    }));
+  }
 
   async function pick(ctid: string | number) {
     setPickErr(null);
@@ -110,8 +136,8 @@ export default function TradePage() {
     : null;
 
   const summary = [
-    c.symbol ? SYMBOLS.find((s) => s.id === c.symbol)?.label : null,
-    c.strategy?.label, c.timeframe,
+    c.symbol || null,
+    c.strategy?.label ?? (c.custom ? `${c.custom.name} (my method)` : null), c.timeframe,
     c.riskPercent ? `${pct(c.riskPercent)} per trade` : null,
     AUTOMATION_LEVELS.find((l) => l.id === c.level)?.label,
   ].filter(Boolean).join(" · ");
@@ -129,17 +155,58 @@ export default function TradePage() {
 
       <section className="card" aria-labelledby="t-market">
         <div className="card-head"><h2 id="t-market"><span className="step-no">1</span> Market</h2></div>
-        {(["Forex", "Metals"] as const).map((g) => (
-          <div className="field" key={g}><span>{g}</span>
-            <div className="chips" role="radiogroup" aria-label={g}>
-              {SYMBOLS.filter((s) => s.group === g).map((s) => (
-                <button key={s.id} type="button" role="radio" className="chip"
-                        aria-checked={c.symbol === s.id}
-                        onClick={() => set("symbol", s.id)}>{s.label}</button>
-              ))}
-            </div>
+        <div className="field"><span>Instrument</span>
+          <input type="search" placeholder="Search your broker's instruments, e.g. EURUSD, XAU, US30"
+                 aria-label="Search instruments" value={query}
+                 onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        {view.classes.length > 1 ? (
+          <div className="chips" role="radiogroup" aria-label="Instrument class">
+            <button type="button" role="radio" className="chip" aria-checked={symClass === "all"}
+                    onClick={() => setSymClass("all")}>All</button>
+            {view.classes.map((k) => (
+              <button key={k.id} type="button" role="radio" className="chip"
+                      aria-checked={symClass === k.id}
+                      onClick={() => setSymClass(k.id)}>{k.label} · {k.count}</button>
+            ))}
           </div>
-        ))}
+        ) : null}
+        {!broker.result ? <Spinner label="Reading your broker's instruments" /> : null}
+        <div className="chips chips-symbols" role="radiogroup" aria-label="Instrument">
+          {view.rows.map((r) => (
+            <button key={r.id} type="button" role="radio" className="chip"
+                    aria-checked={c.symbol === r.id}
+                    aria-disabled={!r.tradeable}
+                    disabled={!r.tradeable}
+                    title={r.reason ?? undefined}
+                    onClick={() => set("symbol", r.id)}>{r.id}</button>
+          ))}
+        </div>
+        {view.rows.length === 0 && broker.result ? (
+          <p className="muted trade-note">No instrument matches. Clear the search or the class.</p>
+        ) : null}
+        {view.matches > ROW_LIMIT ? (
+          <p className="muted trade-note">
+            Showing {ROW_LIMIT} of {view.matches}. Search to narrow it down.
+          </p>
+        ) : null}
+        {view.source === "broker" && view.unsupported > 0 ? (
+          <label className="field-inline" style={{ marginTop: ".4rem" }}>
+            <input type="checkbox" checked={showAll}
+                   onChange={(e) => setShowAll(e.target.checked)} />
+            <span>Also list the {view.unsupported} the engine cannot trade yet</span>
+          </label>
+        ) : null}
+        {shownReasons.length ? (
+          <ul className="trade-note muted" style={{ paddingLeft: "1.1rem" }}>
+            {shownReasons.map((t) => <li key={t}>{t}</li>)}
+          </ul>
+        ) : null}
+        <p className="muted trade-note">
+          {view.source === "broker"
+            ? `Your broker lists ${view.total} instruments. ${view.total - view.unsupported} can be traded now; the rest are shown with the reason, not hidden.`
+            : "Your broker's list could not be read, so this shows what the engine supports: forex with a USD leg, plus gold and silver."}
+        </p>
         <div className="field"><span>Timeframe</span>
           <div className="chips" role="radiogroup" aria-label="Timeframe">
             {TIMEFRAME_CHOICES.map((t) => (
@@ -149,10 +216,6 @@ export default function TradePage() {
             ))}
           </div>
         </div>
-        <p className="muted trade-note">
-          Forex pairs with a USD leg, plus gold and silver. Indices are not offered:
-          the engine has no exchange calendars for them.
-        </p>
       </section>
 
       <section className="card" aria-labelledby="t-strategy">
@@ -169,7 +232,56 @@ export default function TradePage() {
             The strategy list could not be read, so there is nothing to choose from.
           </div>
         ) : null}
-        {groups.length > 1 ? (
+        <div className="chips" role="tablist" aria-label="Where the method comes from">
+          <button type="button" role="tab" className="chip" aria-selected={tab === "ready"}
+                  onClick={() => setTab("ready")}>
+            Ready-made{strategies.length ? ` · ${strategies.length}` : ""}
+          </button>
+          <button type="button" role="tab" className="chip" aria-selected={tab === "mine"}
+                  onClick={() => setTab("mine")}>
+            My methods{myMethods.length ? ` · ${myMethods.length}` : ""}
+          </button>
+        </div>
+        {tab === "mine" ? (
+          <div role="tabpanel" aria-label="My methods">
+            <p className="muted trade-note">
+              A method of your own is a set of entry and exit conditions you built.
+              The instrument, risk and account come from this page, and the conditions
+              are taken from the method as they are now.
+            </p>
+            {myRules.result && !myRules.result.ok ? <ErrorNotice error={myRules.result} onRetry={myRules.reload} /> : null}
+            {myMethods.length === 0 && myRules.result?.ok ? (
+              <p>You have not built a method yet.</p>
+            ) : null}
+            <div className="strat-grid" role="radiogroup" aria-label="My methods">
+              {myMethods.map((r) => (
+                <div key={r.ruleDocId} className="strat" data-chosen={c.custom?.ruleDocId === r.ruleDocId}>
+                  <button type="button" role="radio" className="strat-pick"
+                          aria-checked={c.custom?.ruleDocId === r.ruleDocId}
+                          onClick={() => void pickMethod(r)}>
+                    <span className="strat-title">
+                      <strong>{r.name || "Untitled method"}</strong>
+                      {c.custom?.ruleDocId === r.ruleDocId ? <Check className="ico" aria-hidden /> : null}
+                    </span>
+                    <span className="strat-what">
+                      {r.entryConditions} entry and {r.exitConditions ?? 0} exit condition
+                      {(r.entryConditions ?? 0) + (r.exitConditions ?? 0) === 1 ? "" : "s"}
+                    </span>
+                    <span className="strat-refuses">
+                      Built on {r.symbols?.join(", ") || "no instrument"} · {r.timeframe}
+                    </span>
+                  </button>
+                  <Link className="btn btn-ghost btn-sm" href={`/rules/${r.ruleDocId}`}>Open the method</Link>
+                </div>
+              ))}
+            </div>
+            {methodErr ? <ErrorNotice error={methodErr} /> : null}
+            <p className="trade-note">
+              <Link className="btn btn-ghost btn-sm" href="/rules/new">Build a new method</Link>
+            </p>
+          </div>
+        ) : null}
+        {tab === "ready" && groups.length > 1 ? (
           <div className="chips" role="radiogroup" aria-label="Strategy family">
             <button type="button" role="radio" className="chip" aria-checked={family === "all"}
                     onClick={() => setFamily("all")}>All</button>
@@ -180,12 +292,13 @@ export default function TradePage() {
             ))}
           </div>
         ) : null}
+        {tab === "ready" ? (
         <div className="strat-grid" role="radiogroup" aria-label="Strategy">
           {shown.flatMap((g) => g.strategies).map((s) => (
             <div key={s.id} className="strat" data-chosen={c.strategy?.id === s.id}>
               <button type="button" role="radio" className="strat-pick"
                       aria-checked={c.strategy?.id === s.id}
-                      onClick={() => set("strategy", s)}>
+                      onClick={() => setC((x) => ({ ...x, strategy: s, custom: null }))}>
                 <span className="strat-title">
                   <strong>{s.label}</strong>
                   {c.strategy?.id === s.id ? <Check className="ico" aria-hidden /> : null}
@@ -204,6 +317,7 @@ export default function TradePage() {
             </div>
           ))}
         </div>
+        ) : null}
         <p className="muted trade-note">
           Past behaviour does not predict future results, and no result is shown here
           because none has been published. Each card says what the strategy does and
