@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import {
   ArrowRight,
   ArrowUpRight,
-  Check,
-  Construction,
   Eye,
   GaugeCircle,
   Link2,
@@ -13,6 +11,7 @@ import {
 } from "lucide-react";
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
+import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -51,15 +50,15 @@ export default function Landing() {
           </span>
         </nav>
 
-        <section className="mkt-hero mkt-hero2 mkt-hero-terminal" id="product">
-          <span className="mkt-glow" aria-hidden />
+        <section className="mkt-hero mkt-hero2 mkt-hero-mark" id="product">
+          {/* The brand mark, large, behind the copy. Decoration only. */}
+          <span className="mkt-mark-bg" aria-hidden />
           <div className="mkt-hero-copy">
-            <p className="mkt-kicker">YOUR RULES · YOUR BROKER</p>
+            <p className="mkt-kicker">YOUR RULES, YOUR BROKER</p>
             <h1>Trade like you planned&nbsp;to.</h1>
             <p className="mkt-lede">
-              Get your licence, connect your cTrader account, then choose your
-              market, your method and your risk. Automation follows your rules,
-              and you can stop it any time.
+              Connect your cTrader account, then set your market, method and
+              risk. Automation follows your rules and stops when you say.
             </p>
             <div className="mkt-hero-cta">
               <a className="mkt-btn mkt-btn-lg" href="/signup">
@@ -69,113 +68,85 @@ export default function Landing() {
                 See how it works
               </a>
             </div>
-            <p className="mkt-foot-note">
-              No signals. No profit guarantees. Automation runs on demo accounts in this release.
-            </p>
           </div>
+        </section>
 
-          <div className="mkt-rulecard" aria-label="Illustrative preview of a rule check">
-            <div className="rc-bar"><i /><i /><i /><span>Illustrative preview</span></div>
-            <h3>Rule check</h3>
-            <div className="rc-row"><b>EMA (21)</b><em>crosses above</em><b>EMA (55)</b><u /></div>
-            <div className="rc-row"><b>RSI (14)</b><em>greater than</em><b>50</b><u /></div>
-            <div className="rc-row"><b>Stop-loss</b><em>set</em><b>1.0% risk</b><u /></div>
-            <div className="rc-foot"><span>● Conditions met</span><b>■ Emergency stop</b></div>
-          </div>
+        <section className="mkt-partners" id="partners" aria-label="Broker integrations">
+          <SpotlightGrid className="mkt-partner-grid">
+            <div className="mkt-partner mkt-partner-live" data-spot>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/ctrader-logo-light.svg" alt="cTrader" height={34} />
+              <span className="mkt-partner-status">Available now</span>
+              <a href="/signup">Connect cTrader <ArrowUpRight size={15} aria-hidden /></a>
+            </div>
+            <div className="mkt-partner mkt-partner-soon" data-spot>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/metatrader-4-light.png" alt="MetaTrader 4" height={34} />
+              <span className="mkt-partner-status">Coming soon</span>
+            </div>
+            <div className="mkt-partner mkt-partner-soon" data-spot>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/metatrader-5-light.png" alt="MetaTrader 5" height={34} />
+              <span className="mkt-partner-status">Coming soon</span>
+            </div>
+          </SpotlightGrid>
+          <p className="mkt-partner-note">
+            No install path promised yet for MetaTrader. No signals, no profit
+            guarantees. Automation runs on demo accounts in this release.
+          </p>
         </section>
 
         <section id="features" className="mkt-section">
-          <div className="mkt-section-kicker">
-            <span className="mkt-eyebrow"><i className="mkt-dot" aria-hidden /> Broker ecosystem</span>
-            <span className="mkt-section-note">One workspace, provider by provider.</span>
-          </div>
-          <div className="mkt-broker-grid" aria-label="Broker integrations">
-            <article className="mkt-broker-card mkt-broker-live">
-              <div className="mkt-broker-brand"><span className="mkt-broker-logo ctrader-logo">c</span><strong>cTrader</strong></div>
-              <span className="mkt-broker-status"><i className="mkt-status-dot" aria-hidden /> Available now</span>
-              <p>Connect your own cTrader demo account through the broker&apos;s secure authorisation flow.</p>
-              <a href="/signup">Connect cTrader <ArrowUpRight size={15} aria-hidden /></a>
-            </article>
-            <article className="mkt-broker-card mkt-broker-soon">
-              <div className="mkt-broker-brand"><span className="mkt-broker-logo mt-logo">4</span><strong>MetaTrader 4</strong></div>
-              <span className="mkt-broker-status"><Construction size={14} aria-hidden /> Coming soon</span>
-              <p>We are evaluating a managed connector so traders will not need to install a local bridge.</p>
-              <span className="mkt-broker-note">No install path promised yet</span>
-            </article>
-            <article className="mkt-broker-card mkt-broker-soon">
-              <div className="mkt-broker-brand"><span className="mkt-broker-logo mt-logo">5</span><strong>MetaTrader 5</strong></div>
-              <span className="mkt-broker-status"><Construction size={14} aria-hidden /> Coming soon</span>
-              <p>Planned after the cTrader demo flow is proven and the connector can meet our safety bar.</p>
-              <span className="mkt-broker-note">Demo-first roadmap</span>
-            </article>
-          </div>
-          <p className="mkt-plain mkt-broker-footnote"><Check size={15} aria-hidden /> Provider capabilities are shown honestly. A coming-soon card is not an available connection.</p>
-        </section>
-
-        <section className="mkt-section">
           <h2>What it actually does</h2>
           <p>
             Six things, all of them checkable by using it. None of them is a
             prediction.
           </p>
 
-          <div className="mkt-bento">
-            <article className="mkt-card mkt-bento-large">
+          <SpotlightGrid className="mkt-rails" label="What it does">
+            <article className="mkt-rail mkt-rail-7" data-spot>
               <span className="mkt-card-ico"><Link2 size={17} aria-hidden /></span>
               <h3>Connect your own account</h3>
               <p>
-                You authorise your cTrader account yourself and can disconnect
-                it at any time. We never ask for your broker password, and the
-                access token never reaches your browser.
+                You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password, and the access token never reaches your browser.
               </p>
             </article>
-
-            <article className="mkt-card mkt-bento-large">
+            <article className="mkt-rail mkt-rail-5" data-spot>
               <span className="mkt-card-ico"><ListChecks size={17} aria-hidden /></span>
               <h3>Write rules in named conditions</h3>
               <p>
-                Moving averages, RSI, MACD, ATR, Bollinger Bands, Stochastic,
-                sessions, weekdays, spread and position limits.
+                Moving averages, RSI, MACD, ATR, Bollinger Bands, Stochastic, sessions, weekdays, spread and position limits.
               </p>
             </article>
-
-            <article className="mkt-card">
+            <article className="mkt-rail mkt-rail-5" data-spot>
               <span className="mkt-card-ico"><Eye size={17} aria-hidden /></span>
               <h3>Preview before it runs</h3>
               <p>
-                Read which conditions passed, which failed, and what the rule
-                would decide. Nothing is placed by a preview.
+                Read which conditions passed, which failed, and what the rule would decide. Nothing is placed by a preview.
               </p>
             </article>
-
-            <article className="mkt-card">
+            <article className="mkt-rail mkt-rail-7" data-spot>
               <span className="mkt-card-ico"><GaugeCircle size={17} aria-hidden /></span>
               <h3>Risk limits you set</h3>
               <p>
-                Risk per trade, stop distance, target, and a cap on open
-                positions are enforced on the server.
+                Risk per trade, stop distance, target, and a cap on open positions are enforced on the server.
               </p>
             </article>
-
-            <article className="mkt-card">
+            <article className="mkt-rail mkt-rail-6" data-spot>
               <span className="mkt-card-ico"><PlayCircle size={17} aria-hidden /></span>
               <h3>Start, pause, stop</h3>
               <p>
-                Automation runs only while you have started it. The panel says
-                unknown rather than guessing when it cannot tell.
+                Automation runs only while you have started it. The panel says unknown rather than guessing when it cannot tell.
               </p>
             </article>
-
-            <article className="mkt-card mkt-bento-wide">
+            <article className="mkt-rail mkt-rail-6" data-spot>
               <span className="mkt-card-ico"><ShieldCheck size={17} aria-hidden /></span>
               <h3>A journal of every decision</h3>
               <p>
-                Each evaluation is recorded with the reason it acted or did
-                not. When nothing happens, the journal tells you which condition
-                stopped it.
+                Each evaluation is recorded with the reason it acted or did not. When nothing happens, the journal tells you which condition stopped it.
               </p>
             </article>
-          </div>
+          </SpotlightGrid>
         </section>
 
         <section id="resources" className="mkt-section mkt-flow">
