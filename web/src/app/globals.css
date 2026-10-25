@@ -2226,3 +2226,20 @@ body {
     transform: translate3d(0, 0, 0) scale(1);
   }
 }
+
+/* Provider marks use the official cTrader artwork on a dark keyline. The
+   Apex4Traders lockup remains the product brand everywhere else. */
+.broker-chip-brand,
+.provider-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: #111318;
+  border: 1px solid rgba(255, 255, 255, .16);
+}
+.broker-chip-brand { width: 42px; height: 18px; padding: 2px 4px; }
+.broker-chip-brand img { display: block; width: 34px; height: auto; }
+.provider-heading { display: inline-flex; align-items: center; gap: .6rem; }
+.provider-logo { width: 34px; height: 26px; padding: 4px 5px; border-radius: 7px; }
+.provider-logo img { display: block; width: 100%; height: auto; }

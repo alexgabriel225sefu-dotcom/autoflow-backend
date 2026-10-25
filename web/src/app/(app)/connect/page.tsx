@@ -234,7 +234,7 @@ export default function ConnectPage() {
     <main>
       <div className="page-head">
         <div>
-          <h1>Connect cTrader</h1>
+          <h1 className="provider-heading"><span className="provider-logo"><img src="/ctrader-logo-light.svg" alt="" /></span>Connect cTrader</h1>
           <span className="sub">
             Orders are placed on an account you connect yourself.
           </span>

@@ -163,6 +163,7 @@ export function StatusBar({
           different actions from the reader. */}
       {account?.connected ? (
         <a className="stat-chip" href="/accounts">
+          <span className="broker-chip-brand"><img src="/ctrader-logo-light.svg" alt="" /></span>
           <span className="dot" data-tone="long" />
           <span>cTrader</span><strong>Linked</strong>
         </a>

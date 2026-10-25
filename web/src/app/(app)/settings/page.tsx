@@ -95,7 +95,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="card">
-        <div className="card-head"><h2>Broker</h2></div>
+        <div className="card-head"><h2 className="provider-heading"><span className="provider-logo"><img src="/ctrader-logo-light.svg" alt="" /></span>Broker</h2></div>
         {!ct.result ? <Spinner /> : null}
         {ct.result && !ct.result.ok ? <ErrorNotice error={ct.result} onRetry={ct.reload} /> : null}
         {ct.result?.ok ? (
