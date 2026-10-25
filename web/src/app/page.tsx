@@ -93,7 +93,7 @@ export default function Landing() {
             <article className="mkt-broker-card mkt-broker-live">
               <div className="mkt-broker-brand"><span className="mkt-broker-logo ctrader-logo">c</span><strong>cTrader</strong></div>
               <span className="mkt-broker-status"><i className="mkt-status-dot" aria-hidden /> Available now</span>
-              <p>Connect your own cTrader demo account through the broker's secure authorisation flow.</p>
+              <p>Connect your own cTrader demo account through the broker&apos;s secure authorisation flow.</p>
               <a href="/signup">Connect cTrader <ArrowUpRight size={15} aria-hidden /></a>
             </article>
             <article className="mkt-broker-card mkt-broker-soon">
