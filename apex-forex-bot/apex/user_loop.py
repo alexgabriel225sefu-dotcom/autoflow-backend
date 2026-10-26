@@ -1104,6 +1104,13 @@ def _make_broker(user, user_id=None, ctid=None):
             return float(default if value is None else value)
         except (TypeError, ValueError):
             return float(default)
+
+    def _whole(key, default):
+        value = user.get(key)
+        try:
+            return int(default if value is None else value)
+        except (TypeError, ValueError):
+            return int(default)
     from apex import config as _appcfg
     paper = user.get("paper", False)
     ct_token = user.get("ctrader_access_token", "")
@@ -1181,7 +1188,7 @@ def _make_broker(user, user_id=None, ctid=None):
         # Spread/volatility guards, operator-tunable, never build-derived.
         MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
         FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
-        MIN_CONFIDENCE   = int(user.get("min_confidence", 70)),
+        MIN_CONFIDENCE   = _whole("min_confidence", 70),
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         AI_CONFIRM       = bool(user.get("ai_confirm", True)),  # /aiconfirm off = pure rule engine
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
@@ -1200,7 +1207,7 @@ def _make_broker(user, user_id=None, ctid=None):
         # NEWS_EXIT_SKIP_MANUAL in the environment does nothing.
         NEWS_EXIT_SKIP_MANUAL = getattr(_appcfg, "NEWS_EXIT_SKIP_MANUAL", False),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
-        MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
+        MAX_TRADES_DAY   = _whole("max_trades_day", 10),
         # Caps scaled with RISK_PER_TRADE above (2.5x risk) so the bot still
         # tolerates roughly the same number of consecutive losses per day/from
         # peak before standing aside — not a full linear scale-up, which would
