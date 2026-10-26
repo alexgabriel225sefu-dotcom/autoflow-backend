@@ -154,7 +154,8 @@ def _quote(broker, symbol):
             return (quote["bid"], quote["ask"],
                     received_at)
         if len(quote) == 3:
-            return quote
+            bid, ask, received_at = quote
+            return bid, ask, received_at if received_at is not None else time.time()
         bid, ask = quote
         return bid, ask, time.time()
     bid, ask = broker.get_bid_ask(symbol)

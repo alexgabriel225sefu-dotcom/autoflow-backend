@@ -95,6 +95,20 @@ def test_quote_with_null_timestamp_uses_receive_time():
     assert result["positions"][0]["quoteAgeSec"] >= 0
 
 
+def test_tuple_quote_with_null_timestamp_uses_receive_time():
+    class TupleQuoteBroker(_Broker):
+        def get_quote(self, symbol):
+            return (1.101, 1.102, None)
+
+    result = read_positions(TupleQuoteBroker([{
+        "symbol": "EURUSD", "side": "BUY", "units": 1000,
+        "entryPrice": 1.1000, "stopLoss": 1.0950, "takeProfit": None,
+        "positionId": 7,
+    }]))
+    assert result["status"] == broker_read.OK
+    assert result["positions"][0]["quoteAgeSec"] >= 0
+
+
 def test_stale_quote_is_marked_and_pnl_is_withheld():
     result = read_positions(_Broker([{
         "symbol": "EURUSD", "side": "BUY", "units": 1000,
@@ -167,6 +181,7 @@ if __name__ == "__main__":
         test_no_stop_is_explicitly_unprotected,
         test_failed_quote_never_prices_from_an_old_value,
         test_stale_quote_is_marked_and_pnl_is_withheld,
+        test_tuple_quote_with_null_timestamp_uses_receive_time,
         test_pnl_sign_is_correct_for_buy_and_sell,
         test_failed_deal_list_is_an_error_not_empty_success,
         test_closed_deals_are_cached_for_sixty_seconds,
