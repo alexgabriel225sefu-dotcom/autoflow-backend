@@ -148,8 +148,11 @@ def _quote(broker, symbol):
     if callable(getter):
         quote = getter(symbol)
         if isinstance(quote, dict):
+            received_at = (quote.get("receivedAt")
+                           or quote.get("timestamp")
+                           or time.time())
             return (quote["bid"], quote["ask"],
-                    quote.get("receivedAt", quote.get("timestamp", time.time())))
+                    received_at)
         if len(quote) == 3:
             return quote
         bid, ask = quote

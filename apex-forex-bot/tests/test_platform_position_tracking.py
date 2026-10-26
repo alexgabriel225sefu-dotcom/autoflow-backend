@@ -81,6 +81,20 @@ def test_failed_quote_never_prices_from_an_old_value():
     assert "positions" not in result
 
 
+def test_quote_with_null_timestamp_uses_receive_time():
+    class DictQuoteBroker(_Broker):
+        def get_quote(self, symbol):
+            return {"bid": 1.101, "ask": 1.102, "receivedAt": None}
+
+    result = read_positions(DictQuoteBroker([{
+        "symbol": "EURUSD", "side": "BUY", "units": 1000,
+        "entryPrice": 1.1000, "stopLoss": 1.0950, "takeProfit": None,
+        "positionId": 7,
+    }]))
+    assert result["status"] == broker_read.OK
+    assert result["positions"][0]["quoteAgeSec"] >= 0
+
+
 def test_stale_quote_is_marked_and_pnl_is_withheld():
     result = read_positions(_Broker([{
         "symbol": "EURUSD", "side": "BUY", "units": 1000,

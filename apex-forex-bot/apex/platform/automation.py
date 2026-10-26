@@ -703,6 +703,14 @@ def supervise(*, starter=None, mode_lister=None):
             # the broker cannot confirm the mode. Say which, and leave the
             # record alone so the client still sees what they asked for.
             print(f"[Automation] not reviving {uid}: {e.code} — {e.detail}")
+            try:
+                _jstore.record_error(
+                    f"automation revival refused — {e.code}: {e.detail}",
+                    correlation_id=uuid.uuid4().hex, user_id=uid,
+                    account_id=str(rec.get("accountId") or ""),
+                    rule_doc_id=rid)
+            except Exception:                              # noqa: BLE001
+                pass
         except Exception as e:                               # noqa: BLE001
             print(f"[Automation] reviving {uid} failed: "
                   f"{type(e).__name__}: {e}")
