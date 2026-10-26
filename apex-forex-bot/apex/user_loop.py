@@ -1096,6 +1096,14 @@ def _make_broker(user, user_id=None, ctid=None):
     unchanged; without it the behaviour is exactly what it was.
     """
     import types
+
+    def _number(key, default):
+        """Use a safe default when an older account stores a null setting."""
+        value = user.get(key)
+        try:
+            return float(default if value is None else value)
+        except (TypeError, ValueError):
+            return float(default)
     from apex import config as _appcfg
     paper = user.get("paper", False)
     ct_token = user.get("ctrader_access_token", "")
@@ -1147,17 +1155,17 @@ def _make_broker(user, user_id=None, ctid=None):
         TIMEFRAME        = user.get("timeframe", "5m"),
         CANDLES          = 240,  # M5 history for indicators (H1 gate removed → 720 was overkill)
         PAPER_TRADING    = paper,
-        PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
-        STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
-        TAKE_PROFIT_PIPS = float(user.get("tp_pips", 40)),
+        PAPER_BALANCE    = _number("paper_balance", 1000),
+        STOP_LOSS_PIPS   = _number("sl_pips", 20),
+        TAKE_PROFIT_PIPS = _number("tp_pips", 40),
         # 0 = off (use TAKE_PROFIT_PIPS/ATR as normal). >0 = target this % of
         # the account balance as profit on a full winning trade — TP widens
         # or narrows automatically as the balance (and position size) moves,
         # instead of sitting at a fixed pip count that stops meaning anything
         # once the account has grown or shrunk. See /tptarget.
-        TP_TARGET_PCT    = float(user.get("tp_target_pct", 0) or 0),
-        RISK_PER_TRADE   = float(user.get("risk", 0.025)),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
-        LEVERAGE         = float(user.get("leverage", 30)),
+        TP_TARGET_PCT    = _number("tp_target_pct", 0),
+        RISK_PER_TRADE   = _number("risk", 0.025),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
+        LEVERAGE         = _number("leverage", 30),
         # Whether the number above is the CLIENT'S or just our default. Without
         # this, leverage_for_symbol() cannot tell a deliberate 30 from the
         # fallback 30, so it ignored the setting entirely (see its docstring).
@@ -1167,8 +1175,8 @@ def _make_broker(user, user_id=None, ctid=None):
         # ceiling (1.2p) never reached a live account — every entry was admitted
         # up to 3 pips. On a 15-pip stop that is a 24.7% cost-to-stop toll and
         # pushes the break-even win rate from 37.1% to 41.6%.
-        MAX_SPREAD_PIPS  = float(user.get(
-            "max_spread_pips", getattr(_appcfg, "MAX_SPREAD_PIPS", 3.0))),
+        MAX_SPREAD_PIPS  = _number("max_spread_pips",
+            getattr(_appcfg, "MAX_SPREAD_PIPS", 3.0)),
         PRODUCT          = _appcfg.PRODUCT,  # Redis namespace only — always "forex"
         # Spread/volatility guards, operator-tunable, never build-derived.
         MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
@@ -1181,7 +1189,7 @@ def _make_broker(user, user_id=None, ctid=None):
         HTF_CONFIRM      = bool(user.get("htf", True)),           # multi-timeframe gate — ON by default
         EXIT_MODE        = (user.get("exit_mode") or "fixed").lower(),
         TRAILING_STOP    = bool(user.get("trailing", True)),      # move SL behind price — ON by default
-        BREAKEVEN_AT_R   = float(user.get("breakeven_r", 1.0)),   # move SL to entry at +1R
+        BREAKEVEN_AT_R   = _number("breakeven_r", 1.0),   # move SL to entry at +1R
         NEWS_FILTER      = bool(user.get("news_filter", True)),
         # How many minutes before a high-impact release an ALREADY-OPEN
         # position is closed. Same warning as the EV block below: a key missing
@@ -1198,8 +1206,8 @@ def _make_broker(user, user_id=None, ctid=None):
         # peak before standing aside — not a full linear scale-up, which would
         # make the caps meaningless (matches the product's existing Medium→High
         # risk-tier progression in builder.py).
-        MAX_DD_PCT       = float(user.get("max_dd_pct", 25)),
-        MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 4)),
+        MAX_DD_PCT       = _number("max_dd_pct", 25),
+        MAX_DAILY_LOSS_PCT = _number("max_daily_loss_pct", 4),
         # EV gate. The loop reads its config off THIS object, not the global
         # module, so keys missing here are silently unreachable: without them
         # `getattr(cfg, "EV_GATE_MODE", "shadow")` returned "shadow" forever and
