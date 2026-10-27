@@ -361,10 +361,11 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
             "ENGINE_ERROR",
             f"the trading engine could not start ({detail})") from e
     if ok is False:
-        _jstore.record_error(
-            "the engine refused to start this loop (the starter returned a refusal)",
-            correlation_id=corr, user_id=user_id,
-            account_id=str(conn.get("ctid")))
+        # A false return is the in-process lease hand-off signal.  It is not
+        # a broker failure and must not become a repeated customer-facing
+        # journal error while the supervisor retries the durable RUNNING
+        # record.  The caller still receives the typed refusal and can show
+        # it for an explicit Start attempt.
         raise AutomationRefused(
             "ENGINE_REFUSED",
             "the trading engine refused to start this loop — it may already "

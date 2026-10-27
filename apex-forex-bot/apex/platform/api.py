@@ -604,6 +604,44 @@ def _dispatch(method, route, headers, body, query=None):
         fn = _read.positions if route == "positions" else _read.orders
         return _ok(fn(p.user_id))
 
+    # Explanation read used by the dashboard's decision inspector.  Keep it
+    # read-only and derive every sentence from the durable automation record
+    # and journal; an unavailable journal is an error, never an invented
+    # "nothing happened" answer.
+    if route == "automation/why" and method == "GET":
+        p = _authenticate(headers)
+        state = _auto.status(p.user_id)
+        try:
+            page = _jstore.query(p.user_id, limit=50)
+        except Exception as e:  # noqa: BLE001
+            return _err(503, "JOURNAL_UNAVAILABLE",
+                        f"the decision log could not be read ({type(e).__name__})")
+        entries = page.get("entries", []) if isinstance(page, dict) else []
+        skips = []
+        recorded = []
+        for entry in entries:
+            status = entry.get("status")
+            error = entry.get("error")
+            reason = error or entry.get("decision", {}).get("reason")
+            if status in ("reject", "order_rejected", "broker_error") or error:
+                skips.append({"time": entry.get("ts"),
+                              "reason": str(reason or status or "refused")})
+            elif status in ("evaluated", "hold", "signal"):
+                recorded.append({"at": entry.get("ts"),
+                                 "reason": str(reason or status)})
+        if state.get("state") == "running":
+            summary = "Automation is watching for a setup."
+            reason = "The active rule is being evaluated on each new bar."
+        elif state.get("state") == "paused":
+            summary = "Automation is paused."
+            reason = "Resume automation when you want the rule evaluated again."
+        else:
+            summary = "Automation is not running."
+            reason = "Start automation after selecting an active rule."
+        return _ok({"summary": summary, "reason": reason,
+                    "marketOpen": None, "skips": skips[:20],
+                    "skipsToday": len(skips), "recorded": recorded[:20]})
+
     # ── automation control (demo only) ──────────────────────────────────
     # Separate from connecting an account, deliberately: linking cTrader to
     # look at a balance is not consent to be traded for.
