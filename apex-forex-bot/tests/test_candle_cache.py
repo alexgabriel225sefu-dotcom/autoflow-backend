@@ -208,6 +208,8 @@ candles_fn = SRC.split("def get_candles")[1].split("\n    def ")[0]
 check("get_candles does", "candle_cache.get(" in candles_fn)
 check("the real fetch is still reachable for a miss",
       "_get_candles_uncached" in SRC)
+check("missing broker volume cannot abort candle reads",
+      'getattr(tb, "volume", 0) or 0' in SRC)
 
 print("\n9. The cache is bounded")
 cc.reset()

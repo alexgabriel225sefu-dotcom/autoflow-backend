@@ -802,7 +802,11 @@ class CtraderBroker:
                 "high": (tb.low + tb.deltaHigh) / scale,
                 "low": low,
                 "close": (tb.low + tb.deltaClose) / scale,
-                "volume": float(tb.volume),
+                # Some broker trendbar payloads omit volume. Volume is not
+                # used by the rule evaluator, so preserve the bar with a
+                # documented zero rather than failing the whole market read
+                # with float(None).
+                "volume": float(getattr(tb, "volume", 0) or 0),
             })
         out.sort(key=lambda x: x["time"])
         return out
