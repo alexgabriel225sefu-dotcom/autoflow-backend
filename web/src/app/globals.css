@@ -291,7 +291,9 @@
 :root[data-theme="light"] .btn-ghost:hover { background: rgba(17, 17, 19, .06); border-color: rgba(17, 17, 19, .5); }
 :root[data-theme="light"] .btn-danger { box-shadow: 0 12px 24px -16px rgba(163, 23, 10, .6); }
 :root[data-theme="light"] .auth-block .field input:focus { box-shadow: 0 0 0 4px rgba(17, 17, 19, .10); }
-:root[data-theme="light"] .a4t .brand-lockup-image { filter: invert(1); }
+:root[data-theme="light"] .a4t .brand-lockup-image {
+  filter: invert(1) drop-shadow(0 0 7px color-mix(in srgb, var(--a4t-accent) 58%, transparent));
+}
 :root[data-theme="light"] .btn-lg:not(.btn-ghost):not(.btn-danger)::after {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111113' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M7 17L17 7M9 7h8v8'/></svg>");
 }
@@ -703,6 +705,42 @@ body {
   aspect-ratio: 1116 / 152;
   object-fit: contain;
   object-position: center;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--a4t-accent) 58%, transparent));
+  animation: a4t-logo-breathe 3.8s ease-in-out infinite;
+}
+.brand-lockup .mark {
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--a4t-accent) 62%, transparent));
+  animation: a4t-logo-breathe 3.8s ease-in-out infinite;
+}
+@keyframes a4t-logo-breathe {
+  0%, 100% { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--a4t-accent) 42%, transparent)); }
+  50% { filter: drop-shadow(0 0 11px color-mix(in srgb, var(--a4t-accent) 78%, transparent)); }
+}
+/* Accent changes get a brief four-corner wash. It stays behind the UI and
+   uses the selected token, so it works for every approved palette and theme. */
+:root[data-accent-flash] .a4t::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--a4t-accent) 34%, transparent), transparent 34%),
+    radial-gradient(ellipse at 100% 0, color-mix(in srgb, var(--a4t-accent) 28%, transparent), transparent 34%),
+    radial-gradient(ellipse at 0 100%, color-mix(in srgb, var(--a4t-accent) 28%, transparent), transparent 34%),
+    radial-gradient(ellipse at 100% 100%, color-mix(in srgb, var(--a4t-accent) 34%, transparent), transparent 34%);
+  mix-blend-mode: screen;
+  animation: a4t-accent-flash .9s ease-out both;
+}
+@keyframes a4t-accent-flash {
+  0% { opacity: 0; }
+  22% { opacity: .9; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-lockup-image, .brand-lockup .mark { animation: none; }
+  :root[data-accent-flash] .a4t::before { animation: none; opacity: 0; }
 }
 .brand-lockup .word {
   font-weight: 700; letter-spacing: -.028em; line-height: 1;

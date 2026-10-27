@@ -156,6 +156,7 @@ describe("choosing", () => {
     setAccent("volt");
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
     expect(document.documentElement.getAttribute("data-accent")).toBe("volt");
+    expect(document.documentElement.getAttribute("data-accent-flash")).toBe("true");
     expect(localStorage.getItem("a4t-theme")).toBe("light");
     expect(localStorage.getItem("a4t-accent")).toBe("volt");
     setAccent("cream");
