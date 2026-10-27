@@ -1076,6 +1076,22 @@ def _persist_open_position(user_id, cfg, pos):
         print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
 
 
+def _setting_number(user, key, default, *, integer=False):
+    """Read a persisted setting without letting legacy nulls break reads.
+
+    Older profiles legitimately contain JSON null for optional controls. A
+    broker read must still be able to construct its read-only connector; null
+    means the documented default, while malformed values remain a refusal.
+    """
+    value = (user or {}).get(key)
+    if value is None or value == "":
+        return int(default) if integer else float(default)
+    try:
+        return int(value) if integer else float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"invalid {key} setting")
+
+
 def _make_broker(user, user_id=None, ctid=None):
     """Create the per-user broker with isolated config — cTrader exclusively.
 
@@ -1098,8 +1114,8 @@ def _make_broker(user, user_id=None, ctid=None):
     import types
     from apex import config as _appcfg
     paper = user.get("paper", False)
-    ct_token = user.get("ctrader_access_token", "")
-    ct_account = user.get("ctrader_account_id", "")
+    ct_token = user.get("ctrader_access_token") or ""
+    ct_account = user.get("ctrader_account_id") or ""
     if not ct_token and user_id:
         from apex.platform import ctrader_link as _link
         _conn = _link.get_ctrader_connection(user_id, ctid=ctid)
@@ -1147,17 +1163,17 @@ def _make_broker(user, user_id=None, ctid=None):
         TIMEFRAME        = user.get("timeframe", "5m"),
         CANDLES          = 240,  # M5 history for indicators (H1 gate removed → 720 was overkill)
         PAPER_TRADING    = paper,
-        PAPER_BALANCE    = float(user.get("paper_balance", 1000)),
-        STOP_LOSS_PIPS   = float(user.get("sl_pips", 20)),
-        TAKE_PROFIT_PIPS = float(user.get("tp_pips", 40)),
+        PAPER_BALANCE    = _setting_number(user, "paper_balance", 1000),
+        STOP_LOSS_PIPS   = _setting_number(user, "sl_pips", 20),
+        TAKE_PROFIT_PIPS = _setting_number(user, "tp_pips", 40),
         # 0 = off (use TAKE_PROFIT_PIPS/ATR as normal). >0 = target this % of
         # the account balance as profit on a full winning trade — TP widens
         # or narrows automatically as the balance (and position size) moves,
         # instead of sitting at a fixed pip count that stops meaning anything
         # once the account has grown or shrunk. See /tptarget.
-        TP_TARGET_PCT    = float(user.get("tp_target_pct", 0) or 0),
-        RISK_PER_TRADE   = float(user.get("risk", 0.025)),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
-        LEVERAGE         = float(user.get("leverage", 30)),
+        TP_TARGET_PCT    = _setting_number(user, "tp_target_pct", 0),
+        RISK_PER_TRADE   = _setting_number(user, "risk", 0.025),  # 2.5% default (was 1%) — bigger profit per trade, still bounded by the caps below
+        LEVERAGE         = _setting_number(user, "leverage", 30),
         # Whether the number above is the CLIENT'S or just our default. Without
         # this, leverage_for_symbol() cannot tell a deliberate 30 from the
         # fallback 30, so it ignored the setting entirely (see its docstring).
@@ -1167,13 +1183,13 @@ def _make_broker(user, user_id=None, ctid=None):
         # ceiling (1.2p) never reached a live account — every entry was admitted
         # up to 3 pips. On a 15-pip stop that is a 24.7% cost-to-stop toll and
         # pushes the break-even win rate from 37.1% to 41.6%.
-        MAX_SPREAD_PIPS  = float(user.get(
-            "max_spread_pips", getattr(_appcfg, "MAX_SPREAD_PIPS", 3.0))),
+        MAX_SPREAD_PIPS  = _setting_number(
+            user, "max_spread_pips", getattr(_appcfg, "MAX_SPREAD_PIPS", 3.0)),
         PRODUCT          = _appcfg.PRODUCT,  # Redis namespace only — always "forex"
         # Spread/volatility guards, operator-tunable, never build-derived.
         MAX_SPREAD_PCT   = getattr(_appcfg, "MAX_SPREAD_PCT", 0),
         FLASH_SPIKE_PCT  = getattr(_appcfg, "FLASH_SPIKE_PCT", 0.012),
-        MIN_CONFIDENCE   = int(user.get("min_confidence", 70)),
+        MIN_CONFIDENCE   = _setting_number(user, "min_confidence", 70, integer=True),
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         AI_CONFIRM       = bool(user.get("ai_confirm", True)),  # /aiconfirm off = pure rule engine
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
@@ -1181,7 +1197,7 @@ def _make_broker(user, user_id=None, ctid=None):
         HTF_CONFIRM      = bool(user.get("htf", True)),           # multi-timeframe gate — ON by default
         EXIT_MODE        = (user.get("exit_mode") or "fixed").lower(),
         TRAILING_STOP    = bool(user.get("trailing", True)),      # move SL behind price — ON by default
-        BREAKEVEN_AT_R   = float(user.get("breakeven_r", 1.0)),   # move SL to entry at +1R
+        BREAKEVEN_AT_R   = _setting_number(user, "breakeven_r", 1.0),   # move SL to entry at +1R
         NEWS_FILTER      = bool(user.get("news_filter", True)),
         # How many minutes before a high-impact release an ALREADY-OPEN
         # position is closed. Same warning as the EV block below: a key missing
@@ -1192,21 +1208,21 @@ def _make_broker(user, user_id=None, ctid=None):
         # NEWS_EXIT_SKIP_MANUAL in the environment does nothing.
         NEWS_EXIT_SKIP_MANUAL = getattr(_appcfg, "NEWS_EXIT_SKIP_MANUAL", False),
         SESSION_FILTER   = list(user.get("session_filter") or []),  # [] = all sessions
-        MAX_TRADES_DAY   = int(user.get("max_trades_day", 10)),
+        MAX_TRADES_DAY   = _setting_number(user, "max_trades_day", 10, integer=True),
         # Caps scaled with RISK_PER_TRADE above (2.5x risk) so the bot still
         # tolerates roughly the same number of consecutive losses per day/from
         # peak before standing aside — not a full linear scale-up, which would
         # make the caps meaningless (matches the product's existing Medium→High
         # risk-tier progression in builder.py).
-        MAX_DD_PCT       = float(user.get("max_dd_pct", 25)),
-        MAX_DAILY_LOSS_PCT = float(user.get("max_daily_loss_pct", 4)),
+        MAX_DD_PCT       = _setting_number(user, "max_dd_pct", 25),
+        MAX_DAILY_LOSS_PCT = _setting_number(user, "max_daily_loss_pct", 4),
         # EV gate. The loop reads its config off THIS object, not the global
         # module, so keys missing here are silently unreachable: without them
         # `getattr(cfg, "EV_GATE_MODE", "shadow")` returned "shadow" forever and
         # EV_GATE_MODE=enforce in the environment did nothing on any account.
         EV_GATE_MODE       = getattr(_appcfg, "EV_GATE_MODE", "shadow"),
-        EV_MIN_PROBABILITY = float(user.get(
-            "ev_min_probability", getattr(_appcfg, "EV_MIN_PROBABILITY", 0.55))),
+        EV_MIN_PROBABILITY = _setting_number(
+            user, "ev_min_probability", getattr(_appcfg, "EV_MIN_PROBABILITY", 0.55)),
         EV_MIN_SAMPLES     = int(getattr(_appcfg, "EV_MIN_SAMPLES", 30)),
         AI_VISION          = bool(getattr(_appcfg, "AI_VISION", False)),
         STRUCTURAL_STOPS   = bool(user.get(

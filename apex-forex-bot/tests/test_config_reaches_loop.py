@@ -69,6 +69,27 @@ check("max_spread_pips override", cfg2.MAX_SPREAD_PIPS == 0.8,
 check("ev_min_probability override", cfg2.EV_MIN_PROBABILITY == 0.72,
       str(cfg2.EV_MIN_PROBABILITY))
 
+print("\n── legacy null settings use safe defaults ──")
+_, null_cfg = user_loop._make_broker({"ctrader_access_token": "x",
+                                      "ctrader_account_id": "1",
+                                      "paper_balance": None,
+                                      "sl_pips": None,
+                                      "tp_pips": None,
+                                      "risk": None,
+                                      "leverage": None,
+                                      "max_spread_pips": None,
+                                      "min_confidence": None,
+                                      "breakeven_r": None,
+                                      "max_trades_day": None,
+                                      "max_dd_pct": None,
+                                      "max_daily_loss_pct": None,
+                                      "ev_min_probability": None})
+check("null numeric settings do not crash broker construction",
+      null_cfg.PAPER_BALANCE == 1000.0 and null_cfg.STOP_LOSS_PIPS == 20.0
+      and null_cfg.TAKE_PROFIT_PIPS == 40.0 and null_cfg.MIN_CONFIDENCE == 70
+      and null_cfg.MAX_TRADES_DAY == 10,
+      repr(null_cfg))
+
 print("\n── the news guard resolves currencies from any symbol spelling ──")
 cases = [
     ("EURUSD",  ["EUR", "USD"]),
