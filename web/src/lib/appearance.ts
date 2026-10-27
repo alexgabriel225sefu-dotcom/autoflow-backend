@@ -39,6 +39,7 @@ export const DEFAULT_ACCENT: AccentId = "cream";
 const THEME_KEY = "a4t-theme";
 const ACCENT_KEY = "a4t-accent";
 const EVENT = "a4t-appearance";
+let accentFlashTimer: number | undefined;
 
 const isTheme = (v: unknown): v is ThemeId => THEMES.some((t) => t.id === v);
 const isAccent = (v: unknown): v is AccentId => ACCENTS.some((a) => a.id === v);
@@ -89,6 +90,16 @@ export function setAccent(id: AccentId) {
   if (id === DEFAULT_ACCENT) document.documentElement.removeAttribute("data-accent");
   else document.documentElement.setAttribute("data-accent", id);
   remember(ACCENT_KEY, id);
+  // Give the user a short, unmistakable confirmation that the accent changed.
+  // The attribute drives a CSS-only corner wash, so it does not add a render
+  // loop or repaint every component. It is deliberately transient; the logo
+  // keeps the chosen accent's quiet glow after the transition ends.
+  document.documentElement.setAttribute("data-accent-flash", "true");
+  if (accentFlashTimer !== undefined) window.clearTimeout(accentFlashTimer);
+  accentFlashTimer = window.setTimeout(() => {
+    document.documentElement.removeAttribute("data-accent-flash");
+    accentFlashTimer = undefined;
+  }, 900);
   window.dispatchEvent(new Event(EVENT));
 }
 
