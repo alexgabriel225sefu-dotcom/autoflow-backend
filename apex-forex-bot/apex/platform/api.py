@@ -622,7 +622,8 @@ def _dispatch(method, route, headers, body, query=None):
         for entry in entries:
             status = entry.get("status")
             error = entry.get("error")
-            reason = error or entry.get("decision", {}).get("reason")
+            decision = entry.get("decision") or {}
+            reason = error or decision.get("reason")
             if status in ("reject", "order_rejected", "broker_error") or error:
                 skips.append({"time": entry.get("ts"),
                               "reason": str(reason or status or "refused")})
