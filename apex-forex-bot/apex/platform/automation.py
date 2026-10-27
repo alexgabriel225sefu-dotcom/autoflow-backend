@@ -703,6 +703,14 @@ def supervise(*, starter=None, mode_lister=None):
             # the broker cannot confirm the mode. Say which, and leave the
             # record alone so the client still sees what they asked for.
             print(f"[Automation] not reviving {uid}: {e.code} — {e.detail}")
+            # A second process commonly sees the durable RUNNING record while
+            # the existing owner is still alive.  That is an expected lease
+            # hand-off refusal, not a new engine failure; recording it on
+            # every supervisor tick floods the client's journal with identical
+            # red cards.  Keep the operator log, but leave the journal for
+            # actionable refusals (expired licence, archived rule, etc.).
+            if e.code == "ENGINE_REFUSED" and "another instance" in e.detail:
+                continue
             try:
                 _jstore.record_error(
                     f"automation revival refused — {e.code}: {e.detail}",

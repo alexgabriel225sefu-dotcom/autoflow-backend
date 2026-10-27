@@ -114,6 +114,27 @@ check("but neither simulates",
       demo.PAPER_TRADING is False and live.PAPER_TRADING is False,
       "a connected account is executed on whichever server its mode names")
 
+# A platform read supplies the selected ctid explicitly. Older user records
+# can still carry ctrader_account_id=None; that must not become int(None) in
+# the broker constructor.
+print("\n[3b] an explicitly selected account repairs a null legacy id")
+real_broker = user_loop._CtraderBroker
+real_conn = CTL.get_ctrader_connection
+user_loop._CtraderBroker = lambda cfg: object()
+CTL.get_ctrader_connection = lambda uid, **kw: {
+    "accessToken": "not-a-real-token", "ctid": 47765456,
+    "mode": "demo", "userId": uid,
+}
+try:
+    _b, cfg = user_loop._make_broker(
+        {"ctrader_account_id": None}, USER, ctid=47765456)
+    check("selected ctid reaches the broker config",
+          cfg.CTRADER_ACCOUNT_ID == 47765456,
+          repr(cfg.CTRADER_ACCOUNT_ID))
+finally:
+    CTL.get_ctrader_connection = real_conn
+    user_loop._CtraderBroker = real_broker
+
 # ── 4. the broker really does fake a fill when told to ──────────────────────
 # Without this, section [1] proves nothing: it would pass just as happily if
 # PAPER_TRADING did nothing at all. The harness has to be shown capable of

@@ -1115,12 +1115,17 @@ def _make_broker(user, user_id=None, ctid=None):
     paper = user.get("paper", False)
     ct_token = user.get("ctrader_access_token", "")
     ct_account = user.get("ctrader_account_id", "")
+    # Platform reads and controls always pass the selected account explicitly.
+    # Older user records may still carry a null Telegram-era account id; do
+    # not let that null reach CtraderBroker, where it becomes int(None).
+    if not ct_account and ctid is not None:
+        ct_account = ctid
     if not ct_token and user_id:
         from apex.platform import ctrader_link as _link
         _conn = _link.get_ctrader_connection(user_id, ctid=ctid)
         if _conn:
             ct_token = _conn["accessToken"]
-            ct_account = _conn["ctid"]
+            ct_account = _conn.get("ctid") or ct_account or ctid
             # `paper` AND `ctrader_env` ARE DIFFERENT AXES, AND THIS CONFLATED
             # THEM. The bug it caused is the worst kind: it reported success.
             #
