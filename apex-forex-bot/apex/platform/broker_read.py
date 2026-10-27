@@ -209,10 +209,14 @@ def _enrich_positions(broker):
         bid, ask, received_at = _quote(broker, symbol)
         side = str(row.get("side") or "").upper()
         current = bid if side == "BUY" else ask if side == "SELL" else None
-        age = max(0.0, time.time() - float(received_at))
+        # Some cTrader spot frames carry a price but no receive timestamp.
+        # That is an unknown-age quote, not a reason to fail the whole read
+        # (the previous float(None) made dashboard/positions unusable).
+        age = (max(0.0, time.time() - float(received_at))
+               if received_at is not None else None)
         row["currentPrice"] = current
-        row["quoteAgeSec"] = round(age, 1)
-        row["quoteStale"] = age > 30.0
+        row["quoteAgeSec"] = round(age, 1) if age is not None else None
+        row["quoteStale"] = age is None or age > 30.0
 
         stop = row.get("stopLoss")
         target = row.get("takeProfit")

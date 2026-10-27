@@ -92,6 +92,23 @@ def test_stale_quote_is_marked_and_pnl_is_withheld():
     assert row["pnlPips"] is None and row["pnlAccount"] is None
 
 
+def test_quote_without_timestamp_is_unknown_age_not_internal_error():
+    class _NoTimestamp(_Broker):
+        def get_quote(self, symbol):
+            return (*self._quote, None)
+
+    result = read_positions(_NoTimestamp([{
+        "symbol": "EURUSD", "side": "BUY", "units": 1000,
+        "entryPrice": 1.1000, "stopLoss": 1.0950, "takeProfit": None,
+        "positionId": 7,
+    }]))
+    assert result["status"] == "ok"
+    row = result["positions"][0]
+    assert row["quoteAgeSec"] is None
+    assert row["quoteStale"] is True
+    assert row["pnlPips"] is None and row["pnlAccount"] is None
+
+
 def test_pnl_sign_is_correct_for_buy_and_sell():
     positions = [
         {"symbol": "EURUSD", "side": "BUY", "units": 1000,
@@ -153,6 +170,7 @@ if __name__ == "__main__":
         test_no_stop_is_explicitly_unprotected,
         test_failed_quote_never_prices_from_an_old_value,
         test_stale_quote_is_marked_and_pnl_is_withheld,
+        test_quote_without_timestamp_is_unknown_age_not_internal_error,
         test_pnl_sign_is_correct_for_buy_and_sell,
         test_failed_deal_list_is_an_error_not_empty_success,
         test_closed_deals_are_cached_for_sixty_seconds,
