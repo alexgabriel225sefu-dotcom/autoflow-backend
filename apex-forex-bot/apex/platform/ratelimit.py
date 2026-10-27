@@ -64,7 +64,12 @@ _BUCKETS = {
     # Evaluator runs.
     "preview": ("RL_A4T_PREVIEW_PER_MIN", 20, 60),
     # Anything that changes whether money can move.
-    "control": ("RL_A4T_CONTROL_PER_MIN", 20, 60),
+    # Controls are authenticated, fresh-session actions. Keep a bounded
+    # per-user budget, but leave room for a mobile client retrying after a
+    # slow response: a safety Stop must not be stranded behind a handful of
+    # ordinary control retries. The address floor and the fresh auth check
+    # remain in force.
+    "control": ("RL_A4T_CONTROL_PER_MIN", 120, 60),
     # The client's own panic button, on a bucket nothing else spends. It shared
     # "control" with single closes, so a client who had closed twenty positions
     # by hand got 429 on Emergency. Generous: pressing it again is the right

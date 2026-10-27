@@ -38,6 +38,10 @@ def check(name, cond, detail=""):
         _fails.append(f"{name}{(' — ' + detail) if detail else ''}")
         print(f"  FAIL {name} {detail}")
 
+check("control actions leave room for safety retries",
+      RL.LIMITERS["control"].limit >= 60,
+      str(RL.LIMITERS["control"].limit))
+
 
 # ── 1. every route lands in a bucket, and the costly ones in their own ──────
 print("\n[1] routes are classified")
