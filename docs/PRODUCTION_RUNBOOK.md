@@ -271,6 +271,21 @@ hourly schedule and on manual dispatch. It performs only unauthenticated
 - `https://apex4traders-api.onrender.com/readyz`
 - `https://apex4traders-web.onrender.com/`
 
+For a continuously running read-only watcher, run the same script under a
+process supervisor (Render worker, systemd, or an equivalent host):
+
+```bash
+python3 apex-forex-bot/scripts/check_production_health.py --watch --interval 60
+```
+
+`--watch` keeps polling after a failed cycle so the supervisor retains the
+whole outage timeline. The interval is clamped to ten seconds to avoid turning
+the monitor into a source of traffic; 60 seconds is the default and is the
+recommended production setting. The watcher performs only unauthenticated
+`GET` requests and never starts, stops, pauses, resumes, closes or places a
+trade. It monitors service health and deployment drift, not private customer
+order events; those require authenticated, redacted server-side telemetry.
+
 The workflow has `contents: read`, no secrets, no deploy credentials and no
 service write path. Alert delivery is the GitHub Actions failure notification
 for this repository. The owner must watch this repository or configure GitHub

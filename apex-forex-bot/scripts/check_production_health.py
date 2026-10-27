@@ -8,10 +8,12 @@ It never calls an authenticated route and never writes to the services.
 from __future__ import annotations
 
 import json
+import argparse
 import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -23,6 +25,7 @@ WEB_HOME = "https://apex4traders-web.onrender.com/"
 TIMEOUT_SEC = float(os.getenv("A4T_MONITOR_TIMEOUT_SEC", "20"))
 RETRIES = int(os.getenv("A4T_MONITOR_RETRIES", "2"))
 EXPECTED_API_COMMIT = (os.getenv("A4T_EXPECTED_API_COMMIT") or "").strip()
+WATCH_INTERVAL_SEC = max(10.0, float(os.getenv("A4T_MONITOR_INTERVAL_SEC", "60")))
 
 
 @dataclass
@@ -279,8 +282,9 @@ def run() -> list[Result]:
             check_web_stylesheet(), check_auth()]
 
 
-def main() -> int:
-    results = run()
+def _print_results(results: list[Result]) -> bool:
+    """Print one monitor cycle and return whether every check passed."""
+    print(datetime.now(timezone.utc).isoformat(timespec="seconds"), flush=True)
     for result in results:
         prefix = "OK" if result.ok else "FAIL"
         print(f"{prefix} {result.name}: {result.message}")
@@ -289,7 +293,38 @@ def main() -> int:
         if not result.ok:
             # GitHub Actions annotation. Other runners treat it as plain text.
             print(f"::error title={result.name}::{result.message}")
-    return 0 if all(r.ok for r in results) else 1
+    return all(r.ok for r in results)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Read-only Apex4Traders production monitor")
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="run continuously until interrupted (default interval: 60 seconds)",
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=WATCH_INTERVAL_SEC,
+        help="seconds between watch cycles (minimum 10; default: %(default)s)",
+    )
+    args = parser.parse_args(argv)
+    interval = max(10.0, args.interval)
+
+    if not args.watch:
+        return 0 if _print_results(run()) else 1
+
+    # Watch mode deliberately keeps running after a failed cycle so an
+    # external supervisor can collect a complete outage timeline. It never
+    # calls a write endpoint; stop it with Ctrl-C or the process supervisor.
+    try:
+        while True:
+            _print_results(run())
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("monitor stopped", flush=True)
+        return 0
 
 
 if __name__ == "__main__":

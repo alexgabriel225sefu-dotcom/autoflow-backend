@@ -194,6 +194,15 @@ check("no POST/PUT/PATCH/DELETE request method is configured",
       all(verb not in src for verb in ('method="post"', 'method="put"', 'method="patch"', 'method="delete"')),
       "write verb found")
 
+print("\n[6] watch mode is bounded and remains read-only")
+check("watch interval has a ten-second floor", "max(10.0, args.interval)" in src,
+      "watch interval is not clamped")
+check("watch mode is documented in the CLI", "--watch" in src and "--interval" in src,
+      "watch flags missing")
+check("watch mode does not add authenticated or write routes",
+      "Authorization".lower() not in src and "method=\"post\"" not in src,
+      "unexpected credential or write path found")
+
 if fails:
     print("FAILED:")
     for f in fails:
