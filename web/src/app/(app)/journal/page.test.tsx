@@ -65,6 +65,12 @@ const CONFIRMED: JournalEntry = {
   },
 };
 
+const LEGACY_ENGINE_REFUSAL: JournalEntry = {
+  entryId: "e3", kind: "control", status: "broker_error", ts: 1760000002,
+  symbol: null, accountId: "901", ruleDocId: null, correlationId: "c3",
+  error: "the engine refused to start this loop (the starter returned a refusal)",
+};
+
 function page(entries: JournalEntry[]) {
   routes = {
     journal: {
@@ -144,6 +150,16 @@ describe("an executed row is not dressed as a signal", () => {
     const text = row();
     expect(text).not.toContain("Signal only");
     expect(text).not.toContain("No order placed");
+  });
+});
+
+describe("legacy engine refusals", () => {
+  it("shows Engine error instead of blaming the broker", async () => {
+    page([LEGACY_ENGINE_REFUSAL]);
+    await show();
+    expect(row()).toContain("Engine error");
+    expect(row()).not.toContain("Broker Error");
+    expect(row()).toContain("the engine refused to start this loop");
   });
 });
 

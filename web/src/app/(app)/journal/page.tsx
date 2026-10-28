@@ -4,6 +4,7 @@ import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { When } from "@/components/app/table";
 import { humanise } from "@/components/app/rule-summary";
+import { plainDecision } from "@/components/app/plain";
 import type { JournalEntry, JournalPage } from "@/lib/api";
 
 const STATUSES = [
@@ -101,10 +102,13 @@ export default function JournalView() {
             <div className="records">
               {r.result.data.entries.map((e) => (
                 <article className="record" key={e.entryId}>
+                  {(() => {
+                    const plain = plainDecision(e);
+                    return (
                   <div className="record-head">
                     <span className="record-title">
                       <span className={tone(e)}>
-                        {e.decision?.verdict ?? humanise(e.status ?? e.kind)}
+                        {e.decision?.verdict ?? plain.label}
                       </span>
                       {e.symbol ? <span className="muted"> · {e.symbol}</span> : null}
                     </span>
@@ -112,7 +116,7 @@ export default function JournalView() {
                   </div>
 
                   <p className="muted" style={{ fontSize: ".82rem" }}>
-                    {e.error ?? e.decision?.reason ?? humanise(e.status ?? e.kind)}
+                    {plain.detail ?? e.decision?.reason ?? e.error ?? humanise(e.status ?? e.kind)}
                   </p>
 
                   {/* At Signals Only the client places the trade, so the level
@@ -174,6 +178,8 @@ export default function JournalView() {
                       <span className="pill pill-muted mono">#{e.accountId}</span>
                     ) : null}
                   </div>
+                    );
+                  })()}
                 </article>
               ))}
             </div>

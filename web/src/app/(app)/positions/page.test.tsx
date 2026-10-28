@@ -36,9 +36,14 @@ vi.mock("@/lib/use-api", () => ({
   whenSynced: () => "just now",
 }));
 
-import PositionsPage from "./page";
+import PositionsPage, { positionOpenTimeSeconds } from "./page";
 
 describe("positions read", () => {
+  it("normalises cTrader milliseconds and refuses an impossible old timestamp", () => {
+    expect(positionOpenTimeSeconds(1_761_600_000_000)).toBe(1_761_600_000);
+    expect(positionOpenTimeSeconds(760_000_000)).toBeNull();
+  });
+
   it("shows stale and unprotected values without offering a close action", () => {
     reads.length = 0;
     dealsFailure = false;

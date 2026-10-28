@@ -7,6 +7,19 @@ import { DataTable, Num, Side, When } from "@/components/app/table";
 import { PositionDetail } from "@/components/app/position-detail";
 import type { ClosedTrade, DealsRead, Position, PositionsRead } from "@/lib/api";
 
+/** cTrader has used both second and millisecond epochs across read paths.
+ * Reject dates outside the lifetime of the product instead of showing a
+ * misleading 1994 (or an invalid future date) when a broker sends a malformed
+ * timestamp. */
+export function positionOpenTimeSeconds(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  const raw = Number(value);
+  const seconds = raw > 100_000_000_000 ? raw / 1000 : raw;
+  const now = Date.now() / 1000;
+  if (seconds < 946_684_800 || seconds > now + 86_400) return null;
+  return seconds;
+}
+
 function currentCell(p: Position) {
   if (p.quoteStale) return <><Num value={null} /> <span className="dim">stale</span></>;
   return <Num value={p.currentPrice} />;
@@ -40,7 +53,10 @@ function positionColumns(onDetails: (p: Position) => void) {
   { key: "target", header: "Target", num: true, cell: targetCell },
   { key: "pnl-pips", header: "P&L (pips)", num: true, cell: (p: Position) => pnlCell(p.pnlPips, p.pnlIsEstimate) },
   { key: "pnl-account", header: "P&L (account)", num: true, cell: (p: Position) => pnlCell(p.pnlAccount, p.pnlIsEstimate) },
-  { key: "opened", header: "Opened", cell: (p: Position) => p.openTime == null ? <Num value={null} /> : <When ts={p.openTime} /> },
+  { key: "opened", header: "Opened", cell: (p: Position) => {
+    const ts = positionOpenTimeSeconds(p.openTime);
+    return ts == null ? <Num value={null} /> : <When ts={ts} />;
+  } },
   { key: "id", header: "Position ID", cell: (p: Position) => <span className="dim">{p.positionId}</span> },
   { key: "details", header: "Details", cell: (p: Position) => <button className="btn btn-ghost btn-sm" onClick={() => onDetails(p)}>View details</button> },
  ];
