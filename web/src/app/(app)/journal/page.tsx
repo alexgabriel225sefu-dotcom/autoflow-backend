@@ -100,11 +100,10 @@ export default function JournalView() {
             {/* The journal is a record, not a grid of numbers: each entry gets
                 the room to say what was decided and why, on both widths. */}
             <div className="records">
-              {r.result.data.entries.map((e) => (
-                <article className="record" key={e.entryId}>
-                  {(() => {
-                    const plain = plainDecision(e);
-                    return (
+              {r.result.data.entries.map((e) => {
+                const plain = plainDecision(e);
+                return (
+                  <article className="record" key={e.entryId}>
                   <div className="record-head">
                     <span className="record-title">
                       <span className={tone(e)}>
@@ -178,10 +177,9 @@ export default function JournalView() {
                       <span className="pill pill-muted mono">#{e.accountId}</span>
                     ) : null}
                   </div>
-                    );
-                  })()}
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
 
             <div className="btn-row" style={{ marginTop: ".85rem" }}>
