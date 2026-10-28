@@ -2118,6 +2118,59 @@ body {
 @media (max-width: 1023px) { .trade-bar { bottom: calc(var(--a4t-bottomnav) + var(--sp-3)); } }
 @media (prefers-reduced-motion: reduce) { .chip, .strat { transition: none; } }
 
+/* Trade controls use the visual language of a trading terminal rather than
+   a collection of floating pills. The shared status chips above the page are
+   intentionally untouched; these rules only apply to the setup controls. */
+.trade .step-no {
+  width: 1.65rem; height: 1.65rem; border-radius: .45rem;
+  background: var(--a4t-accent-wash); color: var(--a4t-accent-strong);
+  border: 1px solid color-mix(in srgb, var(--a4t-accent) 48%, var(--a4t-line));
+  font-size: .72rem; letter-spacing: .02em;
+}
+.trade .chip {
+  min-height: 40px; padding: 0 .9rem; border-radius: .65rem;
+  background: color-mix(in srgb, var(--a4t-bg-2) 74%, transparent);
+  border-color: color-mix(in srgb, var(--a4t-line) 86%, var(--a4t-muted));
+  font-size: .82rem; letter-spacing: .005em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+.trade .chip:hover {
+  background: var(--a4t-surface-2); border-color: var(--a4t-muted);
+  transform: translateY(-1px);
+}
+.trade .chip[aria-checked="true"],
+.trade .chip[aria-selected="true"] {
+  position: relative; background: var(--a4t-accent-wash); color: var(--a4t-text);
+  border-color: var(--a4t-accent); box-shadow: inset 3px 0 0 var(--a4t-accent), 0 6px 18px -14px var(--a4t-accent);
+}
+.trade .chip[aria-checked="true"]::before,
+.trade .chip[aria-selected="true"]::before {
+  content: ""; width: .35rem; height: .35rem; margin-right: .45rem;
+  border-radius: 50%; background: var(--a4t-accent); box-shadow: 0 0 8px var(--a4t-accent);
+}
+.trade .chip-input { border-radius: .65rem !important; }
+.trade .strat {
+  border-radius: .8rem; background: var(--a4t-bg-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+.trade .strat:hover { border-color: color-mix(in srgb, var(--a4t-line) 50%, var(--a4t-muted)); }
+.trade .strat[data-chosen="true"] {
+  border-color: var(--a4t-accent); background: var(--a4t-accent-wash);
+  box-shadow: inset 3px 0 0 var(--a4t-accent);
+}
+.trade .level {
+  border-radius: .8rem; background: var(--a4t-bg-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+.trade .level:hover { border-color: var(--a4t-muted); background: var(--a4t-surface-2); }
+.trade .level[aria-checked="true"] {
+  border-color: var(--a4t-accent); background: var(--a4t-accent-wash);
+  box-shadow: inset 3px 0 0 var(--a4t-accent);
+}
+.trade .btn { border-radius: .65rem; box-shadow: none; }
+.trade .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px -14px var(--a4t-accent); }
+.trade-bar { border-radius: .9rem; backdrop-filter: blur(14px); }
+
 /* ── landing: the mark behind the hero, the partner strip, hairline rails ─
    Pointer-spotlight cells follow the pattern of the 21st.dev feature grids.
    The light is two custom properties set on the hovered cell by
