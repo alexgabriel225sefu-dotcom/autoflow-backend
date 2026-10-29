@@ -104,6 +104,18 @@ CTRADER_REDIRECT_URI  = os.getenv("CTRADER_REDIRECT_URI", "").strip()
 # Zero — the default — keeps plain MARKET orders and changes nothing.
 CTRADER_MAX_SLIPPAGE_POINTS = int(os.getenv("CTRADER_MAX_SLIPPAGE_POINTS") or 0)
 
+# LIVE accounts only: the ceiling used when CTRADER_MAX_SLIPPAGE_POINTS is not
+# set. A plain MARKET order on real money has no opinion about price, so live
+# never goes out without a range. 50 points is 5 pips on a 5-digit FX pair and
+# $0.50 on gold — wide enough not to refuse ordinary fills, narrow enough to
+# refuse a news-spike fill half a stop away. Demo keeps the zero default above.
+# A non-positive override is ignored: this can be tuned, not switched off.
+try:
+    _live_slip = int(os.getenv("CTRADER_MAX_SLIPPAGE_POINTS_LIVE") or 0)
+except ValueError:
+    _live_slip = 0
+CTRADER_MAX_SLIPPAGE_POINTS_LIVE = _live_slip if _live_slip > 0 else 50
+
 # The MetaTrader bridge, Twelve Data and MetaAPI settings used to be declared
 # here. Their brokers are refused by _resolve_broker() above and unreachable
 # through apex.brokers.get_broker(), so a credential in the production config

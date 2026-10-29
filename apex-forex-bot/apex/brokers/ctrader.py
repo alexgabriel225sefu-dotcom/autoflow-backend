@@ -77,6 +77,54 @@ except Exception as e:  # pragma: no cover - import guard
     _SDK_OK = False
     _SDK_ERR = str(e)
 
+# Every order this engine sends carries this label (ProtoOANewOrderReq.label,
+# echoed back as ProtoOATradeData.label). It is how the engine tells its own
+# positions from ones the client opened by hand — the weekend flatten closes
+# only the former. Short, constant, no account data.
+ENGINE_ORDER_LABEL = "apex-engine"
+
+
+def effective_slippage_points(broker_cfg=None):
+    """Slippage ceiling (points) for an order on this account.
+
+    An explicit CTRADER_MAX_SLIPPAGE_POINTS always wins. Without one, a LIVE
+    account gets CTRADER_MAX_SLIPPAGE_POINTS_LIVE and a demo account stays at
+    0 (plain MARKET, as before).
+    """
+    explicit = int(getattr(cfg, "CTRADER_MAX_SLIPPAGE_POINTS", 0) or 0)
+    if explicit > 0:
+        return explicit
+    env = str(getattr(broker_cfg, "CTRADER_ENV", "") or "").strip().lower()
+    if env == "live":
+        return int(getattr(cfg, "CTRADER_MAX_SLIPPAGE_POINTS_LIVE", 50) or 50)
+    return 0
+
+
+def _relative_points(side, ref_price, target, digits, kind):
+    """A protocol relative SL/TP distance, or None when it cannot be stated.
+
+    ProtoOANewOrderReq.relativeStopLoss / relativeTakeProfit are int64
+    distances in 1/100000 of a price unit, applied from the fill price (BUY:
+    SL below, TP above; SELL the reverse). The broker refuses one that is not a
+    whole number of the symbol's ticks, so it is rounded to `digits` first. A
+    target on the wrong side of the reference is never encoded.
+    """
+    try:
+        ref, tgt, dg = float(ref_price), float(target), int(digits)
+    except (TypeError, ValueError):
+        return None
+    if ref <= 0 or tgt <= 0 or dg < 0 or dg > 5:
+        return None
+    below = (side == "BUY") == (kind == "sl")
+    dist = (ref - tgt) if below else (tgt - ref)
+    if dist <= 0:
+        return None
+    pts = int(round(round(dist, dg) * 100_000))
+    step = 10 ** (5 - dg)
+    pts = (pts // step) * step
+    return pts if pts > 0 else None
+
+
 # Live + demo proxy endpoints (protobuf, port 5035, TLS required).
 _HOST = {"live": "live.ctraderapi.com", "demo": "demo.ctraderapi.com"}
 _PORT = 5035
@@ -1327,13 +1375,18 @@ class CtraderBroker:
         # cannot be read, the order stays MARKET: sending MARKET_RANGE without
         # a base price would let the broker choose the reference itself, which
         # is the protection removed while appearing to be present.
-        _slip = int(getattr(cfg, "CTRADER_MAX_SLIPPAGE_POINTS", 0) or 0)
-        if _slip > 0:
+        req.label = ENGINE_ORDER_LABEL
+        # The side we would cross — ask to buy, bid to sell. Read once; it is
+        # the reference for both the slippage range and the relative SL/TP.
+        _base = 0.0
+        _slip = effective_slippage_points(self._c)
+        if _slip > 0 or sl or tp:
             try:
                 _bid, _ask = self.get_bid_ask(instrument)
                 _base = float(_ask if side == "BUY" else _bid)
             except Exception:
                 _base = 0.0
+        if _slip > 0:
             if _base > 0:
                 req.orderType = ProtoOAOrderType.MARKET_RANGE
                 req.slippageInPoints = _slip
@@ -1341,11 +1394,32 @@ class CtraderBroker:
             else:
                 print(f"[cTrader] no quote for {sym} — sending MARKET without "
                       f"a slippage ceiling")
-        # NOTE: we do NOT put relativeStopLoss/TP on the order — its 1e-5 unit
-        # doesn't match every instrument's tick size (gold moves in 0.01, so
-        # the relative value fails 'invalid precision'). Instead the position
-        # is amended with ABSOLUTE prices (rounded to the symbol's digits)
-        # immediately after the fill, then verified — see below.
+        # SL/TP ON THE ORDER. The protocol does not accept an absolute
+        # stopLoss/takeProfit on a MARKET order, but it does accept
+        # relativeStopLoss/relativeTakeProfit (ProtoOANewOrderReq fields 19
+        # and 20, int64, 1/100000 of a price unit, applied from the fill).
+        # They used to be left off because a raw 1e-5 distance is not a whole
+        # number of ticks on gold ("invalid precision"); `_relative_points`
+        # rounds to the symbol's digits, which is what the broker checks. So
+        # the position is protected from the moment it exists, instead of one
+        # amend round trip later. The absolute amend below still runs: it
+        # moves the stop to the exact intended price and is the fallback when
+        # these fields could not be stated.
+        _rel_set = False
+        if _base > 0 and (sl or tp):
+            try:
+                _dg = self._digits(instrument)
+            except Exception:
+                _dg = None
+            if _dg is not None:
+                _rsl = _relative_points(side, _base, sl, _dg, "sl") if sl else None
+                _rtp = _relative_points(side, _base, tp, _dg, "tp") if tp else None
+                if _rsl:
+                    req.relativeStopLoss = _rsl
+                    _rel_set = True
+                if _rtp:
+                    req.relativeTakeProfit = _rtp
+                    _rel_set = True
         try:
             res = self._conn()._request(
                 req, ProtoOAExecutionEvent, timeout=20,
@@ -1354,11 +1428,32 @@ class CtraderBroker:
             print(f"[cTrader] order failed {side} {units} {sym}: {e}")
             raise
         execution_error = str(getattr(res, "errorCode", "") or "").strip()
+        _et = _exec_name(getattr(res, "executionType", None))
+        if _rel_set and (execution_error or _et in (
+                "ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED")):
+            # An EXPLICIT refusal: nothing filled, so a resend cannot double
+            # the position (a timeout raised above and is never resent). The
+            # broker may dislike the stated distances (minimum stop distance,
+            # precision) where it would accept the plain order plus the amend
+            # that protected every trade before this change. Once, loudly.
+            print(f"[cTrader] {sym}: order with SL/TP attached was refused "
+                  f"({execution_error or _et}) — resending once without "
+                  f"them; the post-fill amend will attach the stop")
+            req.ClearField("relativeStopLoss")
+            req.ClearField("relativeTakeProfit")
+            try:
+                res = self._conn()._request(
+                    req, ProtoOAExecutionEvent, timeout=20,
+                    accept=_is_terminal_execution)
+            except Exception as e:
+                print(f"[cTrader] order failed {side} {units} {sym}: {e}")
+                raise
+            execution_error = str(getattr(res, "errorCode", "") or "").strip()
+            _et = _exec_name(getattr(res, "executionType", None))
         if execution_error:
             err = f"cTrader order error: {execution_error}"
             print(f"[cTrader] order failed {side} {units} {sym}: {err}")
             raise RuntimeError(err)
-        _et = _exec_name(getattr(res, "executionType", None))
         if _et in ("ORDER_REJECTED", "ORDER_CANCELLED", "ORDER_EXPIRED"):
             err = f"cTrader rejected the order: {_et}"
             print(f"[cTrader] order failed {side} {units} {sym}: {err}")
@@ -1454,11 +1549,22 @@ class CtraderBroker:
                 # this real open+forced-close round trip (and its P&L) never
                 # reached the trade log or the user. Return it as a completed
                 # trade instead so the caller can price and report it.
+                print(f"[cTrader] CRITICAL {sym}: no stop-loss could be "
+                      f"attached — safety-closing the position now")
                 close_res, close_err = None, None
-                try:
-                    close_res = self.close_position(instrument)
-                except Exception as ce:
-                    close_err = ce
+                for _ctry in range(3):
+                    if _ctry:
+                        time.sleep(0.5 * _ctry)
+                    close_err = None
+                    try:
+                        close_res = self.close_position(instrument)
+                    except Exception as ce:
+                        close_err = ce
+                        close_res = None
+                    if close_err is None and close_res:
+                        break
+                    print(f"[cTrader] CRITICAL {sym}: safety close attempt "
+                          f"{_ctry + 1}/3 failed ({close_err})")
                 if close_err is not None or not close_res:
                     # The safety close ITSELF failed. Swallowing this and
                     # still returning SAFETY_CLOSED was the worst reachable
@@ -1466,9 +1572,9 @@ class CtraderBroker:
                     # broker with NO stop-loss attached, reported upstream as
                     # safely closed — so nothing retried it and nothing told
                     # the client. Name it for what it is.
-                    print(f"[cTrader] {sym}: stop-loss attach failed AND the "
-                          f"safety close failed ({close_err}) — position is "
-                          f"OPEN AND UNPROTECTED")
+                    print(f"[cTrader] CRITICAL {sym}: stop-loss attach failed "
+                          f"AND the safety close failed 3 times ({close_err}) — "
+                          f"position is OPEN AND UNPROTECTED")
                     return {"orderId": str(getattr(res.order, "orderId", "")),
                             "status": "UNPROTECTED", "fillPrice": fill,
                             "reason": "the broker rejected the stop-loss and the "
