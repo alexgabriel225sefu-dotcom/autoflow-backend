@@ -102,7 +102,21 @@ _BUCKETS = {
     "addr": ("RL_A4T_ADDR_PER_MIN", 600, 60),
     # The same, for the routes that move money or change what can.
     "addr_control": ("RL_A4T_ADDR_CONTROL_PER_MIN", 120, 60),
+    # PER NETWORK ADDRESS, counted only when a bearer token has to be checked
+    # with Supabase (a cache miss). The address floors above still let one
+    # address spend 600 Supabase lookups a minute with invented tokens; this
+    # is the budget for the lookups themselves. See api._authenticate.
+    "addr_verify": ("RL_A4T_ADDR_VERIFY_PER_MIN", 120, 60),
+    # Erasing an account. Strict: it is rare, irreversible, and expensive (it
+    # scans the store for every key the account owns).
+    "account_delete": ("RL_A4T_ACCOUNT_DELETE_PER_HOUR", 5, 3600),
+    # Exporting an account. Reads everything the account owns in one go.
+    "account_export": ("RL_A4T_ACCOUNT_EXPORT_PER_HOUR", 10, 3600),
 }
+
+# The bucket name a refusal carries when the limiter itself failed on a route
+# that fails closed. Not a configured bucket: nothing is counted under it.
+UNAVAILABLE = "unavailable"
 
 
 def _mk(name):
@@ -184,6 +198,10 @@ def classify(method, route):
     if route.startswith("automation"):
         # A GET of the automation state is a poll, not a control action.
         return "control" if method != "GET" else "default"
+    if route == "account" and method == "DELETE":
+        return "account_delete"
+    if route == "account/export":
+        return "account_export"
     return "default"
 
 
@@ -210,15 +228,36 @@ def key_for(client_key, auth_header):
 # real client's panic button answering 429. The emergency route is still under
 # the generic address floor and its own per-token bucket; what it gives up is
 # the tighter per-address ceiling the other money routes carry.
-_MONEY_BUCKETS = ("control", "oauth", "activate")
+_MONEY_BUCKETS = ("control", "oauth", "activate", "account_delete")
+
+# Mutating routes that still FAIL OPEN when the limiter itself breaks.
+#   emergency  the client's panic button. Refusing a safety stop because the
+#              limiter threw is worse than the hole failing closed would close.
+#   webhook    the payment provider. Unauthenticated and signature-checked;
+#              refusing it leaves a paying client unprovisioned.
+_FAIL_OPEN_WRITES = ("emergency", "webhook")
+
+
+def _fails_closed(method, bucket):
+    """Whether a limiter FAILURE refuses this request.
+
+    Reads stay lenient: a limiter bug must not become an outage of the
+    dashboard. Writes that change what can happen to money do not: a limiter
+    that answers "allowed" whenever it throws is no ceiling at all on exactly
+    the routes a flood aims at.
+    """
+    if (method or "GET").upper() in ("GET", "HEAD", "OPTIONS"):
+        return False
+    return bucket not in _FAIL_OPEN_WRITES
 
 
 def check(method, route, *, client_key=None, auth_header=None):
     """(allowed, bucket, retry_after_seconds).
 
-    `allowed` is True when the request may proceed. It is also True when the
-    limiter cannot decide, because refusing on an internal failure would turn
-    a bug in the limiter into an outage of the platform.
+    When the limiter itself fails, a read is allowed (a limiter bug must not
+    become an outage) and a mutating route is refused with the bucket
+    `UNAVAILABLE`, except the emergency stop and the payment webhook — see
+    `_FAIL_OPEN_WRITES`.
     """
     bucket = classify(method, route)
     limiter = LIMITERS.get(bucket) or LIMITERS["default"]
@@ -246,6 +285,8 @@ def check(method, route, *, client_key=None, auth_header=None):
             # far better than not counting. /readyz reports the degradation.
             ok = limiter.check(key)
     except Exception:
+        if _fails_closed(method, bucket):
+            return False, UNAVAILABLE, 5
         # A bug in the limiter must not become an outage of the platform.
         return True, bucket, 0
     return bool(ok), bucket, (0 if ok else _seconds_until_reset(limiter.window_s))
@@ -272,8 +313,18 @@ def refusal(bucket, retry_after):
     The seconds go in the MESSAGE as well as the field, because the field is
     only as useful as the clients that read it, and the message is what every
     surface already displays.
+
+    A limiter that FAILED on a fail-closed route answers 503 with its own
+    code: the client did nothing wrong, and a 429 would tell them they had.
     """
-    wait = (f"wait {int(retry_after)}s and try again" if retry_after
+    if bucket == UNAVAILABLE:
+        return 503, {"ok": False, "error": {
+            "code": "RATE_LIMIT_UNAVAILABLE",
+            "message": "this action is briefly unavailable — try again in a "
+                       "few seconds",
+            "retryAfterSec": retry_after,
+        }}
+    wait =(f"wait {int(retry_after)}s and try again" if retry_after
             else "try again shortly")
     return 429, {"ok": False, "error": {
         "code": "RATE_LIMITED",
@@ -328,13 +379,14 @@ def _shared_check(key, limit, window_s):
     return n <= limit
 
 
-def check_user(bucket, user_id):
+def check_user(bucket, user_id, *, fail_closed=False):
     """(allowed, retry_after_seconds) for a VERIFIED user id.
 
     Called by a route after authentication, for the few routes where the work
     done per request is large enough that a per-session limit can be multiplied
-    by opening more sessions. Like `check`, a failure of the limiter itself
-    allows: the limiter must not become the outage.
+    by opening more sessions. A failure of the limiter itself allows unless
+    `fail_closed`: the emergency stop must not be refused by a limiter bug,
+    while erasing an account can wait a few seconds.
     """
     lim = LIMITERS.get(bucket)
     if lim is None or not user_id:
@@ -347,7 +399,7 @@ def check_user(bucket, user_id):
         if ok is None:
             ok = lim.check(key)
     except Exception:
-        return True, 0
+        return (False, 5) if fail_closed else (True, 0)
     return bool(ok), (0 if ok else _seconds_until_reset(lim.window_s))
 
 
