@@ -4611,16 +4611,22 @@ def _loop(user_id, alert_fn, gen=None):
                             _would = forex.floor_risk_at(units, symbol, price,
                                                          stop_pips_eff)
                             if _would > _budget * 1.10:
+                                _ml_pct = (round(_would / sizing_balance * 100, 2)
+                                           if sizing_balance else None)
+                                _ml_line = forex.order_line(
+                                    symbol, action, units, sl_price, tp_price,
+                                    _would, _ml_pct)
                                 dash["minLotNotice"] = {
                                     "symbol": symbol, "units": units,
                                     "riskUsd": round(_would, 2),
-                                    "pct": round(_would / sizing_balance * 100, 2)
-                                    if sizing_balance else None,
-                                    "targetUsd": round(_budget, 2)}
+                                    "pct": _ml_pct,
+                                    "targetUsd": round(_budget, 2),
+                                    "orderLine": _ml_line}
                                 print(f"[UserLoop:{user_id}] {symbol}: broker minimum "
                                       f"{units:g} {forex.unit_label(symbol)} risks "
                                       f"${_would:.2f} vs the ${_budget:.2f} target "
-                                      f"— allowed, under the daily-loss limit")
+                                      f"— allowed, under the daily-loss limit "
+                                      f"[{_ml_line}]")
                         except Exception:
                             pass
                 if not entry_ok:
@@ -4679,6 +4685,22 @@ def _loop(user_id, alert_fn, gen=None):
                     if _skip_exec:
                         entry_ok = False
                     else:
+                        # THE order line: what this entry is about to risk,
+                        # stated once, in the log and in the journal below.
+                        _risk_usd, _risk_pct = 0.0, None
+                        try:
+                            _risk_usd, _risk_pct = forex.entry_risk(
+                                units, symbol, price, stop_pips_eff,
+                                paper_balance or sizing_balance)
+                            _risk_usd = round(_risk_usd, 2)
+                            _risk_pct = (round(_risk_pct, 3)
+                                         if _risk_pct is not None else None)
+                        except Exception:
+                            pass
+                        _order_line = forex.order_line(
+                            symbol, action, units, sl_price, tp_price,
+                            _risk_usd, _risk_pct)
+                        print(f"[UserLoop:{user_id}] ORDER {_order_line}")
                         try:
                             from apex import control as _ctl
                             _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
@@ -4719,6 +4741,9 @@ def _loop(user_id, alert_fn, gen=None):
                                 strategy_version=signal.get("strategy_version"),
                                 payload={"side": action, "units": units,
                                          "sl": sl_price, "tp": tp_price,
+                                         "riskUsd": _risk_usd,
+                                         "riskPct": _risk_pct,
+                                         "orderLine": _order_line,
                                          "reason": getattr(_decision, "reason", None),
                                          "detail": str(getattr(_decision, "detail", ""))[:200],
                                          "rid": _rid})
@@ -4759,6 +4784,9 @@ def _loop(user_id, alert_fn, gen=None):
                                                 strategy_version=signal.get("strategy_version"),
                                                 payload={"side": action, "units": units,
                                                          "sl": sl_price, "tp": tp_price,
+                                                         "riskUsd": _risk_usd,
+                                                         "riskPct": _risk_pct,
+                                                         "orderLine": _order_line,
                                                          "rid": _rid})
                                 except Exception as _e3:
                                     print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")

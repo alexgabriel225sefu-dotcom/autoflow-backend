@@ -287,6 +287,23 @@ def daily_loss_headroom_usd(start_balance: float, limit_pct: float,
     return max(0.0, start_balance * (abs(limit_pct) / 100.0) + (daily_pnl or 0.0))
 
 
+def entry_risk(units: float, instrument: str, price: float, stop_pips: float,
+               balance: float):
+    """(dollars lost if the stop is hit, that as % of `balance` or None)."""
+    usd = floor_risk_at(units, instrument, price, stop_pips)
+    pct = (usd / balance * 100.0) if balance and balance > 0 else None
+    return usd, pct
+
+
+def order_line(symbol, side, units, sl, tp, risk_usd, risk_pct) -> str:
+    """The one line that says what an entry is about to risk."""
+    def _px(v):
+        return "none" if v is None else f"{float(v):g}"
+    pct = "n/a" if risk_pct is None else f"{float(risk_pct):.2f}%"
+    return (f"{side} {symbol} units={float(units):g} SL={_px(sl)} TP={_px(tp)} "
+            f"risk=${float(risk_usd or 0.0):.2f} ({pct} of balance)")
+
+
 _LIVE_RISK_CAP_FALLBACK = 1.0
 
 
