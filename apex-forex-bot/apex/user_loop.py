@@ -4680,8 +4680,20 @@ def _loop(user_id, alert_fn, gen=None):
                             price = round(_ra if action == "BUY" else _rb, 6)
                             sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
                             tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
-                    except Exception:
-                        pass
+                    except Exception as _spread_err:
+                        # The re-check itself failed (no quote, bad numbers).
+                        # This used to be a bare `pass`, i.e. send with no
+                        # spread check at all. Live money is not sent blind;
+                        # demo keeps going, but now it says so.
+                        if _is_live_cfg(cfg):
+                            _skip_exec = True
+                            _skip(f"spread could not be re-checked before exec "
+                                  f"({type(_spread_err).__name__}) — live order "
+                                  f"not sent")
+                        else:
+                            print(f"[UserLoop:{user_id}] spread re-check failed "
+                                  f"for {symbol} ({_spread_err}) — demo: sending "
+                                  f"without it")
                     if _skip_exec:
                         entry_ok = False
                     else:
@@ -5195,6 +5207,34 @@ def _alert_fn_for(user_id, alert_fn):
         return alert_fn
 
 
+def _start_fence_required(user_id):
+    """(must this loop hold a lease to start?, why) — for a None lease.
+
+    Required on a LIVE account (platform selection or the legacy record), and
+    in production whenever the mode cannot be read: an account nobody can show
+    to be demo is not evidence of safety. Read from stored state only — no
+    broker call on the start path.
+    """
+    prod = str(os.getenv("APP_ENV", "")).strip().lower() == "production"
+    try:
+        from apex.platform import ctrader_link as _cl
+        pmode = _cl.selected_mode(user_id)
+    except Exception as e:                                  # noqa: BLE001
+        pmode = f"unreadable ({type(e).__name__})"
+    if pmode is not None:
+        if pmode == "demo":
+            return False, "a platform demo account"
+        if pmode == "live":
+            return True, "a platform LIVE account"
+        return prod, f"a platform account whose mode is {pmode}"
+    mode = _mode_of(user_id)
+    if mode == "live":
+        return True, "a LIVE account"
+    if mode in ("demo", "simulation"):
+        return False, f"a {mode} account"
+    return prod, "an account whose mode cannot be read"
+
+
 def start(user_id, alert_fn=None):
     user_id = str(user_id)
     alert_fn = _alert_fn_for(user_id, alert_fn)
@@ -5212,9 +5252,23 @@ def start(user_id, alert_fn=None):
     # the old and new containers, and without this both start a loop for the
     # same cTrader account — the generation token below cannot see the other
     # process. None means no shared backend: uncontended, so carry on.
-    if ownership.acquire(user_id) is False:
+    _lease = ownership.acquire(user_id)
+    if _lease is False:
         print(f"[UserLoop] REFUSED start for {user_id}: another instance owns it")
         return False
+    if _lease is None:
+        # No shared backend: nothing fences this loop against a second
+        # container. Tolerable on demo; on real money two engines managing
+        # one account is worse than a loop that waits for Redis to come back
+        # (the watchdog retries).
+        _fence, _why = _start_fence_required(user_id)
+        if _fence:
+            print(f"[UserLoop] REFUSED start for {user_id}: no ownership lease "
+                  f"backend and this is {_why} — a live loop never runs "
+                  f"unfenced")
+            return False
+        print(f"[UserLoop] WARNING {user_id}: no ownership lease backend — "
+              f"starting UNFENCED ({_why})")
     # Renew on a thread of its own, not from the trading tick.
     ownership.start_renewer(user_id, on_lost=ownership.mark_lost)
 
