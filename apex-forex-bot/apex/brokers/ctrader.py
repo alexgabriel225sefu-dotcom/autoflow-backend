@@ -1194,6 +1194,10 @@ class CtraderBroker:
             # wire message actually defines; do not infer broker state.
             if td.HasField("openTimestamp"):
                 row["openTime"] = td.openTimestamp
+            if td.HasField("label"):
+                # ENGINE_ORDER_LABEL on positions this engine opened; any other
+                # value (or none) is how a manual trade is told apart.
+                row["label"] = td.label
             if p.HasField("swap"):
                 digits = getattr(p, "moneyDigits", 0) or 2
                 row["swap"] = p.swap / (10 ** digits)

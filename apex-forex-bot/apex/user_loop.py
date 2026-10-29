@@ -466,6 +466,38 @@ def _is_live_cfg(cfg):
         return False
 
 
+def _engine_positions(rows, entry_meta, tracked_ids=(), user_id=None):
+    """(positions this engine opened, symbols of the ones it did not).
+
+    The weekend flatten used to close EVERY broker position, including trades
+    the client opened by hand. Evidence, strongest first: the engine's order
+    label; any other label means not ours; no label (opened before labels
+    existed) counts as ours only when the engine holds its entry record for
+    that symbol or it is the position the loop is tracking. What cannot be
+    shown to be the engine's is left open and reported, never guessed closed.
+    """
+    try:
+        from apex.brokers.ctrader import ENGINE_ORDER_LABEL as _lbl
+    except Exception:
+        _lbl = "apex-engine"
+    metas = {_nrm(k) for k in (entry_meta or {})}
+    tracked = {str(t) for t in (tracked_ids or ()) if t is not None}
+    owned, left = [], []
+    for r in rows or []:
+        label = r.get("label")
+        sym = r.get("symbol")
+        if label:
+            mine = label == _lbl
+        else:
+            mine = (_nrm(sym) in metas
+                    or str(r.get("positionId")) in tracked)
+        (owned if mine else left).append(r if mine else sym)
+    if left and user_id is not None:
+        print(f"[UserLoop:{user_id}] weekend: leaving {sorted(set(left))} "
+              f"open — not opened by the engine")
+    return owned, left
+
+
 def _already_journaled(journal, row):
     """True if this exact close is already in the journal.
 
@@ -3426,7 +3458,7 @@ def _loop(user_id, alert_fn, gen=None):
                     alert_fn(user_id, {"action": "WEEKEND_REOPEN", "symbol": symbol})
 
             if in_weekend_window:
-                # Flatten EVERY open position, then report what ACTUALLY
+                # Flatten every ENGINE position, then report what ACTUALLY
                 # happened. This block used to announce "any open position was
                 # closed" before attempting anything, close only the FOCUSED
                 # symbol, and swallow a broker failure with a bare `pass` while
@@ -3434,7 +3466,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # account: the client is told they are flat for the weekend
                 # while the position sits open at the broker, carrying exactly
                 # the Sunday-gap risk this feature exists to remove.
-                _wk_targets = []
+                _wk_targets, _wk_left = [], []
                 if cfg.PAPER_TRADING:
                     if open_pos:
                         _wk_targets = [{**open_pos,
@@ -3442,6 +3474,9 @@ def _loop(user_id, alert_fn, gen=None):
                 else:
                     try:
                         _wk_targets = list(broker.get_all_positions() or [])
+                        _wk_targets, _wk_left = _engine_positions(
+                            _wk_targets, entry_meta_by_sym,
+                            {(open_pos or {}).get("positionId")}, user_id)
                     except Exception as e:
                         print(f"[UserLoop:{user_id}] weekend: position list failed "
                               f"({e}) — falling back to the tracked position")
@@ -3541,7 +3576,8 @@ def _loop(user_id, alert_fn, gen=None):
                                  or _wk_failed != weekend_failed):
                     alert_fn(user_id, {"action": "WEEKEND_CLOSE", "symbol": symbol,
                                        "closed": _wk_closed,
-                                       "failed": sorted(_wk_failed)})
+                                       "failed": sorted(_wk_failed),
+                                       "leftManual": sorted(set(_wk_left))})
                 was_weekend_closed = True
                 weekend_failed = _wk_failed
                 time.sleep(_LOOP_INTERVAL)
