@@ -237,16 +237,28 @@ def public_offer():
 
 
 def verify_signature(payload: bytes, sig_header: str, secret: str, *, now=None) -> bool:
-    """True only for a body this secret actually signed, recently."""
+    """True only for a body this secret actually signed, recently.
+
+    EVERY `v1` is compared, not the last one. While a signing secret is being
+    rolled Stripe sends one `v1` per active secret, in no promised order, and
+    a dict of the header kept only the last: a delivery signed with the secret
+    this server holds was refused whenever the other signature came last.
+    Exactly one `t` is required.
+    """
     if not secret or not sig_header:
         return False
-    try:
-        parts = dict(p.split("=", 1) for p in sig_header.split(",") if "=" in p)
-    except ValueError:
+    ts_values, v1s = [], []
+    for part in str(sig_header).split(","):
+        name, sep, value = part.strip().partition("=")
+        if not sep:
+            continue
+        if name == "t":
+            ts_values.append(value.strip())
+        elif name == "v1" and value.strip():
+            v1s.append(value.strip())
+    if len(ts_values) != 1 or not ts_values[0] or not v1s:
         return False
-    ts, v1 = parts.get("t"), parts.get("v1")
-    if not ts or not v1:
-        return False
+    ts = ts_values[0]
     try:
         age = abs((time.time() if now is None else now) - int(ts))
     except ValueError:
@@ -256,8 +268,14 @@ def verify_signature(payload: bytes, sig_header: str, secret: str, *, now=None) 
     expected = hmac.new(secret.encode(),
                         f"{ts}.".encode() + payload, hashlib.sha256).hexdigest()
     # compare_digest, not ==: a timing difference on a signature comparison is
-    # a signature oracle.
-    return hmac.compare_digest(expected, v1)
+    # a signature oracle. Every candidate is compared, so the time taken does
+    # not depend on WHICH one matched.
+    matched = False
+    for v1 in v1s:
+        # Bytes, because compare_digest raises on a non-ASCII str.
+        if hmac.compare_digest(expected.encode(), v1.encode("utf-8")):
+            matched = True
+    return matched
 
 
 def _event_key(event_id):
