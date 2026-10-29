@@ -403,6 +403,40 @@ def check_user(bucket, user_id, *, fail_closed=False):
     return bool(ok), (0 if ok else _seconds_until_reset(lim.window_s))
 
 
+class Limited(Exception):
+    """Raised from inside a request when a budget refuses it mid-way."""
+
+    def __init__(self, bucket, retry_after):
+        self.bucket, self.retry_after = bucket, retry_after
+        super().__init__(f"rate limited: {bucket}")
+
+
+def check_verify(client_key):
+    """Spend one unit of the address's Supabase-lookup budget, or raise.
+
+    Called only when a token has to be checked with Supabase (a cache miss),
+    so a real client whose session is cached never spends it. No address
+    means the transport did not supply one; the address floors in `check`
+    have the same gap and it is not widened here. A limiter failure allows:
+    the address floor has already been passed, and refusing every cache miss
+    would sign out the platform.
+    """
+    if not client_key:
+        return
+    lim = LIMITERS["addr_verify"]
+    key = f"ip:addr_verify:{client_key}"
+    try:
+        ok = None
+        if _MODE != "memory":
+            ok = _shared_check(key, lim.limit, lim.window_s)
+        if ok is None:
+            ok = lim.check(key)
+    except Exception:
+        return
+    if not ok:
+        raise Limited("addr_verify", _seconds_until_reset(lim.window_s))
+
+
 def reset_all():
     """For tests. Production has no reason to clear a window."""
     for lim in LIMITERS.values():

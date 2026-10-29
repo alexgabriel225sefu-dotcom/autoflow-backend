@@ -23,6 +23,7 @@ lead to different buttons. A single 403 with prose would force the frontend to
 match on English text.
 """
 
+import contextvars
 import json
 import re
 
@@ -137,13 +138,26 @@ def _start_trial_if_new(principal):
               f"gate will report it")
 
 
-def _authenticate(headers, *, fresh=False):
+# The caller's network address for the request being handled, set by
+# `_handle_limited`. A context variable rather than a parameter so the
+# Supabase-lookup budget in `_authenticate` can see it without threading an
+# argument through every route below.
+_CLIENT_KEY = contextvars.ContextVar("a4t_client_key", default=None)
+
+
+def _authenticate(headers, *, fresh=False, start_trial=True):
     token = _id.bearer_token((headers or {}).get("Authorization")
                              or (headers or {}).get("authorization"))
     if not token:
         raise _id.AuthFailed("this endpoint needs a signed-in session")
-    principal = _id.verify_token(token, fresh=fresh)
-    _start_trial_if_new(principal)
+    # Every Supabase lookup (a cache miss) spends the caller's ADDRESS budget
+    # first, so invented tokens cannot buy unlimited lookups. Rejected tokens
+    # are also remembered briefly by identity's negative cache.
+    client = _CLIENT_KEY.get()
+    principal = _id.verify_token(
+        token, fresh=fresh, before_remote=lambda: _rl.check_verify(client))
+    if start_trial:
+        _start_trial_if_new(principal)
     return principal
 
 
@@ -290,9 +304,12 @@ def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
     if not allowed:
         return _rl.refusal(bucket, retry_after)
     method = (method or "GET").upper()
+    ctx_token = _CLIENT_KEY.set(client_key)
     try:
         return _dispatch(method, route, headers or {}, body,
                          _query(path))
+    except _rl.Limited as e:
+        return _rl.refusal(e.bucket, e.retry_after)
     except _id.AuthFailed as e:
         return _err(401, "AUTH_REQUIRED", _safe_error(e))
     except _id.AuthUnavailable as e:
@@ -387,6 +404,8 @@ def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
                     problems=e.problems)
     except ValueError as e:
         return _err(400, "BAD_REQUEST", _safe_error(e))
+    finally:
+        _CLIENT_KEY.reset(ctx_token)
 
 
 def _dispatch(method, route, headers, body, query=None):
