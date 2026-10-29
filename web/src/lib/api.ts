@@ -521,6 +521,34 @@ export type SymbolsRead = {
   symbols?: BrokerSymbol[];
   reason?: string;
 };
+/**
+ * What the broker's minimum order size would risk, against what was chosen.
+ * An ESTIMATE: the stop is the typical one the engine places (a multiple of
+ * ATR, named in `basis`), and a rule that sets its own stop will differ.
+ */
+export type MinLot = {
+  symbol: string;
+  timeframe: string;
+  minUnits: number;
+  unitLabel: string;
+  units: number;
+  stopDistance: number;
+  targetUsd: number;
+  targetPct: number;
+  riskUsd: number;
+  riskPct: number;
+  exceeds: boolean;
+  basis: string;
+};
+export type MinLotRead = {
+  connected: boolean;
+  status: string;
+  accountId?: string | number;
+  mode?: string;
+  /** Absent unless the broker answered. */
+  minLot?: MinLot;
+  reason?: string;
+};
 export type RuleDoc = RuleSummary & Record<string, unknown>;
 
 /**

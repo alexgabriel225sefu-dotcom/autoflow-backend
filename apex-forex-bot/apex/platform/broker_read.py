@@ -436,6 +436,98 @@ def candles(user_id, *, symbol, timeframe, limit=None, **kw):
     return out
 
 
+# The multiple of ATR the engine puts its stop at when it places ATR stops
+# (user_loop). The estimate below uses the same number, which is why it says
+# "typical" and "estimate": a rule that sets its own stop in pips, or a
+# strategy with structural stops, will differ.
+ATR_STOP_MULTIPLE = 2.5
+
+
+def estimate_min_lot(*, balance, risk_fraction, symbol, price, atr, broker_min=None):
+    """What a typical entry on `symbol` would risk once the broker's minimum
+    order size is applied, against what the client chose to risk.
+
+    Pure: numbers in, numbers out, nothing asked of a broker. The client picks
+    1% on a $3,800 account; gold's broker minimum is 1 oz; a stop of 2.5 x ATR
+    on the hourly chart is close to $100, so the smallest allowed trade risks
+    about 2.6%, not 1%. Nothing on the Trade page said so before the first
+    trade, and the account had lost 4.9% in a day by the second.
+
+    None when the inputs cannot support an estimate.
+    """
+    try:
+        balance = float(balance)
+        risk_fraction = float(risk_fraction)
+        price = float(price)
+        atr = float(atr)
+    except (TypeError, ValueError):
+        return None
+    if not (balance > 0 and risk_fraction > 0 and price > 0 and atr > 0):
+        return None
+    pip = forex.pip_size(symbol, price)
+    # The same floor the engine applies: never inside spread-and-noise.
+    distance = max(ATR_STOP_MULTIPLE * atr, 20.0 * pip)
+    stop_pips = forex.to_pips(distance, symbol, price)
+    floor = max(forex.min_units(symbol), float(broker_min or 0))
+    wanted = forex.calc_units(balance, risk_fraction, stop_pips, symbol, price)
+    units = forex.round_units(max(wanted, floor), symbol)
+    risk_usd = forex.floor_risk_at(units, symbol, price, stop_pips)
+    target_usd = balance * risk_fraction
+    return {
+        "minUnits": floor,
+        "unitLabel": forex.unit_label(symbol),
+        "units": units,
+        "stopDistance": round(distance, 5),
+        "targetUsd": round(target_usd, 2),
+        "targetPct": round(risk_fraction * 100, 2),
+        "riskUsd": round(risk_usd, 2),
+        "riskPct": round(risk_usd / balance * 100, 2),
+        # Over the target by more than a lot-step's rounding.
+        "exceeds": risk_usd > target_usd * 1.10,
+    }
+
+
+def min_lot(user_id, *, symbol, timeframe, risk_percent, **kw):
+    """Would the broker's minimum order size risk more than the client chose?
+
+    Read-only, like the rest of this module: balance, candles and the symbol's
+    minimum size are asked for, and nothing is sent. Answers {connected,
+    status} like the others, with `minLot` present only when status is ok.
+    """
+    sym, tf, _n = validate_candle_query(symbol, timeframe, 60)
+    try:
+        risk = float(risk_percent)
+    except (TypeError, ValueError):
+        raise ValueError(f"riskPercent must be a number, got {risk_percent!r}")
+    if not (0 < risk <= 100):
+        raise ValueError(f"riskPercent must be between 0 and 100, got {risk:g}")
+
+    def _call(b):
+        bars = _shape(b.get_candles(sym, tf, 60))
+        if len(bars) < 16:
+            raise RuntimeError("not enough bars to estimate a stop")
+        from apex import indicators as _ind
+        series = _ind.atr(bars, 14)
+        # A series with None until there are enough bars; the latest value is
+        # the one that describes the market now.
+        atr = next((v for v in reversed(series or []) if v), None)
+        mn = None
+        try:
+            mn = b.min_units(sym)
+        except Exception:  # noqa: BLE001 - unknown minimum falls back to the class guess
+            mn = None
+        out = estimate_min_lot(
+            balance=b.get_balance(), risk_fraction=risk / 100.0, symbol=sym,
+            price=bars[-1]["close"], atr=atr, broker_min=mn)
+        if out is None:
+            raise RuntimeError("could not estimate the minimum-size risk")
+        out.update(symbol=sym, timeframe=tf,
+                   basis=f"{ATR_STOP_MULTIPLE:g} x ATR(14) on the last bars")
+        return out
+
+    return _read(user_id, "minLot", _call, **kw)
+
+
 def _shape(rows):
     """Only the five fields a snapshot needs, as plain numbers.
 

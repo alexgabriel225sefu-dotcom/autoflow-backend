@@ -4,9 +4,10 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import {
   api, type ApiError, type AutomationState, type CtraderStatus, type Me,
-  type RuleDoc, type RuleSummary, type StrategyCatalogue, type SymbolsRead,
+  type MinLotRead, type RuleDoc, type RuleSummary, type StrategyCatalogue, type SymbolsRead,
 } from "@/lib/api";
 import { invalidate, useRead } from "@/lib/use-api";
+import { useDebounced } from "@/lib/use-debounced";
 import { ConfirmAction } from "@/components/app/shell";
 import { fireStartConfetti } from "@/components/app/start-confetti";
 import { runAutomationControl } from "@/components/app/automation-control";
@@ -15,7 +16,7 @@ import { ErrorNotice, Spinner } from "@/components/app/state";
 import { groupByFamily } from "../rules/new/strategy/catalog";
 import {
   DAILY_LOSS_CEILING, EMPTY_CHOICE, LIVE_RISK_CAP, RISK_PICKS, ROW_LIMIT,
-  TIMEFRAME_CHOICES, missingChoices, riskAmounts, startState, symbolView,
+  TIMEFRAME_CHOICES, minLotNotice, minLotPath, missingChoices, riskAmounts, startState, symbolView,
   tradeBody, type TradeChoice,
 } from "./trade-model";
 
@@ -68,6 +69,10 @@ export default function TradePage() {
   const start = startState({ status, execution });
   const missing = missingChoices(c);
   const amounts = riskAmounts(c);
+  // Whether the broker's smallest order would risk more than the chosen
+  // percentage. Asked once the choices settle, never on every keystroke.
+  const minLot = useRead<MinLotRead>(useDebounced(minLotPath(c), 400));
+  const lotNotice = minLot.result?.ok ? minLotNotice(minLot.result.data, c) : null;
   const running = auto.result?.ok && auto.result.data.state === "running";
   const catalogue = cat.result?.ok ? cat.result.data : null;
   const strategies = useMemo(() => catalogue?.strategies ?? [], [catalogue]);
@@ -359,6 +364,10 @@ export default function TradePage() {
                    onChange={(e) => set("accountSize", e.target.value)} />
             <span className="field-note">Used only below. It is not read from your broker and is not saved.</span></label>
         </div>
+        {lotNotice ? (
+          <div className={lotNotice.tone === "warn" ? "notice notice-warn" : "field-note"}
+               role="status">{lotNotice.text}</div>
+        ) : null}
         <p className="trade-est" aria-live="polite">
           Most one trade is sized to lose: <strong>{money(amounts.perTrade)}</strong>
           {" · "}Day stops at: <strong>{money(amounts.perDay)}</strong>

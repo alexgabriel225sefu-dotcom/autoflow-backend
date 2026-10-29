@@ -1,5 +1,6 @@
 import type {
-  BrokerSymbol, CtraderStatus, Execution, RuleDoc, StrategyPreset, SymbolsRead,
+  BrokerSymbol, CtraderStatus, Execution, MinLotRead, RuleDoc, StrategyPreset,
+  SymbolsRead,
 } from "@/lib/api";
 import { BLANK, toDoc } from "@/components/app/rule-form";
 import { presetRuleBody } from "../rules/new/strategy/catalog";
@@ -173,6 +174,60 @@ export function riskAmounts(c: Pick<TradeChoice,
   return {
     perTrade: ok && risk !== null && risk > 0 ? cents(size * risk / 100) : null,
     perDay: ok && day !== null && day > 0 ? cents(size * day / 100) : null,
+  };
+}
+
+/**
+ * The read that asks whether the broker's minimum order size would risk more
+ * than the chosen percentage. Null until there is something to ask: an
+ * instrument, a timeframe and a risk that is a usable number.
+ */
+export function minLotPath(c: Pick<TradeChoice, "symbol" | "timeframe" | "riskPercent">): string | null {
+  const risk = num(c.riskPercent);
+  if (!c.symbol || !c.timeframe || risk === null || risk <= 0 || risk > 100) return null;
+  const q = new URLSearchParams({
+    symbol: c.symbol, timeframe: c.timeframe, riskPercent: String(risk),
+  });
+  return `trade/min-lot?${q.toString()}`;
+}
+
+const usd = (n: number) => `$${n.toFixed(2)}`;
+
+/**
+ * The warning shown under Risk, or null when there is nothing to warn about.
+ *
+ * It is shown only when the server says the minimum size exceeds the chosen
+ * risk, and it says so as an estimate. A read that did not answer produces a
+ * quiet "could not check" and never a reassurance: silence would read as
+ * "this is fine", which is a claim nobody made.
+ */
+export function minLotNotice(
+  r: MinLotRead | null | undefined,
+  asked?: Pick<TradeChoice, "symbol" | "timeframe" | "riskPercent">,
+): { tone: "warn" | "muted"; text: string } | null {
+  if (!r) return null;
+  if (r.status === "unavailable") {
+    return { tone: "muted", text: "Could not check the broker's minimum size right now." };
+  }
+  const m = r.minLot;
+  if (r.status !== "ok" || !m || !m.exceeds) return null;
+  // An answer for a different instrument, timeframe or risk than is chosen now
+  // is a stale one: the choice changed while it was on its way. Showing it
+  // would warn about something the client is no longer looking at.
+  if (asked) {
+    const want = num(asked.riskPercent);
+    // The server rounds the percentage to two places.
+    if (m.symbol !== asked.symbol || m.timeframe !== asked.timeframe
+        || want === null || Math.abs(m.targetPct - want) > 0.006) return null;
+  }
+  return {
+    tone: "warn",
+    text:
+      `The broker's smallest order for ${m.symbol} is ${m.minUnits} ${m.unitLabel}. ` +
+      `With a typical stop (${m.basis}) that risks about ${usd(m.riskUsd)} ` +
+      `(${m.riskPct}% of the account), more than the ${usd(m.targetUsd)} ` +
+      `(${m.targetPct}%) you chose. An estimate: a rule with its own stop will differ. ` +
+      `The trade is still sized at the minimum, and the day's loss limit counts what is left.`,
   };
 }
 
