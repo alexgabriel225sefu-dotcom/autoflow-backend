@@ -6,6 +6,7 @@ import { When } from "@/components/app/table";
 import { humanise } from "@/components/app/rule-summary";
 import { plainDecision } from "@/components/app/plain";
 import type { JournalEntry, JournalPage } from "@/lib/api";
+import { downloadText, journalToCsv } from "./csv";
 
 const STATUSES = [
   "", "evaluated", "hold", "reject", "execution_requested", "order_sent",
@@ -53,7 +54,20 @@ export default function JournalView() {
           </span>
         </div>
         {r.result?.ok ? (
-          <span className="pill pill-muted">{r.result.data.total} entries</span>
+          <span className="btn-row">
+            <span className="pill pill-muted">{r.result.data.total} entries</span>
+            {/* Built from the rows on screen: no extra request, and the label
+                says which rows, so nobody mistakes it for the whole journal. */}
+            <button
+              className="btn btn-ghost btn-sm" type="button"
+              disabled={r.result.data.entries.length === 0}
+              onClick={() => downloadText(
+                `apex4traders-journal-${new Date().toISOString().slice(0, 10)}.csv`,
+                journalToCsv(r.result?.ok ? r.result.data.entries : []))}
+            >
+              Export CSV (these {r.result.data.entries.length})
+            </button>
+          </span>
         ) : null}
       </div>
 
