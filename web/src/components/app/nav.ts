@@ -10,7 +10,7 @@
  */
 import {
   BarChart3, Bell, BookOpen, Crosshair, LayoutDashboard, ListChecks, Receipt, Settings,
-  ShieldCheck, TrendingUp, Wallet, type LucideIcon,
+  CircleHelp, ShieldCheck, TrendingUp, Wallet, type LucideIcon,
 } from "lucide-react";
 
 export type NavItem = {
@@ -19,23 +19,34 @@ export type NavItem = {
   icon: LucideIcon;
   /** Shown in the mobile bottom bar. The rest live in the drawer. */
   primary?: boolean;
+  /** Which sidebar group the item sits in. */
+  group: "operations" | "account" | "more";
+  /** A short caveat shown beside the label for a destination that exists but
+   *  cannot be used yet, so nobody has to click to find that out. */
+  note?: string;
 };
 
 export const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, primary: true },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, primary: true, group: "operations" },
   // The front door: pick an instrument and a strategy, set the risk, start.
-  { href: "/trade", label: "Trade", icon: Crosshair, primary: true },
+  { href: "/trade", label: "Trade", icon: Crosshair, primary: true, group: "operations" },
   // Rules is the builder for people who want their own conditions, so it
   // leaves the phone's bottom bar (four slots) for Trade and stays in the drawer.
-  { href: "/rules", label: "Rules", icon: ListChecks },
-  { href: "/positions", label: "Positions", icon: TrendingUp, primary: true },
-  { href: "/orders", label: "Orders", icon: Receipt },
-  { href: "/performance", label: "Performance", icon: BarChart3 },
-  { href: "/journal", label: "Journal", icon: BookOpen, primary: true },
-  { href: "/notifications", label: "Alerts", icon: Bell },
-  { href: "/accounts", label: "Accounts", icon: Wallet },
-  { href: "/live", label: "Live access", icon: ShieldCheck },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/rules", label: "Rules", icon: ListChecks, group: "operations" },
+  { href: "/positions", label: "Positions", icon: TrendingUp, primary: true, group: "operations" },
+  { href: "/orders", label: "Orders", icon: Receipt, group: "operations" },
+  { href: "/performance", label: "Performance", icon: BarChart3, group: "operations" },
+  { href: "/journal", label: "Journal", icon: BookOpen, primary: true, group: "account" },
+  { href: "/notifications", label: "Alerts", icon: Bell, group: "account" },
+  { href: "/accounts", label: "Accounts", icon: Wallet, group: "account" },
+  { href: "/settings", label: "Settings", icon: Settings, group: "account" },
+  { href: "/help", label: "Help", icon: CircleHelp, group: "more" },
+  // The route stays and its gating is untouched; it just does not sit among the
+  // working destinations, because live trading is not available in this release.
+  {
+    href: "/live", label: "Live access", icon: ShieldCheck, group: "more",
+    note: "Not available in this release",
+  },
 ];
 
 export const PRIMARY = NAV.filter((n) => n.primary);

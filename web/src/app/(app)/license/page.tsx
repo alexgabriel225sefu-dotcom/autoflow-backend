@@ -109,7 +109,8 @@ export default function LicensePage() {
             <div className="notice notice-warn" role="alert">
               <p>
                 This account&rsquo;s access was withdrawn. Rules cannot be
-                activated and automation cannot be started. Contact support.
+                activated and automation cannot be started. Support is
+                reachable from the <Link href="/help">Help page</Link>.
               </p>
             </div>
           ) : null}
