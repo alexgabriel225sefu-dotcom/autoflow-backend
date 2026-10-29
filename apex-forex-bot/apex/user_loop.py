@@ -449,6 +449,23 @@ def _mode_of(user_id):
         return None
 
 
+def _is_live_cfg(cfg):
+    """True only when this loop's orders reach a REAL-MONEY cTrader account.
+
+    Two axes, both required: the broker environment is `live` and fills are
+    broker-executed (not simulated). See `_mode_of` for why `paper` alone is
+    the wrong axis. Anything missing or unreadable answers False here, so the
+    callers that use this to TIGHTEN behaviour must fail closed on their own
+    when they cannot tell — this only ever adds restrictions, never removes
+    them.
+    """
+    try:
+        env = str(getattr(cfg, "CTRADER_ENV", "") or "").strip().lower()
+        return env == "live" and getattr(cfg, "PAPER_TRADING", True) is False
+    except Exception:
+        return False
+
+
 def _already_journaled(journal, row):
     """True if this exact close is already in the journal.
 
@@ -4542,7 +4559,25 @@ def _loop(user_id, alert_fn, gen=None):
                         sizing_balance,
                         float(getattr(cfg, "MAX_DAILY_LOSS_PCT", 4.0)),
                         _day_pnl)
-                    if not forex.floor_risk_ok(units, symbol, price,
+                    # LIVE: the daily-loss headroom above is a DEMO allowance.
+                    # On real money the platform's 1% per-trade cap holds at
+                    # order time, minimum lot or not — a broker minimum that
+                    # would risk more is refused here, never sent. Measured
+                    # against the smaller of the sizing and the live balance.
+                    _live_why = None
+                    if _is_live_cfg(cfg):
+                        _cap_bal = min(b for b in (sizing_balance, paper_balance)
+                                       if b and b > 0) if (
+                            (sizing_balance and sizing_balance > 0)
+                            or (paper_balance and paper_balance > 0)) else 0.0
+                        _live_why = forex.live_risk_refusal(
+                            units, symbol, price, stop_pips_eff, _cap_bal)
+                    if _live_why:
+                        print(f"[UserLoop:{user_id}] LIVE REFUSED {action} "
+                              f"{symbol}: {_live_why}")
+                        _skip(_live_why)
+                        entry_ok = False
+                    elif not forex.floor_risk_ok(units, symbol, price,
                                                stop_pips_eff, _budget,
                                                hard_ceiling_usd=_hard):
                         # Name the numbers. "Minimum lot too big" alone leaves
