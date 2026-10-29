@@ -256,6 +256,69 @@ def has_data():
         return False
 
 
+def _stale_s() -> int:
+    try:
+        v = int(os.getenv("NEWS_STALE_SEC") or 0)
+    except ValueError:
+        v = 0
+    return v if 0 < v <= 12 * 3600 else 6 * 3600
+
+
+# A calendar older than this is not evidence of anything. The feed is weekly
+# and refreshed every _TTL, so six hours without a successful fetch means it
+# has been failing for a dozen attempts. Tunable via NEWS_STALE_SEC, capped at
+# 12 hours.
+STALE_S = _stale_s()
+
+
+def calendar_status(now=None):
+    """(status, age_s) of the calendar the guard is reading.
+
+    status: "ok" | "disabled" | "unavailable" (never fetched) | "empty"
+    (answered with no events) | "stale" (last good fetch older than STALE_S).
+    Never raises; asking also kicks the usual background refresh.
+    """
+    try:
+        if not enabled():
+            return "disabled", None
+        events = _load()
+        with _lock:
+            ts = _cache["ts"]
+        if not ts:
+            return "unavailable", None
+        age = (now if now is not None else time.time()) - ts
+        if age > STALE_S:
+            return "stale", age
+        if not events:
+            return "empty", age
+        return "ok", age
+    except Exception:
+        return "unavailable", None
+
+
+def live_entry_block(live):
+    """Why a NEW entry on a LIVE account must wait, or None.
+
+    The guard below is fail-open, which is right for demo. On live, failing
+    closed around the high-impact windows is impossible without the data that
+    says where they are, so no calendar means no new live entry. Demo is never
+    blocked here. An operator who switched the guard off (NEWS_GUARD=false)
+    made that choice explicitly and is not overridden.
+    """
+    if not live:
+        return None
+    status, _age = calendar_status()
+    if status in ("ok", "disabled"):
+        return None
+    detail = {"unavailable": "has not been fetched",
+              "empty": "answered with no events",
+              # Stable text on purpose: the skip journal throttles per
+              # reason, and a minute counter would re-alert every tick.
+              "stale": f"is more than {STALE_S // 3600:g}h old"}.get(status, status)
+    return (f"economic calendar {detail} — no new live entry until it is "
+            f"available again (high-impact windows cannot be seen)")
+
+
 def high_impact_window(currencies, window=None):
     """Nearest high-impact event within ±window minutes for any of `currencies`,
     as {title, currency, mins, time}, else None. Fail-open on any error."""

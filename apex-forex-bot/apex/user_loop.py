@@ -4196,6 +4196,12 @@ def _loop(user_id, alert_fn, gen=None):
                 # what NFP/CPI/FOMC destroys, so this guard was doing nothing
                 # precisely where it mattered most.
                 ev = news.high_impact_window(_currency_legs(symbol))
+                # LIVE only: a guard that cannot see the calendar is not a
+                # guard. Demo keeps the fail-open behaviour above.
+                _news_block = news.live_entry_block(live=_is_live_cfg(cfg))
+                if _news_block and not ev:
+                    entry_ok = False
+                    _skip(f"news guard: {_news_block}")
                 if ev:
                     entry_ok = False
                     _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}",
