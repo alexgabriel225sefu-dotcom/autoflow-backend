@@ -115,7 +115,14 @@ export default function JournalView() {
                   </div>
 
                   <p className="muted" style={{ fontSize: ".82rem" }}>
-                    {plain.detail ?? e.decision?.reason ?? e.error ?? humanise(e.status ?? e.kind)}
+                    {/* An error entry says its error. Anything else says WHY the
+                        engine decided what it did: "Conditions met." is true of
+                        every signal and tells the client nothing, while the
+                        stored reason names the conditions. The generic wording
+                        is only the fallback for an entry with no reason. */}
+                    {e.error
+                      ? (plain.detail ?? e.error)
+                      : (e.decision?.reason ?? plain.detail ?? humanise(e.status ?? e.kind))}
                   </p>
 
                   {/* At Signals Only the client places the trade, so the level
