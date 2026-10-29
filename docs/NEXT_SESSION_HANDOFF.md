@@ -12,7 +12,8 @@ The text under this heading is that session's record, written before merge. Its 
 
 The sections below this one are historical. Several of them still say live
 trading is not implemented and that the founder price is 499 USD. Those lines
-are not the current state. This section is.
+are not the current state. This section is. The price is **497 USD** (49700
+minor units); the single source of truth is `billing.APPROVED_PRICE_MINOR` (49700 minor units, usd) in `apex-forex-bot/apex/platform/billing.py`.
 
 1. **Branch:** `cursor/live-trading-hard-gate-fa29`, opened off `claude/apex4traders-platform-v1` at `89e040e177d14e7be242fb4b14d8d26b539e123f`. Not merged. Not deployed.
 2. **Commit assessed:** `4c2b53e73395796a82b83f9dd3070eee67349683`. The commit that adds this section is documentation only.
@@ -35,7 +36,7 @@ are not the current state. This section is.
 10. **Blockers before live can be switched on,** each owner-only unless noted:
     - Legal pages L1–L8 are still drafts with `[TO BE CONFIRMED]`. Unblocks when the owner publishes real text and an operator records those versions.
     - Tax D5–D6 is not settled. Unblocks when the owner confirms the tax position and an operator publishes the tax terms.
-    - No payment provider. Checkout is 501. Unblocks when a real provider is wired and `checkout_implemented()` becomes true in that same change.
+    - No payment provider. Checkout creation is now implemented in `stripe_checkout.py` but ships dark: it answers 503 until both gates are set and 501 until Stripe variables are set. Unblocks with the sandbox pass in `docs/STRIPE_SANDBOX_RUNBOOK.md`, then the owner's decision to set the gates.
     - Real-broker smoke X1 has not been run for a live order. Unblocks with a smoke on the operator's own live account at minimum size, after the gate is actually open.
     - Monitoring X7 and a restore drill X8 are not done.
     - The release switch and `APEX_ALLOW_LIVE_ACCOUNTS` stay off until the owner flips them, on the operator's own account first.
@@ -101,7 +102,7 @@ What that closes and what it does not is in §1g.
 | Tests | 168 backend files, 255 web tests, build clean, lint 0 errors, 0 npm vulnerabilities |
 | Private demo beta | **NOT YET**, but narrower than this line used to say. Reads, preview on real bars and the controls are all proven against the real broker; the screens were walked on 2026-10-04 with nothing connected. `docs/RELEASE_READINESS.md` gate 1 is the authority; see §2 |
 | Public beta | **NO** |
-| Taking money | **NO** — 499 USD one-time founder offer recorded, checkout still off |
+| Taking money | **NO** — 497 USD one-time founder offer recorded, checkout still off |
 | Live trading | **NO**, and not implemented |
 
 ## 1b. What phases A–E of 2026-09-25 changed
@@ -405,7 +406,7 @@ Commit after `22e4bc8`:
 
 | Commit | Change |
 |---|---|
-| `PENDING` | Records the owner decision that demo remains free and the paid offer is a one-time Founder Lifetime unlock at 499 USD. Billing defaults now describe `49900` / `usd` / `founder_lifetime` / `one_time`, but checkout still fails readiness unless both `A4T_CHECKOUT_ENABLED` and `A4T_AUTHENTICATED_CHECKOUT_ENABLED` are explicitly set. The legacy browser checkout route also refuses before creating a Stripe PaymentIntent unless the authenticated-checkout gate is set. No payment activation was performed. A follow-up also adds the authenticated `/api/v1/billing/checkout` route shape, but it returns 503 while checkout is off and 501 even when both gates are set, so it cannot charge yet. |
+| `PENDING` | Records the owner decision that demo remains free and the paid offer is a one-time Founder Lifetime unlock at 497 USD (written as 499 at the time; corrected). Billing defaults then described `49900` / `usd` (superseded: the code and every later record use `49700`, i.e. 497 USD) / `founder_lifetime` / `one_time`, but checkout still fails readiness unless both `A4T_CHECKOUT_ENABLED` and `A4T_AUTHENTICATED_CHECKOUT_ENABLED` are explicitly set. The legacy browser checkout route also refuses before creating a Stripe PaymentIntent unless the authenticated-checkout gate is set. No payment activation was performed. A follow-up also adds the authenticated `/api/v1/billing/checkout` route shape, but it returns 503 while checkout is off and 501 even when both gates are set, so it cannot charge yet. |
 
 Tests run after `PENDING`:
 

@@ -14,22 +14,33 @@ licence the client holds.
 
 `apex/platform/licence.py` is keyed by the Supabase user id and has exactly
 four states. What a licence *means* changed with the entitlement model in
-`apex/platform/entitlement.py`: demo access is free, so a licence is the
-**paid** tier, and the only state that still blocks anything is a withdrawal.
+`apex/platform/entitlement.py`: demo access is free for the 14-day trial
+(itself an `active` licence), and any state other than `active` blocks demo
+automation (see the table).
 
-| State | Meaning | Entitlement | Blocks demo automation |
-|---|---|---|---|
-| `none` | No record. The default for every new sign-up | `free_demo` | No |
-| `active` | Granted, and not past `expiresAt` | `paid_live` | No |
-| `expired` | Granted, and past `expiresAt` | `free_demo` | No |
-| `revoked` | Withdrawn deliberately | `free_demo` | **Yes** |
+| State | Meaning | Blocks demo automation |
+|---|---|---|
+| `none` | No record. A verified sign-in normally starts a 14-day `demo_trial` automatically (`api._start_trial_if_new`); `none` is what remains if that write failed | **Yes** (`NO_LICENCE`) |
+| `active` | Granted, and not past `expiresAt`. The free demo trial is an `active` licence with `plan: demo_trial` | No |
+| `expired` | Granted, and past `expiresAt`. A trial that ran out lands here | **Yes** (`TRIAL_EXPIRED`) |
+| `revoked` | Withdrawn deliberately | **Yes** (`LICENCE_REVOKED`) |
+
+**Corrected 2026-10-29.** This table used to say `none` and `expired` did not
+block demo automation. That was true of an earlier model and is wrong now:
+`entitlement.capability()` and the engine gate `user_loop._entitled` both
+require an `active` licence, and a running loop is stopped by the watchdog
+sweep (every 180 s) once its licence is no longer active. Proof:
+`apex-forex-bot/tests/test_platform_trial_expiry.py`. A client whose trial has
+ended is brought back by `licence.grant(...)` (section 5), not by signing in
+again; `plans.start_trial` never extends.
 
 `paid_live` does **not** unlock live trading in this release. There is no
 execution path behind it; `entitlement.capability()` refuses a live account
 under both entitlements, and the tests assert all four combinations.
 
-So during the beta there is nothing to grant. What this document is for is
-the case that remains: **withdrawing** a client's access, and putting it
+A new verified account receives its 14-day trial without any action. What
+this document is for is **extending or restoring** access by hand (section 5)
+and **withdrawing** a client's access, and putting it
 back.
 
 The only automated grant path is the payment webhook, and checkout is
@@ -50,11 +61,11 @@ client refused, and neither party will be able to tell you why.
 
 ## 3. Granting
 
-You probably do not need to. A beta tester needs **no** licence: `free_demo`
-already allows building, activating and running a rule on a demo account.
-Grant one only to record that somebody is on the paid tier — and know that
-this release sells nothing and unlocks nothing extra, so the record is
-bookkeeping rather than access.
+A new account gets its trial automatically, so a fresh beta tester needs no
+grant. Grant one to **extend** a trial that is ending or has ended, to
+restore someone, or to record a paid-tier client. Extending is an owner
+decision (see `docs/OWNER_ACTIONS.md`); this release sells nothing and a
+`beta` grant unlocks no live trading.
 
 Run on the backend host, in the deployment's environment (the same
 `PRODUCT`, `DATA_DIR` and Redis configuration — a licence written against the

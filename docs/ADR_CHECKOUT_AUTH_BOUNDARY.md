@@ -9,7 +9,7 @@ Apex4Traders is not taking payments in the current release. Demo accounts are fr
 
 The legacy browser route at `web/src/app/api/create-payment-intent/route.ts` could create a Stripe PaymentIntent when deployment flags were set. That route does not verify a platform session. The payment webhook grants access only from provider-signed events that carry a platform user id written by our server, so checkout creation must be coupled to a verified platform identity before any payment can be trusted.
 
-The platform API already exposes `POST /api/v1/billing/checkout`. It requires a fresh authenticated session and currently returns `CHECKOUT_NOT_ENABLED` while checkout is disabled, then `CHECKOUT_NOT_IMPLEMENTED` even if both checkout gates are turned on.
+The platform API already exposes `POST /api/v1/billing/checkout`. It requires a fresh authenticated session and returns `CHECKOUT_NOT_ENABLED` while checkout is disabled, then `CHECKOUT_NOT_IMPLEMENTED` if both gates are on but no Stripe configuration is present. With configuration, `stripe_checkout.start_checkout` returns a hosted URL (updated 2026-10-29; the creation point is the one this ADR requires).
 
 ## Decision
 

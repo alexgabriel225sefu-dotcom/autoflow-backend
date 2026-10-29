@@ -53,7 +53,7 @@ The store refuses to start if the first two are needed and `APP_ENV` is not
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **yes** | Public by design. Never the service key. |
 | `NEXT_PUBLIC_API_BASE_URL` | yes | Empty means same origin. |
 | `STRIPE_SECRET_KEY` | only with billing | Server-side only; never prefixed `NEXT_PUBLIC_`. |
-| `A4T_PRICE_MINOR`, `A4T_CURRENCY`, `A4T_SKU` | only with billing | Defaults are `49700`, `usd`, `founder_lifetime`. Leave them UNSET: the approved offer lives in `billing.py` and any override that differs from it fails readiness. Checkout still needs both gates below, and this build has no way to create a checkout, so turning them on fails readiness too. |
+| `A4T_PRICE_MINOR`, `A4T_CURRENCY`, `A4T_SKU` | only with billing | Defaults are `49700`, `usd`, `founder_lifetime`. Leave them UNSET: the approved offer lives in `billing.py` and any override that differs from it fails readiness. Checkout still needs both gates below AND Stripe configuration (`A4T_STRIPE_PAYMENT_LINK`, or `STRIPE_SECRET_KEY` + `A4T_STRIPE_PRICE_ID` + `A4T_PUBLIC_WEB_ORIGIN`); gates on with no Stripe configuration fails readiness. |
 | `A4T_CHECKOUT_ENABLED`, `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | only with billing | Both must stay off until paid checkout is reviewed and created from authenticated platform API. |
 | `RESEND_API_KEY` | only for waitlist email delivery | Server-side only. Unset means sign-ups are stored but no waitlist email is sent; `/readyz` reports `waitlist_email: skipped`. |
 | `A4T_WAITLIST_FROM_EMAIL` | only for waitlist email delivery | Verified sender used by Resend, for example `Apex4Traders <waitlist@example.com>`. |

@@ -176,7 +176,7 @@ greppable placeholder.
 
 | # | Blocked | Detail |
 |---|---|---|
-| D5 | Tax handling | Price/currency/SKU/plan are decided as 499 USD one-time `founder_lifetime`; checkout still answers 503 until tax and authenticated checkout are ready. |
+| D5 | Tax handling | Price/currency/SKU/plan are decided as 497 USD one-time `founder_lifetime`; checkout still answers 503 until tax and authenticated checkout are ready. |
 | D6 | Whether paid access is in beta at all | Demo remains free; paid Founder Lifetime unlock is planned but not active. |
 | L1–L2 | Legal entity, registered address, company number, governing law | `docs/LEGAL_LAUNCH_BLOCKERS.md` |
 | L3 | Support contact address | The old one belonged to another brand and was removed, not replaced. |
