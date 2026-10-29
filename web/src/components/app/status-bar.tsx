@@ -31,8 +31,8 @@ function Chip({
     </>
   );
   return href
-    ? <a className="stat-chip" href={href} title={title}>{body}</a>
-    : <span className="stat-chip" title={title}>{body}</span>;
+    ? <a className="stat-chip" data-tone={tone ?? "neutral"} href={href} title={title}>{body}</a>
+    : <span className="stat-chip" data-tone={tone ?? "neutral"} title={title}>{body}</span>;
 }
 
 /* A read that failed is not a read still in flight.
@@ -162,7 +162,7 @@ export function StatusBar({
           "connected but nothing selected" and "not connected" need
           different actions from the reader. */}
       {account?.connected ? (
-        <a className="stat-chip" href="/accounts">
+        <a className="stat-chip" data-tone="long" href="/accounts">
           <span className="dot" data-tone="long" />
           <span>cTrader</span><strong>Linked</strong>
         </a>

@@ -10,7 +10,7 @@
  * The redesign changed how these look, not what they claim. A refusal still
  * carries the backend's own code and words.
  */
-import { CircleAlert, Plug, RefreshCw, TriangleAlert } from "lucide-react";
+import { CircleAlert, Gauge, Plug, RefreshCw, TriangleAlert } from "lucide-react";
 import type { ApiError, Execution, ReadState } from "@/lib/api";
 // ONE definition of what a broker read state says. It was written out
 // longhand here as well, and the two drifted: this copy claimed "No
@@ -40,6 +40,22 @@ export function LicencePill({ state }: { state?: string }) {
 }
 
 export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
+  // A rate limit is the platform asking for a breath, not a failure: it gets
+  // a calm notice instead of a red error. The server's own sentence (with the
+  // wait it asks for) is kept as the body.
+  if (error.code === "RATE_LIMITED") {
+    return (
+      <div className="notice notice-info" role="status">
+        <div className="notice-head">
+          <Gauge className="ico" aria-hidden
+                 style={{ width: 12, height: 12, verticalAlign: "-2px", marginRight: 4 }} />
+          <strong>Slow down a moment</strong>
+          <span className="muted"> · {error.code}</span>
+        </div>
+        <p>{error.message}</p>
+      </div>
+    );
+  }
   return (
     <div className="notice notice-error" role="alert">
       <div className="notice-head">

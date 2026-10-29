@@ -589,6 +589,50 @@ body {
 .stat-chip .dot[data-tone="accent"]{ background: var(--a4t-link); box-shadow: 0 0 8px -1px var(--a4t-link); }
 .stat-chip .dot[data-live="true"]  { animation: a4t-pulse 2s ease-in-out infinite; }
 
+/* Status pills, after the 21st.dev "Status" badge: a tinted pill whose colour
+   says the state before the words do, with a ping ring on the dot. Written
+   against the app tokens; the tone is the only thing that changes. */
+.statusbar .stat-chip {
+  border-radius: 999px; padding: .34rem .75rem .34rem .6rem; gap: .5rem;
+  transition: background .18s, border-color .18s, transform .18s;
+}
+.statusbar .stat-chip:is(a):active { transform: scale(.97); }
+.statusbar .stat-chip[data-tone="long"] {
+  color: color-mix(in srgb, var(--a4t-long) 55%, var(--a4t-text));
+  background: color-mix(in srgb, var(--a4t-long) 10%, var(--a4t-surface));
+  border-color: color-mix(in srgb, var(--a4t-long) 32%, var(--a4t-line));
+}
+.statusbar .stat-chip[data-tone="short"] {
+  color: color-mix(in srgb, var(--a4t-short) 60%, var(--a4t-text));
+  background: color-mix(in srgb, var(--a4t-short) 10%, var(--a4t-surface));
+  border-color: color-mix(in srgb, var(--a4t-short) 34%, var(--a4t-line));
+}
+.statusbar .stat-chip[data-tone="accent"] {
+  color: color-mix(in srgb, var(--a4t-link) 60%, var(--a4t-text));
+  background: color-mix(in srgb, var(--a4t-link) 10%, var(--a4t-surface));
+  border-color: color-mix(in srgb, var(--a4t-link) 34%, var(--a4t-line));
+}
+.statusbar .stat-chip[data-tone="long"]:hover,
+.statusbar .stat-chip[data-tone="short"]:hover,
+.statusbar .stat-chip[data-tone="accent"]:hover { filter: brightness(1.18); }
+.statusbar .stat-chip strong { letter-spacing: .01em; }
+.statusbar .stat-chip .dot { position: relative; width: 8px; height: 8px; box-shadow: none; animation: none; }
+.statusbar .stat-chip .dot::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; background: inherit;
+  opacity: 0;
+}
+.statusbar .stat-chip .dot[data-live="true"]::before {
+  opacity: .7; animation: a4t-ping 1.8s cubic-bezier(0, 0, .2, 1) infinite;
+}
+@keyframes a4t-ping { 75%, 100% { transform: scale(2.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .statusbar .stat-chip .dot[data-live="true"]::before { animation: none; opacity: 0; }
+}
+@media (max-width: 640px) {
+  .statusbar { gap: .35rem; }
+  .statusbar .stat-chip { font-size: .72rem; padding: .3rem .62rem .3rem .5rem; }
+}
+
 /* page body */
 .shell {
   flex: 1;
@@ -1013,6 +1057,7 @@ body {
 }
 .notice p + .btn, .notice p + .btn-row { margin-top: .6rem; }
 .notice-error { border-color: color-mix(in oklab, var(--a4t-short) 42%, transparent); background: var(--a4t-short-wash); }
+.notice-info { border-color: color-mix(in oklab, var(--a4t-link) 38%, transparent); background: color-mix(in oklab, var(--a4t-link) 9%, transparent); }
 .notice-warn  { border-color: color-mix(in oklab, var(--a4t-short) 30%, transparent); }
 .notice-accent { border-color: var(--a4t-link-dim); background: var(--a4t-link-wash); }
 .notice-head { font-size: .72rem; margin-bottom: .3rem; letter-spacing: .04em; text-transform: uppercase; color: var(--a4t-muted); }
@@ -2179,6 +2224,16 @@ body {
 .trade .btn { border-radius: .32rem; box-shadow: none; }
 .trade .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px -14px var(--a4t-accent); }
 .trade-bar { border-radius: .9rem; backdrop-filter: blur(14px); }
+/* On a phone the bar is one compact row — summary left, action right — so it
+   no longer eats a third of the screen above the bottom nav. */
+@media (max-width: 640px) {
+  .trade-bar { flex-wrap: nowrap; padding: .6rem .75rem; gap: .6rem; }
+  .trade-bar-sum { font-size: .8rem; flex: 1; }
+  .trade-bar-sum > span:last-child {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .trade-bar .btn { flex: none; padding-inline: .9rem; }
+}
 
 /* ── landing: the mark behind the hero, the partner strip, hairline rails ─
    Pointer-spotlight cells follow the pattern of the 21st.dev feature grids.
