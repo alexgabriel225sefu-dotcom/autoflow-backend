@@ -287,6 +287,71 @@ def daily_loss_headroom_usd(start_balance: float, limit_pct: float,
     return max(0.0, start_balance * (abs(limit_pct) / 100.0) + (daily_pnl or 0.0))
 
 
+def entry_risk(units: float, instrument: str, price: float, stop_pips: float,
+               balance: float):
+    """(dollars lost if the stop is hit, that as % of `balance` or None)."""
+    usd = floor_risk_at(units, instrument, price, stop_pips)
+    pct = (usd / balance * 100.0) if balance and balance > 0 else None
+    return usd, pct
+
+
+def order_line(symbol, side, units, sl, tp, risk_usd, risk_pct) -> str:
+    """The one line that says what an entry is about to risk."""
+    def _px(v):
+        return "none" if v is None else f"{float(v):g}"
+    pct = "n/a" if risk_pct is None else f"{float(risk_pct):.2f}%"
+    return (f"{side} {symbol} units={float(units):g} SL={_px(sl)} TP={_px(tp)} "
+            f"risk=${float(risk_usd or 0.0):.2f} ({pct} of balance)")
+
+
+_LIVE_RISK_CAP_FALLBACK = 1.0
+
+
+def live_risk_cap_pct() -> float:
+    """The per-trade risk ceiling on a LIVE account, in percent of balance.
+
+    Read from the platform's own table (`risk_gates.PLATFORM`) so there is one
+    number, not two that can drift. If that module cannot be imported the
+    fallback is the same 1% — never something looser.
+    """
+    try:
+        from apex.platform import risk_gates as _rg
+        cap = float(_rg.PLATFORM["maxRiskPercentLive"])
+        if cap > 0:
+            return min(cap, _LIVE_RISK_CAP_FALLBACK)
+    except Exception:
+        pass
+    return _LIVE_RISK_CAP_FALLBACK
+
+
+def live_risk_refusal(units: float, instrument: str, price: float,
+                      stop_pips: float, balance: float,
+                      cap_pct: float = None):
+    """Why this LIVE order must not be sent, or None when it may be.
+
+    `floor_risk_ok` lets a broker-minimum lot past the client's risk target up
+    to what is left of the daily-loss limit (up to 4%). That is a demo
+    allowance. On live money the 1% cap holds at order time: no tolerance for
+    lot-step rounding, and a risk that cannot be measured is a refusal, not a
+    pass.
+    """
+    cap = float(cap_pct) if cap_pct else live_risk_cap_pct()
+    if not balance or balance <= 0:
+        return "live risk cap: the account balance is unknown, so the risk " \
+               "of this order cannot be measured"
+    if not stop_pips or not units:
+        return "live risk cap: the order has no measurable stop distance"
+    loss = floor_risk_at(units, instrument, price, stop_pips)
+    ceiling = balance * cap / 100.0
+    if round(loss, 2) > round(ceiling, 2):
+        return (f"{instrument}: {units:g} {unit_label(instrument)} risks "
+                f"${loss:.2f} ({loss / balance * 100:.2f}% of the account) — "
+                f"past the {cap:g}% per-trade cap on a live account "
+                f"(${ceiling:.2f}). Not sent. Use a tighter stop or a larger "
+                f"account for this instrument's minimum lot.")
+    return None
+
+
 def required_margin(units: int, instrument: str, price: float, leverage: float = 30) -> float:
     # USD-base pairs (USDJPY, USDCHF, USDCAD) are worth ONE dollar per unit; the
     # rest are worth `price` dollars per unit. The test used to be

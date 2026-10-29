@@ -168,7 +168,7 @@ def _reset_daily_if_needed(user_id=None):
 
 
 def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
-                max_dd_pct=20.0, user_id=None, symbol=None):
+                max_dd_pct=20.0, user_id=None, symbol=None, floating_pnl=None):
     """Circuit breaker — per-user when user_id is provided.
 
     Two limits, both measured in MONEY: the daily loss percentage and the
@@ -209,10 +209,25 @@ def should_stop(balance, start_balance, max_daily_loss_pct=3.0,
     # The streak is still COUNTED (strategy_session.consecutiveLosses) so the
     # journal and the dashboard keep telling the truth about what happened.
     # It just no longer stops anything.
-    daily_dd_pct = (s["dailyPnL"] / start_balance) * 100 if start_balance else 0
+    # Open LOSSES count toward the daily stop when the broker reports them
+    # (`floating_pnl`, passed only when it is the broker's own figure). A day
+    # 2.5% down realised with 2% more open was 4.5% down in equity against a
+    # 4% stop, and kept opening trades. Open profit does not count: it may
+    # never be banked, and must not buy room for more realised losses. The
+    # stored dailyPnL stays the realised figure; nothing is closed here.
+    _float_loss = 0.0
+    try:
+        _f = float(floating_pnl) if floating_pnl is not None else 0.0
+        if _f == _f and _f < 0:          # NaN-safe
+            _float_loss = _f
+    except (TypeError, ValueError):
+        _float_loss = 0.0
+    _day = s["dailyPnL"] + _float_loss
+    daily_dd_pct = (_day / start_balance) * 100 if start_balance else 0
     if daily_dd_pct < -abs(max_daily_loss_pct):
+        _incl = (f" incl. ${abs(_float_loss):.2f} floating" if _float_loss else "")
         reasons.append(f"Daily loss exceeded -{abs(max_daily_loss_pct):g}% "
-                       f"(${abs(s['dailyPnL']):.2f}) — daily stop")
+                       f"(${abs(_day):.2f}{_incl}) — daily stop")
     peak_dd = ((balance - s["peakBalance"]) / s["peakBalance"]) * 100 if s["peakBalance"] else 0
     if peak_dd < -abs(max_dd_pct):
         reasons.append(f"Drawdown from peak: {peak_dd:.1f}% (limit {abs(max_dd_pct):g}%) — capital protection stop")

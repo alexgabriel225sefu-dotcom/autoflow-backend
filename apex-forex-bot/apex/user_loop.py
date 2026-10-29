@@ -449,6 +449,55 @@ def _mode_of(user_id):
         return None
 
 
+def _is_live_cfg(cfg):
+    """True only when this loop's orders reach a REAL-MONEY cTrader account.
+
+    Two axes, both required: the broker environment is `live` and fills are
+    broker-executed (not simulated). See `_mode_of` for why `paper` alone is
+    the wrong axis. Anything missing or unreadable answers False here, so the
+    callers that use this to TIGHTEN behaviour must fail closed on their own
+    when they cannot tell — this only ever adds restrictions, never removes
+    them.
+    """
+    try:
+        env = str(getattr(cfg, "CTRADER_ENV", "") or "").strip().lower()
+        return env == "live" and getattr(cfg, "PAPER_TRADING", True) is False
+    except Exception:
+        return False
+
+
+def _engine_positions(rows, entry_meta, tracked_ids=(), user_id=None):
+    """(positions this engine opened, symbols of the ones it did not).
+
+    The weekend flatten used to close EVERY broker position, including trades
+    the client opened by hand. Evidence, strongest first: the engine's order
+    label; any other label means not ours; no label (opened before labels
+    existed) counts as ours only when the engine holds its entry record for
+    that symbol or it is the position the loop is tracking. What cannot be
+    shown to be the engine's is left open and reported, never guessed closed.
+    """
+    try:
+        from apex.brokers.ctrader import ENGINE_ORDER_LABEL as _lbl
+    except Exception:
+        _lbl = "apex-engine"
+    metas = {_nrm(k) for k in (entry_meta or {})}
+    tracked = {str(t) for t in (tracked_ids or ()) if t is not None}
+    owned, left = [], []
+    for r in rows or []:
+        label = r.get("label")
+        sym = r.get("symbol")
+        if label:
+            mine = label == _lbl
+        else:
+            mine = (_nrm(sym) in metas
+                    or str(r.get("positionId")) in tracked)
+        (owned if mine else left).append(r if mine else sym)
+    if left and user_id is not None:
+        print(f"[UserLoop:{user_id}] weekend: leaving {sorted(set(left))} "
+              f"open — not opened by the engine")
+    return owned, left
+
+
 def _already_journaled(journal, row):
     """True if this exact close is already in the journal.
 
@@ -3409,7 +3458,7 @@ def _loop(user_id, alert_fn, gen=None):
                     alert_fn(user_id, {"action": "WEEKEND_REOPEN", "symbol": symbol})
 
             if in_weekend_window:
-                # Flatten EVERY open position, then report what ACTUALLY
+                # Flatten every ENGINE position, then report what ACTUALLY
                 # happened. This block used to announce "any open position was
                 # closed" before attempting anything, close only the FOCUSED
                 # symbol, and swallow a broker failure with a bare `pass` while
@@ -3417,7 +3466,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # account: the client is told they are flat for the weekend
                 # while the position sits open at the broker, carrying exactly
                 # the Sunday-gap risk this feature exists to remove.
-                _wk_targets = []
+                _wk_targets, _wk_left = [], []
                 if cfg.PAPER_TRADING:
                     if open_pos:
                         _wk_targets = [{**open_pos,
@@ -3425,6 +3474,9 @@ def _loop(user_id, alert_fn, gen=None):
                 else:
                     try:
                         _wk_targets = list(broker.get_all_positions() or [])
+                        _wk_targets, _wk_left = _engine_positions(
+                            _wk_targets, entry_meta_by_sym,
+                            {(open_pos or {}).get("positionId")}, user_id)
                     except Exception as e:
                         print(f"[UserLoop:{user_id}] weekend: position list failed "
                               f"({e}) — falling back to the tracked position")
@@ -3524,7 +3576,8 @@ def _loop(user_id, alert_fn, gen=None):
                                  or _wk_failed != weekend_failed):
                     alert_fn(user_id, {"action": "WEEKEND_CLOSE", "symbol": symbol,
                                        "closed": _wk_closed,
-                                       "failed": sorted(_wk_failed)})
+                                       "failed": sorted(_wk_failed),
+                                       "leftManual": sorted(set(_wk_left))})
                 was_weekend_closed = True
                 weekend_failed = _wk_failed
                 time.sleep(_LOOP_INTERVAL)
@@ -3725,11 +3778,18 @@ def _loop(user_id, alert_fn, gen=None):
             # client shared one global session: user A's peak balance made
             # user B's smaller account read as a huge drawdown (false stop),
             # and the loss-streak/daily counters never tracked anyone.
+            # Open losses count toward the daily stop, but only the broker's
+            # own figure — a local estimate or a partial one is not equity.
+            _float_for_stop = (dash.get("floatingPnl")
+                               if (not cfg.PAPER_TRADING
+                                   and dash.get("equitySource") == "broker")
+                               else None)
             stop_check = strategies.should_stop(
                 paper_balance, dash["startBalance"],
                 max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
                 max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
-                user_id=user_id, symbol=symbol)
+                user_id=user_id, symbol=symbol,
+                floating_pnl=_float_for_stop)
             # Publish the verdict for the UI. strategies.should_stop() advances
             # the peak-balance and daily-reset state as a side effect, so the
             # Telegram screens must NEVER call it themselves just to draw a
@@ -4179,6 +4239,12 @@ def _loop(user_id, alert_fn, gen=None):
                 # what NFP/CPI/FOMC destroys, so this guard was doing nothing
                 # precisely where it mattered most.
                 ev = news.high_impact_window(_currency_legs(symbol))
+                # LIVE only: a guard that cannot see the calendar is not a
+                # guard. Demo keeps the fail-open behaviour above.
+                _news_block = news.live_entry_block(live=_is_live_cfg(cfg))
+                if _news_block and not ev:
+                    entry_ok = False
+                    _skip(f"news guard: {_news_block}")
                 if ev:
                     entry_ok = False
                     _skip(f"news guard: {ev.get('title', 'high-impact event') if isinstance(ev, dict) else ev}",
@@ -4542,7 +4608,25 @@ def _loop(user_id, alert_fn, gen=None):
                         sizing_balance,
                         float(getattr(cfg, "MAX_DAILY_LOSS_PCT", 4.0)),
                         _day_pnl)
-                    if not forex.floor_risk_ok(units, symbol, price,
+                    # LIVE: the daily-loss headroom above is a DEMO allowance.
+                    # On real money the platform's 1% per-trade cap holds at
+                    # order time, minimum lot or not — a broker minimum that
+                    # would risk more is refused here, never sent. Measured
+                    # against the smaller of the sizing and the live balance.
+                    _live_why = None
+                    if _is_live_cfg(cfg):
+                        _cap_bal = min(b for b in (sizing_balance, paper_balance)
+                                       if b and b > 0) if (
+                            (sizing_balance and sizing_balance > 0)
+                            or (paper_balance and paper_balance > 0)) else 0.0
+                        _live_why = forex.live_risk_refusal(
+                            units, symbol, price, stop_pips_eff, _cap_bal)
+                    if _live_why:
+                        print(f"[UserLoop:{user_id}] LIVE REFUSED {action} "
+                              f"{symbol}: {_live_why}")
+                        _skip(_live_why)
+                        entry_ok = False
+                    elif not forex.floor_risk_ok(units, symbol, price,
                                                stop_pips_eff, _budget,
                                                hard_ceiling_usd=_hard):
                         # Name the numbers. "Minimum lot too big" alone leaves
@@ -4576,16 +4660,22 @@ def _loop(user_id, alert_fn, gen=None):
                             _would = forex.floor_risk_at(units, symbol, price,
                                                          stop_pips_eff)
                             if _would > _budget * 1.10:
+                                _ml_pct = (round(_would / sizing_balance * 100, 2)
+                                           if sizing_balance else None)
+                                _ml_line = forex.order_line(
+                                    symbol, action, units, sl_price, tp_price,
+                                    _would, _ml_pct)
                                 dash["minLotNotice"] = {
                                     "symbol": symbol, "units": units,
                                     "riskUsd": round(_would, 2),
-                                    "pct": round(_would / sizing_balance * 100, 2)
-                                    if sizing_balance else None,
-                                    "targetUsd": round(_budget, 2)}
+                                    "pct": _ml_pct,
+                                    "targetUsd": round(_budget, 2),
+                                    "orderLine": _ml_line}
                                 print(f"[UserLoop:{user_id}] {symbol}: broker minimum "
                                       f"{units:g} {forex.unit_label(symbol)} risks "
                                       f"${_would:.2f} vs the ${_budget:.2f} target "
-                                      f"— allowed, under the daily-loss limit")
+                                      f"— allowed, under the daily-loss limit "
+                                      f"[{_ml_line}]")
                         except Exception:
                             pass
                 if not entry_ok:
@@ -4639,11 +4729,39 @@ def _loop(user_id, alert_fn, gen=None):
                             price = round(_ra if action == "BUY" else _rb, 6)
                             sl_price = round(price - sl_dist if action == "BUY" else price + sl_dist, 6)
                             tp_price = round(price + tp_dist if action == "BUY" else price - tp_dist, 6)
-                    except Exception:
-                        pass
+                    except Exception as _spread_err:
+                        # The re-check itself failed (no quote, bad numbers).
+                        # This used to be a bare `pass`, i.e. send with no
+                        # spread check at all. Live money is not sent blind;
+                        # demo keeps going, but now it says so.
+                        if _is_live_cfg(cfg):
+                            _skip_exec = True
+                            _skip(f"spread could not be re-checked before exec "
+                                  f"({type(_spread_err).__name__}) — live order "
+                                  f"not sent")
+                        else:
+                            print(f"[UserLoop:{user_id}] spread re-check failed "
+                                  f"for {symbol} ({_spread_err}) — demo: sending "
+                                  f"without it")
                     if _skip_exec:
                         entry_ok = False
                     else:
+                        # THE order line: what this entry is about to risk,
+                        # stated once, in the log and in the journal below.
+                        _risk_usd, _risk_pct = 0.0, None
+                        try:
+                            _risk_usd, _risk_pct = forex.entry_risk(
+                                units, symbol, price, stop_pips_eff,
+                                paper_balance or sizing_balance)
+                            _risk_usd = round(_risk_usd, 2)
+                            _risk_pct = (round(_risk_pct, 3)
+                                         if _risk_pct is not None else None)
+                        except Exception:
+                            pass
+                        _order_line = forex.order_line(
+                            symbol, action, units, sl_price, tp_price,
+                            _risk_usd, _risk_pct)
+                        print(f"[UserLoop:{user_id}] ORDER {_order_line}")
                         try:
                             from apex import control as _ctl
                             _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
@@ -4684,6 +4802,9 @@ def _loop(user_id, alert_fn, gen=None):
                                 strategy_version=signal.get("strategy_version"),
                                 payload={"side": action, "units": units,
                                          "sl": sl_price, "tp": tp_price,
+                                         "riskUsd": _risk_usd,
+                                         "riskPct": _risk_pct,
+                                         "orderLine": _order_line,
                                          "reason": getattr(_decision, "reason", None),
                                          "detail": str(getattr(_decision, "detail", ""))[:200],
                                          "rid": _rid})
@@ -4724,6 +4845,9 @@ def _loop(user_id, alert_fn, gen=None):
                                                 strategy_version=signal.get("strategy_version"),
                                                 payload={"side": action, "units": units,
                                                          "sl": sl_price, "tp": tp_price,
+                                                         "riskUsd": _risk_usd,
+                                                         "riskPct": _risk_pct,
+                                                         "orderLine": _order_line,
                                                          "rid": _rid})
                                 except Exception as _e3:
                                     print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")
@@ -5132,6 +5256,34 @@ def _alert_fn_for(user_id, alert_fn):
         return alert_fn
 
 
+def _start_fence_required(user_id):
+    """(must this loop hold a lease to start?, why) — for a None lease.
+
+    Required on a LIVE account (platform selection or the legacy record), and
+    in production whenever the mode cannot be read: an account nobody can show
+    to be demo is not evidence of safety. Read from stored state only — no
+    broker call on the start path.
+    """
+    prod = str(os.getenv("APP_ENV", "")).strip().lower() == "production"
+    try:
+        from apex.platform import ctrader_link as _cl
+        pmode = _cl.selected_mode(user_id)
+    except Exception as e:                                  # noqa: BLE001
+        pmode = f"unreadable ({type(e).__name__})"
+    if pmode is not None:
+        if pmode == "demo":
+            return False, "a platform demo account"
+        if pmode == "live":
+            return True, "a platform LIVE account"
+        return prod, f"a platform account whose mode is {pmode}"
+    mode = _mode_of(user_id)
+    if mode == "live":
+        return True, "a LIVE account"
+    if mode in ("demo", "simulation"):
+        return False, f"a {mode} account"
+    return prod, "an account whose mode cannot be read"
+
+
 def start(user_id, alert_fn=None):
     user_id = str(user_id)
     alert_fn = _alert_fn_for(user_id, alert_fn)
@@ -5149,9 +5301,23 @@ def start(user_id, alert_fn=None):
     # the old and new containers, and without this both start a loop for the
     # same cTrader account — the generation token below cannot see the other
     # process. None means no shared backend: uncontended, so carry on.
-    if ownership.acquire(user_id) is False:
+    _lease = ownership.acquire(user_id)
+    if _lease is False:
         print(f"[UserLoop] REFUSED start for {user_id}: another instance owns it")
         return False
+    if _lease is None:
+        # No shared backend: nothing fences this loop against a second
+        # container. Tolerable on demo; on real money two engines managing
+        # one account is worse than a loop that waits for Redis to come back
+        # (the watchdog retries).
+        _fence, _why = _start_fence_required(user_id)
+        if _fence:
+            print(f"[UserLoop] REFUSED start for {user_id}: no ownership lease "
+                  f"backend and this is {_why} — a live loop never runs "
+                  f"unfenced")
+            return False
+        print(f"[UserLoop] WARNING {user_id}: no ownership lease backend — "
+              f"starting UNFENCED ({_why})")
     # Renew on a thread of its own, not from the trading tick.
     ownership.start_renewer(user_id, on_lost=ownership.mark_lost)
 
