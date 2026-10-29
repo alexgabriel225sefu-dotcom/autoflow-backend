@@ -402,6 +402,10 @@ def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
     except _rd.RuleDocInvalid as e:
         return _err(422, "RULE_INVALID", "this rule cannot be activated",
                     problems=e.problems)
+    except _store.RuleLimitReached as e:
+        # Before ValueError, which it subclasses: a 400 would tell the client
+        # their request was malformed when it is their account that is full.
+        return _err(409, "RULE_LIMIT_REACHED", _safe_error(e), limit=e.limit)
     except ValueError as e:
         return _err(400, "BAD_REQUEST", _safe_error(e))
     finally:
@@ -1011,7 +1015,11 @@ def _rule_action(action, rid, headers, body):
     # orders, so it is the one that re-checks the session against Supabase
     # instead of trusting a cached answer, insists on a confirmed address, and
     # requires a live licence.
-    sensitive = action == "activate"
+    #
+    # Resume is held to the same gate. It moves a paused or ARCHIVED rule back
+    # to ACTIVE, so without it a client whose licence support had withdrawn
+    # could park a rule before the withdrawal and resume it after.
+    sensitive = action in ("activate", "resume")
     p = _authenticate(headers, fresh=sensitive)
 
     if action == "validate":
@@ -1031,6 +1039,12 @@ def _rule_action(action, rid, headers, body):
         _ent.require_activation(p.user_id)
         return _ok({"rule": _store.activate(
             p.user_id, rid, known_condition_ids=_cond.available())})
+
+    if action == "resume":
+        # The same order as activate: ownership first (404 before 402).
+        _store.get(p.user_id, rid)
+        _id.require_verified_email(p)
+        _ent.require_activation(p.user_id)
 
     if action in ("pause", "resume", "archive"):
         want = {"pause": _rd.PAUSED, "resume": _rd.ACTIVE,
