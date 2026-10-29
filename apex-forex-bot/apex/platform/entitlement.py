@@ -86,7 +86,8 @@ PLAN_NOTICE = (
 # they can do, because a refusal that does not is a dead end.
 TRIAL_EXPIRED_MESSAGE = (
     f"the {_plans.TRIAL_DAYS}-day free demo trial for this account has "
-    f"ended — reconnect once a plan is active, or contact support")
+    f"ended, so demo automation is paused. Your rules and settings are "
+    f"kept — contact support to continue")
 NO_LICENCE_MESSAGE = (
     "this account has no demo trial on file — contact support to start one")
 
