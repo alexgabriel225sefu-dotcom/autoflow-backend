@@ -16,7 +16,7 @@ import type { ApiError, Execution, ReadState } from "@/lib/api";
 // longhand here as well, and the two drifted: this copy claimed "No
 // cTrader account is connected" for a status that also means "linked
 // but nothing selected".
-import { plainRead } from "./plain";
+import { plainErrorTitle, plainRead } from "./plain";
 
 export function StatusPill({ mode }: { mode?: "demo" | "live" | null }) {
   if (!mode) return <span className="pill pill-muted">No account selected</span>;
@@ -64,8 +64,12 @@ export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () 
         <strong>{error.code}</strong>
         {error.status ? <span className="muted"> · HTTP {error.status}</span> : null}
       </div>
-      {/* The backend's own words. Not a friendlier sentence we invented: the
-          operator needs the real reason, and the client deserves it. */}
+      {/* A plain lead for the codes we know, then the backend's own words.
+          Not a friendlier replacement: the operator needs the real reason,
+          and the client deserves it. */}
+      {plainErrorTitle(error.code) ? (
+        <p style={{ fontWeight: 600 }}>{plainErrorTitle(error.code)}</p>
+      ) : null}
       <p>{error.message}</p>
       {error.problems?.length ? (
         <ul className="problems">{error.problems.map((p) => <li key={p}>{p}</li>)}</ul>

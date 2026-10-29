@@ -38,6 +38,7 @@
  * live setup as expired, or offer one that has gone. Only the DELTA of the
  * local clock is trusted, and every device agrees about that.
  */
+import { plainError } from "@/components/app/plain";
 import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 import { api, type ApprovalRead, type ApprovalResult } from "@/lib/api";
@@ -137,7 +138,7 @@ export function PendingApproval() {
     // the shell's unread badge has just changed too.
     invalidate("approvals", "positions", "journal?limit=8",
                "notifications?limit=1");
-    if (!res.ok) return `${res.code}: ${res.message}`;
+    if (!res.ok) return plainError(res);
     // The server's own sentence. It is the only thing that knows whether the
     // broker confirmed the order or never answered, and those are different
     // facts a client has to act on differently.
@@ -255,7 +256,7 @@ function DismissButton({ onDone }: { onDone: () => void }) {
             ? (res.data.alreadyGone
               ? "It had already been answered."
               : "Dismissed. Nothing was opened.")
-            : `${res.code}: ${res.message}`);
+            : plainError(res));
           invalidate("approvals", "notifications?limit=1");
           onDone();
         }}

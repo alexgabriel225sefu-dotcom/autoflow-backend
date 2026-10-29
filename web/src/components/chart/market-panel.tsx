@@ -24,7 +24,7 @@ import { RefreshCw } from "lucide-react";
 import type { CandlesRead, PositionsRead } from "@/lib/api";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice } from "@/components/app/state";
-import { plainRead } from "@/components/app/plain";
+import { plainError, plainRead } from "@/components/app/plain";
 import { TIMEFRAMES } from "@/components/app/rule-form";
 import { isStale, positionOverlays, sameInstrument, type ChartMarker, type PositionOverlay } from "./chart-data";
 import { PriceChart, type Overlay } from "./price-chart";
@@ -131,7 +131,7 @@ export function MarketPanel({
   const lines = useMemo(() => {
     const p = positions.result;
     if (!p) return { overlays: [] as PositionOverlay[], note: null as string | null };
-    if (!p.ok) return { overlays: [], note: `Position lines unavailable — ${p.code}: ${p.message}` };
+    if (!p.ok) return { overlays: [], note: `Position lines unavailable — ${plainError(p)}` };
     if (p.data.status !== "ok") {
       return { overlays: [], note: `Position lines unavailable — ${plainRead(p.data.status, p.data.reason)?.label ?? p.data.status}` };
     }

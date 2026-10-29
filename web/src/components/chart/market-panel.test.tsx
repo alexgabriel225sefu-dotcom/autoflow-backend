@@ -317,7 +317,7 @@ describe("market panel — position lines", () => {
     h.positions = hook(err("STORE_UNAVAILABLE", "positions read failed"));
     mount();
     expect(screen.getByText(/Position lines unavailable/)).toBeDefined();
-    expect(screen.getByText(/STORE_UNAVAILABLE/)).toBeDefined();
+    expect(screen.getByText(/positions read failed/)).toBeDefined();
     expect(candleSeries().lines).toHaveLength(0);
     expect(chartDrawn()).toBe(true);
   });

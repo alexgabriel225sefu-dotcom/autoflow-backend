@@ -288,3 +288,51 @@ export function tonePill(tone: Tone): string {
     : tone === "accent" ? "pill pill-accent"
     : "pill pill-muted";
 }
+
+/* ── a failed request ─────────────────────────────────────────────────── */
+
+/**
+ * What each known refusal code means to a person. These are the lead
+ * sentences only: the server's own message (the wait it asks for, the reason
+ * it gives) is always kept after them, never replaced.
+ */
+const ERROR_SENTENCES: Record<string, string> = {
+  RATE_LIMITED: "Too many requests in a short time.",
+  AUTH_UNAVAILABLE: "Your sign-in could not be confirmed.",
+  AUTH_REQUIRED: "Please sign in again.",
+  STORE_UNAVAILABLE: "Your data could not be reached just now. Nothing was lost.",
+  ACCOUNTS_FAILED: "Your cTrader accounts could not be loaded.",
+  ACCOUNT_LIMIT: "This plan's account limit has been reached.",
+  NO_SUCH_ACCOUNT: "That account is not linked to your login.",
+  LICENCE_REQUIRED: "This needs an active licence.",
+  LICENCE_REVOKED: "Access on this account was withdrawn.",
+  NOT_FOUND: "That could not be found.",
+  NETWORK: "The connection to Apex4Traders failed.",
+  BAD_RESPONSE: "The server sent an answer that could not be read.",
+  REFRESH_FAILED: "cTrader would not renew the authorisation.",
+  REFRESH_UNAVAILABLE: "cTrader could not be asked to renew the authorisation just now.",
+  BROKER_REJECTED: "Your broker rejected the request.",
+  BROKER_UNKNOWN: "Your broker did not confirm the request.",
+  UNAVAILABLE: "This is temporarily unavailable.",
+};
+
+/** The lead sentence for a code, or null when the code is not one we know. */
+export function plainErrorTitle(code: string): string | null {
+  return ERROR_SENTENCES[code] ?? null;
+}
+
+/**
+ * A refusal as one readable string, replacing `${code}: ${message}`.
+ *
+ * Known code: our sentence, then the server's words. Unknown code: the
+ * server's words alone, because a bare code reads as a crash and the message
+ * is what the server meant to say. Nothing is invented for a code we have not
+ * seen, and the message is never dropped.
+ */
+export function plainError(e: { code: string; message?: string | null }): string {
+  const lead = ERROR_SENTENCES[e.code];
+  const msg = (e.message ?? "").trim();
+  if (lead && msg && msg !== lead) return `${lead} ${msg}`;
+  if (lead) return lead;
+  return msg || "Something went wrong. Please try again.";
+}

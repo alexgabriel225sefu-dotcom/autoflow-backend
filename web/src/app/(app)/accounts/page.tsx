@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Check, Plug, RefreshCw } from "lucide-react";
+import { plainError } from "@/components/app/plain";
 import { api, type ApiError, type CtraderStatus } from "@/lib/api";
 import { invalidateBrokerViews, useRead, whenSynced } from "@/lib/use-api";
 import {
@@ -23,7 +24,7 @@ export default function AccountsPage() {
     setBusy(null);
     if (!r.ok) {
       if (r.code === "ACCOUNT_LIMIT") return setLimit(r);
-      return setErr(`${r.code}: ${r.message}`);
+      return setErr(plainError(r));
     }
     invalidateBrokerViews();
   }
@@ -32,7 +33,7 @@ export default function AccountsPage() {
     setBusy("disconnect"); setErr(null); setLimit(null);
     const r = await api("ctrader/disconnect", { method: "POST" });
     setBusy(null);
-    if (!r.ok) return setErr(`${r.code}: ${r.message}`);
+    if (!r.ok) return setErr(plainError(r));
     invalidateBrokerViews();
   }
 
