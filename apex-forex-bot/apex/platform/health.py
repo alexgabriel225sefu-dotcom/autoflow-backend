@@ -41,6 +41,7 @@ import os
 import time
 
 from apex import user_store
+from apex.platform import alerts as _alerts
 from apex.platform import billing as _billing
 from apex.platform import ratelimit as _rl
 from apex.platform import waitlist as _wait
@@ -411,6 +412,12 @@ def ready(*, force=False):
     if degraded:
         payload["degraded"] = degraded
     out = ((503 if failed else 200), payload)
+    if failed and is_production():
+        # Fail-closed in production is the event an operator must hear about.
+        # Check NAMES only (never messages, which can name env variables), and
+        # the alert module de-duplicates, so the 5 s cache cannot page twice.
+        _alerts.log_event("error", "readyz_failed", failed=",".join(failed))
+        _alerts.notify_ops("readyz_fail:" + ",".join(sorted(failed)))
     _ready_cache["at"] = now
     _ready_cache["value"] = out
     return out

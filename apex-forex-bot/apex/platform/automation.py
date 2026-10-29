@@ -40,6 +40,7 @@ import uuid
 
 from apex import automation as _eng_auto
 from apex import user_store
+from apex.platform import alerts as _alerts
 from apex.platform import approvals as _appr
 from apex.platform import ctrader_link as _link
 from apex.platform import emergency as _emerg
@@ -65,6 +66,14 @@ _STOP_SETTLE_S = 3.0
 _STOPPED_RECORD = {"state": "stopped", "ruleDocId": None, "mode": None,
                    "startedAt": None, "appliedTerms": None,
                    "notApplied": None, "engineSnapshot": None}
+
+
+# Consecutive failed revivals per user (this process). Reaching the threshold
+# raises one distinct operator alert; a success or a healthy loop resets it.
+REPEAT_FAILURE_THRESHOLD = 3
+_revive_failures = {}
+# Refusals that are the client's own decision, not a fault worth a page.
+_QUIET_REFUSALS = ("STOPPED_MEANWHILE",)
 
 
 class AutomationRefused(RuntimeError):
@@ -1018,6 +1027,26 @@ def pause(user_id, *, stopper=None):
     return dict(status(user_id), paused=True)
 
 
+def _revival_failed(uid, cause):
+    """Tell the operator a loop could not be brought back. Never raises.
+
+    The cause is a code or an exception TYPE, never a message: messages can
+    carry provider payloads. Repeats get their own alert so a fault that
+    survives several cycles is not mistaken for a one-off.
+    """
+    try:
+        n = _revive_failures.get(uid, 0) + 1
+        _revive_failures[uid] = n
+        _alerts.log_event("error", "revival_failed", user_id=uid,
+                          cause=cause, consecutive=n)
+        _alerts.notify_ops(cause, user_id=uid)
+        if n >= REPEAT_FAILURE_THRESHOLD:
+            _alerts.notify_ops("revival_repeated_failure", user_id=uid,
+                               detail=f"{n} consecutive failures, last: {cause}")
+    except Exception:                                        # noqa: BLE001
+        pass
+
+
 def supervise(*, starter=None, mode_lister=None):
     """Restart platform loops whose thread died. Returns (alive, revived).
 
@@ -1071,25 +1100,39 @@ def supervise(*, starter=None, mode_lister=None):
             continue                    # stopped or paused on purpose
         if user_loop.is_running(uid):
             alive += 1
+            _revive_failures.pop(uid, None)
             continue
         rid = rec.get("ruleDocId")
         if not rid:
             print(f"[Automation] {uid} is RUNNING with no rule recorded — "
                   f"not revived, a human should look at it")
+            _alerts.log_event("error", "revival_no_rule", user_id=uid)
+            _alerts.notify_ops("revival_no_rule", user_id=uid)
             continue
         try:
             start(uid, rid, starter=starter, mode_lister=mode_lister,
                   revive=True)
             revived += 1
+            _revive_failures.pop(uid, None)
             print(f"[Automation] revived the loop for {uid} on rule {rid}")
+            _alerts.log_event("warn", "loop_revived", user_id=uid)
+            _alerts.notify_ops("loop_revived", user_id=uid)
         except AutomationRefused as e:
             # Expected and useful: the licence lapsed, the rule was archived,
             # the broker cannot confirm the mode. Say which, and leave the
             # record alone so the client still sees what they asked for.
             print(f"[Automation] not reviving {uid}: {e.code} — {e.detail}")
+            if e.code not in _QUIET_REFUSALS:
+                _revival_failed(uid, f"revival_refused:{e.code}")
+        except (_ent.NotEntitled, _emerg.Halted):
+            # A lapsed or withdrawn licence, or a halt the operator ordered:
+            # the system doing what it should. Not a page.
+            _revive_failures.pop(uid, None)
+            print(f"[Automation] not reviving {uid}: licence or halt")
         except Exception as e:                               # noqa: BLE001
             print(f"[Automation] reviving {uid} failed: "
                   f"{type(e).__name__}: {e}")
+            _revival_failed(uid, f"revival_failed:{type(e).__name__}")
     return alive, revived
 
 
