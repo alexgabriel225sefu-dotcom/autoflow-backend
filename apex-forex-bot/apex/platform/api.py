@@ -27,6 +27,7 @@ import contextvars
 import json
 import re
 
+from apex.platform import account_data as _acct
 from apex.platform import conditions as _cond
 from apex.platform import approvals as _appr
 from apex.platform import automation as _auto
@@ -826,6 +827,40 @@ def _dispatch(method, route, headers, body, query=None):
             _id.require_verified_email(p)
         return _live_gate.http(
             method, route, p, _body(body) if method != "GET" else None)
+
+    # ── the client's own data: export and erasure ──────────────────────
+    # Both skip the trial start: exporting must not write, and erasing must
+    # not re-create the licence record it is about to remove.
+    if route == "account/export":
+        if method != "GET":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers, fresh=True, start_trial=False)
+        try:
+            return _ok(_acct.export(p.user_id))
+        except _acct.AccountDataError as e:
+            return _err(e.status, e.code, _safe_error(e))
+
+    if route == "account":
+        if method != "DELETE":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers, fresh=True, start_trial=False)
+        # Per PERSON as well as per session, and closed if the limiter breaks.
+        ok_person, wait = _rl.check_user("account_delete", p.user_id,
+                                         fail_closed=True)
+        if not ok_person:
+            return _rl.refusal("account_delete", wait)
+        try:
+            out = _acct.delete(p.user_id, _body(body) or {},
+                               stop_automation=_auto.stop)
+        except _acct.AccountDataError as e:
+            return _err(e.status, e.code, _safe_error(e))
+        print(f"[API] account erased for {p.user_id}: "
+              f"{_acct.describe_deleted(out['deleted'])} "
+              f"authUserDeleted={out['authUserDeleted']}")
+        # The session's cached answer dies with the account.
+        _id.forget(_id.bearer_token(headers.get("Authorization")
+                                    or headers.get("authorization")))
+        return _ok(out)
 
     if route == "me" and method == "GET":
         p = _authenticate(headers)
