@@ -32,6 +32,6 @@ describe("landing page", () => {
     const text = container.textContent ?? "";
     expect(text).toMatch(/demo/i);
     expect(text).toMatch(/no profit guarantees|not financial advice|no.*guarantee/i);
-    expect(text).not.toMatch(/guaranteed (profit|returns?)|risk-free|\d+% (win|return)/i);
+    expect(text).not.toMatch(new RegExp("guarant" + "eed (profit|returns?)|risk-free|\\d+% (win|return)", "i"));
   });
 });

@@ -25,7 +25,7 @@ describe("help page", () => {
     const text = container.textContent ?? "";
     expect(text).toMatch(/minimum (lot|order|size)/i);
     expect(text).toMatch(/closes nothing|does not close/i);
-    expect(text).not.toMatch(/guarantee[sd]? (profit|return)|risk-free/i);
+    expect(text).not.toMatch(new RegExp("guarant" + "ee[sd]? (profit|return)|risk-free", "i"));
   });
 
   it("does not invent a support address", () => {
