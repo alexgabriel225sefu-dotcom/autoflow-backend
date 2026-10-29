@@ -580,6 +580,15 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         return _ok(_read.symbols(p.user_id))
 
+    if route == "trade/min-lot" and method == "GET":
+        # Whether the broker's minimum order size would risk more than the
+        # client chose, as an estimate. Read-only, like the rest of _read.
+        p = _authenticate(headers)
+        q = query or {}
+        return _ok(_read.min_lot(
+            p.user_id, symbol=q.get("symbol"), timeframe=q.get("timeframe"),
+            risk_percent=q.get("riskPercent")))
+
     if route in ("positions", "orders") and method == "GET":
         p = _authenticate(headers)
         fn = _read.positions if route == "positions" else _read.orders

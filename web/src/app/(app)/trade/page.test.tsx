@@ -242,6 +242,59 @@ describe("my methods", () => {
   });
 });
 
+describe("the minimum-size warning", () => {
+  const MIN_LOT = (over: Record<string, unknown> = {}) => ok({
+    connected: true, status: "ok", accountId: 7, mode: "demo",
+    minLot: {
+      symbol: "XAUUSD", timeframe: "1h", minUnits: 1, unitLabel: "oz", units: 1,
+      stopDistance: 100, targetUsd: 38.17, targetPct: 1, riskUsd: 97.4, riskPct: 2.55,
+      exceeds: true, basis: "2.5 x ATR(14) on the last bars", ...over,
+    },
+  });
+
+  it("appears under Risk when the broker's smallest order risks more than was chosen", async () => {
+    routes["trade/min-lot"] = MIN_LOT();
+    await loaded();
+    choose(/^XAUUSD$|Gold/);
+    const note = await screen.findByText(/smallest order for XAUUSD is 1 oz/i, undefined, { timeout: 3000 });
+    expect(note.textContent).toMatch(/more than the \$38\.17/);
+    expect(note.textContent).toMatch(/estimate/i);
+    expect(calls.some((c) => c.path.startsWith("trade/min-lot?symbol=XAUUSD"))).toBe(true);
+  });
+
+  it("does not appear when the minimum fits", async () => {
+    routes["trade/min-lot"] = MIN_LOT({ exceeds: false, riskUsd: 30, riskPct: 0.8 });
+    await loaded();
+    choose(/^XAUUSD$|Gold/);
+    await waitFor(() => expect(calls.some((c) => c.path.startsWith("trade/min-lot"))).toBe(true), { timeout: 3000 });
+    expect(screen.queryByText(/smallest order for/i)).toBeNull();
+  });
+
+  it("says it could not check, rather than staying silent, when the broker did not answer", async () => {
+    routes["trade/min-lot"] = ok({ connected: true, status: "unavailable", reason: "timeout" });
+    await loaded();
+    choose(/^XAUUSD$|Gold/);
+    expect(await screen.findByText(/could not check the broker's minimum size/i, undefined, { timeout: 3000 })).toBeDefined();
+  });
+
+  it("asks nothing until an instrument is chosen", async () => {
+    routes["trade/min-lot"] = MIN_LOT();
+    await loaded();
+    await new Promise((r) => setTimeout(r, 600));
+    expect(calls.some((c) => c.path.startsWith("trade/min-lot"))).toBe(false);
+  });
+
+  it("does not stop Start: it informs, the client decides", async () => {
+    routes["trade/min-lot"] = MIN_LOT();
+    await loaded();
+    choose(/^XAUUSD$|Gold/);
+    choose(/Trend Following/);
+    choose(/Approval Required/);
+    await screen.findByText(/smallest order for XAUUSD/i, undefined, { timeout: 3000 });
+    expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
 describe("Start on demo", () => {
   it("saves, writes the strategy, activates and starts, in that order, with what was chosen", async () => {
     await loaded();

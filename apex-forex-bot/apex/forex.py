@@ -271,6 +271,22 @@ def floor_risk_ok(units: float, instrument: str, price: float,
     return False
 
 
+def daily_loss_headroom_usd(start_balance: float, limit_pct: float,
+                            daily_pnl: float) -> float:
+    """Dollars the account can still lose today before the daily-loss stop.
+
+    The stop fires when the day's net P&L falls below -limit_pct of the day's
+    starting balance, so what is left is that limit plus whatever the day has
+    already made or lost. `floor_risk_ok` used to be given the WHOLE limit as
+    its ceiling no matter what had happened that day: after a 2.2% loss against
+    a 3% limit, a second minimum-lot trade risking 2.7% was waved through
+    because 2.7% is under 3%, and the day ended 4.9% down. Never negative.
+    """
+    if not start_balance or not limit_pct:
+        return 0.0
+    return max(0.0, start_balance * (abs(limit_pct) / 100.0) + (daily_pnl or 0.0))
+
+
 def required_margin(units: int, instrument: str, price: float, leverage: float = 30) -> float:
     # USD-base pairs (USDJPY, USDCHF, USDCAD) are worth ONE dollar per unit; the
     # rest are worth `price` dollars per unit. The test used to be

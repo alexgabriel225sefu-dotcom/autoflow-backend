@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { CtraderStatus, Execution, StrategyPreset } from "@/lib/api";
+import type { CtraderStatus, Execution, MinLot, MinLotRead, StrategyPreset } from "@/lib/api";
 import {
-  EMPTY_CHOICE, missingChoices, riskAmounts, ROW_LIMIT, startState, SYMBOLS,
-  symbolView, tradeBody, type TradeChoice,
+  EMPTY_CHOICE, minLotNotice, minLotPath, missingChoices, riskAmounts, ROW_LIMIT,
+  startState, SYMBOLS, symbolView, tradeBody, type TradeChoice,
 } from "./trade-model";
 
 const STRAT: StrategyPreset = {
@@ -212,5 +212,60 @@ describe("a method of your own", () => {
     expect(b.sides).toBe("BUY");
     expect(b.name).toBe("My RSI dip · XAUUSD");
     expect(b.symbols).toEqual(["XAUUSD"]);
+  });
+});
+
+describe("the broker's minimum size against the chosen risk", () => {
+  const GOLD: TradeChoice = { ...EMPTY_CHOICE, symbol: "XAUUSD", timeframe: "1h", riskPercent: "1" };
+  const lot = (over: Partial<MinLot> = {}): MinLot => ({
+    symbol: "XAUUSD", timeframe: "1h", minUnits: 1, unitLabel: "oz", units: 1,
+    stopDistance: 100, targetUsd: 38.17, targetPct: 1, riskUsd: 97.4, riskPct: 2.55,
+    exceeds: true, basis: "2.5 x ATR(14) on the last bars", ...over,
+  });
+  const read = (over: Partial<MinLotRead> = {}): MinLotRead =>
+    ({ connected: true, status: "ok", minLot: lot(), ...over });
+
+  it("asks only once there is an instrument, a timeframe and a usable risk", () => {
+    expect(minLotPath(GOLD)).toBe("trade/min-lot?symbol=XAUUSD&timeframe=1h&riskPercent=1");
+    expect(minLotPath({ ...GOLD, symbol: "" })).toBeNull();
+    expect(minLotPath({ ...GOLD, riskPercent: "" })).toBeNull();
+    expect(minLotPath({ ...GOLD, riskPercent: "0" })).toBeNull();
+    expect(minLotPath({ ...GOLD, riskPercent: "101" })).toBeNull();
+    expect(minLotPath({ ...GOLD, riskPercent: "abc" })).toBeNull();
+  });
+
+  it("warns, naming the minimum, the risk it implies and the risk chosen", () => {
+    const n = minLotNotice(read(), GOLD)!;
+    expect(n.tone).toBe("warn");
+    expect(n.text).toContain("1 oz");
+    expect(n.text).toContain("$97.40");
+    expect(n.text).toContain("2.55%");
+    expect(n.text).toContain("$38.17");
+    expect(n.text).toContain("(1%)");
+  });
+
+  it("says it is an estimate and names its basis", () => {
+    const t = minLotNotice(read(), GOLD)!.text;
+    expect(t).toMatch(/estimate/i);
+    expect(t).toContain("2.5 x ATR");
+  });
+
+  it("is silent when the minimum fits inside the chosen risk", () => {
+    expect(minLotNotice(read({ minLot: lot({ exceeds: false, riskUsd: 36, riskPct: 0.94 }) }), GOLD)).toBeNull();
+  });
+
+  it("never reassures when the broker could not be asked", () => {
+    const n = minLotNotice({ connected: true, status: "unavailable", reason: "x" }, GOLD)!;
+    expect(n.tone).toBe("muted");
+    expect(n.text).toMatch(/could not check/i);
+    expect(minLotNotice({ connected: false, status: "not_connected" } as MinLotRead, GOLD)).toBeNull();
+    expect(minLotNotice(null, GOLD)).toBeNull();
+  });
+
+  it("drops an answer that belongs to a choice the client has since changed", () => {
+    expect(minLotNotice(read(), { ...GOLD, symbol: "XAGUSD" })).toBeNull();
+    expect(minLotNotice(read(), { ...GOLD, timeframe: "15m" })).toBeNull();
+    expect(minLotNotice(read(), { ...GOLD, riskPercent: "2" })).toBeNull();
+    expect(minLotNotice(read(), { ...GOLD, riskPercent: "1.0" })).not.toBeNull();
   });
 });

@@ -4528,8 +4528,20 @@ def _loop(user_id, alert_fn, gen=None):
                     # 1 oz risks 1.49% of this account against a 4% daily stop
                     # the client set themselves. What must never happen is a
                     # single trade that can trip that stop on its own.
-                    _hard = sizing_balance * (
-                        float(getattr(cfg, "MAX_DAILY_LOSS_PCT", 4.0)) / 100.0)
+                    #
+                    # What is LEFT of that limit today, not the whole of it. The
+                    # whole limit let a second minimum-lot trade through after
+                    # the first had already lost most of it, and the day ended
+                    # at -4.9% against a 3% stop.
+                    try:
+                        _day_pnl = float(strategies.get_session(user_id)
+                                         .get("dailyPnL") or 0.0)
+                    except Exception:
+                        _day_pnl = 0.0
+                    _hard = forex.daily_loss_headroom_usd(
+                        sizing_balance,
+                        float(getattr(cfg, "MAX_DAILY_LOSS_PCT", 4.0)),
+                        _day_pnl)
                     if not forex.floor_risk_ok(units, symbol, price,
                                                stop_pips_eff, _budget,
                                                hard_ceiling_usd=_hard):
@@ -4542,10 +4554,13 @@ def _loop(user_id, alert_fn, gen=None):
                             _would = forex.floor_risk_at(units, symbol, price,
                                                          stop_pips_eff)
                             _pct = (_would / sizing_balance * 100) if sizing_balance else 0
+                            _left = (f"the ${_hard:.2f} left of "
+                                     if _day_pnl < 0 else "")
                             _skip(f"{symbol}: broker minimum is "
                                   f"{units:g} {forex.unit_label(symbol)}, which risks "
                                   f"${_would:.2f} ({_pct:.2f}% of the account) — past "
-                                  f"your {getattr(cfg, 'MAX_DAILY_LOSS_PCT', 4.0):g}% "
+                                  f"{_left}your "
+                                  f"{getattr(cfg, 'MAX_DAILY_LOSS_PCT', 4.0):g}% "
                                   f"daily-loss limit, so one trade could stop the day "
                                   f"by itself")
                         except Exception:

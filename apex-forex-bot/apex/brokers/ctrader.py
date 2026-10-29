@@ -31,6 +31,7 @@ uses cTrader for DATA only and simulates fills locally, so it is safe to run now
 """
 import collections
 import os
+import select
 import ssl
 import time
 import socket
@@ -57,7 +58,7 @@ try:
         ProtoOATraderReq, ProtoOATraderRes,
         ProtoOASymbolsListReq, ProtoOASymbolsListRes,
         ProtoOAGetTrendbarsReq, ProtoOAGetTrendbarsRes,
-        ProtoOASubscribeSpotsReq, ProtoOASpotEvent,
+        ProtoOASubscribeSpotsReq, ProtoOASubscribeSpotsRes, ProtoOASpotEvent,
         ProtoOANewOrderReq, ProtoOAExecutionEvent,
         ProtoOAReconcileReq, ProtoOAReconcileRes,
         ProtoOAClosePositionReq, ProtoOAErrorRes, ProtoOAOrderErrorEvent,
@@ -333,6 +334,22 @@ class _RateLimit:
             waited += sleep_for
 
 
+def _readable(conn, timeout):
+    """True when `conn` has a frame (or part of one) waiting, within `timeout`.
+
+    Never reads. A connection object without a real socket (a test double)
+    counts as readable, so the caller reads from it as usual."""
+    if getattr(conn, "_buf", b""):
+        return True
+    sock = getattr(conn, "_sock", None)
+    if sock is None:
+        return True
+    try:
+        return bool(select.select([sock], [], [], timeout)[0])
+    except (OSError, ValueError):
+        return True
+
+
 class _Conn:
     """One synchronous, authenticated TLS connection to a cTrader proxy.
 
@@ -406,6 +423,14 @@ class _Conn:
             if pm.payloadType == ProtoOAErrorRes().payloadType:
                 err = ProtoOAErrorRes()
                 err.ParseFromString(pm.payload)
+                # The broker's answer to a repeated spot subscription. It means
+                # "you are already subscribed", which is the state get_quote
+                # wants, and it belongs to a quote request, not to the call
+                # that happens to be reading the socket when it arrives.
+                # Raising it here is what made unrelated reads (positions,
+                # leverage) fail with a subscription error.
+                if err.errorCode == "ALREADY_SUBSCRIBED":
+                    continue
                 raise RuntimeError(f"cTrader error: {err.errorCode} {err.description}")
             # Common-layer error (bad app credentials, throttling, protocol issue).
             # Without this branch the frame is skipped and the server's follow-up
@@ -714,10 +739,24 @@ class CtraderBroker:
             req.ctidTraderAccountId = self._ctid()
             req.symbolId.append(sid)
             cid = conn._send(req)
-            # wait for the first spot event carrying bid+ask for this symbol
+            # Wait for the first spot event carrying bid+ask for this symbol AND
+            # for the broker's answer to our own subscribe request. Stopping at
+            # the price alone left that answer in the socket whenever the spot
+            # arrived first, and a repeated subscribe is answered with an error
+            # (ALREADY_SUBSCRIBED): the next, unrelated request read it and
+            # failed with it.
             deadline = now + 8
             bid = ask = None
-            while time.time() < deadline:
+            answered = False
+            sub_res = ProtoOASubscribeSpotsRes().payloadType
+            err_res = ProtoOAErrorRes().payloadType
+            while time.time() < deadline and not (bid and ask and answered):
+                # Once the price is in hand, the answer is a courtesy: give it a
+                # moment, never the whole budget. Asked with select() rather
+                # than a short read timeout, because a read that times out
+                # halfway through a frame loses the framing for good.
+                if bid and ask and not _readable(conn, 1.5):
+                    break
                 pm = conn._read_frame(timeout=8)
                 if pm.payloadType == ProtoOASpotEvent().payloadType:
                     ev = ProtoOASpotEvent()
@@ -727,10 +766,16 @@ class CtraderBroker:
                             bid = ev.bid / self._scale(sym)
                         if ev.ask:
                             ask = ev.ask / self._scale(sym)
-                        if bid and ask:
-                            break
                 elif pm.payloadType == ProtoHeartbeatEvent().payloadType:
                     continue
+                elif pm.clientMsgId == cid and pm.payloadType in (sub_res, err_res):
+                    answered = True
+                    if pm.payloadType == err_res:
+                        err = ProtoOAErrorRes()
+                        err.ParseFromString(pm.payload)
+                        if err.errorCode != "ALREADY_SUBSCRIBED":
+                            raise RuntimeError(
+                                f"cTrader error: {err.errorCode} {err.description}")
         if not bid or not ask:
             raise RuntimeError(f"cTrader: no spot price for {sym}")
         received_at = time.time()
