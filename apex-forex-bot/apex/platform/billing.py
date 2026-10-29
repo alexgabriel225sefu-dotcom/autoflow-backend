@@ -317,6 +317,75 @@ def _release(event_id):
         pass
 
 
+def _k_intent(user_id):
+    """Who this server sent to the Payment Link, and with which address."""
+    return f"{_store._ns()}:{_store._P}:billing:intent:{user_id}"
+
+
+def _k_review(event_id):
+    return f"{_store._ns()}:{_store._P}:billing:review:{event_id}"
+
+
+def record_link_intent(user_id, email, *, now=None):
+    """Note that THIS server sent `user_id` to the Payment Link.
+
+    Called by `stripe_checkout.start_checkout` from an authenticated session.
+    The webhook later requires it, plus a matching e-mail, before trusting a
+    bare `client_reference_id` (see `_trusted_user_of`). Raises when the write
+    did not land, so a checkout is never started that could only end in a
+    manual review.
+    """
+    uid = str(user_id or "").strip()
+    if not uid:
+        raise ValueError("a user id is required")
+    _store._write_strict(_k_intent(uid), {
+        "userId": uid, "email": str(email or "").strip().lower(),
+        "at": time.time() if now is None else now})
+
+
+def _session_email(obj):
+    details = obj.get("customer_details") or {}
+    mail = details.get("email") if isinstance(details, dict) else None
+    return str(mail or obj.get("customer_email") or "").strip().lower()
+
+
+def _trusted_user_of(obj):
+    """(user_id, None) when the grant may go ahead, (claimed, why) otherwise.
+
+    `metadata.a4tUserId` is written by this server on a Checkout Session and
+    the payer cannot edit it: trusted. A Payment Link carries only
+    `client_reference_id`, which rides in the URL and the BUYER CAN EDIT —
+    taken alone it would let anyone attach their payment to another account,
+    or route a stolen-card purchase to a victim. So it is believed only when
+    this server recorded sending that user to the link AND the e-mail Stripe
+    collected matches the one that user signed in with. Anything else is held
+    for a person to look at, never granted.
+    """
+    meta = obj.get("metadata") or {}
+    if meta.get(USER_META_KEY):
+        return str(meta[USER_META_KEY]), None
+    claimed = str(obj.get("client_reference_id") or "") or None
+    if not claimed:
+        return None, None
+    intent = _store._read_strict(_k_intent(claimed))
+    if not isinstance(intent, dict) or str(intent.get("userId")) != claimed:
+        return claimed, "no checkout was started for this account"
+    want, got = str(intent.get("email") or ""), _session_email(obj)
+    if not want or not got:
+        return claimed, "no e-mail to cross-check the account against"
+    if not hmac.compare_digest(want.encode(), got.encode()):
+        return claimed, "the payer's e-mail does not match the account"
+    return claimed, None
+
+
+def _hold_for_review(event_id, etype, claimed, ref, why):
+    _store._write(_k_review(event_id), {
+        "eventId": event_id, "type": etype, "claimedUserId": claimed,
+        "paymentRef": ref, "reason": why, "at": time.time()})
+    print(f"[Billing] HELD {event_id} for manual review "
+          f"(payment={ref or 'unknown'}): {why}")
+
+
 def _user_id_of(obj):
     """The Supabase user id this payment belongs to.
 
@@ -520,6 +589,15 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             if not _paid(obj, etype):
                 _mark_done(event_id, "not-paid")
                 return 200, {"ok": True, "handled": False, "reason": "payment not completed"}
+            trusted, why_untrusted = _trusted_user_of(obj)
+            if why_untrusted or trusted != user_id:
+                # Recorded, not granted, and not retried: the payment is real
+                # and a person has to decide whose it is.
+                _hold_for_review(event_id, etype, user_id, ref,
+                                 why_untrusted or "user id mismatch")
+                _mark_done(event_id, "manual-review")
+                return 200, {"ok": True, "handled": False,
+                             "reason": "held for manual review"}
             cfg = product_config()
             ok_live, why_live = _livemode_ok(event)
             if not ok_live:
