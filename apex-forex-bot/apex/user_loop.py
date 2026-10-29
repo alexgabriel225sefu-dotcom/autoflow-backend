@@ -3742,11 +3742,18 @@ def _loop(user_id, alert_fn, gen=None):
             # client shared one global session: user A's peak balance made
             # user B's smaller account read as a huge drawdown (false stop),
             # and the loss-streak/daily counters never tracked anyone.
+            # Open losses count toward the daily stop, but only the broker's
+            # own figure — a local estimate or a partial one is not equity.
+            _float_for_stop = (dash.get("floatingPnl")
+                               if (not cfg.PAPER_TRADING
+                                   and dash.get("equitySource") == "broker")
+                               else None)
             stop_check = strategies.should_stop(
                 paper_balance, dash["startBalance"],
                 max_daily_loss_pct=getattr(cfg, "MAX_DAILY_LOSS_PCT", 3.0),
                 max_dd_pct=getattr(cfg, "MAX_DD_PCT", 20.0),
-                user_id=user_id, symbol=symbol)
+                user_id=user_id, symbol=symbol,
+                floating_pnl=_float_for_stop)
             # Publish the verdict for the UI. strategies.should_stop() advances
             # the peak-balance and daily-reset state as a side effect, so the
             # Telegram screens must NEVER call it themselves just to draw a
