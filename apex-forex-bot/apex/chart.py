@@ -1,8 +1,10 @@
-"""Candlestick chart rendering — the client's cTrader-in-Telegram.
+"""Candlestick chart rendering — the client's chart inside Telegram.
 
 Renders a dark-theme PNG of recent candles with EMA20/50 and, when a position
 is open, entry/SL/TP levels — sent via sendPhoto on entries and /chart."""
 import io
+
+from apex import config as cfg
 
 
 def _ema(closes, period):
@@ -63,7 +65,7 @@ def render(candles, symbol, timeframe="5m", position=None):
     leg = ax.legend(loc="upper left", fontsize=7, facecolor=bg, edgecolor="#1f2937",
                     labelcolor="#e6e9ef")
     leg.set_zorder(6)
-    ax.text(0.995, 0.015, "APEX FOREX BOT", transform=ax.transAxes, ha="right",
+    ax.text(0.995, 0.015, cfg.BOT_NAME.upper(), transform=ax.transAxes, ha="right",
             color="#334155", fontsize=8, fontweight="bold")
 
     buf = io.BytesIO()

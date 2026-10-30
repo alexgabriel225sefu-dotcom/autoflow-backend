@@ -5,12 +5,11 @@ No. Deployment is click-through (Railway button) and all configuration
 happens through Telegram. The source code is yours to read or modify, but
 you never have to touch it.
 
-### How is this different from the Apex Trade Bot (crypto)?
-Same AI brain and legendary-trader strategies, rebuilt for forex: cTrader
-broker connection, pip-based stops and sizing, leverage-aware margin
-management, spread guard, and market-hours awareness (forex closes on
-weekends). Forex pairs trend on macro cycles and respect technical levels —
-a different opportunity set than crypto.
+### What does it trade?
+Forex majors with a USD leg, plus metals (gold, silver, platinum, palladium),
+through your own cTrader account. Nothing else — crypto, indices, stock CFDs
+and crosses without a USD leg are refused, each for a specific reason set out
+in [ASSETS.md](ASSETS.md).
 
 ### How much money do I need to start?
 $0. A free **cTrader demo account** gives you real market data and the
@@ -56,7 +55,7 @@ instance). They are never sent to us. The `/setkeys` and wizard messages are
 auto-deleted from Telegram after processing.
 
 ### How many trades per day should I expect?
-Typically 0–3. Forex moves slower than crypto and the bot is selective by
+Typically 0–3. Forex moves at macro pace and the bot is selective by
 design. It also sleeps on weekends, automatically.
 
 ### What happens during news events?

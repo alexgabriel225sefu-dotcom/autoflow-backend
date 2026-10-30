@@ -1,0 +1,220 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Check, ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { api, type ApiError, type ConditionSpec, type RuleDoc } from "@/lib/api";
+import { defaultsFor } from "@/components/app/condition-editor";
+import { starterCondition } from "./starter-condition";
+import { BLANK, RuleForm, STEPS, levelMissing, toDoc, type Draft, type StepId } from "@/components/app/rule-form";
+import { RuleSentence, RuleTerms } from "@/components/app/rule-summary";
+import { ErrorNotice, Spinner } from "@/components/app/state";
+
+/**
+ * The rule builder, one step at a time.
+ *
+ * Progressive disclosure, not hidden fields. Every step is reachable from the
+ * rail at any point, Review shows the whole document, and nothing is dropped
+ * because a step was never opened — an unvisited field still takes a value,
+ * and Review states that value rather than implying it.
+ *
+ * The conditions come from /api/v1/conditions. There is no list of conditions
+ * in this project, so the builder cannot offer one the evaluator does not
+ * implement.
+ */
+export default function NewRulePage() {
+  const router = useRouter();
+  const [specs, setSpecs] = useState<Record<string, ConditionSpec> | null>(null);
+  const [loadErr, setLoadErr] = useState<ApiError | null>(null);
+  const [draft, setDraft] = useState<Draft>(BLANK);
+  const [step, setStep] = useState<StepId>("basics");
+  const [err, setErr] = useState<ApiError | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const set = useCallback(<K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setDraft((d) => ({ ...d, [k]: v }));
+  }, []);
+
+  // Bumped by Retry, so a load that failed (or timed out on a phone) can be
+  // asked again without leaving the page.
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    void api<{ conditions: Record<string, ConditionSpec> }>("conditions").then((r) => {
+      if (!r.ok) return setLoadErr(r);
+      setLoadErr(null);
+      setSpecs(r.data.conditions);
+      // The builder opens with a condition that implies a SIDE.
+      //
+      // It used to open with the alphabetically first one, which is `atr` — a
+      // volatility filter that says when to trade and never which way. With
+      // `sides` defaulting to BOTH, the rule a new client was handed could
+      // never trade: the evaluator refuses it with DIRECTION_AMBIGUOUS even
+      // when the condition is satisfied. The summary read like a finished
+      // strategy, so the first sign of trouble was a rule that silently did
+      // nothing.
+      //
+      // `impliesDirection` comes from the server, which owns that fact. A list
+      // of directional ids written here would be a second copy of it, drifting
+      // the first time a condition is added.
+      const first = starterCondition(r.data.conditions);
+      if (first) {
+        setDraft((d) => ({
+          ...d,
+          entry: [{ id: first, params: defaultsFor(r.data.conditions[first]) }],
+        }));
+      }
+    });
+  }, [attempt]);
+
+  async function save() {
+    setBusy(true); setErr(null);
+    const r = await api<{ rule: RuleDoc }>("rules", { method: "POST", body: toDoc(draft) });
+    setBusy(false);
+    if (!r.ok) return setErr(r);
+    router.push(`/rules/${r.data.rule.ruleDocId}`);
+  }
+
+  if (loadErr) {
+    return (
+      <main>
+        <h1>New rule</h1>
+        <ErrorNotice error={loadErr} onRetry={() => { setLoadErr(null); setAttempt((n) => n + 1); }} />
+      </main>
+    );
+  }
+  if (!specs) return <main><h1>New rule</h1><Spinner label="Loading the condition library" /></main>;
+
+  const index = STEPS.findIndex((s) => s.id === step);
+  const isReview = step === "review";
+
+  return (
+    <main>
+      <div className="page-head">
+        <div>
+          <h1>New rule</h1>
+          <span className="sub">
+            Saved as a draft. Nothing trades until you activate it, and
+            activation validates every field again on the server.
+          </span>
+        </div>
+        <span className="pill pill-demo">Demo only</span>
+      </div>
+
+      {/* The other half of the fork, stated on the screen a client lands on
+          rather than hidden in navigation. The engine ships fifteen
+          ready-made strategies and this platform used to expose none of them,
+          so somebody who only wanted Trend Following had to reproduce it in
+          conditions — and could not. */}
+      <div className="notice notice-accent">
+        Don&apos;t want to write conditions?{" "}
+        <Link href="/rules/new/strategy">Choose one of the engine&apos;s
+        strategies</Link> instead and set only your risk and limits.
+      </div>
+
+      {/* The rule read back as a sentence, updating as it is built. A client
+          who cannot read their own rule has not really configured it. */}
+      <RuleSentence doc={toDoc(draft)} specs={specs} />
+
+      <div className="workspace" style={{ marginTop: "var(--sp-3)" }}>
+        <div>
+          {/* The rail is navigation, not a gate: every step is reachable at
+              any time, because a trader fixing the stop should not have to
+              walk back through entry conditions to get there. */}
+          <nav className="steps" aria-label="Rule sections">
+            {STEPS.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                aria-current={s.id === step ? "step" : undefined}
+                onClick={() => setStep(s.id)}
+              >
+                <span className="n">{i < index ? <Check style={{ width: 11, height: 11 }} aria-hidden /> : i + 1}</span>
+                {s.label}
+              </button>
+            ))}
+          </nav>
+
+          {isReview ? (
+            <section className="card">
+              <div className="card-head">
+                <h2>Review</h2>
+                <span className="dim" style={{ fontSize: ".75rem" }}>
+                  Every field, including the ones left at their default
+                </span>
+              </div>
+              <RuleTerms doc={toDoc(draft)} specs={specs} />
+              <p className="muted" style={{ fontSize: ".8rem", marginTop: "var(--sp-3)" }}>
+                Saving creates a draft. Validation and preview run on the rule
+                page, and activation is a separate, deliberate step.
+              </p>
+            </section>
+          ) : (
+            <RuleForm draft={draft} set={set} specs={specs} step={step} />
+          )}
+
+          {err ? <ErrorNotice error={err} /> : null}
+
+          <div className="btn-row" style={{ marginTop: "var(--sp-4)" }}>
+            <button
+              type="button" className="btn btn-ghost"
+              disabled={index === 0}
+              onClick={() => setStep(STEPS[Math.max(0, index - 1)].id)}
+            >
+              <ChevronLeft className="ico" aria-hidden /> Back
+            </button>
+            {index < STEPS.length - 1 ? (
+              <button
+                type="button" className="btn"
+                onClick={() => setStep(STEPS[index + 1].id)}
+              >
+                Next: {STEPS[index + 1].label} <ChevronRight className="ico" aria-hidden />
+              </button>
+            ) : null}
+            {/* ONE filled button per step, and it is the one that moves the
+                flow forward. Mid-flow that is "Next"; on the last step there
+                is no next, so saving becomes the primary action. Both were
+                filled before, which put two equally loud calls to action
+                side by side and left the step with no obvious next move. */}
+            <button
+              className={index < STEPS.length - 1 ? "btn btn-ghost" : "btn btn-lg"}
+              onClick={save}
+              disabled={busy || levelMissing(draft)}
+            >
+              <Save className="ico" aria-hidden /> {busy ? "Saving…" : "Save draft"}
+            </button>
+            <Link className="btn btn-ghost" href="/rules">Cancel</Link>
+          </div>
+          {levelMissing(draft) ? (
+            <p className="muted" role="status" style={{ fontSize: ".82rem", marginTop: ".5rem" }}>
+              Choose who acts on a setup (Market step) before saving.{" "}
+              <button type="button" className="link-sm"
+                      onClick={() => setStep("basics")}>Go to it</button>
+            </p>
+          ) : null}
+        </div>
+
+        <aside className="inspector">
+          <section className="card">
+            <div className="card-head"><h2>What happens next</h2></div>
+            <ol className="muted" style={{ fontSize: ".82rem", lineHeight: 1.7, paddingLeft: "1.1rem" }}>
+              <li>Save this as a draft.</li>
+              <li>Validate it — the server checks every field again.</li>
+              <li>Preview it against real bars from your account.</li>
+              <li>Activate it. The version is then frozen.</li>
+              <li>Start automation on a demo account.</li>
+            </ol>
+          </section>
+
+          <section className="card card-flat">
+            <p className="muted" style={{ fontSize: ".8rem", lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--a4t-text)" }}>Demo only.</strong>{" "}
+              Live trading is not available in this release. Saving or
+              activating a rule places nothing by itself.
+            </p>
+          </section>
+        </aside>
+      </div>
+    </main>
+  );
+}

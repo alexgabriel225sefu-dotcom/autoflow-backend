@@ -7,6 +7,12 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Tests are a development environment and say so explicitly: user_store now
+# REFUSES to start without TOKEN_ENCRYPTION_KEY rather than falling back to
+# plaintext, and that refusal is the behaviour under test elsewhere.
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 from apex import forex  # noqa: E402
 
@@ -92,6 +98,27 @@ check("03:00 UTC → Tokyo + Sydney", "Tokyo" in s and "Sydney" in s, s)
 print("\n9. Spread")
 sp = forex.spread_pips(1.1000, 1.1002, "EUR_USD")
 check("2-pip spread detected", abs(sp - 2) < 1e-9, sp)
+
+print("\n10. Margin: a USD-base pair is worth one dollar a unit, in every spelling")
+# USDJPY (the platform's spelling) used to match neither branch of the old
+# startswith("USD_") test, so 1,000 units were valued at 150,000 dollars and a
+# small account was refused a lot that needs about $33 of margin.
+for spelling in ("USD_JPY", "USDJPY", "usd/jpy", "USD-JPY"):
+    m = forex.required_margin(1000, spelling, 150.0, 30)
+    check(f"{spelling}: 1,000 units need ~$33 at 30x", abs(m - 1000 / 30) < 1e-9, m)
+    check(f"{spelling}: a $3,000 account can take the minimum lot",
+          forex.safe_min_units(spelling, 3000, 150.0, 30, 0.5) == 1000)
+check("USDCHF and USDCAD are USD-base too",
+      all(abs(forex.required_margin(1000, p, 0.9, 30) - 1000 / 30) < 1e-9
+          for p in ("USDCHF", "USD_CAD")))
+check("EURUSD is worth its price a unit (unchanged)",
+      abs(forex.required_margin(1000, "EURUSD", 1.1, 30) - 1100 / 30) < 1e-9)
+check("gold is worth its price an ounce (unchanged)",
+      abs(forex.required_margin(1, "XAUUSD", 3300.0, 30) - 3300 / 30) < 1e-9)
+check("the margin rule agrees with calc_units' own USD-base rule",
+      # calc_units caps units by balance x leverage x cap / notional; for a
+      # USD-base pair notional is 1, so the cap is 3000*30*0.5 = 45,000 units.
+      abs(forex.calc_units(3000, 1.0, 1.0, "USDJPY", 150.0, leverage=30) - 45_000) < 1e-6)
 
 # ─── Result ───────────────────────────────────────────────
 print("\n" + "=" * 50)
