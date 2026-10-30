@@ -197,6 +197,46 @@ cannot tell who anyone is, and it refuses rather than guessing.
 has been observed. Ownership and order idempotency depend on the shared
 backend being reachable — that is why it is required, not optional.
 
+### Deploy procedure and the loop-downtime window
+
+Every deploy restarts the API process, and **every client's automation loop
+runs inside that process** as a daemon thread. Expect roughly **3 minutes in
+which no loop is running**: the old instance suspends its loops and hands back
+their leases on SIGTERM (`_release_for_shutdown`, 5 s budget), the new one
+starts, and its supervisor revives each RUNNING account through the same
+preflight a Start press runs. The supervisor cycle is 180 s
+(`A4T_SUPERVISE_INTERVAL_S`), so a loop that is refused on the first pass
+(for example the lease has not been released yet) waits a full cycle. Before
+the lease-release fix the gap was ~12 minutes; if you see that again, the
+release did not complete.
+
+**During that window positions are unmanaged.** Nothing trails a stop, moves to
+break-even, applies an exit condition or reacts to news. Only the stop-loss and
+take-profit already held by the broker still protect a position. That is
+acceptable on a demo account and it is not acceptable with real money.
+
+Safe-window rules:
+
+1. **Do not deploy while any live account has an open position.** Check first
+   (journal / the account's open positions). Live execution is closed in this
+   release (`A4T_LIVE_EXECUTION` unset), so today this is a rule for the day it
+   opens.
+2. For demo-only fleets, prefer a quiet window: not in the London/New York
+   overlap (about 13:00-17:00 UTC), not around scheduled high-impact news, and
+   not on Friday evening, when a failed deploy would sit unnoticed all weekend.
+   Sunday after the open is also poor: the first revival is then followed by a
+   gap.
+3. After the deploy, confirm: `/readyz` is 200; the log shows
+   `automation supervisor: N alive, M revived` with `M` equal to the number of
+   accounts that were RUNNING; and the operator alert channel (below) shows one
+   `loop_revived` per account. A RUNNING account with no revival alert and no
+   `not reviving` log line was missed.
+4. Use `scripts/check_runtime_env.py` against the service's environment before
+   changing any variable that triggers a redeploy.
+
+Changing an environment variable on Render restarts the service and has the
+same effect as a deploy.
+
 ## 6. Rollback
 
 1. Redeploy the previous revision of the component that changed.
@@ -260,6 +300,102 @@ correct, but means an overlap window is wanted.
 > customer is the alert. The workflow remains valuable as the manual deep
 > check: it parses `/readyz` per check and follows the stylesheet, neither of
 > which an uptime service can do.
+
+**Your two options for the hourly workflow, pick one.** (a) Merge the workflow
+file to `main` (owner decision; this work is forbidden from merging itself), or
+(b) rely on the external monitor below and treat the workflow as
+`workflow_dispatch`-only. Until one of those is done, nothing is watching.
+
+### First line: UptimeRobot, with a phone alert (about 10 minutes, free)
+
+1. Create a free account at uptimerobot.com and install the **UptimeRobot app**
+   on your phone (iOS/Android). Sign in; allow push notifications.
+2. Dashboard, **Add New Monitor**:
+   - Monitor type **HTTP(s)**, friendly name `a4t api healthz`, URL
+     `https://apex4traders-api.onrender.com/healthz`, interval **5 minutes**.
+3. Add a second monitor: `a4t api readyz`, URL
+   `https://apex4traders-api.onrender.com/readyz`, same interval. `/readyz`
+   answers **503** when a required dependency fails and UptimeRobot treats any
+   non-2xx as down, so this one covers Redis, Supabase, encryption and the
+   cTrader variables. Optional: tick *Keyword* monitoring and alert when
+   `"status": "fail"` exists.
+4. Add a third: `a4t web home`, URL `https://apex4traders-web.onrender.com/`.
+5. **Alert contacts** (My Settings, Alert Contacts): make sure your e-mail is
+   verified, then add either *Telegram* or *Slack* (both free) so a down event
+   reaches your phone as a notification, not an e-mail you read tomorrow. Keep
+   the mobile push on as well.
+6. Edit each monitor and tick every alert contact. Set the notification to
+   fire when down for **2 checks in a row** if you find single blips noisy.
+7. **Test it.** Pause nothing; instead add a throwaway monitor to a URL that
+   returns 404 (`.../healthz-test-404`), confirm the phone alert arrives,
+   then delete it. An alert path that was never tested is not an alert path.
+8. The API runs on the Starter plan, which does not sleep, so a 5-minute poll
+   keeps nothing warm that was not already running.
+
+What this does NOT see: a client whose loop died while the API is healthy.
+That is what the operator alerts below are for.
+
+### Operator alerts from the application
+
+`apex/platform/alerts.py` posts a short message to a webhook you own. It is
+off until you set **`OPS_ALERT_WEBHOOK_URL`** (https only, treat the URL as a
+secret: Slack/Discord/Telegram webhook paths are credentials). Setting it
+restarts the service.
+
+- Slack: an Incoming Webhook URL. Discord: a channel webhook URL.
+  Telegram: `https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID>`.
+  The body carries both `text` and `content`, so each reads the field it knows.
+- Alerts fire when: the supervisor found a loop dead and **revived** it
+  (`loop_revived`); a revival was **refused** for a reason other than a lapsed
+  licence, an emergency halt or the client's own Stop
+  (`revival_refused:<CODE>`, `revival_failed:<ExceptionType>`,
+  `revival_no_rule`); the same user fails **3 cycles in a row**
+  (`revival_repeated_failure`); and `/readyz` fails closed in production
+  (`readyz_fail:<check names>`).
+- Limits: one alert per user per cause per 30 minutes, at most 10 alerts per
+  10 minutes overall, held in memory per container. A user is shown as an
+  8-character hash, never an id, e-mail or token; causes are codes and
+  exception type names, never exception text.
+- It can never raise into the supervisor or the health probe; a dead webhook
+  costs one log line (`[Alerts] delivery failed (OSError)`). Test it by setting
+  the variable on a staging service and triggering a revival.
+- A lapsed licence deliberately does not page you: the system is doing what it
+  should.
+- Because the de-dup state is per process, a restart can repeat an alert you
+  already saw. That is accepted.
+
+### Structured logs and attaching Sentry later
+
+`alerts.log_event(level, event, **fields)` prints one JSON line:
+`{"ts":..., "level":"error", "event":"revival_failed", "fields":{"user":"3fa9...","cause":"..."}}`.
+Field names containing token/secret/password/key/cookie/webhook are dropped,
+`user_id` is replaced by the same 8-character hash, and the whole line passes
+through `apex/redact.py`. Filter in Render's log search with e.g.
+`"event": "revival_failed"`. It is used by the supervisor and by `/readyz`
+failure today; use it in any new code you touch.
+
+To add Sentry later **without a dependency now**: add `sentry-sdk` to
+`requirements.txt`, and in `platform_server.main()`:
+
+```python
+if os.getenv("SENTRY_DSN"):
+    import sentry_sdk
+    sentry_sdk.init(dsn=os.environ["SENTRY_DSN"], send_default_pii=False)
+    alerts.set_error_hook(lambda event, fields: sentry_sdk.capture_message(
+        event, level="error", extras=fields))
+```
+
+Every `level="error"` event then reaches Sentry already redacted. Do not enable
+Sentry's request or breadcrumb capture without reviewing what it would send.
+
+### Status page
+
+Not set up. Cheapest honest option: UptimeRobot's free *Public Status Page*
+(Dashboard, Status Pages, Add) showing the three monitors, linked from the web
+app footer once you want to commit to it. Do not publish one before the alert
+path above is tested, because a status page that is green while you are down is
+worse than none. Until then, announce incidents to clients by e-mail from the
+waitlist/licence list.
 
 Second line, manual until the workflow sits on a default branch:
 `.github/workflows/production-health.yml` runs the
@@ -420,6 +556,31 @@ written before that date, it is not a backup of this product.
   writes a snapshot to the system temp directory that holds licence keys —
   delete it afterwards.
 
+- **Restore-drill-into-live checklist** (not yet performed; do it first on a
+  staging service with its own Redis, never first on production):
+  1. Announce a maintenance window. Stop every client's automation
+     (`POST automation/stop` per client, or `scripts/emergency_stop.py halt`)
+     so no loop is writing while the keyspace is replaced, and confirm no live
+     account has an open position.
+  2. Take a fresh `python -m apex.backup dump` AND note the provider
+     snapshot id, so there is a way back from the restore itself. Run
+     `verify` on the dump; do not continue on a failure.
+  3. Confirm the target holds the same `TOKEN_ENCRYPTION_KEY` as the source.
+     Records encrypted under another key restore as unreadable.
+  4. Scale the API to one instance (or suspend it) so the old and new keyspace
+     are never served together.
+  5. Run `restore` into the target. Compare the reported counts with the dump
+     (rules, frozen versions, licences, broker links, journal, waitlist, both
+     indexes).
+  6. Start the API. `/readyz` must be 200. Check one known client end to end:
+     sign in, licence shows, rule and its frozen version present, journal
+     entries point at an existing version.
+  7. Expect broker reconnection per client to be exercised here for the first
+     time: each client's link must complete a token refresh on first use. If
+     refresh fails, ask a test client to reconnect and record what happened.
+  8. Release the halt. Let the supervisor revive RUNNING accounts and check the
+     `loop_revived` alerts match the count you expect.
+  9. Delete the dump file (it holds licence keys) from every machine it touched.
 - **Still unproven:** a restore **into** a live deployment, and broker
   reconnection after one. The drill proves the snapshot is complete and
   restorable into an isolated target. Reconnecting cTrader per user is the
@@ -434,3 +595,137 @@ cookie cannot ride in on a client request.
 
 When pasting logs into an issue, check for `access_token`, `refresh_token`,
 `whsec_`, `sk_live_` and anything Fernet-shaped (`gAAAAA…`).
+
+## 14. Capacity: the loop load test
+
+Capacity has not been measured on the real engine. `scripts/loadtest_loops.py`
+gives a first, honest approximation and a way to compare machines.
+
+### Run it (Render shell of `apex4traders-api`, or any Linux box)
+
+```
+cd ~/project/src/apex-forex-bot
+python3 scripts/loadtest_loops.py --n 5,10,20,40,80 --duration 30
+python3 scripts/loadtest_loops.py --n 20,40 --aligned        # worst case
+python3 scripts/loadtest_loops.py --n 20 --net-ms 0           # CPU only
+```
+
+It starts N fake users in-process: two threads each (loop + lease renewer, as
+production does), a fake broker returning synthetic candles, and pure-Python
+indicator arithmetic every tick. The interval is compressed (default 5 s, not
+300 s). It imports nothing from `apex`, opens no socket, and touches no Redis,
+Supabase or broker. It does consume the machine's CPU and RAM while it runs, so
+**run it on a staging service or off-peak**, not during a London/New York
+session on the live API.
+
+### Reading the table
+
+| Column | Meaning | Worry when |
+|---|---|---|
+| `rssMB` / `peakMB` | Process memory after the run / its high-water mark | Above about 70% of the plan's RAM once the real service's own baseline is added |
+| `perLoopKB` | Memory added per fake user | Use it to project: baseline + N x perLoopKB |
+| `threads` | Peak thread count (2 per user + a few) | Climbing faster than 2N |
+| `p50ms` | Typical tick work time. With `--net-ms 150` and 3 symbols the floor is about 450 ms: that is the stand-in broker latency, not CPU | Rising above the floor as N grows |
+| `p95ms`, `maxms` | Tail: threads waiting on the interpreter lock and on each other | p95 more than about 2x the N=5 row |
+| `overruns` | Ticks longer than the interval | Anything above 0: a loop is falling behind |
+
+**The wall** is the first N where any worry condition holds. Trust the
+`--aligned` figure, because a deploy restarts every loop together and the first
+tick is then a stampede. `--net-ms 0` isolates CPU from the broker stand-in.
+
+Calibrate before believing it: compare the harness's `baseline rss` and
+`perLoopKB` with the real process (Render's memory graph before and after a
+known number of clients start loops). The harness models buffers and
+arithmetic, not TLS sessions, protobuf objects or journals, so real
+`perLoopKB` will be larger. Treat a harness figure as a floor.
+
+### First scaling wall and beta guidance
+
+From reading the code, not from measurement (the load test is how to confirm):
+
+- Each running client costs one OS thread and one blocking TLS socket to
+  cTrader, plus a lease-renewer thread, all inside **one** API process on a
+  Starter instance (check the current CPU and RAM in the Render dashboard).
+  Python threads share one interpreter lock, so CPU work from all loops
+  serialises.
+- The likely first wall is **tick-time CPU contention at synchronised ticks**
+  (a restart revives every loop at once), then **memory** as per-loop buffers
+  and connections accumulate, then **broker-side limits** (cTrader meters
+  historical requests at five per second per connection).
+- Horizontal scaling is not a quick fix: a loop's lease is held by one
+  instance, every instance's supervisor tries to revive every RUNNING account,
+  and this has not been exercised under load.
+- **Beta guidance from the audit: keep concurrent running loops to 15-20.**
+  Do not onboard past that until the load test has been run on the real plan
+  and the wall found. A bigger instance buys CPU and memory headroom, not
+  relief from the per-connection broker limit.
+
+## 15. Outage plans: Redis and Supabase
+
+### Redis / Upstash (the shared store) is down or slow
+
+What happens: `/readyz` fails `shared_store` and `rate_limit_store`, and the
+operator alert fires `readyz_fail:...`. Ownership, entitlement and order
+idempotency need the store, and every `/api/v1/*` request costs one counter
+`INCR`, so a *slow* store shows as latency before it shows as an error.
+
+1. Confirm at the provider's status page and with
+   `python3 apex-forex-bot/scripts/check_production_health.py`.
+2. **Do not** set `ALLOW_LOCAL_BACKEND_DEV` or `ALLOW_PLAINTEXT_DEV_STORAGE`
+   to get back up. Per-container ownership could let two instances trade one
+   account.
+3. Do not restart the API repeatedly: liveness ignores Redis on purpose, so
+   restarts will not help and each costs about 3 minutes of unmanaged loops.
+4. `scripts/emergency_stop.py` needs the store. If you must stop the product
+   while the store is down, set `A4T_EMERGENCY_HALT=all` on the service (costs
+   a restart), and clear it after recovery.
+5. If open positions exist anywhere, tell affected clients their broker-side
+   stop-loss and target are the only protection until it recovers.
+6. On recovery `/readyz` returns to 200 by itself (cached up to 5 s) and the
+   supervisor revives dead loops on its next cycle (up to 3 minutes). Check the
+   `loop_revived` alerts match the expected count.
+7. If data was lost, follow section 12 (provider snapshot first).
+
+### Supabase (identity) is down
+
+What happens: authenticated routes answer 503 `AUTH_UNAVAILABLE`; the platform
+refuses rather than guessing who is calling. Running loops use stored broker
+links, not the Supabase session, so **they keep running**. New sign-ins and
+every client action, including a client's own Stop, stop working.
+
+1. Confirm at Supabase's status page; do not rotate keys as a first move.
+2. To stop a client urgently while auth is down, use the operator switch:
+   `scripts/emergency_stop.py halt --users <user-id> ...`. It reads the shared
+   store, not the client's session.
+3. On recovery nothing needs restarting; sessions refresh normally.
+4. If the project was paused or restored, verify `SUPABASE_URL` and the anon
+   key are unchanged before assuming clients are affected.
+
+## 16. Config drift check
+
+Before and after any environment change:
+
+```
+cd ~/project/src/apex-forex-bot && python3 scripts/check_runtime_env.py
+python3 scripts/check_runtime_env.py --env-file prod.env   # a local file, never committed
+```
+
+It prints each variable's NAME with `OK`, `MISSING` or `UNSAFE`, never a value,
+and exits non-zero on any problem, so its output is safe to paste into a chat or
+an issue. The list comes from `health.py` (the readiness checks),
+`user_store.py` (shared backend, product), `platform_server.py`
+(`A4T_ALLOWED_ORIGIN`) and `entitlement.py` (the live switch). Required
+variables must be present, and https where it matters. The dev-only flags,
+`LIVE_TRADING_ENABLED`, `A4T_LIVE_EXECUTION`, `SUPABASE_SERVICE_KEY`,
+`RATE_LIMIT_STORE=memory` and `A4T_CHECKOUT_ENABLED` must not be set in
+production. `A4T_LIVE_EXECUTION` showing `UNSAFE` is intentional: opening it is
+a separate owner decision, not configuration.
+
+## 17. Open items only the owner can close
+
+- Merge `production-health.yml` to `main`, or complete the UptimeRobot setup in
+  section 10. Today nothing watches production.
+- Set `OPS_ALERT_WEBHOOK_URL` on the API service and test it.
+- Run the load test on the real plan and record the measured wall in section 14.
+- Rehearse the restore-into-live checklist (section 12) on a staging service.
+- Decide on the status page and on Sentry.
