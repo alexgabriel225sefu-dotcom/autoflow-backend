@@ -63,7 +63,7 @@ These are factual claims about the software, checkable by reading the code:
 | **L2** | **Governing law and jurisdiction** | Terms §10 | No stated forum for a dispute. |
 | **L3** | **Support / contact address** | Terms §11, Privacy §10 | A client has no way to reach the operator. The old address belonged to another brand and was removed rather than replaced. |
 | **L4** | **Refund policy** | Terms §9 | The webhook already revokes a licence on refund; what a client is *entitled* to is not a code question. |
-| **L5** | **Tax display and checkout legal wording** | Terms §9 | Price and plan are decided as a 499 USD one-time Founder Lifetime unlock. What remains is tax-inclusive/exclusive wording and the legal text around payment/refund. |
+| **L5** | **Tax display and checkout legal wording** | Terms §9 | Price and plan are decided as a 497 USD one-time Founder Lifetime unlock. What remains is tax-inclusive/exclusive wording and the legal text around payment/refund. |
 | **L6** | **Hosting provider, data region, sub-processor list** | Privacy §5 | Required by most privacy regimes. Supabase, cTrader and Stripe are named because they are in the dependency list; the hosting provider and region are not something this repository can state. |
 | **L7** | **Retention periods** | Privacy §7 | How long account data, journal entries and disconnected broker links are kept. |
 | **L8** | **Data subject rights and how to exercise them** | Privacy §8 | Depends on L2. |

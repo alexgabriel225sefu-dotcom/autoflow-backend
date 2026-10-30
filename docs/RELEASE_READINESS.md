@@ -1,7 +1,9 @@
 # Apex4Traders — release readiness
 
 **Assessed at:** `cdbe833` on `claude/apex4traders-platform-v1`
-**Date:** 2026-09-30
+**Date:** 2026-09-30 (stale statements reconciled against the code on 2026-10-29; see the
+"Reconciled 2026-10-29" block under the live-trading section. Anything not
+re-checked there is **unverified** at the current commit.)
 > **What "assessed at" means here.** The commit named is the one the tree was in
 > when these numbers were produced. The commit that updates this line changes
 > only documentation, so the numbers still hold at it — that is the convention,
@@ -24,7 +26,7 @@
 | **PRIVATE DEMO BETA** | **NOT YET** — X1 nearly closed: reads 2026-09-30, preview on real bars and the controls 2026-10-02 (16/16), the screens walked in a browser 2026-10-04. What is left is the screens **with a connected account** |
 | **PUBLIC BETA** | **NO** |
 | **PUBLIC PAID LAUNCH** | **NO** |
-| **LIVE TRADING** | **FALSE**, and out of scope by design |
+| **LIVE TRADING** | **FALSE** in this deployment: `A4T_LIVE_EXECUTION` is closed by default. Not "out of scope" any more: the gated controller exists (see the reconciliation block below) |
 
 The honest summary: the software is in good shape, and against a real cTrader
 demo account the reads, preview on real bars and the automation controls have
@@ -139,9 +141,9 @@ thing.
 
 | # | Gate | Status |
 |---|---|---|
-| 1 | Owner-approved pricing | ⚠️ D1-D3 decided: 499 USD one-time `founder_lifetime`; D5 tax handling still open |
+| 1 | Owner-approved pricing | ⚠️ D1-D3 decided: 497 USD one-time `founder_lifetime`; D5 tax handling still open |
 | 2 | Owner-approved legal, contact, refund | ❌ L1–L4, L6–L8 |
-| 3 | Verified payment webhook works | ❌ X5 — tested with a local signature, never a real delivery |
+| 3 | Verified payment webhook works | ❌ X5 — tested with a local signature, never a real delivery. A signed local replay now exists (`apex-forex-bot/scripts/stripe_webhook_replay.py`) and the test-mode procedure is `docs/STRIPE_SANDBOX_RUNBOOK.md`; a real Stripe delivery is still **unverified** |
 | 4 | Licences granted correctly | ⚠️ correct in test; depends on gate 3 |
 | 5 | Production Redis / Upstash | ✅ — **X2 is done.** 2026-10-01, from the deployed instance: `shared_store` ok, `backend: redis`, `latencyMs: 7`, and `rate_limit_store` reports counters shared across instances rather than the per-process fallback |
 | 6 | Production OAuth redirect works | ✅ — **X4 is done.** `ctrader_oauth` reports client id, secret and redirect URI configured; and it is not merely configured — a real authorisation completed THROUGH it on 2026-09-27 (`[link] begin` → `exchange.attempt` → `complete` 200, redirect `https://apex4traders-api.onrender.com/api/v1/ctrader/callback`) and the token it stored was still exchanging and reading on 2026-09-30 |
@@ -158,6 +160,41 @@ infrastructure rather than code.
 ---
 
 ## LIVE TRADING READY — **FALSE**
+
+### Reconciled 2026-10-29 (verified in code at this commit)
+
+The bullet list below was written on 2026-09-30, before the gated live
+controller. Against the code now:
+
+- **Stale:** "`entitlement.capability()` refuses a live account under both
+  entitlements. A paid plan unlocks nothing here." `capability()` can now
+  return `canAutomate=True` for a live account, but only after
+  `live_execution_enabled()` (env `A4T_LIVE_EXECUTION`, closed by default),
+  then `plans.may_trade_live(plan)`, then the live hard gate
+  (`live_readiness`: accepted terms, confirmed lifetime licence, operator
+  approval). Unknown reads are closed.
+- **Stale:** "`automation.start` refuses any account that is not demo".
+  `automation.py` no longer compares the mode; it asks the capability. Whether
+  every path is still refused is covered by
+  `tests/test_platform_live_invariants.py`, which is the authority.
+- **Stale:** "`LIVE_TRADING_ENABLED` ... `/readyz` refuses to start if it is
+  set". `LIVE_TRADING_ENABLED` is a legacy name that enables nothing; setting
+  it makes the `live_trading` readiness check FAIL (`health.py`) so nobody
+  believes they opened live. The real switch is `A4T_LIVE_EXECUTION`.
+- **Stale:** "move checkout creation behind the authenticated platform API" and
+  "the route refuses until authenticated checkout ... are ready". Creation
+  exists (`stripe_checkout.py`, reached only through
+  `POST /api/v1/billing/checkout` after a fresh session). It still answers 503
+  until both checkout gates are set and 501 until Stripe is configured.
+- **Still true (verified):** `ctrader_link.live_allowed()` needs
+  `APP_ENV` production AND `APEX_ALLOW_LIVE_ACCOUNTS`;
+  `bridge.SUPPORTED_ORDER_TYPES == {"MARKET"}`, `SUPPORTED_CONSTRAINTS` empty.
+- **Unverified here:** the test/file counts in this document (162 backend
+  files, 215 frontend tests, 159 files) were not re-run; the backend now has
+  230 `tests/test_*.py` files. The dashboard "not available" live option
+  wording was not re-checked.
+
+Original 2026-09-30 text, kept for the record:
 
 Out of scope and deliberately not made easier. The properties that keep it
 false, all tested:
@@ -186,7 +223,7 @@ work moved towards it.
 
 ## The shortest path to a private beta
 
-1. **Owner:** D1-D3 are decided: the paid offer is a 499 USD one-time `founder_lifetime` unlock. D5 tax handling and D6 beta timing remain open, and checkout stays off until authenticated checkout, legal and refund policy are ready.
+1. **Owner:** D1-D3 are decided: the paid offer is a 497 USD one-time `founder_lifetime` unlock. D5 tax handling and D6 beta timing remain open, and checkout stays off until authenticated checkout, legal and refund policy are ready.
 2. ~~**Owner:** create or name the production Supabase project (X3)~~ — **done,
    and it was done before this line was last read.** A real project is wired
    into the deployed web bundle and answers; `/readyz` reports
@@ -211,7 +248,7 @@ needs a browser and a phone and cannot be done from a script.
 
 Everything above, then: L1–L4, L6–L8 and L10 from the owner; D5 tax handling
 and refund policy from the owner; move checkout creation behind the
-authenticated platform API; register the Stripe endpoint and take one real
+authenticated platform API (done in code, unexercised); register the Stripe endpoint and take one real
 delivery end to end (X5); HTTPS and domain (X6); monitoring (X7); five
 external testers (X9).
 
@@ -280,7 +317,7 @@ Mobile destinations went from 1 of 8 to 8 of 8.
 |---|---|---|
 | **Ship a private demo beta now?** | **No**, but only just. Reads, preview on real bars and the controls are all proven against a real broker (…456; 2026-09-30 and 2026-10-02, 16/16). The screens were walked on 2026-10-04 with no account connected. What is left is walking them **connected** | Engineering, by running the eleven-step walk-through in `docs/CTRADER_DEMO_SMOKE_TEST.md` in a browser against a connected demo account |
 | **Ship a public beta?** | **No.** Nine of twelve public-launch gates are open | Owner, for the decisions; engineering, for X2–X9 |
-| **Take money?** | **No.** The 499 USD one-time Founder Lifetime offer is approved, but checkout is off and the route refuses until authenticated checkout, legal, refund and tax are ready | Owner — D5, D6 and legal/refund decisions; engineering — authenticated checkout |
+| **Take money?** | **No.** The 497 USD one-time Founder Lifetime offer is approved and authenticated checkout creation exists in code, but the gates are off by default (production values unverified), so the route answers 503/501 unless the owner has set them. Next: the Stripe test-mode pass (`docs/STRIPE_SANDBOX_RUNBOOK.md`), then the owner's call on the gates. Company, VAT and legal text are deferred by owner decision until first revenue | Owner — D5, D6 and legal/refund decisions; engineering — authenticated checkout |
 | **Enable live trading?** | **No, and not by a flag.** It is not implemented. `LIVE_TRADING_ENABLED` has no execution path behind it and `/readyz` refuses to start if it is set | A separate milestone with its own review |
 
 None of these is blocked on code that is missing and unwritten. Three are

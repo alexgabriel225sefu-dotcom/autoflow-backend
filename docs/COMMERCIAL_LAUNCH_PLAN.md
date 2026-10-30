@@ -9,9 +9,20 @@ demo product that is already available.
 - Live execution is unavailable. `entitlement.live_execution_enabled()` is a
   hard `False`, and the broker bridge is intentionally unreachable from the
   production request path.
-- Checkout is unavailable. `POST /api/v1/billing/checkout` requires a fresh
-  authenticated session and still returns `CHECKOUT_NOT_IMPLEMENTED`; the
-  legacy browser route cannot create a payment object.
+- Checkout is OFF by configuration, not by missing code. `POST
+  /api/v1/billing/checkout` requires a fresh authenticated session and then:
+  `503 CHECKOUT_NOT_ENABLED` unless both `A4T_CHECKOUT_ENABLED` and
+  `A4T_AUTHENTICATED_CHECKOUT_ENABLED` are set; `501 CHECKOUT_NOT_IMPLEMENTED`
+  ("Not on sale yet") when the gates are on but Stripe is not configured; and
+  only when `A4T_STRIPE_PAYMENT_LINK`, or `STRIPE_SECRET_KEY` +
+  `A4T_STRIPE_PRICE_ID` + `A4T_PUBLIC_WEB_ORIGIN`, are set does
+  `apex/platform/stripe_checkout.py` return a hosted URL (a Payment Link, or a
+  newly created one-time Checkout Session). The session carries the platform
+  user id in `client_reference_id` and `metadata.a4tUserId`, written by the
+  server. The legacy browser route cannot create a payment object.
+- The price is one figure: `billing.APPROVED_PRICE_MINOR = 49700` (497.00 USD).
+  Any other number in a document is a transcription error; see
+  `docs/PAYMENT_AND_LICENCE_DECISIONS.md` D1.
 - No deployment flag or environment variable may be used to bypass either
   decision.
 
@@ -19,16 +30,20 @@ demo product that is already available.
 
 ### 1. Sandbox checkout
 
-Implement and test the authenticated platform API with Stripe test mode only.
-The server must create a one-time Checkout Session for the approved Founder
-Lifetime product and write the authenticated platform user id into provider
-metadata. The browser receives only the hosted checkout URL.
+The authenticated creation path exists (see "Current release status"); what
+is missing is the test-mode exercise of it. Run it with Stripe test mode only,
+following `docs/STRIPE_SANDBOX_RUNBOOK.md`. The server creates a one-time
+Checkout Session for the approved Founder Lifetime product and writes the
+authenticated platform user id into provider metadata. The browser receives
+only the hosted checkout URL.
 
-Fulfilment remains webhook-driven. The server must verify the raw signature,
-require `payment_status == "paid"`, accept both
-`checkout.session.completed` and `checkout.session.async_payment_succeeded`,
-and keep event processing idempotent. A success-page redirect never grants a
-licence.
+Fulfilment remains webhook-driven. The server verifies the raw signature,
+requires `payment_status == "paid"`, and keeps event processing idempotent. A success-page redirect never grants a
+licence. In code the webhook accepts `checkout.session.completed` (which must
+be `paid`), `payment_intent.succeeded` and `invoice.payment_succeeded`;
+`checkout.session.async_payment_succeeded` is NOT handled by `billing.py`
+today, so a delayed-payment method would be acknowledged and ignored. Card
+payments arrive as `completed` + `paid` and are unaffected.
 
 The sandbox checklist is complete only after a real test-mode payment, webhook
 delivery, duplicate delivery, unpaid session, wrong-user metadata, refund and

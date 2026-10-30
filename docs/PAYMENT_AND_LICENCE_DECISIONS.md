@@ -1,7 +1,7 @@
 # Payment and licence — one-time founder access, checkout still gated
 
 This records what was found in the repository and what was built on top of it.
-The owner has now chosen the commercial shape: demo access stays free and the paid unlock is a one-time Founder Lifetime purchase at **499 USD**. Checkout still stays off until the authenticated checkout path, legal copy, refund policy and tax handling are reviewed.
+The owner has now chosen the commercial shape: demo access stays free and the paid unlock is a one-time Founder Lifetime purchase at **497 USD** (`billing.APPROVED_PRICE_MINOR = 49700`; see D1). Checkout still stays off until the authenticated checkout path, legal copy, refund policy and tax handling are reviewed.
 
 ---
 

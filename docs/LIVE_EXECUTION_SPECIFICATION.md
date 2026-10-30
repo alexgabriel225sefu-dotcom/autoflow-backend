@@ -63,7 +63,7 @@ Today `paid_live` is a name with nothing behind it, and that is deliberate
 
 **Open owner decisions that block this section entirely:** D5 and D6 in
 `docs/PAYMENT_AND_LICENCE_DECISIONS.md`, and L1–L4, L6–L8 in
-`docs/LEGAL_LAUNCH_BLOCKERS.md`. The 499 USD one-time founder offer is
+`docs/LEGAL_LAUNCH_BLOCKERS.md`. The 497 USD one-time founder offer is
 approved, but tax handling, refund policy, legal entity and authenticated
 checkout are not ready. Until those exist there is nothing to sell safely and
 nobody to sell it from.
