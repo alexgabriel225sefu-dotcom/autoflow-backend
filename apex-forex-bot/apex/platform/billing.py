@@ -237,16 +237,28 @@ def public_offer():
 
 
 def verify_signature(payload: bytes, sig_header: str, secret: str, *, now=None) -> bool:
-    """True only for a body this secret actually signed, recently."""
+    """True only for a body this secret actually signed, recently.
+
+    EVERY `v1` is compared, not the last one. While a signing secret is being
+    rolled Stripe sends one `v1` per active secret, in no promised order, and
+    a dict of the header kept only the last: a delivery signed with the secret
+    this server holds was refused whenever the other signature came last.
+    Exactly one `t` is required.
+    """
     if not secret or not sig_header:
         return False
-    try:
-        parts = dict(p.split("=", 1) for p in sig_header.split(",") if "=" in p)
-    except ValueError:
+    ts_values, v1s = [], []
+    for part in str(sig_header).split(","):
+        name, sep, value = part.strip().partition("=")
+        if not sep:
+            continue
+        if name == "t":
+            ts_values.append(value.strip())
+        elif name == "v1" and value.strip():
+            v1s.append(value.strip())
+    if len(ts_values) != 1 or not ts_values[0] or not v1s:
         return False
-    ts, v1 = parts.get("t"), parts.get("v1")
-    if not ts or not v1:
-        return False
+    ts = ts_values[0]
     try:
         age = abs((time.time() if now is None else now) - int(ts))
     except ValueError:
@@ -256,8 +268,14 @@ def verify_signature(payload: bytes, sig_header: str, secret: str, *, now=None) 
     expected = hmac.new(secret.encode(),
                         f"{ts}.".encode() + payload, hashlib.sha256).hexdigest()
     # compare_digest, not ==: a timing difference on a signature comparison is
-    # a signature oracle.
-    return hmac.compare_digest(expected, v1)
+    # a signature oracle. Every candidate is compared, so the time taken does
+    # not depend on WHICH one matched.
+    matched = False
+    for v1 in v1s:
+        # Bytes, because compare_digest raises on a non-ASCII str.
+        if hmac.compare_digest(expected.encode(), v1.encode("utf-8")):
+            matched = True
+    return matched
 
 
 def _event_key(event_id):
@@ -297,6 +315,75 @@ def _release(event_id):
         user_store.set_blob(_event_key(event_id), "", ttl_s=1)
     except Exception:
         pass
+
+
+def _k_intent(user_id):
+    """Who this server sent to the Payment Link, and with which address."""
+    return f"{_store._ns()}:{_store._P}:billing:intent:{user_id}"
+
+
+def _k_review(event_id):
+    return f"{_store._ns()}:{_store._P}:billing:review:{event_id}"
+
+
+def record_link_intent(user_id, email, *, now=None):
+    """Note that THIS server sent `user_id` to the Payment Link.
+
+    Called by `stripe_checkout.start_checkout` from an authenticated session.
+    The webhook later requires it, plus a matching e-mail, before trusting a
+    bare `client_reference_id` (see `_trusted_user_of`). Raises when the write
+    did not land, so a checkout is never started that could only end in a
+    manual review.
+    """
+    uid = str(user_id or "").strip()
+    if not uid:
+        raise ValueError("a user id is required")
+    _store._write_strict(_k_intent(uid), {
+        "userId": uid, "email": str(email or "").strip().lower(),
+        "at": time.time() if now is None else now})
+
+
+def _session_email(obj):
+    details = obj.get("customer_details") or {}
+    mail = details.get("email") if isinstance(details, dict) else None
+    return str(mail or obj.get("customer_email") or "").strip().lower()
+
+
+def _trusted_user_of(obj):
+    """(user_id, None) when the grant may go ahead, (claimed, why) otherwise.
+
+    `metadata.a4tUserId` is written by this server on a Checkout Session and
+    the payer cannot edit it: trusted. A Payment Link carries only
+    `client_reference_id`, which rides in the URL and the BUYER CAN EDIT —
+    taken alone it would let anyone attach their payment to another account,
+    or route a stolen-card purchase to a victim. So it is believed only when
+    this server recorded sending that user to the link AND the e-mail Stripe
+    collected matches the one that user signed in with. Anything else is held
+    for a person to look at, never granted.
+    """
+    meta = obj.get("metadata") or {}
+    if meta.get(USER_META_KEY):
+        return str(meta[USER_META_KEY]), None
+    claimed = str(obj.get("client_reference_id") or "") or None
+    if not claimed:
+        return None, None
+    intent = _store._read_strict(_k_intent(claimed))
+    if not isinstance(intent, dict) or str(intent.get("userId")) != claimed:
+        return claimed, "no checkout was started for this account"
+    want, got = str(intent.get("email") or ""), _session_email(obj)
+    if not want or not got:
+        return claimed, "no e-mail to cross-check the account against"
+    if not hmac.compare_digest(want.encode(), got.encode()):
+        return claimed, "the payer's e-mail does not match the account"
+    return claimed, None
+
+
+def _hold_for_review(event_id, etype, claimed, ref, why):
+    _store._write(_k_review(event_id), {
+        "eventId": event_id, "type": etype, "claimedUserId": claimed,
+        "paymentRef": ref, "reason": why, "at": time.time()})
+    print(f"[Billing] HELD {event_id} for manual review "
+          f"(payment={ref or 'unknown'}): {why}")
 
 
 def _user_id_of(obj):
@@ -502,6 +589,15 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             if not _paid(obj, etype):
                 _mark_done(event_id, "not-paid")
                 return 200, {"ok": True, "handled": False, "reason": "payment not completed"}
+            trusted, why_untrusted = _trusted_user_of(obj)
+            if why_untrusted or trusted != user_id:
+                # Recorded, not granted, and not retried: the payment is real
+                # and a person has to decide whose it is.
+                _hold_for_review(event_id, etype, user_id, ref,
+                                 why_untrusted or "user id mismatch")
+                _mark_done(event_id, "manual-review")
+                return 200, {"ok": True, "handled": False,
+                             "reason": "held for manual review"}
             cfg = product_config()
             ok_live, why_live = _livemode_ok(event)
             if not ok_live:

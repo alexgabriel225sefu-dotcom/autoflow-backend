@@ -232,6 +232,10 @@ def paid_link(user=USER, **extra):
         "currency": "usd",
         "payment_intent": "pi_link_" + user,
         "payment_link": "plink_founder",
+        # The address the buyer signed in with (see _Principal). A bare
+        # client_reference_id is no longer trusted without it — see
+        # tests/test_payment_link_reference.py.
+        "customer_details": {"email": "buyer@example.test"},
     }
     base.update(extra)
     return base

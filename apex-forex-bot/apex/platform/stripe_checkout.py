@@ -259,4 +259,15 @@ def start_checkout(principal, body=None, *, transport=None):
     if not url:
         raise CheckoutError(
             "CHECKOUT_NOT_IMPLEMENTED", "Not on sale yet", status=501)
+    # `client_reference_id` rides in this URL and the buyer can edit it, so
+    # the webhook grants only if this server recorded sending THIS user, and
+    # the e-mail Stripe collects matches theirs (billing._trusted_user_of).
+    from apex.platform import billing as billing
+    try:
+        billing.record_link_intent(uid, email)
+    except Exception as exc:                                 # noqa: BLE001
+        raise CheckoutError(
+            "CHECKOUT_FAILED",
+            "checkout could not be prepared — try again shortly",
+            status=503) from exc
     return {"url": url, "kind": "payment_link"}

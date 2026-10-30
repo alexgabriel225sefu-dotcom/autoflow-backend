@@ -102,8 +102,18 @@ _FERNET_ERROR = None
 
 if cfg.TOKEN_ENCRYPTION_KEY:
     try:
-        from cryptography.fernet import Fernet
+        from cryptography.fernet import Fernet, MultiFernet
         _fernet = Fernet(cfg.TOKEN_ENCRYPTION_KEY.encode())
+        # KEY ROTATION. TOKEN_ENCRYPTION_OLD_KEYS is an optional
+        # comma-separated list of RETIRED keys, accepted for decryption only.
+        # TOKEN_ENCRYPTION_KEY stays the one that encrypts. Same encrypt /
+        # decrypt interface, so no caller changes.
+        _old_keys = [k.strip() for k in
+                     (os.getenv("TOKEN_ENCRYPTION_OLD_KEYS") or "").split(",")
+                     if k.strip()]
+        if _old_keys:
+            _fernet = MultiFernet(
+                [_fernet] + [Fernet(k.encode()) for k in _old_keys])
     except Exception as e:
         # The message only. The key itself must never reach a log line.
         _FERNET_ERROR = f"TOKEN_ENCRYPTION_KEY is set but not a valid Fernet key ({type(e).__name__})"

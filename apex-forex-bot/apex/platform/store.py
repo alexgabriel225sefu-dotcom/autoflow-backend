@@ -39,6 +39,31 @@ class NotFound(LookupError):
     caller enumerate other clients' rule ids."""
 
 
+class RuleLimitReached(ValueError):
+    """This owner already stores the maximum number of rule documents."""
+
+    def __init__(self, limit):
+        self.limit = int(limit)
+        super().__init__(
+            f"you already have {self.limit} rules, the most one account can "
+            f"keep. Archived rules count too — edit an existing draft, or "
+            f"contact support to remove old ones.")
+
+
+# Every create is a write to the shared store, and nothing bounded how many
+# one account could make: a script could fill the store. Archived rules count,
+# because they are still stored (the journal points at their versions).
+DEFAULT_MAX_RULES_PER_USER = 50
+
+
+def max_rules_per_user():
+    try:
+        n = int(os.getenv("A4T_MAX_RULES_PER_USER") or DEFAULT_MAX_RULES_PER_USER)
+    except (TypeError, ValueError):
+        n = DEFAULT_MAX_RULES_PER_USER
+    return n if n > 0 else DEFAULT_MAX_RULES_PER_USER
+
+
 class OwnershipViolation(PermissionError):
     """A stored document does not belong to the owner it was fetched for.
     Only reachable through a key-construction bug, and loud on purpose."""
@@ -341,6 +366,9 @@ def create(owner_id, doc):
         raise ValueError("a RuleDoc needs a ruleDocId")
     if _read(_k_current(owner_id, rid)) is not None:
         raise ValueError(f"rule {rid} already exists")
+    limit = max_rules_per_user()
+    if len(set(_index_members(owner_id))) >= limit:
+        raise RuleLimitReached(limit)
     doc.setdefault("state", ruledoc.DRAFT)
     # Same canonical spelling as save_draft applies. A rule created in one
     # form and edited in another would otherwise change instrument silently.
@@ -506,6 +534,11 @@ def set_state(owner_id, rule_doc_id, state):
     were already frozen and validated at activation, and re-running validation
     against a condition library that has since changed could refuse to restart
     a rule that has been running correctly all along.
+
+    The ENTITLEMENT is not checked here — this module cannot import
+    entitlement (licence imports store). Every caller that moves a rule to
+    ACTIVE must apply activation's gate first; the API's resume route does
+    (`api._rule_action`), and tests/test_rule_resume_and_cap.py holds it.
     """
     if state not in ruledoc.STATES:
         raise ValueError(f"state must be one of {', '.join(ruledoc.STATES)}")

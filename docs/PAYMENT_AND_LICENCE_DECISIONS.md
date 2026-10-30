@@ -164,3 +164,25 @@ currency `usd` records the `founder_lifetime` licence for `client_reference_id`
 Link purchase is that event, provided the link was opened with
 `client_reference_id`. A different amount does not grant. The legacy browser
 route `web/src/app/api/create-payment-intent` still creates nothing.
+
+### `client_reference_id` is not trusted on its own (security audit, 2026-10-29)
+
+`client_reference_id` travels in the Payment Link URL and the buyer can edit
+it. The webhook therefore grants on a Payment Link purchase only when:
+
+1. this server recorded sending that user to the link
+   (`billing.record_link_intent`, written by `POST billing/checkout`, key
+   `a4t:billing:intent:<uid>` holding the sign-in e-mail), **and**
+2. the e-mail Stripe collected (`customer_details.email`, else
+   `customer_email`) matches that e-mail, case-insensitively.
+
+Anything else (no intent, a different e-mail, no e-mail at all) is **not
+granted**: it is recorded at `a4t:billing:review:<event id>` with the claimed
+user, the payment reference and the reason, logged as `HELD ... for manual
+review`, and answered 200 so Stripe stops retrying. Support grants it by hand
+after checking (see `docs/MANUAL_LICENCE_OPERATIONS.md`).
+
+Known limit: a buyer who changes the prefilled e-mail on Stripe's page lands in
+manual review. A Checkout Session (`metadata.a4tUserId`, written server-side)
+is unaffected and, when both are present, metadata wins over
+`client_reference_id`. Tests: `apex-forex-bot/tests/test_payment_link_reference.py`.

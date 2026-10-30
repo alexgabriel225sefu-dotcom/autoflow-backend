@@ -23,9 +23,11 @@ lead to different buttons. A single 403 with prose would force the frontend to
 match on English text.
 """
 
+import contextvars
 import json
 import re
 
+from apex.platform import account_data as _acct
 from apex.platform import conditions as _cond
 from apex.platform import approvals as _appr
 from apex.platform import automation as _auto
@@ -137,13 +139,26 @@ def _start_trial_if_new(principal):
               f"gate will report it")
 
 
-def _authenticate(headers, *, fresh=False):
+# The caller's network address for the request being handled, set by
+# `_handle_limited`. A context variable rather than a parameter so the
+# Supabase-lookup budget in `_authenticate` can see it without threading an
+# argument through every route below.
+_CLIENT_KEY = contextvars.ContextVar("a4t_client_key", default=None)
+
+
+def _authenticate(headers, *, fresh=False, start_trial=True):
     token = _id.bearer_token((headers or {}).get("Authorization")
                              or (headers or {}).get("authorization"))
     if not token:
         raise _id.AuthFailed("this endpoint needs a signed-in session")
-    principal = _id.verify_token(token, fresh=fresh)
-    _start_trial_if_new(principal)
+    # Every Supabase lookup (a cache miss) spends the caller's ADDRESS budget
+    # first, so invented tokens cannot buy unlimited lookups. Rejected tokens
+    # are also remembered briefly by identity's negative cache.
+    client = _CLIENT_KEY.get()
+    principal = _id.verify_token(
+        token, fresh=fresh, before_remote=lambda: _rl.check_verify(client))
+    if start_trial:
+        _start_trial_if_new(principal)
     return principal
 
 
@@ -290,9 +305,12 @@ def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
     if not allowed:
         return _rl.refusal(bucket, retry_after)
     method = (method or "GET").upper()
+    ctx_token = _CLIENT_KEY.set(client_key)
     try:
         return _dispatch(method, route, headers or {}, body,
                          _query(path))
+    except _rl.Limited as e:
+        return _rl.refusal(e.bucket, e.retry_after)
     except _id.AuthFailed as e:
         return _err(401, "AUTH_REQUIRED", _safe_error(e))
     except _id.AuthUnavailable as e:
@@ -385,8 +403,14 @@ def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
     except _rd.RuleDocInvalid as e:
         return _err(422, "RULE_INVALID", "this rule cannot be activated",
                     problems=e.problems)
+    except _store.RuleLimitReached as e:
+        # Before ValueError, which it subclasses: a 400 would tell the client
+        # their request was malformed when it is their account that is full.
+        return _err(409, "RULE_LIMIT_REACHED", _safe_error(e), limit=e.limit)
     except ValueError as e:
         return _err(400, "BAD_REQUEST", _safe_error(e))
+    finally:
+        _CLIENT_KEY.reset(ctx_token)
 
 
 def _dispatch(method, route, headers, body, query=None):
@@ -804,6 +828,40 @@ def _dispatch(method, route, headers, body, query=None):
         return _live_gate.http(
             method, route, p, _body(body) if method != "GET" else None)
 
+    # ── the client's own data: export and erasure ──────────────────────
+    # Both skip the trial start: exporting must not write, and erasing must
+    # not re-create the licence record it is about to remove.
+    if route == "account/export":
+        if method != "GET":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers, fresh=True, start_trial=False)
+        try:
+            return _ok(_acct.export(p.user_id))
+        except _acct.AccountDataError as e:
+            return _err(e.status, e.code, _safe_error(e))
+
+    if route == "account":
+        if method != "DELETE":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers, fresh=True, start_trial=False)
+        # Per PERSON as well as per session, and closed if the limiter breaks.
+        ok_person, wait = _rl.check_user("account_delete", p.user_id,
+                                         fail_closed=True)
+        if not ok_person:
+            return _rl.refusal("account_delete", wait)
+        try:
+            out = _acct.delete(p.user_id, _body(body) or {},
+                               stop_automation=_auto.stop)
+        except _acct.AccountDataError as e:
+            return _err(e.status, e.code, _safe_error(e))
+        print(f"[API] account erased for {p.user_id}: "
+              f"{_acct.describe_deleted(out['deleted'])} "
+              f"authUserDeleted={out['authUserDeleted']}")
+        # The session's cached answer dies with the account.
+        _id.forget(_id.bearer_token(headers.get("Authorization")
+                                    or headers.get("authorization")))
+        return _ok(out)
+
     if route == "me" and method == "GET":
         p = _authenticate(headers)
         # `execution` is the SERVER's verdict on what this client may do, so
@@ -992,7 +1050,11 @@ def _rule_action(action, rid, headers, body):
     # orders, so it is the one that re-checks the session against Supabase
     # instead of trusting a cached answer, insists on a confirmed address, and
     # requires a live licence.
-    sensitive = action == "activate"
+    #
+    # Resume is held to the same gate. It moves a paused or ARCHIVED rule back
+    # to ACTIVE, so without it a client whose licence support had withdrawn
+    # could park a rule before the withdrawal and resume it after.
+    sensitive = action in ("activate", "resume")
     p = _authenticate(headers, fresh=sensitive)
 
     if action == "validate":
@@ -1012,6 +1074,12 @@ def _rule_action(action, rid, headers, body):
         _ent.require_activation(p.user_id)
         return _ok({"rule": _store.activate(
             p.user_id, rid, known_condition_ids=_cond.available())})
+
+    if action == "resume":
+        # The same order as activate: ownership first (404 before 402).
+        _store.get(p.user_id, rid)
+        _id.require_verified_email(p)
+        _ent.require_activation(p.user_id)
 
     if action in ("pause", "resume", "archive"):
         want = {"pause": _rd.PAUSED, "resume": _rd.ACTIVE,

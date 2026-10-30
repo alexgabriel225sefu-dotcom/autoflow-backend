@@ -49,6 +49,17 @@ _MAX_CACHE = 512
 _cache = {}
 _lock = threading.Lock()
 
+# NEGATIVE CACHE: tokens Supabase has just REJECTED (401/403). Without it a
+# client, or a script, repeating one bad token paid a Supabase round trip per
+# request, and a flood of them throttled the platform's key for everyone.
+# Short, because the only thing it can get wrong is a token that becomes valid
+# — which a rejected Supabase token never does. Honoured even with fresh=True:
+# freshness exists so a REVOKED session dies quickly, and a rejected one is
+# already dead. Keyed by SHA-256, like the positive cache.
+NEG_CACHE_TTL_S = 30
+_MAX_NEG_CACHE = 4096
+_neg = {}
+
 
 class AuthFailed(Exception):
     """The caller is not authenticated. Becomes a 401.
@@ -155,19 +166,47 @@ def _fetch_user(url, key, token, timeout_s):
         raise AuthUnavailable("Supabase returned a body that is not JSON")
 
 
-def verify_token(token, *, fresh=False, timeout_s=6.0):
-    """A Principal, or raise. `fresh=True` skips the cache.
+def _neg_hit(h, now):
+    with _lock:
+        exp = _neg.get(h)
+        if exp is not None and exp <= now:
+            _neg.pop(h, None)
+            exp = None
+    return exp is not None
+
+
+def _neg_remember(h, now):
+    with _lock:
+        if len(_neg) >= _MAX_NEG_CACHE:
+            for k in [k for k, exp in _neg.items() if exp <= now]:
+                _neg.pop(k, None)
+            if len(_neg) >= _MAX_NEG_CACHE:
+                for k in sorted(_neg, key=_neg.get)[: len(_neg) // 2 + 1]:
+                    _neg.pop(k, None)
+        _neg[h] = now + NEG_CACHE_TTL_S
+
+
+def verify_token(token, *, fresh=False, timeout_s=6.0, before_remote=None):
+    """A Principal, or raise. `fresh=True` skips the positive cache.
 
     Pass fresh=True for anything destructive or irreversible — starting
     automation, connecting a broker account, changing a credential. The point
     of the cache is to spare read traffic, not to keep a revoked session alive
     through an action the client cannot undo.
+
+    `before_remote`, when given, is called immediately before Supabase is
+    asked — that is, only on a cache miss — and may raise to refuse the
+    lookup. The API uses it to meter Supabase calls per client address, so
+    invented tokens cannot buy unlimited lookups.
     """
     if not token or not isinstance(token, str):
         raise AuthFailed("no bearer token")
     url, key = _config()          # raises AuthUnavailable when unset
     h = _hash(token)
     now = time.time()
+
+    if _neg_hit(h, now):
+        raise AuthFailed("the session is invalid or has expired")
 
     if not fresh:
         with _lock:
@@ -176,20 +215,30 @@ def verify_token(token, *, fresh=False, timeout_s=6.0):
         if hit and hit[0] > now:
             return hit[1]
 
-    data = _fetch_user(url, key, token, timeout_s)
-    if not isinstance(data, dict):
-        raise AuthUnavailable("Supabase returned an unexpected shape")
+    if before_remote is not None:
+        before_remote()
 
-    # Supabase answers 200 with a user object. A 200 carrying no id is not a
-    # login; treat the absence as a refusal rather than minting an anonymous
-    # principal that every ownership check would then compare against.
-    principal = Principal(
-        user_id=data.get("id"),
-        email=data.get("email"),
-        email_verified=bool(data.get("email_confirmed_at")
-                            or data.get("confirmed_at")),
-        app_metadata=data.get("app_metadata"),
-        checked_at=now)
+    try:
+        data = _fetch_user(url, key, token, timeout_s)
+        if not isinstance(data, dict):
+            raise AuthUnavailable("Supabase returned an unexpected shape")
+
+        # Supabase answers 200 with a user object. A 200 carrying no id is
+        # not a login; treat the absence as a refusal rather than minting an
+        # anonymous principal that every ownership check would then compare
+        # against.
+        principal = Principal(
+            user_id=data.get("id"),
+            email=data.get("email"),
+            email_verified=bool(data.get("email_confirmed_at")
+                                or data.get("confirmed_at")),
+            app_metadata=data.get("app_metadata"),
+            checked_at=now)
+    except AuthFailed:
+        # Only a REFUSAL is remembered. AuthUnavailable is not: an outage
+        # must not keep a good session signed out after it ends.
+        _neg_remember(h, now)
+        raise
 
     with _lock:
         _prune(now)
@@ -211,6 +260,7 @@ def forget(token):
 def forget_all():
     with _lock:
         _cache.clear()
+        _neg.clear()
 
 
 def require_verified_email(principal):
