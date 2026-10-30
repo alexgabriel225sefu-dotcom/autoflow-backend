@@ -33,6 +33,7 @@ import { EmergencyStop } from "@/components/app/emergency-stop";
 import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
+import { FirstRunChecklist } from "@/components/app/first-run";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -184,6 +185,10 @@ export default function Dashboard() {
           <RefreshCw className="ico" aria-hidden /> Refresh
         </button>
       </div>
+
+      <FirstRunChecklist
+        me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}
+      />
 
       <OverviewBand tiles={overview} />
 

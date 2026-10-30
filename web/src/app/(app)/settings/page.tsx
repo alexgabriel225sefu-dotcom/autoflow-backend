@@ -6,6 +6,8 @@ import { useRead } from "@/lib/use-api";
 import { ErrorNotice, LicencePill, Spinner } from "@/components/app/state";
 import type { CtraderStatus, Me } from "@/lib/api";
 import { AppearanceControls } from "@/components/app/appearance-controls";
+import { YourData } from "@/components/app/your-data";
+import { resendConfirmation } from "@/components/auth/resend-confirmation";
 
 export default function SettingsPage() {
   const me = useRead<Me>("me");
@@ -24,14 +26,10 @@ export default function SettingsPage() {
     setResendBusy(true);
     setResendNote(null);
     setResendError(null);
-    const { error } = await createClient().auth.resend({
-      type: "signup",
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
+    const r = await resendConfirmation(email);
     setResendBusy(false);
-    if (error) { setResendError(error.message); return; }
-    setResendNote("If the address still needs confirming, another link is on its way.");
+    if (!r.ok) { setResendError(r.message); return; }
+    setResendNote(r.message);
   }
 
   async function signOut() {
@@ -109,6 +107,8 @@ export default function SettingsPage() {
         <div className="card-head"><h2>Password</h2></div>
         <a className="btn btn-ghost" href="/auth/reset">Send a reset link</a>
       </section>
+
+      <YourData />
 
       <section className="card">
         <div className="card-head"><h2>Session</h2></div>

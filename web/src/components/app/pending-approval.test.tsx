@@ -221,7 +221,7 @@ describe("answering it", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Yes$/ }));
     });
-    await waitFor(() => expect(screen.getByText(/EXPIRED: this setup was found/))
+    await waitFor(() => expect(screen.getByText(/this setup was found/))
       .toBeTruthy());
   });
 

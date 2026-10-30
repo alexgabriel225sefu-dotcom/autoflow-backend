@@ -83,8 +83,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLockup size={22} />
         </Link>
 
-        <SideGroup label="Operations" items={NAV.slice(0, 6)} path={path} badge={badge} first />
-        <SideGroup label="Account" items={NAV.slice(6)} path={path} badge={badge} />
+        <SideGroup label="Operations" items={NAV.filter((n) => n.group === "operations")} path={path} badge={badge} first />
+        <SideGroup label="Account" items={NAV.filter((n) => n.group === "account")} path={path} badge={badge} />
+        <SideGroup label="More" items={NAV.filter((n) => n.group === "more")} path={path} badge={badge} />
 
         <div className="side-foot">
           <AppearanceMenu />
@@ -122,6 +123,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link role="menuitem" href="/settings" onClick={close}>Settings</Link>
                 <Link role="menuitem" href="/license" onClick={close}>Licence</Link>
                 <Link role="menuitem" href="/accounts" onClick={close}>cTrader accounts</Link>
+                <Link role="menuitem" href="/help" onClick={close}>Help</Link>
                 <button role="menuitem" onClick={signOut}>
                   <LogOut className="ico" aria-hidden /> Sign out
                 </button>
@@ -189,10 +191,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 this menu is looking for a page, and making them remember
                 which bar holds which one is the problem being fixed. */}
             <div className="drawer-links">
-              {NAV.map(({ href, label, icon: Icon }) => (
+              {NAV.map(({ href, label, icon: Icon, note }) => (
                 <Link key={href} href={href} data-active={isActive(path, href)} onClick={close}>
                   <Icon className="ico" aria-hidden />
                   <span style={{ flex: 1 }}>{label}</span>
+                  {note ? <span className="dim" style={{ fontSize: ".72rem" }}>{note}</span> : null}
                   {badge(href)}
                 </Link>
               ))}
@@ -251,7 +254,7 @@ function SideGroup({
         <span className="side-rail" aria-hidden><i /></span>
         <span className="side-hl" aria-hidden />
         <ul>
-        {items.map(({ href, label: text, icon: Icon }, i) => (
+        {items.map(({ href, label: text, icon: Icon, note }, i) => (
           <li key={href} data-lit={lit >= 0 && i <= lit}>
             <Link
               className="side-link"
@@ -264,6 +267,7 @@ function SideGroup({
               <span className="side-node" aria-hidden />
               <Icon className="ico" aria-hidden />
               <span style={{ flex: 1 }}>{text}</span>
+              {note ? <span className="dim" style={{ fontSize: ".66rem" }}>Not available</span> : null}
               {badge(href)}
             </Link>
           </li>

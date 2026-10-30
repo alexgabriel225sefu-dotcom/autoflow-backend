@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleButton } from "@/components/auth/google-button";
+import { ResendConfirmation } from "@/components/auth/resend-confirmation";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -49,6 +50,10 @@ export default function SignUpPage() {
           You will need to confirm it before connecting a cTrader account
           or activating a rule.
         </p>
+        <p className="auth-lead">
+          Nothing arrived? Check your spam folder, then ask for another link.
+        </p>
+        <ResendConfirmation email={email} />
       </AuthShell>
     );
   }

@@ -1,4 +1,5 @@
 "use client";
+import { plainError } from "@/components/app/plain";
 import { useEffect, useRef, useState } from "react";
 import { api, type CtraderStatus } from "@/lib/api";
 import { invalidateBrokerViews, useRead } from "@/lib/use-api";
@@ -188,7 +189,7 @@ export default function ConnectPage() {
     const r = await api<{ authorizeUrl: string; nonce: string }>(
       "ctrader/connect", { method: "POST" });
     setBusy(false);
-    if (!r.ok) return setErr(`${r.code}: ${r.message}`);
+    if (!r.ok) return setErr(plainError(r));
     remember(r.data.nonce, null);
     window.open(r.data.authorizeUrl, "_blank", "noopener");
   }
@@ -224,7 +225,7 @@ export default function ConnectPage() {
       if (TERMINAL.has(r.code) && !RETRYABLE.has(r.code)) remember(null);
       setDiagnosticId(
         typeof r.diagnosticId === "string" ? r.diagnosticId : null);
-      return setErr(`${r.code}: ${r.message}`);
+      return setErr(plainError(r));
     }
     remember(null);
     invalidateBrokerViews();

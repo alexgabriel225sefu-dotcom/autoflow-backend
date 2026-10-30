@@ -83,6 +83,7 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/rules/[id]": "protected",
   "/rules/[id]/edit": "protected",
   "/settings": "protected",
+  "/help": "protected",
 };
 
 const FOUND = routes().sort();

@@ -835,3 +835,53 @@ export type AutomationState = {
   stopNote?: string | null;
   loopStoppedHere?: boolean;
 };
+
+/* ── account data: export and deletion ───────────────────────────────── */
+
+/** GET /account/export: everything held about the caller, as JSON. */
+export type AccountExport = {
+  ok: true;
+  exportedAt: string;
+  data: Record<string, unknown>;
+};
+
+/** DELETE /account: counts per category, and whether the login itself went. */
+export type AccountDeletion = {
+  ok: true;
+  deleted: Record<string, number>;
+  authUserDeleted: boolean;
+};
+
+/** The code given to a 404/501: the endpoint is not deployed on this server. */
+export const ENDPOINT_NOT_DEPLOYED = "NOT_DEPLOYED";
+
+/**
+ * A missing route is not a failed request, it is a server that has not been
+ * updated yet. Said calmly and kept distinct, so the page does not alarm
+ * somebody over something they cannot fix and nothing was changed.
+ */
+function notDeployed<T>(r: ApiResult<T>, what: string): ApiResult<T> {
+  if (r.ok || (r.status !== 404 && r.status !== 501)) return r;
+  return fail(r.status, ENDPOINT_NOT_DEPLOYED,
+    `${what} is not available on this server yet. Nothing was changed. Please try again later.`);
+}
+
+export async function exportAccount(): Promise<ApiResult<AccountExport>> {
+  const r = await api<AccountExport>("account/export",
+    { timeoutMs: 60_000, timeoutMessage: "The export took too long. Try again in a moment." });
+  if (r.ok && (typeof r.data.data !== "object" || r.data.data === null)) {
+    return fail(200, "BAD_RESPONSE", "The export came back in a shape that could not be read.");
+  }
+  return notDeployed(r, "Export");
+}
+
+/** The caller must have typed DELETE; the server checks it again. */
+export async function deleteAccount(confirm: string): Promise<ApiResult<AccountDeletion>> {
+  const r = await api<AccountDeletion>("account", {
+    method: "DELETE",
+    body: { confirm },
+    timeoutMs: 60_000,
+    timeoutMessage: "Deleting is taking a while. Check Settings before trying again.",
+  });
+  return notDeployed(r, "Account deletion");
+}

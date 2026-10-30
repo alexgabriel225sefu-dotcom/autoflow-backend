@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const push = vi.fn();
 const refresh = vi.fn();
 const signUp = vi.fn();
+const resend = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, refresh }),
@@ -23,7 +24,9 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({ auth: { signUp: (body: unknown) => signUp(body) } }),
+  createClient: () => ({
+    auth: { signUp: (body: unknown) => signUp(body), resend: (body: unknown) => resend(body) },
+  }),
 }));
 
 import SignUpPage from "./page";
@@ -32,6 +35,7 @@ beforeEach(() => {
   push.mockReset();
   refresh.mockReset();
   signUp.mockReset();
+  resend.mockReset();
 });
 
 async function submit() {
@@ -56,5 +60,30 @@ describe("sign up", () => {
     expect(await screen.findByRole("heading", { name: /check your email/i })).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
     expect(screen.queryByText(/already registered|already exists/i)).toBeNull();
+  });
+
+  it("resends the link, says so, and starts a cooldown", async () => {
+    signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
+    resend.mockResolvedValue({ error: null });
+    await submit();
+    await userEvent.click(await screen.findByRole("button", { name: /resend the link/i }));
+    expect(resend).toHaveBeenCalledWith({
+      type: "signup",
+      email: "ada@example.test",
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
+    expect((await screen.findByRole("status")).textContent).toMatch(/another link is on its way/i);
+    const again = screen.getByRole("button", { name: /resend available in \d+s/i }) as HTMLButtonElement;
+    expect(again.disabled).toBe(true);
+  });
+
+  it("shows a failure and allows trying again", async () => {
+    signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
+    resend.mockResolvedValue({ error: { message: "email rate limit exceeded" } });
+    await submit();
+    await userEvent.click(await screen.findByRole("button", { name: /resend the link/i }));
+    expect((await screen.findByRole("alert")).textContent).toContain("email rate limit exceeded");
+    const btn = screen.getByRole("button", { name: /resend the link/i }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
   });
 });
