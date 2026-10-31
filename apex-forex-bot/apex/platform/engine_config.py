@@ -511,6 +511,47 @@ def restore_patch(snapshot):
 ENGINE_DEFAULT_RISK = 0.025
 
 
+def names_capital(doc):
+    """True when the rule names a positive capital allocation.
+
+    Absent means the engine sizes against the whole balance, which is what
+    every rule written before the field existed already does.
+    """
+    limits = (doc or {}).get("limits") if isinstance(doc, dict) else None
+    if not isinstance(limits, dict):
+        return False
+    value = limits.get("capitalAllocated")
+    return _num(value) and value > 0
+
+
+def scale_risk_to_capital(applied, doc, balance):
+    """(applied, state). Rebase `risk` onto the allocated capital.
+
+    The engine sizes `risk` as a fraction of the whole balance. A client who
+    allocated 1,000 of a 5,000 balance at 1% asked to risk 10, not 50. The
+    fraction written to the account is scaled by min(balance, allocated) /
+    balance so the money at risk is the money they named.
+
+    `state` is None when nothing had to change or the scale was applied, and
+    "unchecked" when the rule names an allocation and the balance cannot be
+    used. The caller must not start in that case: leaving the unscaled
+    fraction in place would risk more than the allocation.
+    Never mutates `applied`.
+    """
+    if not names_capital(doc):
+        return applied, None
+    risk = (applied or {}).get("risk")
+    if not _num(risk):
+        return applied, None
+    if not _num(balance) or balance <= 0:
+        return dict(applied or {}), "unchecked"
+    allocated = float(doc["limits"]["capitalAllocated"])
+    base = min(float(balance), allocated)
+    out = dict(applied)
+    out["risk"] = float(risk) * (base / float(balance))
+    return out, None
+
+
 def live_refusals(doc, account):
     """Why a rule must NOT start on a LIVE account, as [(code, detail)].
 

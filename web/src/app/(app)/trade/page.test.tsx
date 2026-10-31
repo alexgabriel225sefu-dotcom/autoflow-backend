@@ -1,21 +1,11 @@
 /**
- * The Trade page: the product's front door, checked through the page.
+ * The automation setup: five steps, checked through the page.
  *
- * WHAT HAS TO HOLD
- *
- *  - Nothing is chosen for the client that changes what is risked or who acts:
- *    Start stays disabled, with the reason, until an instrument, a strategy, a
- *    risk and "who acts on a setup" are chosen.
- *  - Start is four calls in a fixed order (save, write the strategy, activate,
- *    start) and the body carries exactly what was chosen. A failure stops the
- *    sequence at that step and never reaches `automation/start`.
- *  - Live never starts from here on the browser's say-so. A closed live
- *    account turns the button into the next step towards access; an open one
- *    asks for a confirmation that names the account and says real money moves.
- *  - Nothing the server did not say is shown as a result: there is no number
- *    about any strategy's performance on the page.
+ * Start is one POST to /automation/setup. A closed live account never posts
+ * a start; it shows Request live access or Awaiting approval. No strategy
+ * card shows a result the server did not publish.
  */
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiResult, StrategyCatalogue } from "@/lib/api";
 
@@ -61,12 +51,14 @@ const CATALOGUE: StrategyCatalogue = {
   strategies: [
     { id: "trend", label: "Trend Following", version: "1", family: "trend",
       what: "Buys pullbacks inside a confirmed uptrend.", decides: "EMA50 over EMA200.",
-      refuses: "Counter-trend entries.", source: "apex/ai.py" },
+      refuses: "Counter-trend entries.", source: "apex/ai.py",
+      timeframeNote: "Runs on the timeframe you choose.", backtest: null },
     { id: "fvg", label: "Fair Value Gap", version: "1", family: "structure",
       what: "Forwards a detector's side.", decides: "A gap is detected.",
-      refuses: "Nothing beyond the setup not being there.", source: "apex/strategy_extra.py" },
+      refuses: "Nothing beyond the setup not being there.", source: "apex/strategy_extra.py",
+      timeframeNote: "Runs on the timeframe you choose.", backtest: null },
   ],
-  withheld: [],
+  withheld: [{ id: "grid", label: "Grid", reason: "It adds exposure to a losing position.", kind: "high_risk" }],
 };
 const ok = (data: unknown) => ({ ok: true, data });
 const execution = (over: Record<string, unknown> = {}) => ({
@@ -84,7 +76,6 @@ const demo = ok({ connected: true, accounts: [{ ctid: 7, mode: "demo" }],
   selected: { ctid: 7, mode: "demo" }, liveAllowed: false });
 const live = ok({ connected: true, accounts: [{ ctid: 9, mode: "live" }],
   selected: { ctid: 9, mode: "live" }, liveAllowed: true });
-
 const BROKER = ok({ connected: true, status: "ok", accountId: 7, mode: "demo", symbols: [
   { id: "EURUSD", class: "forex", tradeable: true, reason: null },
   { id: "XAUUSD", class: "metal", tradeable: true, reason: null },
@@ -97,35 +88,65 @@ const RULES = ok({ rules: [
   { ruleDocId: "p1", name: "Trend Following · EURUSD", state: "active", version: 1, symbols: ["EURUSD"],
     timeframe: "1h", updatedAt: 1, strategy: "trend", entryConditions: 0, exitConditions: 0 },
 ] });
+const LIBRARY = ok({
+  ...CATALOGUE,
+  disclaimer: "Past performance does not guarantee future results.",
+  tradedSymbolNote: "This release trades the first symbol. Any others are recorded on the rule and are not watched.",
+  bounds: {},
+});
 
 let autoState = "stopped";
 function baseRoutes() {
   autoState = "stopped";
   routes = {
-    strategies: ok(CATALOGUE),
+    "automation/setup": (init?: Call["init"]) => {
+      if (init?.method === "POST") {
+        autoState = "running";
+        return ok({ started: true, executed: true, account: "demo", ruleDocId: "r1" });
+      }
+      return LIBRARY;
+    },
     symbols: BROKER,
-    rules: (init?: Call["init"]) =>
-      init?.method === "POST" ? ok({ rule: { ruleDocId: "r1" } }) : RULES,
+    rules: RULES,
     "ctrader/status": demo,
     me: me(),
     automation: () => ok({ state: autoState, ruleDocId: null, mode: "demo" }),
-    "automation/start": () => { autoState = "running"; return ok({ state: "running", ruleDocId: "r1", mode: "demo" }); },
     "rules/m1": ok({ rule: { ruleDocId: "m1", entry: { combine: "AND", conditions: [{ id: "rsi" }, { id: "ema" }] },
       exit: { combine: "OR", conditions: [{ id: "rsi" }] }, sides: "BUY" } }),
-    "rules/r1/activate": ok({}),
-    "rules/r1": ok({ rule: { ruleDocId: "r1" } }),
   };
 }
 
 async function loaded() {
   render(<TradePage />);
-  await screen.findByRole("radio", { name: /Trend Following/ });
+  await screen.findByRole("radio", { name: "EURUSD" });
 }
 const choose = (name: RegExp) => fireEvent.click(screen.getByRole("radio", { name }));
-function chooseEverything() {
-  choose(/^EURUSD$/);
+const cont = () => fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+async function toStrategy(symbol: RegExp = /^EURUSD$/) {
+  await loaded();
+  choose(symbol);
+  cont();
+  await screen.findByRole("radio", { name: /Trend Following/ });
+}
+async function toRisk() {
+  await toStrategy();
   choose(/Trend Following/);
+  cont();
+  await screen.findByLabelText("Capital allocated");
+}
+async function toAccount() {
+  await toRisk();
+  fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
   choose(/Approval Required/);
+  cont();
+  await screen.findByRole("radio", { name: "Demo" });
+}
+async function toReview() {
+  await toAccount();
+  choose(/^Demo$/);
+  cont();
+  await screen.findByRole("heading", { name: /Review/ });
 }
 
 beforeEach(() => { calls.length = 0; fireStartConfetti.mockClear(); baseRoutes(); });
@@ -133,42 +154,46 @@ afterEach(() => { vi.clearAllMocks(); });
 
 describe("the choices", () => {
   it("offers every strategy the server lists, each with what it will not trade", async () => {
-    await loaded();
+    await toStrategy();
     expect(screen.getByText(/Buys pullbacks inside a confirmed uptrend/)).toBeDefined();
     expect(screen.getAllByText(/Will not trade:/).length).toBe(2);
     expect(screen.getByText(/Nothing beyond the setup not being there/)).toBeDefined();
+    expect(screen.getAllByText(/No stored backtest/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Past performance does not guarantee future results/)).toBeDefined();
+    expect(screen.getByText(/It adds exposure to a losing position/)).toBeDefined();
   });
 
   it("shows no performance number", async () => {
-    await loaded();
+    await toStrategy();
     const text = document.body.textContent ?? "";
-    expect(text).toMatch(/no result is shown here/i);
-    expect(text).not.toMatch(/win rate|profit factor|backtest result/i);
+    expect(text).toMatch(/No stored backtest is published/i);
+    expect(text).not.toMatch(/win rate|profit factor/i);
   });
 
   it("does not choose an instrument, a strategy or who acts on the client's behalf", async () => {
-    await loaded();
+    await toRisk();
     for (const r of screen.getAllByRole("radio")) {
       const name = r.textContent ?? "";
-      if (/^EURUSD$|Trend Following|Signals Only|Approval Required|Full Automation/.test(name)) {
+      if (/Signals Only|Approval Required|Full Automation/.test(name)) {
         expect(r.getAttribute("aria-checked"), name).toBe("false");
       }
     }
   });
 
-  it("keeps Start disabled and says what is still to choose", async () => {
+  it("keeps Continue disabled until the step is filled, then enables Start", async () => {
     await loaded();
-    const start = await screen.findByRole("button", { name: "Start on demo" });
-    expect((start as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/Still to choose: an instrument, a strategy or a method of your own, who acts on a setup/)).toBeDefined();
-    chooseEverything();
-    await waitFor(() =>
-      expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(false));
+    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/Choose an instrument/)).toBeDefined();
   });
 
-  it("works the money estimate out from the size typed, and says it is not a forecast", async () => {
-    await loaded();
-    fireEvent.change(screen.getByLabelText(/Account size/i), { target: { value: "10000" } });
+  it("enables Start once every step is filled", async () => {
+    await toReview();
+    expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("works the money estimate out from the capital allocated, and says it is not a forecast", async () => {
+    await toRisk();
+    fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
     expect(screen.getByText("$100.00")).toBeDefined();
     expect(screen.getByText("$200.00")).toBeDefined();
     expect(screen.getByText(/not a forecast/)).toBeDefined();
@@ -212,33 +237,39 @@ describe("the broker's own instruments", () => {
 });
 
 describe("my methods", () => {
-  it("lists only methods built from conditions, not the preset rules the page made", async () => {
-    await loaded();
+  async function methods() {
+    await toStrategy();
     fireEvent.click(screen.getByRole("tab", { name: /My methods/ }));
+  }
+  it("lists only methods built from conditions, not the preset rules the page made", async () => {
+    await methods();
     expect(screen.getByRole("radio", { name: /My RSI dip/ })).toBeDefined();
     expect(screen.queryByText(/Trend Following · EURUSD/)).toBeNull();
     expect(screen.getByText(/2 entry and 1 exit conditions/)).toBeDefined();
     expect(screen.getByRole("link", { name: "Build a new method" }).getAttribute("href")).toBe("/rules/new");
   });
 
-  it("starts from the client's own conditions, with no strategy field", async () => {
-    await loaded();
+  it("starts from the client's own method, with no strategy field", async () => {
+    await toStrategy(/^XAUUSD$/);
     fireEvent.click(screen.getByRole("tab", { name: /My methods/ }));
     fireEvent.click(screen.getByRole("radio", { name: /My RSI dip/ }));
     await waitFor(() => expect(
       screen.getByRole("radio", { name: /My RSI dip/ }).getAttribute("aria-checked")).toBe("true"));
-    choose(/^XAUUSD$/);
+    cont();
+    fireEvent.change(await screen.findByLabelText("Capital allocated"), { target: { value: "10000" } });
     choose(/Approval Required/);
+    cont();
+    choose(/^Demo$/);
+    cont();
     fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
-    await waitFor(() => expect(calls.some((c) => c.path === "automation/start")).toBe(true));
-    const body = calls.find((c) => c.path === "rules" && c.init?.method === "POST")!
-      .init!.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    await waitFor(() => expect(calls.some((c) => c.path === "automation/setup" && c.init?.method === "POST")).toBe(true));
+    const body = calls.find((c) => c.path === "automation/setup" && c.init?.method === "POST")!
+      .init!.body as Record<string, unknown>;
     expect(body.strategy).toBeUndefined();
-    expect(body.entry.conditions.map((x: { id: string }) => x.id)).toEqual(["rsi", "ema"]);
-    expect(body.exit.conditions.length).toBe(1);
-    expect(body.sides).toBe("BUY");
+    expect(body.sourceRuleId).toBe("m1");
     expect(body.symbols).toEqual(["XAUUSD"]);
+    expect(body.account).toBe("demo");
   });
 });
 
@@ -254,8 +285,9 @@ describe("the minimum-size warning", () => {
 
   it("appears under Risk when the broker's smallest order risks more than was chosen", async () => {
     routes["trade/min-lot"] = MIN_LOT();
-    await loaded();
-    choose(/^XAUUSD$|Gold/);
+    await toStrategy(/^XAUUSD$/);
+    choose(/Trend Following/);
+    cont();
     const note = await screen.findByText(/smallest order for XAUUSD is 1 oz/i, undefined, { timeout: 3000 });
     expect(note.textContent).toMatch(/more than the \$38\.17/);
     expect(note.textContent).toMatch(/estimate/i);
@@ -264,16 +296,18 @@ describe("the minimum-size warning", () => {
 
   it("does not appear when the minimum fits", async () => {
     routes["trade/min-lot"] = MIN_LOT({ exceeds: false, riskUsd: 30, riskPct: 0.8 });
-    await loaded();
-    choose(/^XAUUSD$|Gold/);
+    await toStrategy(/^XAUUSD$/);
+    choose(/Trend Following/);
+    cont();
     await waitFor(() => expect(calls.some((c) => c.path.startsWith("trade/min-lot"))).toBe(true), { timeout: 3000 });
     expect(screen.queryByText(/smallest order for/i)).toBeNull();
   });
 
   it("says it could not check, rather than staying silent, when the broker did not answer", async () => {
     routes["trade/min-lot"] = ok({ connected: true, status: "unavailable", reason: "timeout" });
-    await loaded();
-    choose(/^XAUUSD$|Gold/);
+    await toStrategy(/^XAUUSD$/);
+    choose(/Trend Following/);
+    cont();
     expect(await screen.findByText(/could not check the broker's minimum size/i, undefined, { timeout: 3000 })).toBeDefined();
   });
 
@@ -286,58 +320,64 @@ describe("the minimum-size warning", () => {
 
   it("does not stop Start: it informs, the client decides", async () => {
     routes["trade/min-lot"] = MIN_LOT();
-    await loaded();
-    choose(/^XAUUSD$|Gold/);
+    await toStrategy(/^XAUUSD$/);
     choose(/Trend Following/);
-    choose(/Approval Required/);
+    cont();
     await screen.findByText(/smallest order for XAUUSD/i, undefined, { timeout: 3000 });
+    fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
+    choose(/Approval Required/);
+    cont();
+    choose(/^Demo$/);
+    cont();
     expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
 
 describe("Start on demo", () => {
-  it("saves, writes the strategy, activates and starts, in that order, with what was chosen", async () => {
-    await loaded();
-    chooseEverything();
+  it("posts the setup once, with what was chosen", async () => {
+    await toRisk();
     choose(/^0\.5%$/);
+    fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
     fireEvent.change(screen.getByLabelText(/Stop the day at/i), { target: { value: "3" } });
+    choose(/Approval Required/);
+    cont();
+    choose(/^Demo$/);
+    cont();
     fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
 
-    await waitFor(() => expect(calls.some((c) => c.path === "automation/start")).toBe(true));
-    const writes = calls.filter((c) => c.init?.method === "POST" || c.init?.method === "PUT")
-      .map((c) => `${c.init!.method} ${c.path}`);
-    expect(writes).toEqual([
-      "POST rules", "PUT rules/r1", "POST rules/r1/activate", "POST automation/start",
-    ]);
-    const body = calls.find((c) => c.path === "rules" && c.init?.method === "POST")!.init!.body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    await waitFor(() => expect(calls.some((c) => c.path === "automation/setup" && c.init?.method === "POST")).toBe(true));
+    const posts = calls.filter((c) => c.init?.method === "POST").map((c) => c.path);
+    expect(posts.filter((p) => p === "automation/setup")).toEqual(["automation/setup"]);
+    expect(posts).not.toContain("automation/start");
+    const body = calls.find((c) => c.path === "automation/setup" && c.init?.method === "POST")!.init!.body as Record<string, unknown>;
     expect(body.symbols).toEqual(["EURUSD"]);
     expect(body.strategy).toBe("trend");
     expect(body.automationLevel).toBe("approval");
-    expect(body.sizing.riskPercent).toBe(0.5);
-    expect(body.limits.maxDailyLossPercent).toBe(3);
-    expect(body.entry.conditions).toEqual([]);
-    expect(calls.find((c) => c.path === "automation/start")!.init!.body).toEqual({ ruleDocId: "r1" });
-    // The server accepted Start, so the confetti fires, once.
+    expect(body.riskPercent).toBe(0.5);
+    expect(body.maxDailyLossPercent).toBe(3);
+    expect(body.capitalAllocated).toBe(10000);
+    expect(body.account).toBe("demo");
+    expect(body.stopLossPips).toBe(20);
+    expect(body.takeProfitPips).toBe(40);
+    expect(body.maxOpenPositions).toBe(1);
     await waitFor(() => expect(fireStartConfetti).toHaveBeenCalledTimes(1));
   });
 
-  it("stops at activation, says so, and never reaches automation/start", async () => {
-    routes["rules/r1/activate"] = { ok: false, status: 422, code: "NOT_ACTIVATABLE", message: "no stop" };
-    await loaded();
-    chooseEverything();
+  it("stops when the server refuses, and does not celebrate", async () => {
+    routes["automation/setup"] = (init?: Call["init"]) => init?.method === "POST"
+      ? { ok: false, status: 400, code: "SETUP_INVALID", message: "refused", problems: ["riskPercent: too high"] }
+      : LIBRARY;
+    await toReview();
     fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
-    await screen.findByText("NOT_ACTIVATABLE");
-    expect(calls.some((c) => c.path === "automation/start")).toBe(false);
-    expect(screen.getByText(/saved but did not start/i)).toBeDefined();
+    await screen.findByText("SETUP_INVALID");
     expect(fireStartConfetti).not.toHaveBeenCalled();
   });
 
   it("is disabled with the reason while automation is already running", async () => {
     autoState = "running";
-    await loaded();
-    chooseEverything();
+    await toReview();
     await screen.findByText(/already running/i);
     expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -346,36 +386,56 @@ describe("Start on demo", () => {
 describe("live", () => {
   it("a closed live account turns Start into the next step and starts nothing", async () => {
     routes["ctrader/status"] = live;
-    routes.me = me({ canAutomate: false, liveGate: {
+    routes.me = me({ canAutomate: false, accountMode: "live", liveGate: {
       open: false, status: "closed", summary: "Terms not accepted yet.", conditions: [], missing: [],
       request: { status: "none" }, checkoutOpen: false } });
-    await loaded();
-    chooseEverything();
-    const link = await screen.findByRole("link", { name: "Request live access" });
-    expect(link.getAttribute("href")).toBe("/live");
+    await toAccount();
+    choose(/^Live$/);
+    cont();
+    const links = await screen.findAllByRole("link", { name: "Request live access" });
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0].getAttribute("href")).toBe("/live");
     expect(screen.queryByRole("button", { name: /Start on/ })).toBeNull();
     expect(screen.getByText(/Terms not accepted yet/)).toBeDefined();
-    expect(calls.some((c) => c.path === "automation/start")).toBe(false);
+    expect(calls.some((c) => c.path === "automation/setup" && c.init?.method === "POST")).toBe(false);
   });
 
   it("a pending request reads as waiting for approval", async () => {
     routes["ctrader/status"] = live;
-    routes.me = me({ canAutomate: false, liveGate: {
+    routes.me = me({ canAutomate: false, accountMode: "live", liveGate: {
       open: false, status: "closed", summary: "x", conditions: [], missing: [],
       request: { status: "pending" }, checkoutOpen: false } });
-    await loaded();
+    await toAccount();
+    choose(/^Live$/);
     expect((await screen.findAllByText(/Awaiting approval/)).length).toBeGreaterThan(0);
   });
 
   it("an account the server allows still needs a confirmation that names it and says real money", async () => {
     routes["ctrader/status"] = live;
-    routes.me = me({ canAutomate: true });
-    await loaded();
-    chooseEverything();
+    routes.me = me({ canAutomate: true, accountMode: "live", liveGate: { open: true, status: "open", summary: "cleared", request: { status: "approved" } } });
+    await toAccount();
+    choose(/^Live$/);
+    cont();
     fireEvent.click(await screen.findByRole("button", { name: "Start on live" }));
     const q = await screen.findByText(/LIVE account #9/);
     expect(q.textContent).toMatch(/Real money moves/);
-    expect(calls.some((c) => c.path === "automation/start")).toBe(false);
-    within(document.body).getByRole("button", { name: "Cancel" });
+    expect(calls.some((c) => c.init?.method === "POST" && c.path === "automation/setup")).toBe(false);
+    screen.getByRole("button", { name: "Cancel" });
+  });
+
+  it("a server that refuses to execute live does not celebrate", async () => {
+    routes["ctrader/status"] = live;
+    routes.me = me({ canAutomate: true, accountMode: "live" });
+    routes["automation/setup"] = (init?: Call["init"]) => init?.method === "POST"
+      ? ok({ started: false, executed: false, account: "live",
+             live: { open: false, state: "request", label: "Request live access", summary: "The gate is closed." } })
+      : LIBRARY;
+    await toAccount();
+    choose(/^Live$/);
+    cont();
+    fireEvent.click(await screen.findByRole("button", { name: "Start on live" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
+    expect(await screen.findByText(/The gate is closed/)).toBeDefined();
+    expect(fireStartConfetti).not.toHaveBeenCalled();
   });
 });

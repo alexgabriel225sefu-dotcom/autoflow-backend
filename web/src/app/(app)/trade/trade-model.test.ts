@@ -17,6 +17,7 @@ type Body = {
 };
 const READY: TradeChoice = {
   ...EMPTY_CHOICE, symbol: "EURUSD", strategy: STRAT, level: "approval",
+  capitalAllocated: "1000", account: "demo",
 };
 const status = (over: Partial<CtraderStatus>): CtraderStatus => ({
   connected: true, accounts: [{ ctid: 7, mode: "demo" }],
@@ -60,7 +61,10 @@ describe("riskAmounts", () => {
 describe("missingChoices", () => {
   it("asks for the choices nobody should make for the client, in order", () => {
     expect(missingChoices(EMPTY_CHOICE))
-      .toEqual(["an instrument", "a strategy or a method of your own", "who acts on a setup"]);
+      .toEqual([
+        "an instrument", "a strategy or a method of your own",
+        "capital to allocate", "who acts on a setup",
+      ]);
   });
   it("is empty only when everything is chosen", () => {
     expect(missingChoices(READY)).toEqual([]);
@@ -71,10 +75,14 @@ describe("missingChoices", () => {
         .toContain("a risk per trade");
     }
   });
-  it("lets the daily loss be empty (the account's own applies) but not nonsense", () => {
-    expect(missingChoices({ ...READY, dailyLossPercent: "" })).toEqual([]);
+  it("requires a daily loss inside the platform ceiling", () => {
+    expect(missingChoices({ ...READY, dailyLossPercent: "" }))
+      .toContain("a valid daily loss limit");
     expect(missingChoices({ ...READY, dailyLossPercent: "0" }))
       .toContain("a valid daily loss limit");
+    expect(missingChoices({ ...READY, dailyLossPercent: "5" }))
+      .toContain("a valid daily loss limit");
+    expect(missingChoices({ ...READY, dailyLossPercent: "2" })).toEqual([]);
   });
 });
 
@@ -200,7 +208,10 @@ describe("a method of your own", () => {
   const CUSTOM = { ruleDocId: "m1", name: "My RSI dip",
     entry: { combine: "AND", conditions: [{ id: "rsi" }] },
     exit: { combine: "OR", conditions: [] }, sides: "BUY" };
-  const MINE: TradeChoice = { ...EMPTY_CHOICE, symbol: "XAUUSD", level: "approval", custom: CUSTOM };
+  const MINE: TradeChoice = {
+    ...EMPTY_CHOICE, symbol: "XAUUSD", level: "approval", custom: CUSTOM,
+    capitalAllocated: "1000", account: "demo",
+  };
   it("counts as a chosen method", () => {
     expect(missingChoices(MINE)).toEqual([]);
   });

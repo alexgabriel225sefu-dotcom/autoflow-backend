@@ -574,6 +574,10 @@ export type StrategyPreset = {
   refuses: string;
   /** Where the description was read from, so a claim can be checked. */
   source: string;
+  /** Which candles it reads. The clock timeframe is the client's. */
+  timeframeNote?: string;
+  /** A published backtest, or null when this release has none. */
+  backtest?: { trades: number; note: string } | null;
 };
 
 /** A strategy the engine registers and this platform does not offer. */
@@ -597,6 +601,39 @@ export type StrategyCatalogue = {
    * and almost always empty is a key the UI learns to ignore.
    */
   unclassified?: string[];
+};
+
+/** GET /automation/setup — the wizard's library, limits, and live state. */
+export type SetupLibrary = {
+  strategies: StrategyPreset[];
+  withheld: WithheldStrategy[];
+  disclaimer: string;
+  tradedSymbolNote: string;
+  bounds: {
+    capitalAllocated: { min: number; max: number };
+    riskPercentDemo: { min: number; max: number };
+    riskPercentLive: { min: number; max: number };
+    maxDailyLossPercent: { min: number; max: number };
+    maxOpenPositions: { min: number; max: number };
+    stopLossPips: { min: number; max: number };
+    takeProfitPips: { min: number; max: number };
+  };
+  live?: {
+    open: boolean;
+    state: string;
+    label: string;
+    requestStatus: string;
+    summary: string;
+  };
+};
+
+export type SetupResult = {
+  started: boolean;
+  executed: boolean;
+  account: "demo" | "live";
+  ruleDocId?: string;
+  tradedSymbolNote?: string;
+  live?: { open: boolean; state: string; label: string; summary: string };
 };
 
 export type ConditionParam = {
