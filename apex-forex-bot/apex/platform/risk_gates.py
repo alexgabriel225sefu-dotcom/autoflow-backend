@@ -432,13 +432,28 @@ def _g_risk_per_trade(ctx):
                         else "maxRiskPercentDemo"]
     cap_pct = _cap(rule_pct, mode_pct)
 
+    # Capital allocated to this automation, when the rule names one. The
+    # percentage is then a percentage of that amount, not of a larger balance.
+    # A rule that does not name one is unchanged: the base stays the balance.
+    limits = ctx["rule"].get("limits")
+    limits = limits if isinstance(limits, dict) else {}
+    allocated = limits.get("capitalAllocated")
+    base = float(bal)
+    if _pos(allocated):
+        base = min(base, float(allocated))
+        ctx["facts"]["capitalAllocated"] = float(allocated)
+    ctx["facts"]["riskBase"] = base
     ctx["facts"]["riskMoney"] = money
     ctx["facts"]["riskPercent"] = round(money / bal * 100.0, 6)
     ctx["facts"]["riskCapPercent"] = cap_pct
-    if money > _cents(cap_pct / 100.0 * bal):
+    if money > _cents(cap_pct / 100.0 * base):
         # Which cap bit decides what the client can do about it. Their own
         # number is editable; the platform's is not, and telling them to edit
         # a rule that is already inside its own limit would be wrong.
+        if _pos(allocated) and base < float(bal):
+            return ("RISK_OVER_ALLOCATION",
+                    f"this order risks {money:.2f}, over {cap_pct:g}% of the "
+                    f"{base:.2f} allocated to this automation")
         over_rule = _pos(rule_pct) and cap_pct == float(rule_pct)
         return (("RISK_OVER_RULE" if over_rule else "RISK_OVER_PLATFORM_CAP"),
                 f"this order risks {money:.2f} of a {bal:.2f} balance "

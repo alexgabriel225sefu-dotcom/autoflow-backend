@@ -139,11 +139,22 @@ export type TradeChoice = {
   level: string;
   /** Optional, typed by the client, used ONLY for the estimate. */
   accountSize: string;
+  /** Other instruments recorded on the rule. This release trades `symbol` only. */
+  also: string[];
+  /** Account currency allocated to this automation. Saved, and enforced. */
+  capitalAllocated: string;
+  maxOpenPositions: string;
+  stopLossPips: string;
+  takeProfitPips: string;
+  /** Which account the setup should run on. Empty until the account step. */
+  account: "" | "demo" | "live";
 };
 
 export const EMPTY_CHOICE: TradeChoice = {
   symbol: "", timeframe: "1h", strategy: null, custom: null,
   riskPercent: "1", dailyLossPercent: "2", level: "", accountSize: "",
+  also: [], capitalAllocated: "", maxOpenPositions: "1",
+  stopLossPips: "20", takeProfitPips: "40", account: "",
 };
 
 const num = (v: string): number | null => {
@@ -236,14 +247,136 @@ export function missingChoices(c: TradeChoice): string[] {
   const out: string[] = [];
   if (!c.symbol) out.push("an instrument");
   if (!c.strategy && !c.custom) out.push("a strategy or a method of your own");
+  const capital = num(c.capitalAllocated);
+  if (capital === null || capital < 1) out.push("capital to allocate");
   const risk = num(c.riskPercent);
   if (risk === null || risk <= 0 || risk > 100) out.push("a risk per trade");
   const day = num(c.dailyLossPercent);
-  if (c.dailyLossPercent.trim() !== "" && (day === null || day <= 0 || day > 100)) {
+  if (day === null || day <= 0 || day > DAILY_LOSS_CEILING) {
     out.push("a valid daily loss limit");
   }
+  const positions = num(c.maxOpenPositions);
+  if (positions === null || positions < 1 || positions > 8
+      || !Number.isInteger(positions)) {
+    out.push("a position limit");
+  }
+  const stop = num(c.stopLossPips);
+  if (stop === null || stop < 1 || stop > 500) out.push("a stop loss");
+  const target = num(c.takeProfitPips);
+  if (target === null || target < 1 || target > 2000) out.push("a take profit");
   if (!c.level) out.push("who acts on a setup");
   return out;
+}
+
+/** Why Continue is disabled on a wizard step, or null when the step is done. */
+export function stepBlock(step: number, c: TradeChoice): string | null {
+  if (step <= 0 && !c.symbol) return "Choose an instrument.";
+  if (step === 1 && !c.strategy && !c.custom) return "Choose a strategy.";
+  if (step === 2) {
+    const miss = missingChoices(c).filter(
+      (m) => m !== "an instrument" && m !== "a strategy or a method of your own",
+    );
+    if (miss.length) return `Still to choose: ${miss.join(", ")}.`;
+  }
+  if (step === 3 && c.account !== "demo" && c.account !== "live") {
+    return "Choose demo or live.";
+  }
+  return null;
+}
+
+export type SetupPayload = {
+  symbols: string[];
+  timeframe: string;
+  strategy?: string;
+  sourceRuleId?: string;
+  capitalAllocated: number;
+  riskPercent: number;
+  maxDailyLossPercent: number;
+  maxOpenPositions: number;
+  stopLossPips: number;
+  takeProfitPips: number;
+  automationLevel: string;
+  account: "demo" | "live";
+};
+
+/**
+ * The one body POST /automation/setup accepts. The server rebuilds the rule
+ * from it and is the check that matters; this only sends a body it will accept.
+ */
+export function setupPayload(c: TradeChoice): SetupPayload {
+  if (!c.symbol || (!c.strategy && !c.custom)) {
+    throw new Error("a strategy or method is required");
+  }
+  if (c.account !== "demo" && c.account !== "live") {
+    throw new Error("an account is required");
+  }
+  const risk = num(c.riskPercent);
+  const day = num(c.dailyLossPercent);
+  const capital = num(c.capitalAllocated);
+  const positions = num(c.maxOpenPositions);
+  const stop = num(c.stopLossPips);
+  const target = num(c.takeProfitPips);
+  if (risk === null || day === null || capital === null || positions === null
+      || stop === null || target === null) {
+    throw new Error("the risk settings are incomplete");
+  }
+  const symbols = [c.symbol, ...c.also.filter((s) => s && s !== c.symbol)];
+  const shared = {
+    symbols,
+    timeframe: c.timeframe,
+    capitalAllocated: capital,
+    riskPercent: risk,
+    maxDailyLossPercent: day,
+    maxOpenPositions: Math.trunc(positions),
+    stopLossPips: stop,
+    takeProfitPips: target,
+    automationLevel: c.level,
+    account: c.account,
+  };
+  if (c.strategy) return { ...shared, strategy: c.strategy.id };
+  return { ...shared, sourceRuleId: c.custom!.ruleDocId };
+}
+
+/**
+ * What the review step's button is, given the account the client picked.
+ *
+ * Demo uses a connected demo account. Live uses `startState` only once a live
+ * account is the selected one — `canAutomate` on a demo selection is not
+ * permission to trade live. Otherwise the button is the request or the wait,
+ * and it does not start.
+ */
+export function accountAction(
+  intent: TradeChoice["account"],
+  input: { status: CtraderStatus | null; execution: Execution | null },
+): StartState {
+  if (intent === "demo") {
+    const demo = input.status?.accounts?.find((a) => a.mode === "demo");
+    if (!input.status?.connected || !demo) {
+      return { kind: "connect", label: "Connect cTrader",
+               reason: "Connect a demo account to run this." };
+    }
+    return { kind: "demo", label: "Start on demo", reason: null,
+             accountId: String(demo.ctid) };
+  }
+  if (intent === "live") {
+    if (input.status?.selected?.mode === "live") return startState(input);
+    const gate = input.execution?.liveGate;
+    if (gate?.request?.status === "pending") {
+      return { kind: "live_closed", label: "Awaiting approval", href: "/live",
+               reason: "Your request for live access is waiting for approval." };
+    }
+    if (gate?.status === "unknown") {
+      return { kind: "live_closed", label: "Live status unknown", href: "/live",
+               reason: gate.summary
+                 || "The live status could not be read, so nothing starts." };
+    }
+    return { kind: "live_closed", label: "Request live access", href: "/live",
+             reason: gate?.summary
+               || input.execution?.message
+               || "Live access is not open on this account yet." };
+  }
+  return { kind: "choose_account", label: "Choose an account",
+           reason: "Pick demo or live." };
 }
 
 /**

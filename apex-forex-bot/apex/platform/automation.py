@@ -578,6 +578,35 @@ def _record_starter_failure(user_id, corr, conn, exc, *, revive):
     return cause
 
 
+def _allocation_balance(user_id):
+    """The balance a capital allocation is scaled against, or None.
+
+    The broker's answer first. A stored paper balance is only the fallback,
+    for an account whose broker cannot be asked. None is "could not read",
+    which the caller treats as a refusal rather than as the whole balance.
+    """
+    try:
+        from apex.platform import broker_read as _br
+        row = _br.account(user_id)
+        if isinstance(row, dict) and row.get("status") == "ok":
+            bal = row.get("balance")
+            if isinstance(bal, (int, float)) and not isinstance(bal, bool) \
+                    and bal > 0:
+                return float(bal)
+    except Exception:                                        # noqa: BLE001
+        pass
+    try:
+        rec = user_store.load(user_id) or {}
+    except Exception:                                        # noqa: BLE001
+        return None
+    for key in ("paper_balance", "balance"):
+        bal = rec.get(key)
+        if isinstance(bal, (int, float)) and not isinstance(bal, bool) \
+                and bal > 0:
+            return float(bal)
+    return None
+
+
 def start(user_id, rule_doc_id, *, starter=None, now=None,
           mode_lister=None, revive=False):
     """Begin automation for one rule. Idempotent unless `revive`.
@@ -695,6 +724,25 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
         # setting the loop reads, and returns the ones that do not so the
         # client can be told rather than left to assume.
         applied, not_applied = _ecfg.translate(rule)
+        # A named capital allocation is a money amount, and the engine sizes
+        # a fraction of the whole balance. Scale the fraction onto that
+        # amount, or refuse: starting with the unscaled fraction would risk
+        # more than the client allocated. Rules that do not name one skip
+        # the balance read entirely.
+        if _ecfg.names_capital(rule):
+            _bal = _allocation_balance(user_id)
+            applied, _alloc = _ecfg.scale_risk_to_capital(applied, rule, _bal)
+            if _alloc == "unchecked":
+                if held:
+                    try:
+                        user_store.release_claim(lock, corr)
+                    except Exception:                       # noqa: BLE001
+                        pass
+                raise AutomationRefused(
+                    "CAPITAL_UNCHECKED",
+                    "the account balance could not be read, so the capital "
+                    "allocated to this automation could not be applied. "
+                    "Nothing was started.")
         # Captured BEFORE the write, so stop() can put back what was there.
         # Without it a rule that ran once leaves its settings behind for
         # whatever runs next.
@@ -717,6 +765,8 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
         else:
             snapshot = _ecfg.snapshot_of(user_store.load(user_id))
         user_store.update(user_id, dict(applied, active=True))
+    except AutomationRefused:
+        raise
     except Exception as e:  # noqa: BLE001
         raise AutomationRefused("STORE_UNAVAILABLE",
                                 f"the account settings could not be saved "

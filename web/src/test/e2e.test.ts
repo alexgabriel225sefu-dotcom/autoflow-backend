@@ -231,6 +231,38 @@ describe("the main flow against the real backend", () => {
   // draft — which is also the thing the client can act on next. This used to
   // assert a 402 and passed before the body was even read; see
   // apex/platform/entitlement.py for why the paywall is gone.
+  it("refuses a live setup while the gates are off and does not start", async () => {
+    const blocked = await api<{ executed: boolean; started: boolean; live?: { open: boolean; state: string } }>(
+      "automation/setup", {
+        method: "POST",
+        body: {
+          symbols: ["EURUSD"], timeframe: "1h", strategy: "trend",
+          capitalAllocated: 1000, riskPercent: 1, maxDailyLossPercent: 2,
+          maxOpenPositions: 1, stopLossPips: 20, takeProfitPips: 40,
+          automationLevel: "full", account: "live",
+        },
+      });
+    expect(blocked.ok).toBe(true);
+    if (blocked.ok) {
+      expect(blocked.data.executed).toBe(false);
+      expect(blocked.data.started).toBe(false);
+      expect(blocked.data.live?.open).toBe(false);
+    }
+    const auto = await api<{ state: string }>("automation");
+    if (auto.ok) expect(auto.data.state).not.toBe("running");
+    const over = await api("automation/setup", {
+      method: "POST",
+      body: {
+        symbols: ["EURUSD"], timeframe: "1h", strategy: "trend",
+        capitalAllocated: 1000, riskPercent: 5, maxDailyLossPercent: 2,
+        maxOpenPositions: 1, stopLossPips: 20, takeProfitPips: 40,
+        automationLevel: "full", account: "live",
+      },
+    });
+    expect(over.ok).toBe(false);
+    if (!over.ok) expect(over.code).toBe("SETUP_INVALID");
+  });
+
   it("will not start automation on a rule that was never activated", async () => {
     const r = await api("automation/start", { method: "POST", body: { ruleDocId: ruleId } });
     expect(r.ok).toBe(false);
@@ -298,6 +330,23 @@ describe("the main flow against the real backend", () => {
 
     const nt = await api<{ unread: number }>("notifications");
     if (nt.ok) expect(nt.data.unread).toBeGreaterThan(0);
+
+    const setup = await api<{ executed: boolean; started: boolean; account: string }>(
+      "automation/setup", {
+        method: "POST",
+        body: {
+          symbols: ["GBPUSD"], timeframe: "1h", strategy: "mean_reversion",
+          capitalAllocated: 1000, riskPercent: 0.5, maxDailyLossPercent: 2,
+          maxOpenPositions: 1, stopLossPips: 20, takeProfitPips: 40,
+          automationLevel: "full", account: "demo",
+        },
+      });
+    expect(setup.ok).toBe(true);
+    if (setup.ok) {
+      expect(setup.data.executed).toBe(true);
+      expect(setup.data.account).toBe("demo");
+    }
+    await api("automation/stop", { method: "POST" });
   });
 
   it("serves real candles, and refuses a bad request before the broker", async () => {

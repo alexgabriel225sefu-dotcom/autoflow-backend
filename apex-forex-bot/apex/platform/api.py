@@ -695,6 +695,24 @@ def _dispatch(method, route, headers, body, query=None):
         if action == "why" and method == "GET":
             p = _authenticate(headers)
             return _ok(_auto.why(p.user_id))
+        # The guided setup. GET is the library and the live state. POST
+        # validates risk and starts only when the account and the live gate
+        # allow it. A closed gate answers 200 with executed false — it is a
+        # state, not a malformed body — and does not call start.
+        if action == "setup" and method == "GET":
+            p = _authenticate(headers)
+            from apex.platform import automation_setup as _setup
+            return _ok(_setup.preview(p.user_id))
+        if action == "setup" and method == "POST":
+            p = _authenticate(headers, fresh=True)
+            _id.require_verified_email(p)
+            from apex.platform import automation_setup as _setup
+            try:
+                return _ok(_setup.submit(p.user_id, _body(body)))
+            except _setup.SetupInvalid as e:
+                return _err(400, "SETUP_INVALID",
+                            "the automation setup was refused",
+                            problems=e.problems)
         if method != "POST":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
         # Every one of these changes whether money moves, so none of them
