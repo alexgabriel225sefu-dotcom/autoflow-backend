@@ -834,6 +834,15 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         return _ok(_health.system_status(p))
 
+    # Operator audit of connected cTrader accounts. The caller is a signed-in
+    # operator on A4T_OPERATOR_USER_IDS, the same check the live approval
+    # routes use. GET only. A fresh session, because the answer is every
+    # connected account, not one client's own dashboard.
+    if route == "admin" or route.startswith("admin/"):
+        p = _authenticate(headers, fresh=True)
+        from apex.platform import admin_audit as _admin_audit
+        return _admin_audit.handle(method, route, p, query or {})
+
     # Live access. The client can read the gate, accept the published
     # versions, and request a connection. Publishing, granting and deciding
     # are operator actions; live_gate.http refuses anyone else and writes
