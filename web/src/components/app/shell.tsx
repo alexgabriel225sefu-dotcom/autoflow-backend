@@ -2,12 +2,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LogOut, MoreHorizontal, User, X } from "lucide-react";
+import { ClipboardList, LogOut, MoreHorizontal, User, X } from "lucide-react";
 import { BrandLockup, BrandMark } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
-import type { AutomationState, CtraderStatus, Me, NotificationPage } from "@/lib/api";
+import { api, type AutomationState, type CtraderStatus, type Me, type NotificationPage } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
-import { isActive, NAV, PRIMARY, SECONDARY, titleFor } from "./nav";
+import { isActive, NAV, PRIMARY, titleFor } from "./nav";
 import { StatusBar } from "./status-bar";
 import { AppearanceControls } from "./appearance-controls";
 import type { NavItem } from "./nav";
@@ -27,6 +27,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  // The audit list reads the broker, so it is the wrong request to make on
+  // every screen just to decide whether a link is shown. live/queue is the
+  // existing operator check and it does not open a cTrader session. A refusal
+  // leaves the page reachable by its URL and absent from the menu.
+  const [showAudit, setShowAudit] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api<{ requests?: unknown[] }>("live/queue").then((result) => {
+      if (live && result.ok) setShowAudit(true);
+    });
+    return () => { live = false; };
+  }, []);
 
   // One fetch of each, shared with the status strip, rather than every page
   // asking again for the same three facts.
@@ -69,6 +81,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
 
+  const auditItem: NavItem = {
+    href: "/admin/audit", label: "Audit", icon: ClipboardList, group: "more",
+  };
+  const destinations = showAudit ? [...NAV, auditItem] : NAV;
   const badge = (href: string) =>
     href === "/notifications" && unread > 0 ? (
       <span className="pill pill-accent" style={{ padding: "0 .3rem", fontSize: ".62rem" }}>
@@ -83,9 +99,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLockup size={22} />
         </Link>
 
-        <SideGroup label="Operations" items={NAV.filter((n) => n.group === "operations")} path={path} badge={badge} first />
-        <SideGroup label="Account" items={NAV.filter((n) => n.group === "account")} path={path} badge={badge} />
-        <SideGroup label="More" items={NAV.filter((n) => n.group === "more")} path={path} badge={badge} />
+        <SideGroup label="Operations" items={destinations.filter((n) => n.group === "operations")} path={path} badge={badge} first />
+        <SideGroup label="Account" items={destinations.filter((n) => n.group === "account")} path={path} badge={badge} />
+        <SideGroup label="More" items={destinations.filter((n) => n.group === "more")} path={path} badge={badge} />
 
         <div className="side-foot">
           <AppearanceMenu />
@@ -156,7 +172,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
         <button
           onClick={() => setDrawer(true)}
-          data-active={SECONDARY.some((n) => isActive(path, n.href))}
+          data-active={destinations.some((n) => !n.primary && isActive(path, n.href))}
           aria-expanded={drawer}
           aria-label="More destinations"
         >
@@ -191,7 +207,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 this menu is looking for a page, and making them remember
                 which bar holds which one is the problem being fixed. */}
             <div className="drawer-links">
-              {NAV.map(({ href, label, icon: Icon, note }) => (
+              {destinations.map(({ href, label, icon: Icon, note }) => (
                 <Link key={href} href={href} data-active={isActive(path, href)} onClick={close}>
                   <Icon className="ico" aria-hidden />
                   <span style={{ flex: 1 }}>{label}</span>

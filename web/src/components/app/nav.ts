@@ -64,5 +64,9 @@ export function titleFor(pathname: string): string {
   if (hit) return hit.label;
   if (pathname.startsWith("/connect")) return "Connect cTrader";
   if (pathname.startsWith("/license")) return "Licence";
+  // Not in NAV. Operator status is a server answer, so the shell adds this
+  // link only after that answer is yes. The title is still needed when the
+  // page is opened from the address bar.
+  if (pathname === "/admin/audit" || pathname.startsWith("/admin/audit/")) return "Audit";
   return "Apex4Traders";
 }
