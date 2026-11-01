@@ -62,6 +62,7 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/configurator": "public",          // arrives from an OLD receipt, no session
   "/pricing": "public",               // the price, linked from the landing page
 
+  "/admin/audit": "protected",          // operator audit; the server refuses everyone else
   "/dashboard": "protected",
   "/trade": "protected",
   "/accounts": "protected",

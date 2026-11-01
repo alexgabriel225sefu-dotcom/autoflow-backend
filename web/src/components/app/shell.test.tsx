@@ -21,6 +21,7 @@ const refresh = vi.fn();
 let pathname = "/dashboard";
 const shellState = vi.hoisted(() => ({
   emailVerified: true as boolean | undefined,
+  operator: false,
   signOut: vi.fn(async (): Promise<{ error?: { message: string } }> => ({})),
 }));
 
@@ -62,6 +63,10 @@ vi.mock("@/lib/api", async (orig) => {
       if (path === "automation") {
         return { ok: true, data: { state: "running", ruleDocId: "r1", mode: "demo", startedAt: 0 } };
       }
+      if (path === "live/queue") {
+        if (shellState.operator) return { ok: true, data: { requests: [] } };
+        return { ok: false, status: 403, code: "NOT_OPERATOR", message: "this action is limited to an operator" };
+      }
       return { ok: false, status: 404, code: "NOT_FOUND", message: "no stub" };
     }),
   };
@@ -73,6 +78,7 @@ import { NAV, PRIMARY, SECONDARY, isActive, titleFor } from "./nav";
 afterEach(() => {
   pathname = "/dashboard";
   shellState.emailVerified = true;
+  shellState.operator = false;
   shellState.signOut.mockReset();
   shellState.signOut.mockResolvedValue({});
   vi.clearAllMocks();
@@ -128,6 +134,7 @@ describe("navigation model", () => {
   it("every destination has a title, so the top bar always says where you are", () => {
     for (const n of NAV) expect(titleFor(n.href)).toBe(n.label);
     expect(titleFor("/connect")).toBe("Connect cTrader");
+    expect(titleFor("/admin/audit")).toBe("Audit");
   });
 });
 
@@ -164,6 +171,16 @@ describe("application shell", () => {
     }
     // Signing out must not require finding the desktop sidebar.
     expect(within(drawer).getByRole("button", { name: /Sign out/ })).toBeDefined();
+  });
+
+  it("puts Audit in the sidebar only when the server accepts the operator", async () => {
+    const { unmount } = render(<AppShell><p>page</p></AppShell>);
+    await screen.findByRole("status", { name: "Platform status" });
+    expect(screen.queryByRole("link", { name: /^Audit/ })).toBeNull();
+    unmount();
+    shellState.operator = true;
+    render(<AppShell><p>page</p></AppShell>);
+    expect(await screen.findByRole("link", { name: /^Audit/ })).toBeTruthy();
   });
 
   it("the drawer is a modal dialog and closes on Escape", () => {
