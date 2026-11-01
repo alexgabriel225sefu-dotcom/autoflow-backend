@@ -177,6 +177,9 @@ def classify(method, route):
         # Both are market-data reads that go to cTrader, whose limits are
         # shared across every client on a connection, so they share a budget.
         return "candles"
+    if route == "admin" or (route or "").startswith("admin/"):
+        # The operator audit reads the same broker, including deal history.
+        return "candles"
     if _PREVIEW_RE.match(route):
         return "preview"
     if _ACTIVATE_RE.match(route):
