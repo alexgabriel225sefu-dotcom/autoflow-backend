@@ -43,7 +43,7 @@ const DEMO_FEATURES = [
   "Full journal",
 ];
 
-function planFor(offer: PublicOffer): PricingPlan[] {
+export function planFor(offer: PublicOffer): PricingPlan[] {
   const lifetime = offer.periodDays === null;
   // Both have to be true. checkoutEnabled alone has meant "the flags are
   // on" while POST billing/checkout still answers 501.
@@ -77,6 +77,10 @@ function planFor(offer: PublicOffer): PricingPlan[] {
         : `One-time payment, access for ${offer.periodDays} days`,
       ctaQuiet: !purchaseOpen,
       featuredLabel: lifetime ? "Lifetime access" : undefined,
+      variant: lifetime ? "lifetime" : undefined,
+      // The same wording the button carries, from the same flag: a state
+      // read from the server, not a second opinion about it.
+      statusBadge: purchaseOpen ? undefined : "Not on sale yet",
       ctaLabel: purchaseOpen ? "Get Founder access" : "Not on sale yet",
       ctaHref: purchaseOpen ? "/license" : undefined,
       ctaDisabled: !purchaseOpen,

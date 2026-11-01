@@ -1,0 +1,31 @@
+/* Lifetime-deal restyle of the Founder card. Existing --mkt-* / --pc-* tokens only. */
+.badges { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+
+.status {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  padding: .2rem .6rem; border-radius: 999px;
+  color: var(--pc-head-accent-fg);
+  border: 1px dashed rgba(255, 255, 255, .45);
+}
+.status::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--pc-head-accent-fg);
+}
+
+.priceBlock {
+  margin-top: 1.2rem; padding: 1rem 1.1rem;
+  border-radius: 12px; border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(0, 0, 0, .18);
+}
+.priceBlock :global(.pc-price) { font-size: clamp(2.3rem, 8vw, 2.9rem); }
+
+.lifetime :global(.pc-features) { gap: 0; }
+.lifetime :global(.pc-features li) {
+  padding: .65rem 0; border-top: 1px solid var(--mkt-line-soft);
+}
+.lifetime :global(.pc-features li:first-child) { border-top: 0; padding-top: .2rem; }
+.lifetime :global(.pc-features .ico) {
+  box-sizing: content-box; padding: 3px; border-radius: 50%;
+  background: var(--mkt-accent-wash); margin-top: 0;
+}
