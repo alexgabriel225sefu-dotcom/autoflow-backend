@@ -1,3 +1,7 @@
+"use client";
+import type { ReactNode } from "react";
+import { onSpot } from "./spotlight";
+
 /**
  * The dashboard's first glance: four facts, large, read-only.
  *
@@ -6,12 +10,15 @@
  * making anyway, so a tile can never disagree with the panel below it. A read
  * that has not answered renders a dash, never a zero: "0 open" and "we have
  * not asked yet" must not look the same.
+ *
+ * The tile is a spotlight card: a glow in the accent colour follows the
+ * pointer and lights the border. It does not change the number.
  */
 export type Tile = {
   label: string;
   /** Null while the read is pending or failed — shown as a dash. */
-  value: string | null;
-  note?: string | null;
+  value: ReactNode;
+  note?: ReactNode;
   tone?: "long" | "short" | "neutral";
 };
 
@@ -19,9 +26,15 @@ export function OverviewBand({ tiles }: { tiles: Tile[] }) {
   return (
     <section className="ovb" aria-label="Overview">
       {tiles.map((t) => (
-        <div className="ovb-tile" key={t.label} data-tone={t.tone ?? "neutral"}>
+        <div
+          className="ovb-tile spot"
+          key={t.label}
+          data-tone={t.tone ?? "neutral"}
+          onPointerMove={onSpot}
+          onPointerDown={onSpot}
+        >
           <span className="ovb-label">{t.label}</span>
-          <span className="ovb-value" data-empty={t.value === null ? "true" : undefined}>
+          <span className="ovb-value" data-empty={t.value == null || t.value === "" ? "true" : undefined}>
             {t.value ?? "—"}
           </span>
           {t.note ? <span className="ovb-note">{t.note}</span> : <span className="ovb-note">&nbsp;</span>}

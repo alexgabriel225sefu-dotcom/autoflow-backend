@@ -69,7 +69,11 @@ export default function NotificationsPage() {
         r.result.data.notifications.length ? (
           <div className="records">
             {r.result.data.notifications.map((n) => (
-              <article className="record" key={n.id} style={{ opacity: n.readAt ? 0.6 : 1 }}>
+              <article
+                className={(n.level === "critical" || n.level === "warning" || /error/i.test(n.title)) ? "record halo" : "record"}
+                key={n.id}
+                style={{ opacity: n.readAt ? 0.6 : 1 }}
+              >
                 <div className="record-head">
                   <span className="record-title">
                     {!n.readAt ? (

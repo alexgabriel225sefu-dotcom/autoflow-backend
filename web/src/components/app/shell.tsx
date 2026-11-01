@@ -43,7 +43,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // One fetch of each, shared with the status strip, rather than every page
   // asking again for the same three facts.
   const me = useRead<Me>("me", 120_000);
-  const ct = useRead<CtraderStatus>("accounts", 60_000);
+  // The same path the dashboard and the trade page read, so the three do not
+  // each spend a request on one account record. `accounts` is the same
+  // payload and stays in the invalidation list.
+  const ct = useRead<CtraderStatus>("ctrader/status", 60_000);
   const auto = useRead<AutomationState>("automation", 30_000);
   const notes = useRead<NotificationPage>("notifications?limit=1", 60_000);
 
@@ -167,7 +170,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {PRIMARY.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} data-active={isActive(path, href)}>
             <Icon className="ico" aria-hidden />
-            {label}
+            <span className="bn-label">{label}</span>
           </Link>
         ))}
         <button
@@ -188,7 +191,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
             ) : null}
           </span>
-          More
+          <span className="bn-label">More</span>
         </button>
       </nav>
 

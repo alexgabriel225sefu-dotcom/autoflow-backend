@@ -47,6 +47,13 @@ describe("the account chip", () => {
       .toContain("47765456");
   });
 
+  it("hides the status emoji from assistive tech", () => {
+    strip({ ok: true, data: CONNECTED });
+    const emojis = document.querySelectorAll(".status-emoji");
+    expect(emojis.length).toBeGreaterThan(0);
+    for (const el of emojis) expect(el.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("says not connected only when the API said so", () => {
     expect(strip({ ok: true, data: NOTHING }).textContent)
       .toContain("Not connected");
@@ -181,6 +188,10 @@ describe("the Risk Guard chip", () => {
     expect(t).toContain("Market closed");
     expect(t).not.toContain("Active");
     expect(t).not.toContain("No report yet");
+    // The automation chip agrees. RUNNING next to "Market closed" was the
+    // contradiction on the owner's phone.
+    expect(t).toContain("MARKET CLOSED");
+    expect(t).not.toContain("RUNNING");
   });
 
   it.each([[false], [null], [undefined]])(

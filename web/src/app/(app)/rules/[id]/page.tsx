@@ -117,7 +117,7 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
     `rules/${id}`);
   const me = useRead<Me>("me");
   const ct = useRead<CtraderStatus>("ctrader/status");
-  const auto = useRead<AutomationState>("automation", 20_000);
+  const auto = useRead<AutomationState>("automation", 30_000);
 
   const [specs, setSpecs] = useState<Record<string, ConditionSpec> | null>(null);
   const [problems, setProblems] = useState<string[] | null>(null);

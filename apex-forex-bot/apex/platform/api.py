@@ -693,7 +693,11 @@ def _dispatch(method, route, headers, body, query=None):
         if not action and method == "GET":
             p = _authenticate(headers)
             return _ok(_auto.status(p.user_id))
-        if action == "why" and method == "GET":
+        # A read. GET is what the "Why no trade" card sends. POST is accepted
+        # too so a client that still posts the question is not told
+        # "GET not allowed" or the reverse. It changes nothing.
+        why_name = action.split("/")[0].strip().lower()
+        if why_name == "why" and method in ("GET", "HEAD", "POST"):
             p = _authenticate(headers)
             return _ok(_auto.why(p.user_id))
         # The guided setup. GET is the library and the live state. POST

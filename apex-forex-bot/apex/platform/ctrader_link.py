@@ -980,7 +980,14 @@ def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None):
         if not match:
             raise LinkError("NO_SUCH_ACCOUNT",
                             "that account is not one of the connected ones")
-        want_ctid, want_mode = match["ctid"], match["mode"]
+        # The match proved this client owns the id they asked for. An older
+        # account row can have the id only on the key we compared, with the
+        # stored field null. Passing that null into int() is the TypeError
+        # the orders and market screens showed.
+        want_ctid = match.get("ctid")
+        if want_ctid is None or want_ctid == "":
+            want_ctid = ctid
+        want_mode = match.get("mode")
     if want_mode == LIVE and not live_allowed():
         # Read-only or not, opening a live account means a live broker
         # session. The environment gate is the same one select_account uses;

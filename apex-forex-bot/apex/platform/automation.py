@@ -545,7 +545,33 @@ def _preflight(user_id, rule_doc_id, *, mode_lister=None):
     return rule, conn
 
 
-def _note_engine_refused(user_id, corr, ctid, *, revive):
+# Identical engine refusals, so a retry does not fill the journal. The
+# claim is cross-process when a store exists; the dict covers a process
+# with no shared backend (tests, and a single container).
+_noted_refusals = {}
+
+
+def _duplicate_engine_note(user_id, message, *, window_s=3600):
+    """True when this exact sentence was already filed for this user."""
+    digest = hashlib.sha1(message.encode()).hexdigest()[:12]
+    try:
+        first = user_store.claim(
+            f"eng-note:{user_id}:{digest}", ttl_s=window_s)
+    except Exception:                                        # noqa: BLE001
+        first = None
+    if first is False:
+        return True
+    if first is None:
+        key = (str(user_id), digest)
+        now = time.time()
+        prev = _noted_refusals.get(key)
+        _noted_refusals[key] = now
+        if prev is not None and now - prev < window_s:
+            return True
+    return False
+
+
+def _note_engine_refused(user_id, corr, ctid, *, revive, reason=None):
     """File the engine's refusal to start a loop — unless the supervisor asked.
 
     The supervisor retries a dead loop every few minutes and, right after a
@@ -562,10 +588,16 @@ def _note_engine_refused(user_id, corr, ctid, *, revive):
     """
     if revive:
         return
+    detail = str(reason or "").strip()
+    message = (
+        f"the trading engine refused to start this loop ({detail})"
+        if detail else
+        "the trading engine refused to start this loop — it may already "
+        "be owned by another instance")
+    if _duplicate_engine_note(user_id, message):
+        return
     _jstore.record_engine_error(
-        "the engine refused to start this loop — it may already be owned by "
-        "another instance",
-        correlation_id=corr, user_id=user_id, account_id=str(ctid))
+        message, correlation_id=corr, user_id=user_id, account_id=str(ctid))
 
 
 # What the cTrader connector says when the PROVIDER answered with a refusal.
@@ -834,11 +866,18 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
             "ENGINE_START_FAILED",
             f"the trading engine could not start this loop ({cause})") from None
     if ok is False:
-        _note_engine_refused(user_id, corr, conn.get("ctid"), revive=revive)
+        reason = None
+        try:
+            from apex import user_loop as _ul
+            reason = _ul.note_start_refusal(user_id)
+        except Exception:                                    # noqa: BLE001
+            reason = None
+        _note_engine_refused(
+            user_id, corr, conn.get("ctid"), revive=revive, reason=reason)
+        detail = reason or "it may already be owned by another instance"
         raise AutomationRefused(
             "ENGINE_REFUSED",
-            "the trading engine refused to start this loop — it may already "
-            "be owned by another instance")
+            f"the trading engine refused to start this loop ({detail})")
 
     # The same question once more, before RUNNING is written over whatever is
     # there. The engine has just been started; a stop that landed while it came

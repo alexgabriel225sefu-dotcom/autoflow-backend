@@ -54,7 +54,7 @@ vi.mock("@/lib/api", async (orig) => {
           licence: { state: "active", expiresAt: null, plan: "demo" },
         } };
       }
-      if (path === "accounts") {
+      if (path === "ctrader/status" || path === "accounts") {
         return { ok: true, data: {
           connected: true, accounts: [{ ctid: 501, mode: "demo" }],
           selected: { ctid: 501, mode: "demo" }, liveAllowed: false,

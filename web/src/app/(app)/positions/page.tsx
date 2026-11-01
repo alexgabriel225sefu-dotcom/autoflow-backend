@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
 import { DataTable, Num, Side, When } from "@/components/app/table";
+import { CurrencyTicker } from "@/components/app/currency-ticker";
 import { PositionDetail } from "@/components/app/position-detail";
 import type { ClosedTrade, DealsRead, Position, PositionsRead } from "@/lib/api";
 
@@ -52,7 +53,9 @@ function positionColumns(onDetails: (p: Position) => void) {
   { key: "stop", header: "Stop", num: true, cell: stopCell },
   { key: "target", header: "Target", num: true, cell: targetCell },
   { key: "pnl-pips", header: "P&L (pips)", num: true, cell: (p: Position) => pnlCell(p.pnlPips, p.pnlIsEstimate) },
-  { key: "pnl-account", header: "P&L (account)", num: true, cell: (p: Position) => pnlCell(p.pnlAccount, p.pnlIsEstimate) },
+  { key: "pnl-account", header: "P&L (account)", num: true, cell: (p: Position) => (
+    p.pnlAccount == null ? <span className="dim">—</span> : <CurrencyTicker value={p.pnlAccount} />
+  ) },
   { key: "opened", header: "Opened", cell: (p: Position) => {
     const ts = positionOpenTimeSeconds(p.openTime);
     return ts == null ? <Num value={null} /> : <When ts={ts} />;
@@ -77,7 +80,7 @@ export default function PositionsPage() {
   // the detail shows what the broker last said and not a copy from the click.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [lastSeen, setLastSeen] = useState<Position | null>(null);
-  const r = useRead<PositionsRead>("positions", 5_000);
+  const r = useRead<PositionsRead>("positions", 20_000);
   const accountId = r.result?.ok ? r.result.data.accountId : undefined;
   const dealsPath = accountId ? `accounts/${accountId}/deals?days=7` : null;
   const deals = useRead<DealsRead>(dealsPath, 60_000);
@@ -88,7 +91,7 @@ export default function PositionsPage() {
   const unknownPnl = rows.length - knownPnl.length;
   const totalPnl = unknownPnl === 0 ? knownPnl.reduce((sum, value) => sum + value, 0) : null;
   const summary = r.result?.ok
-    ? `${rows.length} positions · ${unknownPnl > 0 ? `${unknownPnl} positions without a current price` : `Total estimated P&L ${totalPnl!.toFixed(2)}`}`
+    ? `${rows.length} positions · ${unknownPnl > 0 ? `${unknownPnl} positions without a current price` : "Total estimated P&L"}`
     : "Positions — · Total estimated P&L —";
 
   function openDetails(p: Position) {
@@ -101,10 +104,14 @@ export default function PositionsPage() {
       <div className="page-head">
         <div>
           <h1>Positions</h1>
-          <span className="sub">{summary} · Last synced {whenSynced(r.lastSync)}</span>
+          <span className="sub">
+            {summary}
+            {r.result?.ok && unknownPnl === 0 ? <> <CurrencyTicker value={totalPnl} /></> : null}
+            {" · "}Last synced {whenSynced(r.lastSync)}
+          </span>
         </div>
         <span className="btn-row">
-          {r.result?.ok ? <><>{r.result.data.accountId ? <span className="pill pill-muted mono">#{r.result.data.accountId}</span> : null}</><StatusPill mode={r.result.data.mode} /></> : null}
+          {r.result?.ok ? <><>{r.result.data.accountId ? <span className="pill pill-muted mono">#{r.result.data.accountId}</span> : null}</><StatusPill mode={r.result.data.mode} accountId={r.result.data.accountId} /></> : null}
           <button className="btn btn-ghost btn-sm" onClick={r.reload} disabled={r.loading}><RefreshCw className="ico" aria-hidden /> Refresh</button>
         </span>
       </div>

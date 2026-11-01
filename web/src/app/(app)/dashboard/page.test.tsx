@@ -295,6 +295,23 @@ describe("dashboard — automation state", () => {
     await waitFor(() => expect(screen.getByText(label)).toBeDefined());
   });
 
+  it("a running loop in the weekend window says the market is closed, not that it is watching", async () => {
+    routes.automation = { ok: true, data: {
+      state: "running", ruleDocId: "r1", mode: "demo", startedAt: 0,
+      marketClosed: true,
+      marketMessage: "Market closed (weekend), reopens Sun 22:00 UTC",
+      riskGuard: { state: "unknown", reasons: [] },
+    } };
+    routes.rules = { ok: true, data: { rules: [
+      { ruleDocId: "r1", name: "EURUSD trend", state: "active", version: 1, symbols: ["EURUSD"], timeframe: "1h", updatedAt: 0 },
+    ] } };
+    await renderDash();
+    await waitFor(() => expect(screen.getAllByText("Market closed").length).toBeGreaterThan(0));
+    expect(screen.queryByText("Watching market")).toBeNull();
+    expect(screen.queryByText("Running")).toBeNull();
+    expect(screen.getAllByText(/reopens Sun 22:00 UTC/).length).toBeGreaterThan(0);
+  });
+
   it("start is refused without an active rule, and says why", async () => {
     routes.rules = { ok: true, data: { rules: [] } };
     await renderDash();

@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import type { PerfGroup, PerfSummary, PerformanceRead } from "@/lib/api";
+import { CurrencyTicker, formatMoney } from "@/components/app/currency-ticker";
 
 /**
  * What the closed trades say — the same figures the Telegram bot showed.
@@ -20,8 +21,13 @@ const PERIODS = [
   { id: "month", label: "30 days" }, { id: "all", label: "All time" },
 ] as const;
 
-const money = (v: number | null | undefined) =>
-  v == null ? "—" : `${v < 0 ? "−" : ""}$${Math.abs(v).toFixed(2)}`;
+function Money({ value }: { value: number | null | undefined }) {
+  return <CurrencyTicker value={value} />;
+}
+function moneyText(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return formatMoney(value);
+}
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${v}%`);
 
 function pf(s: PerfSummary) {
@@ -29,7 +35,7 @@ function pf(s: PerfSummary) {
   return s.profit_factor == null ? "—" : String(s.profit_factor);
 }
 
-function Tile({ k, v }: { k: string; v: string }) {
+function Tile({ k, v }: { k: string; v: ReactNode }) {
   return (
     <div className="stat">
       <span className="stat-k">{k}</span>
@@ -51,7 +57,7 @@ function Groups({ title, rows, minTrades }: { title: string; rows: PerfGroup[]; 
             <br />
             <span className="muted">
               {g.trades} trade{g.trades === 1 ? "" : "s"} · {g.wins} won ({pct(g.win_rate)}) ·
-              net {money(g.net)} · expectancy {money(g.expectancy)}
+              net {moneyText(g.net)} · expectancy {moneyText(g.expectancy)}
             </span>
           </li>
         ))}
@@ -113,13 +119,13 @@ export default function PerformancePage() {
                 <Tile k="Closed trades" v={String(d.summary.trades)} />
                 <Tile k="Winning trades"
                       v={d.summary.win_rate == null ? "—" : `${d.summary.wins} of ${d.summary.trades} (${d.summary.win_rate}%)`} />
-                <Tile k="Net" v={money(d.summary.net)} />
+                <Tile k="Net" v={<Money value={d.summary.net} />} />
                 <Tile k="Profit factor" v={pf(d.summary)} />
-                <Tile k="Expectancy / trade" v={money(d.summary.expectancy)} />
-                <Tile k="Max drawdown" v={money(d.summary.max_drawdown)} />
-                <Tile k="Average win" v={money(d.summary.avg_win)} />
-                <Tile k="Average loss" v={money(d.summary.avg_loss)} />
-                <Tile k="Best / worst" v={`${money(d.summary.best)} / ${money(d.summary.worst)}`} />
+                <Tile k="Expectancy / trade" v={<Money value={d.summary.expectancy} />} />
+                <Tile k="Max drawdown" v={<Money value={d.summary.max_drawdown} />} />
+                <Tile k="Average win" v={<Money value={d.summary.avg_win} />} />
+                <Tile k="Average loss" v={<Money value={d.summary.avg_loss} />} />
+                <Tile k="Best / worst" v={<><Money value={d.summary.best} /> / <Money value={d.summary.worst} /></>} />
               </div>
             )}
             <p className="muted" style={{ fontSize: ".78rem", marginTop: "var(--sp-3)" }}>{d.note}</p>

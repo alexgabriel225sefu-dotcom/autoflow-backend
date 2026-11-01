@@ -106,15 +106,15 @@ describe("market panel — what it asks the hook for", () => {
   it("asks for the new timeframe when it is changed", () => {
     mount();
     h.useRead.mockClear();
-    fireEvent.change(screen.getByRole("combobox", { name: /Timeframe/i }), { target: { value: "15m" } });
+    fireEvent.click(screen.getByRole("radio", { name: "15m" }));
     const path = h.useRead.mock.calls.map((c) => c[0] as string | null).find((p) => p?.startsWith("accounts/"))!;
     expect(new URLSearchParams(path.split("?")[1]).get("timeframe")).toBe("15m");
   });
 
   it("offers the timeframes the rule form offers, and only the instruments it was given", () => {
     mount();
-    const tf = screen.getByRole("combobox", { name: /Timeframe/i });
-    expect(within(tf).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)).toEqual(TIMEFRAMES);
+    const tf = screen.getByRole("radiogroup", { name: "Timeframe" });
+    expect(within(tf).getAllByRole("radio").map((o) => o.textContent)).toEqual(TIMEFRAMES);
     const sym = screen.getByRole("combobox", { name: /Instrument/i });
     expect(within(sym).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)).toEqual(["EURUSD", "XAUUSD"]);
   });
@@ -201,7 +201,7 @@ describe("market panel — states that must not look like a quiet market", () =>
 
   it("likewise for the timeframe", () => {
     mount();
-    fireEvent.change(screen.getByRole("combobox", { name: /Timeframe/i }), { target: { value: "4h" } });
+    fireEvent.click(screen.getByRole("radio", { name: "4h" }));
     expect(document.querySelector(".price-chart")).toBeNull();
   });
 });

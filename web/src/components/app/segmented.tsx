@@ -16,7 +16,8 @@ export function SegmentedControl<T extends string>({
   label, value, options, onChange,
 }: { label: string; value: T; options: SegmentOption<T>[]; onChange: (v: T) => void }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const index = Math.max(0, options.findIndex((o) => o.value === value));
+  const found = options.findIndex((o) => o.value === value);
+  const index = found < 0 ? 0 : found;
 
   function onKey(e: React.KeyboardEvent, i: number) {
     const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1
@@ -33,7 +34,7 @@ export function SegmentedControl<T extends string>({
       className="segc"
       role="radiogroup"
       aria-label={label}
-      style={{ "--n": options.length, "--i": index } as React.CSSProperties}
+      style={{ "--n": options.length, "--i": index, "--thumb": found < 0 ? 0 : 1 } as React.CSSProperties}
     >
       <span className="segc-thumb" aria-hidden />
       {options.map((o, i) => (

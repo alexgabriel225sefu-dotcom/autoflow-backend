@@ -409,7 +409,9 @@ class _Conn:
     def __init__(self, env, access_token, ctid):
         self.env = "live" if str(env).lower() == "live" else "demo"
         self.access_token = access_token
-        self.ctid = int(ctid)
+        # 0 is the pre-auth socket used to list accounts. None is not an
+        # account: int(None) used to reach the phone as a raw TypeError.
+        self.ctid = account_id(ctid, allow_zero=True)
         self._sock = None
         self._buf = b""
         self._mid = 0
@@ -563,8 +565,35 @@ _conns: dict = {}
 _pool_lock = threading.Lock()
 
 
+def account_id(value, *, allow_zero=False):
+    """The cTrader account id as an int, or a clear refusal.
+
+    `int(None)` is a TypeError whose text ("not NoneType") was shown on the
+    Orders page and the market panel. A missing id is "nothing is selected",
+    which the screen can say. 0 is allowed only for the socket that lists
+    accounts before any one of them is authenticated.
+    """
+    if isinstance(value, bool) or value is None:
+        raise ValueError("no cTrader account is selected")
+    if isinstance(value, int):
+        number = value
+    else:
+        text = str(value).strip()
+        if not text:
+            raise ValueError("no cTrader account is selected")
+        try:
+            number = int(text)
+        except (TypeError, ValueError):
+            raise ValueError("no cTrader account is selected") from None
+    if number == 0 and not allow_zero:
+        raise ValueError("no cTrader account is selected")
+    if number < 0:
+        raise ValueError("no cTrader account is selected")
+    return number
+
+
 def _conn_for(env, access_token, ctid) -> _Conn:
-    key = (str(env).lower(), int(ctid))
+    key = (str(env).lower(), account_id(ctid, allow_zero=True))
     with _pool_lock:
         c = _conns.get(key)
         if c and c._sock is not None:
@@ -575,7 +604,7 @@ def _conn_for(env, access_token, ctid) -> _Conn:
 
 
 def _drop_conn(env, ctid):
-    key = (str(env).lower(), int(ctid))
+    key = (str(env).lower(), account_id(ctid, allow_zero=True))
     with _pool_lock:
         c = _conns.pop(key, None)
     if c:
@@ -606,7 +635,7 @@ class CtraderBroker:
         )
 
     def _ctid(self):
-        return int(self._c.CTRADER_ACCOUNT_ID)
+        return account_id(getattr(self._c, "CTRADER_ACCOUNT_ID", None))
 
     def _rpc(self, req, res_cls, timeout=15):
         """Read-only request with one transparent reconnect. The proxy closes
@@ -1830,12 +1859,12 @@ def account_balance(access_token: str, ctid, env: str = "demo") -> float:
     the `accounts` scope too, so it doubles as a connection health check right
     after OAuth: if this fails, candles/orders will fail the same way."""
     req = ProtoOATraderReq()
-    req.ctidTraderAccountId = int(ctid)
+    req.ctidTraderAccountId = account_id(ctid)
     try:
-        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+        res = _conn_for(env, access_token, ctid)._request(req, ProtoOATraderRes)
     except (ConnectionError, OSError, TimeoutError):
-        _drop_conn(env, int(ctid))  # pooled socket may be dead — one clean retry
-        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+        _drop_conn(env, ctid)  # pooled socket may be dead — one clean retry
+        res = _conn_for(env, access_token, ctid)._request(req, ProtoOATraderRes)
     money_digits = getattr(res.trader, "moneyDigits", 2) or 2
     return res.trader.balance / (10 ** money_digits)
 
@@ -1873,12 +1902,12 @@ def get_broker_name(access_token: str, ctid, env: str = "demo") -> str:
     LLC') — used to gate onboarding to a specific partner broker. Not present
     on the account-list response; only ProtoOATraderRes carries it."""
     req = ProtoOATraderReq()
-    req.ctidTraderAccountId = int(ctid)
+    req.ctidTraderAccountId = account_id(ctid)
     try:
-        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+        res = _conn_for(env, access_token, ctid)._request(req, ProtoOATraderRes)
     except (ConnectionError, OSError, TimeoutError):
-        _drop_conn(env, int(ctid))
-        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOATraderRes)
+        _drop_conn(env, ctid)
+        res = _conn_for(env, access_token, ctid)._request(req, ProtoOATraderRes)
     return getattr(res.trader, "brokerName", "") or ""
 
 
@@ -1888,12 +1917,12 @@ def available_symbol_names(access_token: str, ctid, env: str = "demo") -> set:
     the onboarding quick-pick buttons down to what will actually place an
     order, instead of guessing which CFDs a given broker/account offers."""
     req = ProtoOASymbolsListReq()
-    req.ctidTraderAccountId = int(ctid)
+    req.ctidTraderAccountId = account_id(ctid)
     try:
-        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOASymbolsListRes)
+        res = _conn_for(env, access_token, ctid)._request(req, ProtoOASymbolsListRes)
     except (ConnectionError, OSError, TimeoutError):
-        _drop_conn(env, int(ctid))
-        res = _conn_for(env, access_token, int(ctid))._request(req, ProtoOASymbolsListRes)
+        _drop_conn(env, ctid)
+        res = _conn_for(env, access_token, ctid)._request(req, ProtoOASymbolsListRes)
     return {s.symbolName.replace("/", "").replace("_", "").upper() for s in res.symbol}
 
 

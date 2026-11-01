@@ -18,8 +18,19 @@ import type { ApiError, Execution, ReadState } from "@/lib/api";
 // but nothing selected".
 import { plainErrorTitle, plainRead } from "./plain";
 
-export function StatusPill({ mode }: { mode?: "demo" | "live" | null }) {
-  if (!mode) return <span className="pill pill-muted">No account selected</span>;
+export function StatusPill({
+  mode, accountId,
+}: {
+  mode?: "demo" | "live" | null;
+  /** When the read names an account but not demo/live, that is not "nothing selected". */
+  accountId?: string | number | null;
+}) {
+  if (!mode) {
+    if (accountId != null && String(accountId) !== "") {
+      return <span className="pill pill-muted">Account #{String(accountId)}</span>;
+    }
+    return <span className="pill pill-muted">No account selected</span>;
+  }
   return (
     <span className={mode === "live" ? "pill pill-live" : "pill pill-demo"}>
       {mode === "live" ? "LIVE" : "DEMO"}
@@ -59,6 +70,7 @@ export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () 
   return (
     <div className="notice notice-error" role="alert">
       <div className="notice-head">
+        <span aria-hidden="true">⚠️</span>
         <CircleAlert className="ico" aria-hidden
                      style={{ width: 12, height: 12, verticalAlign: "-2px", marginRight: 4 }} />
         <strong>{error.code}</strong>

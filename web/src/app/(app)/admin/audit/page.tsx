@@ -11,6 +11,7 @@ import { api, type ApiError, type ApiResult } from "@/lib/api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { DataTable, Num, Side, type Column } from "@/components/app/table";
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
+import { CurrencyTicker } from "@/components/app/currency-ticker";
 import { AUDIT_DAY_CHOICES, DEFAULT_AUDIT_DAYS, auditDetailPaths } from "./range";
 
 type Account = {
@@ -90,12 +91,6 @@ type Details = {
   deals: ApiResult<{ deals: DealRow[]; from?: string; to?: string; timezone?: string; truncated?: boolean }>;
   orders: ApiResult<{ orders: OrderRow[]; truncated?: boolean }>;
 };
-
-function money(value: number | null | undefined): string | null {
-  if (value === null || value === undefined) return null;
-  const sign = value < 0 ? "−" : "";
-  return `${sign}${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 function wall(iso: string | null): string {
   if (!iso) return "—";
@@ -298,12 +293,12 @@ export default function AuditPage() {
 function AccountAudit({ details }: { details: Details }) {
   const summary = details.summary.ok ? details.summary.data.account : null;
   const tiles: Tile[] = summary ? [
-    { label: "Balance", value: money(summary.balance) },
+    { label: "Balance", value: summary.balance == null ? null : <CurrencyTicker value={summary.balance} /> },
     { label: "Leverage", value: summary.leverage == null ? null : `1:${summary.leverage}` },
     { label: "Broker", value: summary.broker },
     {
       label: "Equity",
-      value: summary.equityKnown ? money(summary.equity) : null,
+      value: summary.equityKnown ? <CurrencyTicker value={summary.equity} /> : null,
       note: summary.equityKnown
         ? "Balance plus unrealized P/L"
         : "Unrealized P/L is not on this read",

@@ -74,6 +74,9 @@ try:
     check("it is an engine error, with the user and account",
           len(engine_errs) == 1 and engine_errs[0][1]["user_id"] == "u1"
           and engine_errs[0][1]["account_id"] == "501", str(engine_errs))
+    AU._note_engine_refused("u1", "c2b", 501, revive=False)
+    check("the same refusal is not filed again",
+          len(engine_errs) == 1, str(engine_errs))
 
     # ── 3. who is blamed ────────────────────────────────────────────────────
     print("\n[3] a refusal the PROVIDER sent is a broker error")
@@ -165,7 +168,8 @@ check("start wraps the starter and records the exception",
       "_record_starter_failure(user_id, corr, conn, e, revive=revive)" in body)
 check("a starter exception becomes ENGINE_START_FAILED, not a 500", '"ENGINE_START_FAILED"' in body)
 check("an engine refusal goes through the helper with revive",
-      '_note_engine_refused(user_id, corr, conn.get("ctid"), revive=revive)' in body)
+      "_note_engine_refused(" in body and "revive=revive" in body
+      and "reason=reason" in body)
 check("start no longer writes an error inline", "_jstore.record_error(" not in body)
 check("engine_error is a journal status", J.ENGINE_ERROR in J.STATUSES and J.ENGINE_ERROR != J.BROKER_ERROR)
 e = J.for_engine_error("x", correlation_id="c", user_id="u")
