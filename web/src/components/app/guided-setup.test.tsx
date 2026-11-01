@@ -23,8 +23,8 @@ describe("GuidedSetup", () => {
     expect(screen.getByRole("heading", { name: "Guided setup" })).toBeDefined();
     expect(screen.getByRole("list", { name: "Automation setup steps" })).toBeDefined();
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
-    expect(screen.getByRole("link", { name: "Open setup step: Choose a strategy" }))
-      .toHaveAttribute("href", "/rules/new/strategy");
+    expect(screen.getByRole("link", { name: "Open setup step: Choose a strategy" })
+      .getAttribute("href")).toBe("/rules/new/strategy");
     expect(screen.getByLabelText("1 of 5 setup steps complete")).toBeDefined();
   });
 
@@ -37,7 +37,8 @@ describe("GuidedSetup", () => {
     );
 
     expect(screen.getByText("All setup steps are complete. Starting is still a deliberate action.")).toBeDefined();
-    expect(screen.getByRole("link", { name: "Review automation" })).toHaveAttribute("href", "#automation");
+    expect(screen.getByRole("link", { name: "Review automation" })
+      .getAttribute("href")).toBe("#automation");
     expect(screen.queryByRole("link", { name: /Open setup step:/ })).toBeNull();
   });
 });

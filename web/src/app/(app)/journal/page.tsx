@@ -115,7 +115,7 @@ export default function JournalView() {
                   </div>
 
                   <p className="muted" style={{ fontSize: ".82rem" }}>
-                    {plain.detail ?? e.decision?.reason ?? e.error ?? humanise(e.status ?? e.kind)}
+                    {e.decision?.reason ?? plain.detail ?? e.error ?? humanise(e.status ?? e.kind)}
                   </p>
 
                   {/* At Signals Only the client places the trade, so the level
