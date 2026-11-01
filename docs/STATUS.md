@@ -8,7 +8,7 @@ section 7). `docs/NEXT_SESSION_HANDOFF.md` stays the platform's narrative.
 Team rules and how work is picked up: issue #73 (the protocol wins where they
 differ; the owner decided on 2026-11-01 that this file is kept).
 
-Last update: 2026-11-01. Everything below is what was observed on that date;
+Last update: 2026-11-01 (second update). Everything below is what was observed on that date;
 "unverified" means nobody looked.
 
 ## Running now
@@ -37,6 +37,8 @@ Last update: 2026-11-01. Everything below is what was observed on that date;
 | Item | State |
 |---|---|
 | Issue #13 queue how-to | Draft PR #87 from `claude/issue-13-queue-howto`; docs only; `run_all.py` 254/254 |
+| Issue #70 erasure coverage | Draft PR #90: Redis-path erasure test and key-kind coverage; `run_all.py` 255/255; CI green. Finding: `billing:review` records are not erased, owner decision in #89 |
+| Issue #71 operator list | Draft PR #91: `check_runtime_env.py` row, tests, `OWNER_ACTIONS.md` section D; `run_all.py` 254/254; CI pending |
 | PR #15 Codex L1 live ledger | Draft, **do not merge**, now conflicts with the platform branch. Owner decision |
 | PR #6, #5 (to `main`) | Owner only; not touched |
 
@@ -47,9 +49,8 @@ Last update: 2026-11-01. Everything below is what was observed on that date;
 | #69 smoke-test SL/TP with the order on a real demo account | owner places trades | P1: the change is live on the owner's demo and was never seen against cTrader |
 | #67 persist the position snapshot before the send | claude | `needs-owner`: order path |
 | #68 re-read the lease at send time on live | claude | `needs-owner`: order path |
-| #70 account erasure: Redis scan path and key coverage | claude | `ready`; GDPR path |
-| #71 document and check the operator list | claude | `ready`; low |
-| #72 tests for orders/live/license pages, menu focus | codex | `ready`; low |
+| #89 decide whether erasure and export cover `billing:review` records | owner, then claude | `needs-owner`: payment records, legal retention |
+| #72 tests for orders/live/license pages, menu focus | codex | `ready`; low; Codex starts it manually (protocol section 9) |
 
 Owner backlog (labels `backlog` and `priority:*`, none `ready` yet): P0 #74 npm
 advisories in the root app, #75 Stripe webhook secret handling (`needs-owner`),
