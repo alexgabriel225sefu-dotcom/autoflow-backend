@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CompanyBlock, DraftShell } from "@/components/legal/draft-shell";
+import { LegalSection, LegalSections } from "@/components/legal/legal-section";
 
 export const metadata: Metadata = { title: "Terms of Service — Apex4Traders" };
 
@@ -25,7 +26,8 @@ export default function TermsPage() {
         on as complete.
       </div>
 
-      <section>
+      <LegalSections>
+<LegalSection>
         <h2>1. What Apex4Traders is</h2>
         <p>
           Apex4Traders is software. You describe a trading rule from named
@@ -35,9 +37,9 @@ export default function TermsPage() {
           decide what you should trade, and it does not promise a profit, a
           return, or a particular outcome.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>2. Your broker account</h2>
         <p>
           Orders are placed on a cTrader account that you choose, that you
@@ -47,9 +49,9 @@ export default function TermsPage() {
           removes the platform&rsquo;s access tokens. Revoking access inside
           cTrader is a separate step that you control.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>3. We do not hold your funds</h2>
         <p>
           Apex4Traders never takes custody of your money. It holds no client
@@ -59,9 +61,9 @@ export default function TermsPage() {
           and nothing else. Trading losses are losses on your broker account.
           They are not a balance this platform holds and cannot refund.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>4. Demo only in this release</h2>
         <p>
           Live trading is not available in this release. Automation runs on
@@ -71,9 +73,9 @@ export default function TermsPage() {
           expect on demo is the only evidence you have about it. Demo results
           are not a forecast of live results.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>5. No financial advice and no promise of returns</h2>
         <p>
           Apex4Traders is not a financial adviser, a broker, or a portfolio
@@ -84,9 +86,9 @@ export default function TermsPage() {
           and demo runs are not a promise of future results. There is no
           promised income and no promised performance.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>6. Risk disclosure</h2>
         <p>
           Trading carries risk, including the loss of all of your capital.
@@ -107,9 +109,9 @@ export default function TermsPage() {
           will be profitable. If you do not accept that you can lose all of
           the capital on the account you connect, do not use the software.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>7. Availability</h2>
         <p>
           The platform depends on services outside its control, including
@@ -118,18 +120,18 @@ export default function TermsPage() {
           platform cannot reach your broker it stops and records why, rather
           than guessing.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>8. Your account with us</h2>
         <p>
           You are responsible for keeping your sign-in credentials
           confidential and for what happens under your account. Tell us
           promptly if you believe it has been used without your permission.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>9. Licensing and payment</h2>
         <p>
           Access to the paid plan may require a licence. The price is the
@@ -140,9 +142,9 @@ export default function TermsPage() {
           <strong> [TO BE CONFIRMED — refund policy]</strong> until a lawyer
           has reviewed it and it has been published.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>10. Who provides this service, and under which law</h2>
         <CompanyBlock />
         <p>
@@ -152,14 +154,15 @@ export default function TermsPage() {
           product yet. These terms do not create a contract with an unnamed
           entity.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>11. Contact</h2>
         <p>
           <strong>[TO BE CONFIRMED — support contact address.]</strong>
         </p>
-      </section>
+      </LegalSection>
+</LegalSections>
     </DraftShell>
   );
 }
