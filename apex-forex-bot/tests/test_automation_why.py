@@ -242,7 +242,16 @@ check("an unreadable clock is None, never a guess",
 print("\n[6] GET /automation/why is routed")
 src = open(os.path.join(ROOT, "apex", "platform", "api.py")).read()
 check("api routes 'why' to automation.why",
-      'action == "why"' in src and "_auto.why(" in src)
+      'why_name == "why"' in src and "_auto.why(" in src)
+from apex.platform import api as _API                 # noqa: E402
+_status, _body = _API.handle("GET", "/api/v1/automation/why", {})
+_code = ((_body or {}).get("error") or {}).get("code")
+check("GET /automation/why is not METHOD_NOT_ALLOWED",
+      _code != "METHOD_NOT_ALLOWED", f"status={_status} code={_code} body={_body}")
+_status_p, _body_p = _API.handle("POST", "/api/v1/automation/why", {})
+_code_p = ((_body_p or {}).get("error") or {}).get("code")
+check("POST /automation/why is also a read, not a 405",
+      _code_p != "METHOD_NOT_ALLOWED", f"status={_status_p} code={_code_p}")
 
 print()
 if _fails:

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import type { ApiError, RuleSummary, SetupLibrary, StrategyPreset } from "@/lib/api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
+import { SegmentedControl } from "@/components/app/segmented";
+import { onSpot } from "@/components/app/spotlight";
 import type { FamilyGroup } from "../rules/new/strategy/catalog";
 import type { CustomMethod, TradeChoice } from "./trade-model";
 
@@ -71,7 +73,8 @@ export function StrategyStep({
             ? <p>You have not built a method yet.</p> : null}
           <div className="strat-grid" role="radiogroup" aria-label="My methods">
             {myMethods.map((r) => (
-              <div key={r.ruleDocId} className="strat" data-chosen={custom?.ruleDocId === r.ruleDocId}>
+              <div key={r.ruleDocId} className="strat spot" data-chosen={custom?.ruleDocId === r.ruleDocId}
+                   onPointerMove={onSpot} onPointerDown={onSpot}>
                 <button type="button" role="radio" className="strat-pick"
                         aria-checked={custom?.ruleDocId === r.ruleDocId}
                         onClick={() => onMethod(r)}>
@@ -98,20 +101,21 @@ export function StrategyStep({
         </div>
       ) : null}
       {tab === "ready" && groups.length > 1 ? (
-        <div className="chips" role="radiogroup" aria-label="Strategy family">
-          <button type="button" role="radio" className="chip" aria-checked={family === "all"}
-                  onClick={() => setFamily("all")}>All</button>
-          {groups.map((g) => (
-            <button key={g.family} type="button" role="radio" className="chip"
-                    aria-checked={family === g.family}
-                    onClick={() => setFamily(g.family)}>{g.label}</button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Strategy family"
+          value={family}
+          onChange={setFamily}
+          options={[
+            { value: "all", label: "All" },
+            ...groups.map((g) => ({ value: g.family, label: g.label })),
+          ]}
+        />
       ) : null}
       {tab === "ready" ? (
         <div className="strat-grid" role="radiogroup" aria-label="Strategy">
           {shown.flatMap((g) => g.strategies).map((s) => (
-            <div key={s.id} className="strat" data-chosen={choice.strategy?.id === s.id}>
+            <div key={s.id} className="strat spot" data-chosen={choice.strategy?.id === s.id}
+                 onPointerMove={onSpot} onPointerDown={onSpot}>
               <button type="button" role="radio" className="strat-pick"
                       aria-checked={choice.strategy?.id === s.id}
                       onClick={() => onPick(s)}>

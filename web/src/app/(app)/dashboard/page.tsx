@@ -31,7 +31,7 @@ import { DataTable, Num, Side, When } from "@/components/app/table";
 import { WhyCard } from "@/components/app/why-card";
 import { EmergencyStop } from "@/components/app/emergency-stop";
 import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
-import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
+import { collapseRepeated, plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
 import { FirstRunChecklist } from "@/components/app/first-run";
 import { MarketPanel } from "@/components/chart/market-panel";
@@ -68,10 +68,10 @@ function Unavailable({ status, reason }: { status: string; reason?: string }) {
 export default function Dashboard() {
   const me = useRead<Me>("me", 120_000);
   const ct = useRead<CtraderStatus>("ctrader/status", 60_000);
-  const auto = useRead<AutomationState>("automation", 20_000);
-  const pos = useRead<PositionsRead>("positions", 30_000);
+  const auto = useRead<AutomationState>("automation", 30_000);
+  const pos = useRead<PositionsRead>("positions", 45_000);
   const ord = useRead<OrdersRead>("orders", 60_000);
-  const jr = useRead<JournalPage>("journal?limit=8", 30_000);
+  const jr = useRead<JournalPage>("journal?limit=8", 45_000);
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 120_000);
   const [busy, setBusy] = useState(false);
   // A refusal from the account picker. Its own state rather than a shared
@@ -96,7 +96,9 @@ export default function Dashboard() {
     ?? null;
 
   const lastSync = Math.max(...[ct, auto, pos, jr].map((r) => r.lastSync ?? 0)) || null;
-  const autoPlain = plainAutomation(running?.state, !!activeRule);
+  const autoPlain = plainAutomation(running?.state, !!activeRule, {
+    closed: running?.marketClosed, message: running?.marketMessage,
+  });
   const licPlain = plainLicence(licence);
   const isDemo = selected?.mode === "demo";
   // A live account the SERVER has cleared, and cleared for live specifically.
@@ -119,10 +121,16 @@ export default function Dashboard() {
     },
     {
       label: "State",
-      value: running ? { running: "Running", paused: "Paused", stopped: "Stopped", blocked: "Blocked" }[running.state] : null,
-      note: running?.blockReason
-        ?? (running && running.state !== "stopped" && running.state !== "blocked" ? running.levelLabel ?? null : null),
-      tone: running?.state === "running" ? "long" : "neutral",
+      value: running
+        ? (running.state === "running" && running.marketClosed
+          ? "Market closed"
+          : { running: "Running", paused: "Paused", stopped: "Stopped", blocked: "Blocked" }[running.state])
+        : null,
+      note: running?.state === "running" && running.marketClosed
+        ? (running.marketMessage ?? "The loop is idle until the market reopens.")
+        : running?.blockReason
+          ?? (running && running.state !== "stopped" && running.state !== "blocked" ? running.levelLabel ?? null : null),
+      tone: running?.state === "running" && !running.marketClosed ? "long" : "neutral",
     },
     {
       label: "Rule",
@@ -425,6 +433,7 @@ export default function Dashboard() {
                 <span className="mobile-context-kicker">RISK GUARD</span>
                 <strong>
                   {running?.state === "paused" ? "Trading paused"
+                    : running?.state === "running" && running.marketClosed ? "Market closed"
                     : running?.state === "running" ? "Risk checks on" : "Automation is not running"}
                 </strong>
                 <span>Your risk limits are checked before every action. Open rules to change them.</span>
@@ -456,14 +465,15 @@ export default function Dashboard() {
             {jr.result?.ok ? (
               jr.result.data.entries.length ? (
                 <div className="records">
-                  {jr.result.data.entries.map((e) => {
+                  {collapseRepeated(jr.result.data.entries).map(({ row: e, count }) => {
                     const p = plainDecision(e);
                     return (
-                      <article className="record" key={e.entryId}>
+                      <article className={p.label === "Engine error" ? "record halo" : "record"} key={e.entryId}>
                         <div className="record-head">
                           <span className="record-title">
                             <span className={toneClass(p.tone)}>{p.label}</span>
                             {e.symbol ? <span className="muted"> · {e.symbol}</span> : null}
+                            {count > 1 ? <span className="dim"> · repeated {count} times</span> : null}
                           </span>
                           <span className="dim" style={{ fontSize: ".74rem" }}><When ts={e.ts} /></span>
                         </div>

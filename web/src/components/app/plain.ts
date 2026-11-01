@@ -58,7 +58,19 @@ export function plainLevel(id: unknown): string {
 export function plainAutomation(
   state: string | null | undefined,
   hasRule: boolean,
+  market?: { closed?: boolean | null; message?: string | null },
 ): Plain {
+  // The loop can be up and still be idle: PR 66 says the weekend window is
+  // closed and the loop waits. "Watching market" would contradict the Risk
+  // Guard chip, which says the market is closed.
+  if (state === "running" && market?.closed === true) {
+    return {
+      label: "Market closed",
+      detail: market.message
+        || "The market is closed for the weekend, so the loop is idle. It watches again when the market reopens.",
+      tone: "neutral",
+    };
+  }
   switch (state) {
     case "running":
       return {
@@ -100,6 +112,23 @@ const LEGACY_ENGINE_REFUSAL = "the engine refused to start this loop";
 function isLegacyEngineRefusal(error: string | null | undefined): boolean {
   return typeof error === "string"
     && error.trim().toLowerCase().startsWith(LEGACY_ENGINE_REFUSAL);
+}
+
+/** Same engine refusal filed again. The screen shows it once, with a count. */
+export function collapseRepeated<T extends { status?: string | null; error?: string | null }>(
+  rows: T[],
+): { row: T; count: number }[] {
+  const out: { row: T; count: number }[] = [];
+  for (const row of rows) {
+    const prev = out[out.length - 1];
+    const same = !!prev
+      && (row.status === "engine_error" || isLegacyEngineRefusal(row.error))
+      && prev.row.status === row.status
+      && (prev.row.error ?? "") === (row.error ?? "");
+    if (same && prev) prev.count += 1;
+    else out.push({ row, count: 1 });
+  }
+  return out;
 }
 
 /**

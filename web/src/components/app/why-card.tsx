@@ -17,7 +17,7 @@ import { When } from "./table";
  * "nothing recorded", never as "there was no reason".
  */
 export function WhyCard() {
-  const why = useRead<WhyRead>("automation/why", 30_000);
+  const why = useRead<WhyRead>("automation/why", 45_000);
   const raw = why.result?.ok ? why.result.data : null;
   // A reply of the wrong shape is reported, not rendered: an explanation that
   // crashes the dashboard is the worst place for the page to fail.

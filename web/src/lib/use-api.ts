@@ -22,6 +22,24 @@ type Flight = {
 
 const flights = new Map<string, Flight>();
 
+/**
+ * One cadence per path, shared by every mounted reader.
+ *
+ * The shell, the dashboard and the trade page each used to keep their own
+ * timer for the same fact. A phone sitting on the dashboard then opening
+ * Trade step 4 fired both, and a visibility change fired them again. The
+ * server answered RATE_LIMITED. A poll that landed inside this gap is the
+ * same question the previous reader just asked.
+ */
+export const MIN_POLL_GAP_MS = 8_000;
+const lastAttempt = new Map<string, number>();
+const pathPauseUntil = new Map<string, number>();
+
+function pollGap(intervalMs: number): number {
+  if (!intervalMs) return MIN_POLL_GAP_MS;
+  return Math.max(MIN_POLL_GAP_MS, Math.floor(intervalMs / 2));
+}
+
 function beginRead(path: string, force: boolean): Flight {
   const current = flights.get(path);
   // Join only a request somebody is still waiting on. A flight left behind
@@ -104,6 +122,13 @@ export function invalidateBrokerViews() {
   invalidate(...BROKER_VIEW_PATHS);
 }
 
+/** Test hook. The gap and the 429 pause are process-wide, so a test that
+ *  advances time must not leave that wait for the next file. */
+export function resetReadSchedule() {
+  lastAttempt.clear();
+  pathPauseUntil.clear();
+}
+
 export function useRead<T>(path: string | null, intervalMs = 0) {
   const [result, setResult] = useState<ApiResult<T> | null>(null);
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -114,11 +139,19 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   /** The request this mounted reader is waiting on, so unmount can drop it. */
   const held = useRef<Flight | null>(null);
 
-  const load = useCallback(async (force = false): Promise<ApiResult<T> | undefined> => {
+  const load = useCallback(async (force = false, kind: "mount" | "poll" | "visible" | "online" = "mount"): Promise<ApiResult<T> | undefined> => {
     if (!path) return undefined;
     // The server said how long to wait. Polling again before that spends the
-    // budget the refusal just told us is empty.
-    if (!force && Date.now() < pauseUntil.current) return undefined;
+    // budget the refusal just told us is empty. The pause is per path, so a
+    // second reader of the same endpoint waits out the same refusal.
+    const sharedPause = pathPauseUntil.get(path) ?? 0;
+    if (!force && (Date.now() < pauseUntil.current || Date.now() < sharedPause)) return undefined;
+    if (!force && (kind === "poll" || kind === "visible")) {
+      const last = lastAttempt.get(path) ?? 0;
+      const gap = kind === "visible" ? Math.max(pollGap(intervalMs), 12_000) : pollGap(intervalMs);
+      if (Date.now() - last < gap) return undefined;
+    }
+    lastAttempt.set(path, Date.now());
     const mine = ++seq.current;
     setLoading(true);
     const flight = beginRead(path, force);
@@ -137,8 +170,11 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     setLoading(false);
     if (!r.ok && r.code === "RATE_LIMITED"
         && typeof r.retryAfterSec === "number" && r.retryAfterSec > 0) {
-      pauseUntil.current = Date.now() + r.retryAfterSec * 1000;
-    } else {
+      const until = Date.now() + r.retryAfterSec * 1000;
+      pauseUntil.current = until;
+      const prev = pathPauseUntil.get(path) ?? 0;
+      pathPauseUntil.set(path, Math.max(prev, until));
+    } else if (r.ok) {
       pauseUntil.current = 0;
     }
     // Stamped only on an answer we actually received — including a refusal.
@@ -148,7 +184,7 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     // answer it gets back against what it expected, instead of trusting the
     // screen to have caught up.
     return r;
-  }, [path]);
+  }, [path, intervalMs]);
 
   useEffect(() => {
     // Queued rather than called straight from the effect body. `load` sets
@@ -188,12 +224,13 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
 
   useEffect(() => {
     if (!intervalMs || !path) return;
-    const tick = () => { if (!document.hidden) void load(); };
+    const tick = () => { if (!document.hidden) void load(false, "poll"); };
+    const onVisible = () => { if (!document.hidden) void load(false, "visible"); };
     const id = window.setInterval(tick, intervalMs);
-    document.addEventListener("visibilitychange", tick);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", tick);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [intervalMs, path, load]);
 
@@ -212,7 +249,7 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   // the case the status bar is. Recovery must not depend on polling.
   useEffect(() => {
     if (!path) return;
-    const onBack = () => { void load(); };
+    const onBack = () => { void load(false, "online"); };
     window.addEventListener("online", onBack);
     return () => window.removeEventListener("online", onBack);
   }, [path, load]);

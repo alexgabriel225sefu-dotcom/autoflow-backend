@@ -1164,13 +1164,24 @@ def _make_broker(user, user_id=None, ctid=None):
     from apex import config as _appcfg
     paper = user.get("paper", False)
     ct_token = user.get("ctrader_access_token") or ""
-    ct_account = user.get("ctrader_account_id") or ""
-    if not ct_token and user_id:
+    # JSON null is stored as None. `or ""` turns that into "no id", which is
+    # the same as a missing key. A platform client keeps the id on the link
+    # record, not here — including when a stale token is still on the user
+    # record. Skipping the link in that case built a broker with no account
+    # and the next read died on int(None).
+    record_id = user.get("ctrader_account_id")
+    record_missing = record_id is None or record_id == ""
+    ct_account = "" if record_missing else record_id
+    if user_id and (not ct_token or record_missing):
         from apex.platform import ctrader_link as _link
         _conn = _link.get_ctrader_connection(user_id, ctid=ctid)
         if _conn:
-            ct_token = _conn["accessToken"]
-            ct_account = _conn["ctid"]
+            ct_token = _conn.get("accessToken") or ct_token
+            link_id = _conn.get("ctid")
+            if link_id is None or link_id == "":
+                link_id = ctid
+            if link_id is not None and link_id != "":
+                ct_account = link_id
             # `paper` AND `ctrader_env` ARE DIFFERENT AXES, AND THIS CONFLATED
             # THEM. The bug it caused is the worst kind: it reported success.
             #
@@ -1202,12 +1213,15 @@ def _make_broker(user, user_id=None, ctid=None):
             # remains the only writer of the stored flag, which
             # test_live_path_invariants.py enforces.
             paper = False
-            user = dict(user, ctrader_env=_conn["mode"])
+            # A missing mode must not be written as None: dict.get's default
+            # only applies when the key is absent, so None would skip "demo".
+            mode = _conn.get("mode") if _conn.get("mode") in ("demo", "live") else None
+            user = dict(user, ctrader_env=mode or user.get("ctrader_env") or "demo")
     fake_cfg = types.SimpleNamespace(
         CTRADER_ACCESS_TOKEN  = ct_token,
         CTRADER_REFRESH_TOKEN = user.get("ctrader_refresh_token", ""),
         CTRADER_ACCOUNT_ID    = ct_account,
-        CTRADER_ENV           = user.get("ctrader_env", "demo"),
+        CTRADER_ENV           = user.get("ctrader_env") or "demo",
         SYMBOL           = user.get("symbol") or _appcfg.SYMBOL,
         TIMEFRAME        = user.get("timeframe", "5m"),
         CANDLES          = 240,  # M5 history for indicators (H1 gate removed → 720 was overkill)
@@ -1272,11 +1286,11 @@ def _make_broker(user, user_id=None, ctid=None):
         EV_GATE_MODE       = getattr(_appcfg, "EV_GATE_MODE", "shadow"),
         EV_MIN_PROBABILITY = _setting_number(
             user, "ev_min_probability", getattr(_appcfg, "EV_MIN_PROBABILITY", 0.55)),
-        EV_MIN_SAMPLES     = int(getattr(_appcfg, "EV_MIN_SAMPLES", 30)),
+        EV_MIN_SAMPLES     = int(getattr(_appcfg, "EV_MIN_SAMPLES", 30) or 30),
         AI_VISION          = bool(getattr(_appcfg, "AI_VISION", False)),
         STRUCTURAL_STOPS   = bool(user.get(
             "structural_stops", getattr(_appcfg, "STRUCTURAL_STOPS", False))),
-        STRUCTURAL_MIN_RR  = float(getattr(_appcfg, "STRUCTURAL_MIN_RR", 1.3)),
+        STRUCTURAL_MIN_RR  = float(getattr(_appcfg, "STRUCTURAL_MIN_RR", 1.3) or 1.3),
         # Sentinel. Same warning as the EV block above: absent here means the
         # env var is unreachable from inside the loop.
         SENTINEL_MODE      = getattr(_appcfg, "SENTINEL_MODE", "shadow"),
@@ -5324,27 +5338,43 @@ def _platform_unlicensed(user_id):
         return True
 
 
+# The last reason start() returned False, per user. automation.start reads
+# it so the journal and the button say WHY, not "the starter returned a
+# refusal". Cleared when read.
+_start_refusals = {}
+
+
+def note_start_refusal(user_id):
+    """The reason the last start() refused, once. None if it did not say."""
+    return _start_refusals.pop(str(user_id), None)
+
+
+def _refuse_start(user_id, reason):
+    _start_refusals[str(user_id)] = reason
+    print(f"[UserLoop] REFUSED start for {user_id}: {reason}")
+    return False
+
+
 def start(user_id, alert_fn=None):
     user_id = str(user_id)
     alert_fn = _alert_fn_for(user_id, alert_fn)
     if not _entitled(user_id):
         # Clear `active` too, or the watchdog resurrects this every 180s.
-        print(f"[UserLoop] REFUSED start for {user_id}: not entitled "
-              f"(no access grant and no license on file)")
         try:
             user_store.update(user_id, {"active": False})
         except Exception:
             pass
         stop(user_id)
-        return False
+        return _refuse_start(
+            user_id, "this account is not allowed to run a loop")
     # Take the cross-container lease BEFORE spawning anything. A deploy overlaps
     # the old and new containers, and without this both start a loop for the
     # same cTrader account — the generation token below cannot see the other
     # process. None means no shared backend: uncontended, so carry on.
     _lease = ownership.acquire(user_id)
     if _lease is False:
-        print(f"[UserLoop] REFUSED start for {user_id}: another instance owns it")
-        return False
+        return _refuse_start(
+            user_id, "another instance already owns this loop")
     if _lease is None:
         # No shared backend: nothing fences this loop against a second
         # container. Tolerable on demo; on real money two engines managing
@@ -5352,10 +5382,10 @@ def start(user_id, alert_fn=None):
         # (the watchdog retries).
         _fence, _why = _start_fence_required(user_id)
         if _fence:
-            print(f"[UserLoop] REFUSED start for {user_id}: no ownership lease "
-                  f"backend and this is {_why} — a live loop never runs "
-                  f"unfenced")
-            return False
+            return _refuse_start(
+                user_id,
+                "no ownership lease is available, so a live loop is not "
+                f"started ({_why})")
         print(f"[UserLoop] WARNING {user_id}: no ownership lease backend — "
               f"starting UNFENCED ({_why})")
     # Renew on a thread of its own, not from the trading tick.
@@ -5363,7 +5393,8 @@ def start(user_id, alert_fn=None):
 
     with _lock:
         if user_id in _loops and _loops[user_id]["running"]:
-            return False
+            return _refuse_start(
+                user_id, "a loop for this account is already running")
         # Generation token: a stop()+start() restart can race a thread that is
         # asleep in its 5-minute tick — it wakes, sees the NEW entry's
         # running=True and keeps trading alongside the new loop (two engines

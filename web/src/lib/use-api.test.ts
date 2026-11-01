@@ -21,7 +21,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { invalidate, invalidateBrokerViews, useRead, whenSynced } from "./use-api";
+import { invalidate, invalidateBrokerViews, resetReadSchedule, useRead, whenSynced } from "./use-api";
 import * as apiModule from "./api";
 
 /** A pending call whose result the test decides, later. */
@@ -36,6 +36,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetReadSchedule();
   vi.restoreAllMocks();
 });
 

@@ -11,6 +11,8 @@ import { ConfirmAction } from "@/components/app/shell";
 import { fireStartConfetti } from "@/components/app/start-confetti";
 import { AUTOMATION_LEVELS } from "@/components/app/plain";
 import { ErrorNotice, Spinner } from "@/components/app/state";
+import { SegmentedControl } from "@/components/app/segmented";
+import { CurrencyTicker } from "@/components/app/currency-ticker";
 import { groupByFamily } from "../rules/new/strategy/catalog";
 import { StrategyStep } from "./strategy-step";
 import {
@@ -30,8 +32,6 @@ import {
 
 const STEPS = ["Symbols", "Strategy", "Risk", "Account", "Review"] as const;
 const pct = (v: string) => (v.trim() === "" ? "" : `${v.trim()}%`);
-const money = (n: number | null) =>
-  n === null ? "—" : n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
 export default function TradePage() {
   const lib = useRead<SetupLibrary>("automation/setup");
@@ -171,15 +171,15 @@ export default function TradePage() {
                    onChange={(e) => setQuery(e.target.value)} />
           </div>
           {view.classes.length > 1 ? (
-            <div className="chips" role="radiogroup" aria-label="Instrument class">
-              <button type="button" role="radio" className="chip" aria-checked={symClass === "all"}
-                      onClick={() => setSymClass("all")}>All</button>
-              {view.classes.map((k) => (
-                <button key={k.id} type="button" role="radio" className="chip"
-                        aria-checked={symClass === k.id}
-                        onClick={() => setSymClass(k.id)}>{k.label} · {k.count}</button>
-              ))}
-            </div>
+            <SegmentedControl
+              label="Instrument class"
+              value={symClass}
+              onChange={setSymClass}
+              options={[
+                { value: "all", label: "All" },
+                ...view.classes.map((k) => ({ value: k.id, label: `${k.label} · ${k.count}` })),
+              ]}
+            />
           ) : null}
           {!broker.result ? <Spinner label="Reading your broker's instruments" /> : null}
           <div className="chips chips-symbols" role="radiogroup" aria-label="Instrument">
@@ -231,13 +231,12 @@ export default function TradePage() {
             </div>
           ) : null}
           <div className="field"><span>Timeframe</span>
-            <div className="chips" role="radiogroup" aria-label="Timeframe">
-              {TIMEFRAME_CHOICES.map((t) => (
-                <button key={t} type="button" role="radio" className="chip"
-                        aria-checked={c.timeframe === t}
-                        onClick={() => set("timeframe", t)}>{t}</button>
-              ))}
-            </div>
+            <SegmentedControl
+              label="Timeframe"
+              value={c.timeframe}
+              onChange={(v) => set("timeframe", v)}
+              options={TIMEFRAME_CHOICES.map((t) => ({ value: t, label: t }))}
+            />
           </div>
         </section>
       ) : null}
@@ -277,12 +276,13 @@ export default function TradePage() {
             </label>
           </div>
           <div className="field"><span>Risk per trade <span className="hint">% of the capital allocated</span></span>
-            <div className="chips" role="radiogroup" aria-label="Risk per trade">
-              {RISK_PICKS.map((r) => (
-                <button key={r} type="button" role="radio" className="chip"
-                        aria-checked={c.riskPercent === r}
-                        onClick={() => set("riskPercent", r)}>{r}%</button>
-              ))}
+            <div className="chips">
+              <SegmentedControl
+                label="Risk per trade"
+                value={c.riskPercent}
+                onChange={(v) => set("riskPercent", v)}
+                options={RISK_PICKS.map((r) => ({ value: r, label: `${r}%` }))}
+              />
               <input type="number" step="0.05" min="0.05" max="100" aria-label="Custom risk per trade, percent"
                      className="chip-input" value={c.riskPercent}
                      onChange={(e) => set("riskPercent", e.target.value)} />
@@ -320,8 +320,8 @@ export default function TradePage() {
                  role="status">{lotNotice.text}</div>
           ) : null}
           <p className="trade-est" aria-live="polite">
-            Most one trade is sized to lose: <strong>{money(amounts.perTrade)}</strong>
-            {" · "}Day stops at: <strong>{money(amounts.perDay)}</strong>
+            Most one trade is sized to lose: <strong><CurrencyTicker value={amounts.perTrade} /></strong>
+            {" · "}Day stops at: <strong><CurrencyTicker value={amounts.perDay} /></strong>
             <span className="muted"> (limits from the capital you allocated, not a forecast)</span>
           </p>
           <div className="field"><span>Who acts on a setup</span>

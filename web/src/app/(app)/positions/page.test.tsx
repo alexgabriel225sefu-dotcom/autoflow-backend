@@ -56,7 +56,7 @@ describe("positions read", () => {
     expect(screen.queryByRole("button", { name: /Close position/i })).toBeNull();
     fireEvent.click(screen.getAllByRole("button", { name: "View details" })[0]);
     expect(screen.getByRole("button", { name: "Close position" })).toBeDefined();
-    expect(reads.some((r) => r.path === "positions" && r.interval === 5_000)).toBe(true);
+    expect(reads.some((r) => r.path === "positions" && r.interval === 20_000)).toBe(true);
     expect(reads.some((r) => r.path === "accounts/501/deals?days=7" && r.interval === 60_000)).toBe(true);
   });
 

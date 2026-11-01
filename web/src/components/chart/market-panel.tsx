@@ -26,6 +26,7 @@ import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice } from "@/components/app/state";
 import { plainError, plainRead } from "@/components/app/plain";
 import { TIMEFRAMES } from "@/components/app/rule-form";
+import { SegmentedControl } from "@/components/app/segmented";
 import { isStale, positionOverlays, sameInstrument, type ChartMarker, type PositionOverlay } from "./chart-data";
 import { PriceChart, type Overlay } from "./price-chart";
 
@@ -191,12 +192,15 @@ export function MarketPanel({
                   : <option value="">No instrument on this rule</option>}
               </select>
             </label>
-            <label className="field" style={{ marginBottom: 0 }}>
+            <div className="field" style={{ marginBottom: 0 }}>
               <span>Timeframe</span>
-              <select value={tf} onChange={(e) => setTf(e.target.value)}>
-                {TIMEFRAMES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </label>
+              <SegmentedControl
+                label="Timeframe"
+                value={tf}
+                onChange={setTf}
+                options={TIMEFRAMES.map((t) => ({ value: t, label: t }))}
+              />
+            </div>
             <label className="field" style={{ marginBottom: 0 }}>
               <span>Overlay <span className="hint">(computed)</span></span>
               <select value={overlayKind} onChange={(e) => setOverlayKind(e.target.value as typeof overlayKind)}>

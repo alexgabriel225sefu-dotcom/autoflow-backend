@@ -4,7 +4,7 @@ import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { When } from "@/components/app/table";
 import { humanise } from "@/components/app/rule-summary";
-import { plainDecision } from "@/components/app/plain";
+import { collapseRepeated, plainDecision } from "@/components/app/plain";
 import type { JournalEntry, JournalPage } from "@/lib/api";
 import { downloadText, journalToCsv } from "./csv";
 
@@ -114,16 +114,17 @@ export default function JournalView() {
             {/* The journal is a record, not a grid of numbers: each entry gets
                 the room to say what was decided and why, on both widths. */}
             <div className="records">
-              {r.result.data.entries.map((e) => {
+              {collapseRepeated(r.result.data.entries).map(({ row: e, count }) => {
                 const plain = plainDecision(e);
                 return (
-                  <article className="record" key={e.entryId}>
+                  <article className={plain.label === "Engine error" ? "record halo" : "record"} key={e.entryId}>
                   <div className="record-head">
                     <span className="record-title">
                       <span className={tone(e)}>
                         {e.decision?.verdict ?? plain.label}
                       </span>
                       {e.symbol ? <span className="muted"> · {e.symbol}</span> : null}
+                      {count > 1 ? <span className="dim"> · repeated {count} times</span> : null}
                     </span>
                     <span className="dim" style={{ fontSize: ".74rem" }}><When ts={e.ts} /></span>
                   </div>

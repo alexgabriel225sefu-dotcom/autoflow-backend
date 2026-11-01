@@ -62,6 +62,19 @@ _deals_cache_lock = threading.Lock()
 _deals_fetch_locks = {}
 
 
+def _human_broker_fault(exc, *secrets):
+    """A sentence a client can read. A raw int(None) is not one.
+
+    The TypeError text was shown in full on Orders and the market panel.
+    The id was missing; saying so is the whole message.
+    """
+    raw = _scrub(exc, *secrets)
+    if "NoneType" in raw or raw.startswith("int() argument"):
+        return ("the account id was missing, so this was not sent to the "
+                "broker. Choose the account again.")
+    return raw
+
+
 def _scrub(text, *secrets):
     """An error message with every known secret removed."""
     # Only the access token was known here, so a refresh token, the app secret
@@ -144,8 +157,12 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
     try:
         broker = broker_fn()
     except Exception as e:  # noqa: BLE001
+        # The account is known — the connection was read before the broker
+        # was built. Omitting it here made the orders page say "No account
+        # selected" beside a status strip that showed the demo account.
         return None, {"connected": True, "status": UNAVAILABLE,
-                      "reason": _scrub(e, conn.get("accessToken"))}
+                      "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                      "reason": _human_broker_fault(e, conn.get("accessToken"))}
     # The check above is about the CONNECTION. The broker is built separately,
     # and `user_loop._make_broker` prefers a token and account id stored on the
     # legacy user record over the platform connection it was handed. Nothing on
@@ -179,7 +196,7 @@ def _read(user_id, key, call, *, ctid=None, connection_fn=None,
         # nothing" look identical to a dashboard and mean opposite things.
         return {"connected": True, "status": UNAVAILABLE,
                 "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                "reason": _scrub(e, conn.get("accessToken"))}
+                "reason": _human_broker_fault(e, conn.get("accessToken"))}
     return {"connected": True, "status": OK, "accountId": conn.get("ctid"),
             "mode": conn.get("mode"), key: data}
 

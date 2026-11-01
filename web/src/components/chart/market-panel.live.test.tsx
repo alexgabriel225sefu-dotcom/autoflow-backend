@@ -28,6 +28,7 @@ vi.mock("lightweight-charts", async () => (await import("@/test/lightweight-char
 
 import { lwc } from "@/test/lightweight-charts-mock";
 import { createChart } from "lightweight-charts";
+import { resetReadSchedule } from "@/lib/use-api";
 import { CHART_REFRESH_MS, MarketPanel } from "./market-panel";
 
 const T0 = 1_758_542_400;
@@ -51,6 +52,7 @@ function setHidden(hidden: boolean) {
 }
 
 beforeEach(() => {
+  resetReadSchedule();
   vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] });
   h.calls.length = 0;
   lwc.reset();

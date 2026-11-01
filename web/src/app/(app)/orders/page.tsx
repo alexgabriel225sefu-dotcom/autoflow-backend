@@ -20,7 +20,7 @@ export default function OrdersPage() {
               {r.result.data.accountId ? (
                 <span className="pill pill-muted mono">#{r.result.data.accountId}</span>
               ) : null}
-              <StatusPill mode={r.result.data.mode} />
+              <StatusPill mode={r.result.data.mode} accountId={r.result.data.accountId} />
             </>
           ) : null}
           <button className="btn btn-ghost btn-sm" onClick={r.reload} disabled={r.loading}>
