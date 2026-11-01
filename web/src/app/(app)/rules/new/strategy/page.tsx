@@ -252,7 +252,7 @@ export default function PickStrategyPage() {
               closes. Everything else below reaches the engine.
             </p>
             {SHARED_STEPS.map((s) => (
-              <div key={s.id} style={{ marginBottom: "var(--sp-3)" }}>
+              <div key={s.id} id={s.id} style={{ marginBottom: "var(--sp-3)" }}>
                 <RuleForm draft={draft} set={set} specs={{}} step={s.id} />
               </div>
             ))}

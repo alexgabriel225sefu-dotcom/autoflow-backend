@@ -33,6 +33,7 @@ import { EmergencyStop } from "@/components/app/emergency-stop";
 import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
 import { plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
+import { GuidedSetup, type GuidedSetupStep } from "@/components/app/guided-setup";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -134,6 +135,62 @@ export default function Dashboard() {
     },
   ];
 
+  const setupSteps: GuidedSetupStep[] = [
+    {
+      id: "symbol",
+      title: "Choose a symbol",
+      description: activeRule?.symbols.length
+        ? `${activeRule.symbols.join(", ")} selected.`
+        : "Pick the market your rule will watch.",
+      href: activeRule ? `/rules/${activeRule.ruleDocId}/edit` : "/rules/new",
+      complete: Boolean(activeRule?.symbols.length),
+    },
+    {
+      id: "strategy",
+      title: "Choose a strategy or build your own",
+      description: activeRule?.strategy
+        ? "A library strategy is attached to the rule."
+        : activeRule?.entryConditions
+          ? "Your own entry conditions are attached to the rule."
+          : "Start with a library strategy or your own conditions.",
+      href: activeRule ? `/rules/${activeRule.ruleDocId}/edit` : "/rules/new/strategy",
+      complete: Boolean(activeRule && (activeRule.strategy || (activeRule.entryConditions ?? 0) > 0)),
+    },
+    {
+      id: "risk",
+      title: "Review risk settings",
+      description: activeRule
+        ? "The saved rule has server-validated risk settings."
+        : "Set risk, stop loss, target and limits before saving.",
+      href: activeRule ? `/rules/${activeRule.ruleDocId}/edit` : "/rules/new/strategy#risk",
+      complete: Boolean(activeRule),
+    },
+    {
+      id: "account",
+      title: selected?.mode === "live" ? "Review live account access" : "Select a demo account",
+      description: selected
+        ? `Account #${selected.ctid} selected (${selected.mode}).`
+        : "Connect cTrader and choose the account to use.",
+      href: selected ? "/accounts" : "/connect",
+      complete: Boolean(selected),
+    },
+    {
+      id: "start",
+      title: "Start automation",
+      description: running?.state === "running"
+        ? "Automation is running; the dashboard shows its current state."
+        : "Starting is deliberate and happens from the automation panel.",
+      href: "#automation",
+      complete: running?.state === "running",
+    },
+  ];
+
+  const accountSummary = selected
+    ? `${selected.mode === "demo" ? "Demo" : "Live"} account #${selected.ctid} is selected. The server controls whether automation can start.`
+    : account?.connected
+      ? "cTrader is connected, but no account is selected yet."
+      : "Connect cTrader before choosing an account.";
+
   /**
    * Choosing which connected account to use.
    *
@@ -187,6 +244,8 @@ export default function Dashboard() {
 
       <OverviewBand tiles={overview} />
 
+      <GuidedSetup steps={setupSteps} accountSummary={accountSummary} />
+
       <div className="workspace">
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
 
@@ -203,7 +262,7 @@ export default function Dashboard() {
           <PendingApproval />
 
           {/* ── 1 + 2: which account, and is it running ─────────────── */}
-          <section className="card">
+          <section className="card" id="automation">
             <div className="card-head">
               <h2>Automation</h2>
               <span className="btn-row">
