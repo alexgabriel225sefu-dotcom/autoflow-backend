@@ -39,6 +39,7 @@ Last update: 2026-11-01 (second update). Everything below is what was observed o
 | Issue #13 queue how-to | Draft PR #87 from `claude/issue-13-queue-howto`; docs only; `run_all.py` 254/254 |
 | Issue #70 erasure coverage | Draft PR #90: Redis-path erasure test and key-kind coverage; `run_all.py` 255/255; CI green. Finding: `billing:review` records are not erased, owner decision in #89 |
 | Issue #71 operator list | Draft PR #91: `check_runtime_env.py` row, tests, `OWNER_ACTIONS.md` section D; `run_all.py` 254/254; CI pending |
+| Issue #92 trades data (owner approved in chat, 2026-11-01) | Draft PR #95: `GET /trades`, `daily` and `equity` series on `/trades` and `/performance`; `run_all.py` 255/255; CI pending |
 | PR #15 Codex L1 live ledger | Draft, **do not merge**, now conflicts with the platform branch. Owner decision |
 | PR #6, #5 (to `main`) | Owner only; not touched |
 
@@ -49,6 +50,8 @@ Last update: 2026-11-01 (second update). Everything below is what was observed o
 | #69 smoke-test SL/TP with the order on a real demo account | owner places trades | P1: the change is live on the owner's demo and was never seen against cTrader |
 | #67 persist the position snapshot before the send | claude | `needs-owner`: order path |
 | #68 re-read the lease at send time on live | claude | `needs-owner`: order path |
+| #93 Trades page and chart replay | codex | web; builds on PR #95; Codex starts it manually |
+| #94 P&L overview (today, week, month, equity curve) | codex | web; builds on PR #95; Codex starts it manually |
 | #89 decide whether erasure and export cover `billing:review` records | owner, then claude | `needs-owner`: payment records, legal retention |
 | #72 tests for orders/live/license pages, menu focus | codex | `ready`; low; Codex starts it manually (protocol section 9) |
 
