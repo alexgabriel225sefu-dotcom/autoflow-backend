@@ -292,6 +292,13 @@ def _deal_rows(broker, days):
         "closedAt": row.get("closedAt"),
         "strategyId": row.get("strategyId"),
         "positionId": row.get("positionId"),
+        # When the opening deal was inside the window the connector read. Absent
+        # (None) otherwise: a start time is never estimated.
+        "openedAt": row.get("openedAt"),
+        "durationS": row.get("durationS"),
+        "gross": row.get("grossPnl"),
+        "swap": row.get("swap"),
+        "commission": row.get("commissionUsd"),
     } for row in raw.values()]
 
 

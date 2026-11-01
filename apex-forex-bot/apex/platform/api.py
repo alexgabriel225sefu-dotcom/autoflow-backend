@@ -44,6 +44,7 @@ from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
 from apex.platform import notifications as _notify
 from apex.platform import performance_read as _perfread
+from apex.platform import trades_read as _tradesread
 from apex.platform import preview as _preview
 from apex.platform import linklog as _log
 from apex.platform import candle_coalesce as _candle_coalesce
@@ -808,6 +809,14 @@ def _dispatch(method, route, headers, body, query=None):
         return _ok(_perfread.read(p.user_id, period=q.get("period") or "all",
                                   mode=q.get("mode") or "demo",
                                   ctid=q.get("accountId") or None))
+
+    # ── trades (closed, one row each, with the curve they make) ─────────
+    if route == "trades" and method == "GET":
+        p = _authenticate(headers)
+        q = query or {}
+        return _ok(_tradesread.read(p.user_id, days=q.get("days", 30),
+                                    mode=q.get("mode") or "demo",
+                                    ctid=q.get("accountId") or None))
 
     # ── journal ─────────────────────────────────────────────────────────
     if route == "journal" and method == "GET":

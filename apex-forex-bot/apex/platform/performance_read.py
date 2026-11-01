@@ -39,6 +39,7 @@ import math
 from datetime import datetime, timedelta
 
 from apex import performance as _perf
+from apex.platform import pnl_series
 
 PERIODS = ("today", "week", "month", "all")
 MODES = ("demo", "live", "all")
@@ -131,6 +132,9 @@ def _deal_to_row(deal, journal_by_pos, acct_mode):
         "entry": deal.get("entry"), "exit": deal.get("exit"),
         "netPnl": deal.get("net"),
         "positionId": pid,
+        # Unix seconds, kept beside the journal-style text time so the curve is
+        # bucketed by UTC day from the broker's own timestamp.
+        "closedAt": deal.get("closedAt"),
         "strategyId": (j or {}).get("strategyId"),
         "slPips": (j or {}).get("slPips"),
         "mode": acct_mode,
@@ -214,6 +218,10 @@ def read(user_id, *, period="all", mode="demo", ctid=None, deals_reader=None,
         if mode != "all" else []
     chosen = in_period if mode == "all" else [r for r in in_period if _mode_of(r) == mode]
     attributed = sum(1 for r in chosen if r.get("_attributed"))
+    # The curve is drawn only from rows that carry the broker's close time.
+    # Older journal-only rows have a server-local text time and no UTC second,
+    # so they are counted as unusable instead of being given a day.
+    series = pnl_series.build(chosen)
 
     return {
         "status": "ok", "period": period, "mode": mode,
@@ -229,5 +237,9 @@ def read(user_id, *, period="all", mode="demo", ctid=None, deals_reader=None,
                    "attributed": attributed,
                    "unattributed": len(chosen) - attributed},
         "journalTrades": len(journal),
+        "daily": series["daily"],
+        "equity": series["equity"],
+        "currency": None,
+        "seriesExcluded": series["excluded"],
         "note": NOTE,
     }
