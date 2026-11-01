@@ -44,21 +44,63 @@ def _read(user_id):
     return raw if isinstance(raw, dict) else None
 
 
+def _is_operator(user_id):
+    """Whether this id is on the operator list.
+
+    The list lives in live_gate and is the same check the approval routes
+    use. Imported here, inside the function, because live_gate imports this
+    module. A failure to ask is not a yes.
+    """
+    try:
+        from apex.platform.live_gate import is_operator
+    except Exception:                                        # noqa: BLE001
+        return False
+    try:
+        return bool(is_operator(user_id))
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
+def _as_licensed(status):
+    """The same record, read as an active licence.
+
+    The stored plan is kept, so an operator does not become a paid-live
+    entitlement by being an operator. A past expiry is dropped from this
+    answer so a screen does not count down a trial that no longer binds
+    them. Nothing is written.
+    """
+    out = dict(status)
+    out["state"] = ACTIVE
+    if status.get("state") != ACTIVE:
+        out["expiresAt"] = None
+    return out
+
+
 def status_for(user_id, *, now=None):
-    """The client's entitlement. Never raises; never invents an active one."""
+    """The client's entitlement. Never raises.
+
+    A missing record is NONE, and a lapsed one is EXPIRED. An operator, the
+    id on A4T_OPERATOR_USER_IDS, is reported ACTIVE. That is the licence
+    check only: the live gate, the release switch and the risk limits do
+    not read this as permission to trade real money.
+    """
     now = time.time() if now is None else now
     rec = _read(str(user_id))
     if not rec:
-        return {"state": NONE, "expiresAt": None, "plan": None}
-    state = rec.get("state") or NONE
-    exp = rec.get("expiresAt")
-    # An expired record is reported EXPIRED rather than rewritten here. A read
-    # that silently mutates storage turns a dashboard refresh into a write,
-    # and makes the record's history depend on who looked at it.
-    if state == ACTIVE and exp is not None and float(exp) <= now:
-        state = EXPIRED
-    return {"state": state, "expiresAt": exp, "plan": rec.get("plan"),
-            "maskedKey": rec.get("maskedKey")}
+        status = {"state": NONE, "expiresAt": None, "plan": None}
+    else:
+        state = rec.get("state") or NONE
+        exp = rec.get("expiresAt")
+        # An expired record is reported EXPIRED rather than rewritten here. A
+        # read that silently mutates storage turns a dashboard refresh into a
+        # write, and makes the record's history depend on who looked at it.
+        if state == ACTIVE and exp is not None and float(exp) <= now:
+            state = EXPIRED
+        status = {"state": state, "expiresAt": exp, "plan": rec.get("plan"),
+                  "maskedKey": rec.get("maskedKey")}
+    if _is_operator(user_id):
+        return _as_licensed(status)
+    return status
 
 
 def require(user_id, *, now=None):
