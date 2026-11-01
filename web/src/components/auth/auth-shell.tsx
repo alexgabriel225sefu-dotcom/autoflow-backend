@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLockup, BrandMark } from "@/components/brand/logo";
+import styles from "./auth-shell.module.css";
 
 /**
  * The frame of every sign-in screen: the form on the calm surface, the product
@@ -15,7 +16,13 @@ export function AuthShell({
   title, lead, children, footer,
 }: { title: string; lead?: string; children: ReactNode; footer?: ReactNode }) {
   return (
-    <main className="a4t auth-split">
+    <main className={`a4t auth-split ${styles.shell}`}>
+      {/* Slow-drifting glows behind the form column. Decoration only. */}
+      <div className={styles.backdrop} aria-hidden="true">
+        <span className={`${styles.glow} ${styles.g1}`} />
+        <span className={`${styles.glow} ${styles.g2}`} />
+        <span className={`${styles.glow} ${styles.g3}`} />
+      </div>
       <section className="auth-main">
         <Link href="/" className="auth-logo" aria-label="Apex4Traders — home">
           <BrandLockup size={24} />
@@ -29,7 +36,7 @@ export function AuthShell({
           <p className="auth-hero-kicker">YOUR RULES · YOUR BROKER</p>
           <p className="auth-hero-head">Trade like you planned&nbsp;to.</p>
         </div>
-        <div className="auth-block">
+        <div className={`auth-block ${styles.block}`}>
           <h1>{title}</h1>
           {lead ? <p className="auth-lead">{lead}</p> : null}
           {children}

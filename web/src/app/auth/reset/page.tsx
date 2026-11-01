@@ -1,5 +1,6 @@
 "use client";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthSubmit } from "@/components/auth/auth-submit";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -42,9 +43,7 @@ export default function ResetPage() {
                    onChange={(e) => setEmail(e.target.value)} />
           </label>
           {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-          <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
-            {busy ? "Sending…" : "Send reset link"}
-          </button>
+          <AuthSubmit busy={busy} idle="Send reset link" busyLabel="Sending…" />
         </form>
       )}
     </AuthShell>

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordField } from "@/components/auth/password-field";
+import { AuthSubmit } from "@/components/auth/auth-submit";
 import { GoogleButton } from "@/components/auth/google-button";
 import { ResendConfirmation } from "@/components/auth/resend-confirmation";
 
@@ -77,16 +79,10 @@ export default function SignUpPage() {
           <input type="email" required value={email} autoComplete="email"
                  onChange={(e) => setEmail(e.target.value)} />
         </label>
-        <label className="field">
-          <span>Password</span>
-          <input type="password" required minLength={8} value={password}
-                 autoComplete="new-password"
-                 onChange={(e) => setPassword(e.target.value)} />
-        </label>
+        <PasswordField label="Password" value={password} onChange={setPassword}
+                       autoComplete="new-password" minLength={8} />
         {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-        <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
-          {busy ? "Creating…" : "Create account"}
-        </button>
+        <AuthSubmit busy={busy} idle="Create account" busyLabel="Creating…" />
       </form>
       <p className="muted" style={{ fontSize: ".8rem", marginTop: "1.2rem" }}>
         Apex4Traders executes rules you configure on a cTrader account you
