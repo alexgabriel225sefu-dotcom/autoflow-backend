@@ -93,9 +93,14 @@ _real_all = user_store.all_active
 _real_is_platform = CTL.is_platform_account
 _real_read = AUTO._read
 _real_is_running = user_loop.is_running
+_real_stop = user_loop.stop
+_real_write = AUTO._write
+_real_lic = AUTO._licence_active
 try:
     user_store.all_active = lambda: [PLATFORM_USER, TELEGRAM_USER]
     CTL.is_platform_account = lambda uid: str(uid) == PLATFORM_USER
+    # Revival is only for an active licence. This user stands in for one.
+    AUTO._licence_active = lambda uid: True
     AUTO._read = lambda uid: {"state": AUTO.RUNNING, "ruleDocId": "rule-1"}
     user_loop.is_running = lambda uid: False          # the process restarted
     AUTO.start = lambda uid, rid, **kw: calls.append((str(uid), rid, kw))
@@ -162,9 +167,28 @@ try:
     check("but a normal start of a second rule still IS refused",
           got2 == "ALREADY_RUNNING", str(got2))
 
+    print("\n[4c] a lapsed licence is marked blocked and is not started")
+    calls.clear()
+    stopped = []
+    written = []
+    AUTO._licence_active = lambda uid: False
+    user_loop.is_running = lambda uid: True
+    user_loop.stop = lambda uid: stopped.append(str(uid)) or True
+    AUTO._write = lambda uid, rec: written.append((str(uid), dict(rec))) or rec
+    AUTO.start = lambda *a, **k: calls.append("start")
+    alive, revived = AUTO.supervise()
+    check("an unlicensed account is not started", not calls and revived == 0,
+          str(calls))
+    check("a loop that is still ticking is stopped",
+          stopped == [PLATFORM_USER], str(stopped))
+    check("the stored state is blocked, not running",
+          written and written[-1][1].get("state") == "blocked", str(written))
+    AUTO._licence_active = lambda uid: True
+
     print("\n[5] a refusal is survivable and does not stop the sweep")
     # A lapsed trial is the expected case over a weekend. It must refuse, say
     # why, and leave the record alone — not crash the supervisor.
+    user_loop.is_running = lambda uid: False
     AUTO._read = lambda uid: {"state": AUTO.RUNNING, "ruleDocId": "rule-1"}
     def _refuse(uid, rid, **kw):
         raise AUTO.AutomationRefused("NOT_ENTITLED", "the trial has ended")
@@ -174,10 +198,13 @@ try:
     check("and the sweep returned rather than raising", alive == 0)
 finally:
     AUTO.start = _real_start
+    AUTO._licence_active = _real_lic
+    AUTO._write = _real_write
     user_store.all_active = _real_all
     CTL.is_platform_account = _real_is_platform
     AUTO._read = _real_read
     user_loop.is_running = _real_is_running
+    user_loop.stop = _real_stop
 
 # ── 6. the supervisor is not silent when healthy ────────────────────────────
 # The first version printed only on boot and on a revival, so a healthy cycle

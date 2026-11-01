@@ -192,6 +192,10 @@ CTL.is_platform_account = lambda uid: True
 user_store.all_active = lambda: [PU]
 user_loop.is_running = lambda uid: False
 AUTO._read = lambda uid: {"state": AUTO.RUNNING, "ruleDocId": "r1"}
+# These cases are about revival alerts. The account is treated as licensed;
+# an unlicensed RUNNING record is blocked before start(), and that path is
+# covered in test_platform_weekend_and_truth.py.
+AUTO._licence_active = lambda uid: True
 
 sent = []
 A._default_sender = lambda url, body, timeout: sent.append(body)

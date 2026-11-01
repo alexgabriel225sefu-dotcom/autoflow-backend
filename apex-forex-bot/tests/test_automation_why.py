@@ -45,6 +45,9 @@ from apex.platform import automation as AU                  # noqa: E402
 from apex.platform import emergency as EM                   # noqa: E402
 
 USER = "why-user"
+# These cases are about which reason wins, so the account is licensed.
+# A lapsed licence is its own case further down.
+AU._licence_active = lambda uid: True
 
 
 def put(state, level="full"):
@@ -79,6 +82,11 @@ check("paused is its own reason", ask()["reason"] == "paused")
 put(AU.RUNNING, "full")
 check("running + loop alive + market open = watching",
       ask()["reason"] == "watching", ask()["reason"])
+AU._licence_active = lambda uid: False
+check("a lapsed licence is blocked before it is called watching",
+      ask()["reason"] == "blocked" and "licence" in ask()["summary"],
+      ask()["reason"])
+AU._licence_active = lambda uid: True
 check("market closed is named when that is all there is",
       ask(market=False)["reason"] == "market_closed")
 r = ask(dash={"openPosition": {"symbol": "EURUSD"}, "maxpos": 1})

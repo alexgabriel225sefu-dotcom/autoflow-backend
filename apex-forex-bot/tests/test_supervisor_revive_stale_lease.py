@@ -77,6 +77,7 @@ _names = ("claim_value", "release_claim", "renew_claim", "get_blob", "load",
 _orig_us = {n: getattr(user_store, n) for n in _names}
 _orig = {
     "start": AUTO.start, "_read": AUTO._read,
+    "_licence_active": AUTO._licence_active,
     "is_platform_account": CTL.is_platform_account,
     "_loop": user_loop._loop, "_entitled": user_loop._entitled,
     "_alert_fn_for": user_loop._alert_fn_for,
@@ -95,6 +96,9 @@ try:
     user_store.all_active = lambda: [UID]
     CTL.is_platform_account = lambda uid: True
     AUTO._read = lambda uid: {"state": AUTO.RUNNING, "ruleDocId": "rule-1"}
+    # Revival is for a licensed account. An unlicensed record is blocked
+    # and is not started; that is a different test.
+    AUTO._licence_active = lambda uid: True
     user_loop._loop = lambda *a, **k: None          # the thread body
     user_loop._entitled = lambda uid: True
     user_loop._alert_fn_for = lambda uid, fn: None
@@ -168,6 +172,7 @@ try:
 finally:
     AUTO.start = _orig["start"]
     AUTO._read = _orig["_read"]
+    AUTO._licence_active = _orig["_licence_active"]
     CTL.is_platform_account = _orig["is_platform_account"]
     user_loop._loop = _orig["_loop"]
     user_loop._entitled = _orig["_entitled"]

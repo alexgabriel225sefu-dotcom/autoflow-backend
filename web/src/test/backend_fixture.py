@@ -91,8 +91,25 @@ from apex.platform import licence  # noqa: E402
 from apex import user_loop, user_store  # noqa: E402
 
 # The engine is not started for real: this test is about the web layer, and a
-# live trading loop has no business inside it.
-user_loop.start = lambda uid, alert_fn=None: True
+# live trading loop has no business inside it. The flag is still set, because
+# the status the browser reads is the in-process loop, not the stored word
+# RUNNING. A stub that returns success and leaves the registry empty would
+# make a successful start look stopped.
+def _mark_loop_running(uid, alert_fn=None):
+    with user_loop._lock:
+        user_loop._loops[str(uid)] = {"running": True, "gen": 1, "dash": {}}
+    return True
+
+
+def _mark_loop_stopped(uid):
+    with user_loop._lock:
+        entry = user_loop._loops.get(str(uid))
+        if entry is not None:
+            entry["running"] = False
+    return True
+
+
+user_loop.start = _mark_loop_running
 
 # The broker, standing in for cTrader's account list.
 #
@@ -108,7 +125,7 @@ from apex.brokers import ctrader as _ct_broker  # noqa: E402
 
 _ct_broker.list_accounts = lambda token: [{"ctid": 501, "live": False},
                                           {"ctid": 502, "live": True}]
-user_loop.stop = lambda uid: None
+user_loop.stop = _mark_loop_stopped
 
 # The BROKER is stubbed too, and only the broker. get_candles has no paper
 # short-circuit the way get_all_positions does — trendbars are public market

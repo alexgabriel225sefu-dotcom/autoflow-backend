@@ -80,6 +80,12 @@ export function plainAutomation(
           : "Activate a rule first, then start it.",
         tone: "neutral",
       };
+    case "blocked":
+      return {
+        label: "Automation blocked",
+        detail: "It is not running. The licence is not active.",
+        tone: "short",
+      };
     default:
       // Unknown, because the read has not come back — not "stopped".
       return { label: state ? String(state) : "Unknown", tone: "neutral" };

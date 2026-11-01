@@ -107,10 +107,15 @@ export function StatusBar({
           tone={running.state === "running" ? "accent" : "neutral"}
           live={running.state === "running"}
           label="Automation"
-          value={running.state.toUpperCase()}
-          title={running.levelBlurb ?? undefined}
+          value={running.state === "blocked" ? "BLOCKED" : running.state.toUpperCase()}
+          title={running.blockReason ?? running.levelBlurb ?? undefined}
         />
       )}
+      {running?.marketMessage ? (
+        <span className="stat-chip" title={running.marketMessage}>
+          <span>{running.marketMessage}</span>
+        </span>
+      ) : null}
 
       {/* WHAT "RUNNING" MEANS. The three engine levels differ by whether a
           setup becomes an order, and this strip showed the same RUNNING for

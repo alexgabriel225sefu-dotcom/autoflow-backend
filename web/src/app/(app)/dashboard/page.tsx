@@ -105,7 +105,7 @@ export default function Dashboard() {
   // refresh on different clocks.
   const liveCleared = gateCleared(execution);
   const liveCopy = liveNotice(execution);
-  const runningThis = running && running.state !== "stopped";
+  const runningThis = running?.state === "running" || running?.state === "paused";
 
   // The first-glance tiles. Each is derived from a read the page makes anyway,
   // and each is null until that read answers — see OverviewBand.
@@ -119,8 +119,9 @@ export default function Dashboard() {
     },
     {
       label: "State",
-      value: running ? { running: "Running", paused: "Paused", stopped: "Stopped" }[running.state] : null,
-      note: running && running.state !== "stopped" ? running.levelLabel ?? null : null,
+      value: running ? { running: "Running", paused: "Paused", stopped: "Stopped", blocked: "Blocked" }[running.state] : null,
+      note: running?.blockReason
+        ?? (running && running.state !== "stopped" && running.state !== "blocked" ? running.levelLabel ?? null : null),
       tone: running?.state === "running" ? "long" : "neutral",
     },
     {
@@ -227,6 +228,13 @@ export default function Dashboard() {
                 The server has always reported the days left; until this was
                 here, nothing in the browser read them, so the free period
                 ran out without the client ever seeing it count down. */}
+            {running?.marketMessage ? (
+              <p className="notice" role="status">{running.marketMessage}</p>
+            ) : null}
+            {running?.blockReason ? (
+              <p className="notice notice-warn" role="status">{running.blockReason}</p>
+            ) : null}
+
             <TrialNotice execution={execution} />
 
             {/* What this release costs and what it cannot do, in the
