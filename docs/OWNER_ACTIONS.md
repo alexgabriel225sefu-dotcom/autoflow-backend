@@ -140,3 +140,39 @@ Nothing here is drafted or filled in. In order:
 4. Only then consider live execution: a separate reviewed milestone
    (`docs/LIVE_EXECUTION_SPECIFICATION.md`, `docs/LIVE_LAUNCH_CHECKLIST.md`).
    `A4T_LIVE_EXECUTION` stays closed until that review.
+
+---
+
+## D. Reference: the operator list (`A4T_OPERATOR_USER_IDS`)
+
+A comma-separated list of Supabase user ids, set on the API service in Render.
+It is optional: unset is the normal state for everyone who is not the owner.
+
+What an id on the list gets:
+- **An active licence with no expiry.** The licence check reports it as
+  `active`; the stored record is not changed, its plan name is kept, and it does
+  not become a paid-live entitlement (`apex/platform/licence.py`).
+- **The operator routes** in `apex/platform/live_gate.py`: list and decide
+  live-access requests, record the published legal document versions, and grant
+  an operator licence to another user id (`POST live/licence/grant`). Plus the
+  read-only operator audit page.
+
+What it does **not** do: it does not open live trading. `A4T_LIVE_EXECUTION`,
+`APEX_ALLOW_LIVE_ACCOUNTS`, the release switch and the live gate are separate
+and are not read as permission by the licence check.
+
+Things to know before changing it:
+- **Setting the variable replaces the whole value.** Read the current value in
+  the Render dashboard first and keep every id that should stay.
+- A change redeploys the API, which restarts the loops (about 3 minutes; see
+  the deploy-window notes in `docs/PRODUCTION_RUNBOOK.md`).
+- Use the Supabase **user id**, never an e-mail address. Your own is
+  `user.userId` in `GET /api/v1/me`, or Authentication, Users in Supabase. An
+  entry that is not an id never matches anyone, and the check below flags it.
+- A loop that was marked blocked while the licence had lapsed does not start by
+  itself: press Start on the Trade page after the licence is active again.
+
+Check it with `python3 scripts/check_runtime_env.py` (from `apex-forex-bot/`):
+the variable shows as `OK` (at least one id), `SKIPPED` (unset, not an error) or
+`UNSAFE` (an entry that is not a user id). The output names the variable and
+never prints an id.
