@@ -12,6 +12,7 @@ import { fireStartConfetti } from "@/components/app/start-confetti";
 import { AUTOMATION_LEVELS } from "@/components/app/plain";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { SegmentedControl } from "@/components/app/segmented";
+import { SetupSummary } from "@/components/app/setup-summary";
 import { CurrencyTicker } from "@/components/app/currency-ticker";
 import { groupByFamily } from "../rules/new/strategy/catalog";
 import { StrategyStep } from "./strategy-step";
@@ -139,6 +140,30 @@ export default function TradePage() {
     levelLabel,
     c.account === "live" ? "Live" : c.account === "demo" ? "Demo" : null,
   ].filter(Boolean).join(" · ");
+
+  const startControl = (
+    <>
+      {action.kind === "demo" || action.kind === "live" ? (
+          <ConfirmAction
+            label={action.label}
+            question={action.kind === "live"
+              ? `Start on LIVE account #${action.accountId}? Real money moves.`
+              : `Start on demo account #${action.accountId}?`}
+            onConfirm={go}
+            busyLabel="Starting…"
+            disabled={!!stepBlock(2, c) || !!running || !c.symbol}
+            disabledReason={running
+              ? "Automation is already running. Stop it from the dashboard before starting another."
+              : stepBlock(2, c) ?? undefined}
+            danger={action.kind === "live"}
+          />
+        ) : action.kind === "live_closed" ? (
+          <Link className="btn" href={action.href}>{action.label}</Link>
+        ) : (
+          <Link className="btn" href="/connect">{action.label}</Link>
+        )}
+    </>
+  );
 
   return (
     <main className="trade">
@@ -381,6 +406,10 @@ export default function TradePage() {
       {step === 4 ? (
         <section className="card" aria-labelledby="t-review">
           <div className="card-head"><h2 id="t-review"><span className="step-no">5</span> Review</h2></div>
+          <SetupSummary choice={c}
+            accountId={action.kind === "demo" || action.kind === "live" ? action.accountId : null}>
+            {startControl}
+          </SetupSummary>
           <dl className="trade-note">
             <div><dt>Symbols</dt><dd>{[c.symbol, ...c.also].filter(Boolean).join(", ") || "—"}</dd></div>
             <div><dt>Timeframe</dt><dd>{c.timeframe}</dd></div>
@@ -423,24 +452,7 @@ export default function TradePage() {
           {step < 4 ? (
             <button type="button" className="btn" disabled={!!block}
                     onClick={() => setStep((n) => n + 1)}>Continue</button>
-          ) : action.kind === "demo" || action.kind === "live" ? (
-            <ConfirmAction
-              label={action.label}
-              question={action.kind === "live"
-                ? `Start on LIVE account #${action.accountId}? Real money moves.`
-                : `Start on demo account #${action.accountId}?`}
-              onConfirm={go}
-              disabled={!!stepBlock(2, c) || !!running || !c.symbol}
-              disabledReason={running
-                ? "Automation is already running. Stop it from the dashboard before starting another."
-                : stepBlock(2, c) ?? undefined}
-              danger={action.kind === "live"}
-            />
-          ) : action.kind === "live_closed" ? (
-            <Link className="btn" href={action.href}>{action.label}</Link>
-          ) : (
-            <Link className="btn" href="/connect">{action.label}</Link>
-          )}
+          ) : null}
         </span>
         {step < 4 && block ? <span className="muted" style={{ fontSize: ".8rem" }}>{block}</span> : null}
       </div>
