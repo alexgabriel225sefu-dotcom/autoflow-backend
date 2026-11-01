@@ -1,0 +1,23 @@
+@property --a4t-ray-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.ray {
+  position: absolute; inset: -1px; border-radius: inherit; padding: 2px;
+  pointer-events: none; z-index: 1;
+  background: conic-gradient(
+    from var(--a4t-ray-angle),
+    transparent 0deg, transparent 250deg,
+    color-mix(in srgb, var(--a4t-accent) 30%, transparent) 310deg,
+    var(--a4t-accent) 355deg, transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: ray-turn 3.6s linear infinite;
+}
+@keyframes ray-turn { to { --a4t-ray-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .ray { animation: none; background: var(--a4t-accent); }
+}

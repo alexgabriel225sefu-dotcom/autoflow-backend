@@ -14,6 +14,7 @@
 import { Activity, Plug, ShieldCheck } from "lucide-react";
 import type { AutomationState, CtraderStatus, Me } from "@/lib/api";
 import type { ApiResult } from "@/lib/api";
+import { ShimmerText } from "@/components/ui/shimmer-text";
 
 type Tone = "long" | "short" | "accent" | "neutral";
 
@@ -125,6 +126,7 @@ export function StatusBar({
           label="Automation"
           value={marketIdle ? "MARKET CLOSED"
             : running.state === "blocked" ? "BLOCKED"
+            : running.state === "running" ? <ShimmerText>RUNNING</ShimmerText>
             : running.state.toUpperCase()}
           title={marketIdle
             ? (running.marketMessage ?? "The market is closed, so the loop is idle.")
