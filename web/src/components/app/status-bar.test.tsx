@@ -210,4 +210,18 @@ describe("the Risk Guard chip", () => {
   it("is not invented when the server sent no guard block", () => {
     expect(text(running(undefined))).not.toContain("Risk Guard");
   });
+
+  it("shows the weekend sentence the server sent, and not a running loop", () => {
+    const t = text({
+      ok: true,
+      data: {
+        state: "blocked",
+        blockReason: "the licence is not active, so automation is not running",
+        marketMessage: "Market closed (weekend), reopens Sun 22:00 UTC",
+      } as unknown as AutomationState,
+    });
+    expect(t).toContain("BLOCKED");
+    expect(t).not.toContain("RUNNING");
+    expect(t).toContain("Market closed (weekend), reopens Sun 22:00 UTC");
+  });
 });

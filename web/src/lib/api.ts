@@ -803,8 +803,8 @@ export type EmergencyResult = {
  *  "the loop had no reason" — the screen words it accordingly. */
 export type WhyRead = {
   status: "ok";
-  state: "stopped" | "running" | "paused";
-  reason: "halted" | "paused" | "stopped" | "loop_inactive" | "level_no_orders"
+  state: "stopped" | "running" | "paused" | "blocked";
+  reason: "halted" | "paused" | "stopped" | "blocked" | "loop_inactive" | "level_no_orders"
     | "position_open" | "market_closed" | "watching" | "risk_holding";
   riskGuard: RiskGuard;
   summary: string;
@@ -825,7 +825,11 @@ export type WhyRead = {
 export type RiskGuard = { state: "ok" | "holding" | "unknown"; reasons: string[] };
 
 export type AutomationState = {
-  state: "stopped" | "running" | "paused";
+  state: "stopped" | "running" | "paused" | "blocked";
+  /** Why the chip is not RUNNING. Set when the stored record was stale. */
+  blockReason?: string | null;
+  /** The weekend sentence, present only while the forex week is shut. */
+  marketMessage?: string | null;
   ruleDocId: string | null; mode: "demo" | null; startedAt: number | null;
   /** WHAT "RUNNING" MEANS, which the state on its own does not say.
    *

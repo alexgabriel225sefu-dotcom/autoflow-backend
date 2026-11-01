@@ -98,16 +98,19 @@ def _running_rule(user_id):
         return None, ("this market frame carries no account id, so the rule "
                       "running on the account cannot be looked up — holding "
                       "rather than trading something nobody configured")
+    # The stored record, not the screen's overlay. The chip says stopped when
+    # the thread is gone; this function is how the thread, while it is alive,
+    # finds the rule it was started with.
     try:
-        state = _automation.status(user_id)
+        rec = _automation._read(user_id)
     except Exception as e:                                   # noqa: BLE001
         return None, (f"the automation state for this account could not be "
                       f"read ({type(e).__name__}), so the running rule is "
                       f"unknown — holding")
-    if state.get("state") != _automation.RUNNING:
-        return None, (f"automation is {state.get('state')!r} for this "
+    if rec.get("state") != _automation.RUNNING:
+        return None, (f"automation is {rec.get('state')!r} for this "
                       f"account, not running, so there is no rule to act on")
-    rule_doc_id = state.get("ruleDocId")
+    rule_doc_id = rec.get("ruleDocId")
     if not rule_doc_id:
         return None, ("automation is running but names no rule document, "
                       "which is a state nothing should be able to reach — "

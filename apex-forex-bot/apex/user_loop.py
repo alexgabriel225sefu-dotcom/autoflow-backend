@@ -2349,7 +2349,14 @@ def _loop(user_id, alert_fn, gen=None):
                 pass
             break
         try:
-            if not forex.is_market_open():
+            if not forex.is_market_open() or _weekend_orders_paused():
+                # Closed week: wait. Do not place, and do not raise — the
+                # market being shut is not a fault.
+                time.sleep(60)
+                continue
+            if _platform_unlicensed(user_id):
+                # The licence lapsed under a loop that is still alive. Idle
+                # until the supervisor marks it blocked. Do not place.
                 time.sleep(60)
                 continue
 
@@ -5282,6 +5289,39 @@ def _start_fence_required(user_id):
     if mode in ("demo", "simulation"):
         return False, f"a {mode} account"
     return prod, "an account whose mode cannot be read"
+
+
+def _weekend_orders_paused():
+    """True when the forex week is shut. Unreadable means paused.
+
+    A closed market is not an error. Failing closed here means the loop
+    waits instead of sending an order it cannot know is allowed.
+    """
+    try:
+        from apex.platform.weekend import weekend_closed
+        return bool(weekend_closed())
+    except Exception:                                        # noqa: BLE001
+        return True
+
+
+def _platform_unlicensed(user_id):
+    """True when this is a platform account whose licence is not active.
+
+    Operators are active: `licence.status_for` says so. A Telegram account
+    is not this check. Unreadable for a known platform account means do not
+    place.
+    """
+    try:
+        from apex.platform import ctrader_link as _cl
+        if not _cl.is_platform_account(user_id):
+            return False
+    except Exception:                                        # noqa: BLE001
+        return False
+    try:
+        from apex.platform import licence as _lic
+        return _lic.status_for(user_id).get("state") != _lic.ACTIVE
+    except Exception:                                        # noqa: BLE001
+        return True
 
 
 def start(user_id, alert_fn=None):

@@ -72,7 +72,8 @@ check("...and persists the cleared value",
       is not None,
       "clearing it in memory only would come back on the next restart")
 check("it is checked after the market-open guard, not before",
-      SRC.index("if not forex.is_market_open():") < SRC.index("if _clear_stale_streak():"),
+      SRC.index("if not forex.is_market_open() or _weekend_orders_paused():")
+      < SRC.index("if _clear_stale_streak():"),
       "no point rolling the day over while the market is shut")
 
 print("\n2b. What it clears at STARTUP is written down too")

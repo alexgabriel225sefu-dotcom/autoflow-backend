@@ -564,7 +564,15 @@ try:
     # account is already in flight" — a sentence that was simply untrue.
     AU.pause(USER)
     _lock_calls.clear()
-    resumed = AU.resume(USER, starter=lambda uid: True)
+    def _engine_accepts(uid):
+        # A start the engine accepted has a loop. The chip reads that, not
+        # only the stored word.
+        from apex import user_loop
+        with user_loop._lock:
+            user_loop._loops[str(uid)] = {"running": True, "gen": 1, "dash": {}}
+        return True
+
+    resumed = AU.resume(USER, starter=_engine_accepts)
     check("resume immediately after pause is accepted",
           resumed.get("state") == "running", str(resumed.get("state")))
     check("and it leaves no lock behind either", _locks == {}, str(_locks))
@@ -634,7 +642,7 @@ try:
           AU.status(USER).get("ruleDocId") == rid,
           str(AU.status(USER).get("ruleDocId")))
     # The proof that it is recoverable: the same call again, and it works.
-    again = AU.resume(USER, starter=lambda uid: True)
+    again = AU.resume(USER, starter=_engine_accepts)
     check("so resuming again works, instead of being stuck",
           again.get("state") == "running", str(again.get("state")))
     AU.stop(USER)

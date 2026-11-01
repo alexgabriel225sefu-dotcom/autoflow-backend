@@ -51,11 +51,16 @@ from apex.platform import notifications as _notify
 from apex.platform import ruledoc as _rd
 from apex.platform import signals as _signals
 from apex.platform import store as _store
+from apex.platform.weekend import CLOSED_MESSAGE as _WEEKEND_MESSAGE
 
 STOPPED = "stopped"
 RUNNING = "running"
 PAUSED = "paused"
-STATES = (STOPPED, RUNNING, PAUSED)
+BLOCKED = "blocked"
+STATES = (STOPPED, RUNNING, PAUSED, BLOCKED)
+LICENCE_BLOCK_REASON = (
+    "the licence is not active, so automation is not running")
+LOOP_DOWN_REASON = "the loop is not running"
 
 DEMO = "demo"
 LIVE = "live"
@@ -154,31 +159,67 @@ def risk_guard(user_id, *, reader=None):
 
 
 def _weekend_idle(reader=None):
-    """True while the loop sits out the weekend close window, None if unknown.
+    """True while forex is shut for the weekend, None if the clock cannot be read.
 
-    This is the loop's OWN condition (`market.is_weekend_close_window`), not a
-    general "is the market open" guess: inside that window the loop returns
-    to sleep before it reaches the point where it publishes a Risk Guard
-    report, so a loop revived over a weekend has nothing to show until the
-    market reopens. The dashboard needs to say THAT, not "no report yet",
-    which reads as a guard that has failed to start. Never raises, and None —
-    not False — when it cannot be read, so the chip falls back to the honest
-    "no report" wording rather than claiming a closed market it did not check.
+    The window is Friday 22:00 UTC through Sunday 22:00 UTC
+    (`apex.platform.weekend`). A caller may pass a reader; a test does.
+    Never raises. None — not False — when it cannot be read, so the chip
+    does not claim a closed market it did not check.
     """
     try:
         if reader is None:
-            from apex import market as _market
-            reader = _market.is_weekend_close_window
+            from apex.platform.weekend import weekend_closed
+            reader = weekend_closed
         return bool(reader())
     except Exception:                                        # noqa: BLE001
         return None
+
+
+def _licence_active(user_id):
+    """The licence check, including the operator exception in status_for.
+
+    Unreadable is not active. This never starts a loop.
+    """
+    try:
+        from apex.platform import licence as _lic
+        return _lic.status_for(user_id).get("state") == _lic.ACTIVE
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
+def _loop_alive(user_id):
+    try:
+        from apex import user_loop
+        return bool(user_loop.is_running(str(user_id)))
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
+def _truthful_state(user_id, rec):
+    """The state a screen may show. A stored RUNNING is not enough.
+
+    A licence that is not active (an operator's read counts as active) is
+    blocked. A loop that is not actually running is stopped. Neither answer
+    starts a loop.
+    """
+    stored = rec.get("state") or STOPPED
+    if stored == BLOCKED or (stored == RUNNING and not _licence_active(user_id)):
+        return BLOCKED, rec.get("blockReason") or LICENCE_BLOCK_REASON
+    if stored != RUNNING:
+        return stored, rec.get("blockReason")
+    if not _loop_alive(user_id):
+        return STOPPED, LOOP_DOWN_REASON
+    return RUNNING, None
 
 
 def status(user_id, *, weekend_reader=None):
     """Safe to hand a browser. Carries no token and no broker credential."""
     rec = _read(user_id)
     level = _level_of(rec)
-    return {"status": "ok", "state": rec.get("state", STOPPED),
+    shown, block_reason = _truthful_state(user_id, rec)
+    closed = _weekend_idle(weekend_reader)
+    return {"status": "ok", "state": shown,
+            "blockReason": block_reason,
             "ruleDocId": rec.get("ruleDocId"), "mode": rec.get("mode"),
             "startedAt": rec.get("startedAt"),
             "updatedAt": rec.get("updatedAt"),
@@ -211,8 +252,9 @@ def status(user_id, *, weekend_reader=None):
             # meaningful while a loop runs; the browser shows it then.
             "riskGuard": risk_guard(user_id),
             # Why that report may be absent without anything being wrong: the
-            # loop is idle for the weekend close window. See _weekend_idle.
-            "marketClosed": _weekend_idle(weekend_reader)}
+            # loop is idle for the weekend. See weekend.py.
+            "marketClosed": closed,
+            "marketMessage": _WEEKEND_MESSAGE if closed is True else None}
 
 
 def why(user_id, *, loop_reader=None, declines_reader=None,
@@ -223,6 +265,8 @@ def why(user_id, *, loop_reader=None, declines_reader=None,
     reasons applies, in order of how much each one explains:
 
       stopped / paused      the loop is not looking at all
+      blocked               the licence is not active (a stored RUNNING
+                            with a lapsed licence is this, not "watching")
       halted                an emergency stop is in force
       loop not active here  the platform says Running, this process is not
                             running a loop for the client (a restart: the
@@ -302,7 +346,8 @@ def why(user_id, *, loop_reader=None, declines_reader=None,
     try:
         if market_open is None:
             from apex import forex as _fx
-            out["marketOpen"] = bool(_fx.is_market_open())
+            from apex.platform.weekend import weekend_closed
+            out["marketOpen"] = bool(_fx.is_market_open()) and not weekend_closed()
         else:
             out["marketOpen"] = bool(market_open())
     except Exception:                                        # noqa: BLE001
@@ -322,6 +367,11 @@ def why(user_id, *, loop_reader=None, declines_reader=None,
     elif state == PAUSED:
         code, text = "paused", ("Automation is paused. It is not looking for "
                                 "setups until you resume it.")
+    elif state == BLOCKED or (state == RUNNING and not _licence_active(user_id)):
+        # A stored RUNNING whose licence has lapsed is not a running loop.
+        # Say so before any "marked as running" explanation.
+        code, text = "blocked", (rec.get("blockReason") or LICENCE_BLOCK_REASON)
+        out["state"] = BLOCKED
     elif state != RUNNING:
         code, text = "stopped", ("Automation is stopped, which is why "
                                  "nothing is happening. Start it from a "
@@ -348,8 +398,12 @@ def why(user_id, *, loop_reader=None, declines_reader=None,
             f"{lim} at a time. It looks for the next setup once this one "
             f"closes.")
     elif out["marketOpen"] is False:
-        code, text = "market_closed", ("The forex market is closed, so "
-                                       "there is nothing to act on.")
+        from apex.platform.weekend import weekend_closed
+        if weekend_closed():
+            code, text = "market_closed", _WEEKEND_MESSAGE
+        else:
+            code, text = "market_closed", ("The forex market is closed, so "
+                                           "there is nothing to act on.")
     else:
         code, text = "watching", (
             "It is on and watching. It only enters when a setup passes every "
@@ -1147,7 +1201,25 @@ def supervise(*, starter=None, mode_lister=None):
             continue
         rec = _read(uid)
         if rec.get("state") != RUNNING:
-            continue                    # stopped or paused on purpose
+            continue                    # stopped, paused, or blocked on purpose
+        # A stored RUNNING whose licence has lapsed is a lie on the dashboard.
+        # Correct the record and stop a loop that is still ticking. Do not
+        # start one: a lapsed licence is not consent to trade.
+        if not _licence_active(uid):
+            try:
+                if user_loop.is_running(uid):
+                    user_loop.stop(uid)
+            except Exception as e:                           # noqa: BLE001
+                print(f"[Automation] could not stop {uid} after the licence "
+                      f"lapsed ({type(e).__name__})")
+            blocked = dict(rec)
+            blocked["state"] = BLOCKED
+            blocked["blockReason"] = LICENCE_BLOCK_REASON
+            _write(uid, blocked)
+            _revive_failures.pop(uid, None)
+            print(f"[Automation] {uid} is not licensed — marked blocked, "
+                  f"not started")
+            continue
         if user_loop.is_running(uid):
             alive += 1
             _revive_failures.pop(uid, None)
