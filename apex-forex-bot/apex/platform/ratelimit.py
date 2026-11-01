@@ -173,7 +173,7 @@ def classify(method, route):
         # select and disconnect: they change which account automation would
         # act on, which is exactly what the control bucket is for.
         return "control"
-    if _CANDLES_RE.match(route) or route in ("symbols", "trade/min-lot"):
+    if _CANDLES_RE.match(route) or route in ("symbols", "trade/min-lot", "trades"):
         # Both are market-data reads that go to cTrader, whose limits are
         # shared across every client on a connection, so they share a budget.
         return "candles"
