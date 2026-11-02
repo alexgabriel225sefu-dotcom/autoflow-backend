@@ -47,7 +47,7 @@ Last update: 2026-11-01 (second update). Everything below is what was observed o
 
 | Issue | Agent | Note |
 |---|---|---|
-| #69 smoke-test SL/TP with the order on a real demo account | owner places trades | P1: the change is live on the owner's demo and was never seen against cTrader |
+| #69 smoke-test SL/TP with the order on a real demo account | owner places trades | P1: first demo entry 2026-11-02 03:17 UTC (XAUUSD SELL, SL 3924.84, TP 3858.18, risk 3.00%): logged, no alarm; broker-side stops not yet confirmed by the owner, EURUSD not tried |
 | #67 persist the position snapshot before the send | claude | `needs-owner`: order path |
 | #68 re-read the lease at send time on live | claude | `needs-owner`: order path |
 | #93 Trades page and chart replay | codex | web; builds on PR #95; Codex starts it manually |
