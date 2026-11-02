@@ -326,13 +326,30 @@ def may_trade(user_id, live):
         # a tick still finishing, or a request served in the last seconds, could
         # act while the replacement started to.
         return False, "SHUTTING_DOWN"
+    if live:
+        # A real-money order does NOT trust the local timestamp. `holds()` keeps
+        # answering "yes" for up to RENEW_EVERY_S after another container has
+        # taken the lease, which on a live account means two owners for that
+        # window. One GET at the moment of sending closes it; the renewer thread
+        # is then only a second line, not the one the order depends on.
+        try:
+            cur = user_store.get_blob(_key(str(user_id)))
+        except Exception as e:                      # unreadable is not "ours"
+            print(f"[Ownership] live lease read failed for {user_id}: {e}")
+            return False, "OWNERSHIP_UNKNOWN"
+        if cur is None:
+            return False, "OWNERSHIP_UNKNOWN"
+        if str(cur) == INSTANCE_ID:
+            return True, "OWNER"
+        with _lock:
+            _held.pop(str(user_id), None)           # what the next heartbeat would do
+        print(f"[Ownership] live order refused for {user_id} - lease held by {cur!r}")
+        return False, "NOT_OWNER"
     v = holds(user_id)
     if v is True:
         return True, "OWNER"
     if v is False:
         return False, "NOT_OWNER"
-    if live:
-        return False, "OWNERSHIP_UNKNOWN"
     return True, "OWNERSHIP_UNKNOWN_DEMO"
 
 
