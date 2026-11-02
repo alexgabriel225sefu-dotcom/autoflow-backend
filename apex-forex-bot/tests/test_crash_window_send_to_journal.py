@@ -369,6 +369,36 @@ try:
 finally:
     pass
 
+# ── 7. the autonomous loop has its own send; it follows the same rule ───────
+print("\n[7] the loop's own send writes its intent first (shipped source)")
+# `_loop` is one 3,000-line closure that cannot be driven without a live tick,
+# so, as the neighbouring tests do, this pins the shipped source: the order of
+# the steps and the branches that withdraw or keep the intent.
+_src = open(os.path.join(ROOT, "apex", "user_loop.py"), encoding="utf-8").read()
+_loop = _src.split("def _loop(", 1)[1].split("\nclass _StopBeforeSend", 1)[0]
+_i_send = _loop.index("_order_res = broker.place_order(")
+_i_intent = _loop.index('"pending": True')
+check("the pending intent is written BEFORE the loop's broker call", _i_intent < _i_send)
+check("it carries the original stop, which the broker cannot give back",
+      '"initialStop": sl_price' in _loop[_i_intent - 400:_i_intent + 100])
+_blk = _loop[_i_intent - 900:_i_send]
+check("a live order whose intent cannot be written is not sent",
+      "is False and _is_live_cfg(cfg)" in _blk and "raise _IntentNotRecorded()" in _blk)
+check("the not-recorded case is handled as 'not sent', not as a broker error",
+      "except _IntentNotRecorded:" in _loop)
+_after = _loop[_i_send:_i_send + 3000]
+check("a definite rejection puts the previous snapshot back",
+      "if not broker_result_ambiguous(oe):" in _after
+      and "_persist_open_snapshot(_prev_snap)" in _after)
+_sc = _loop[_loop.index('_order_res.get("status") == "SAFETY_CLOSED"'):]
+check("a safety close withdraws the intent",
+      "_persist_open_snapshot(_prev_snap)" in _sc[:2000])
+_up = _loop[_loop.index('_order_res.get("status") == "UNPROTECTED"'):]
+check("an unprotected fill is recorded WITHOUT a stop, not with the requested one",
+      '"stopLoss": None' in _up[:2000] and '"initialStop": None' in _up[:2000])
+check("the confirmed snapshot after a fill still overwrites the intent",
+      '_persist_open_snapshot({**open_pos, "symbol": symbol,' in _loop)
+
 # ── 6. the platform's live ledger ───────────────────────────────────────────
 print("\n[6] platform live ledger: outcome write lost after the send")
 from apex.platform import decision as D                     # noqa: E402

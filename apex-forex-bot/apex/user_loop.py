@@ -1851,7 +1851,7 @@ def _loop(user_id, alert_fn, gen=None):
         _persist_risk_state()
 
     def _persist_open_snapshot(pos):
-        _persist_open_position(user_id, cfg, pos)
+        return _persist_open_position(user_id, cfg, pos)
 
     def _with_initial_stop(pos, sym):
         """Re-persist a broker-read position without losing its original stop.
@@ -4796,6 +4796,7 @@ def _loop(user_id, alert_fn, gen=None):
                             pass
                         order_ok = True
                         _order_res = None
+                        _prev_snap = None
                         # Ownership, revalidated at the last possible moment.
                         # The lease is renewed on a timer, so between that
                         # renewal and this order another container may have
@@ -4877,14 +4878,43 @@ def _loop(user_id, alert_fn, gen=None):
                                                          "rid": _rid})
                                 except Exception as _e3:
                                     print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")
+                                # THE INTENT GOES ON RECORD BEFORE THE ORDER LEAVES
+                                # (same rule as `force_trade`; see there). A crash
+                                # between the send and the confirmed snapshot below
+                                # then leaves something for restart recovery to
+                                # adopt, with the original stop. A live order whose
+                                # intent cannot be written is not sent.
+                                try:
+                                    _prev_snap = (user_store.load(user_id) or {}).get(
+                                        "open_position_snapshot")
+                                except Exception:
+                                    _prev_snap = None
+                                if _persist_open_snapshot({
+                                        "side": action, "entryPrice": price,
+                                        "symbol": symbol, "units": units,
+                                        "stopLoss": sl_price, "takeProfit": tp_price,
+                                        "initialStop": sl_price,
+                                        "entrySpreadPips": spread,
+                                        "openedAt": now_str,
+                                        "pending": True}) is False and _is_live_cfg(cfg):
+                                    raise _IntentNotRecorded()
                                 _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
                                 ledger.record(_rid, _order_res)
                             except _StopBeforeSend:
                                 order_ok = False
                                 print(f"[UserLoop:{user_id}] stop requested - "
                                       f"{action} {symbol} was not sent")
+                            except _IntentNotRecorded:
+                                order_ok = False
+                                print(f"[UserLoop:{user_id}] {action} {symbol} not "
+                                      f"sent: the order intent could not be recorded")
                             except Exception as oe:
                                 order_ok = False
+                                # A definite rejection withdraws the intent; an
+                                # ambiguous answer keeps it so recovery asks the
+                                # broker.
+                                if not broker_result_ambiguous(oe):
+                                    _persist_open_snapshot(_prev_snap)
                                 # The claim stands. A submit that raised may
                                 # still have reached the broker, and retrying
                                 # in the next few seconds is exactly how one
@@ -4898,6 +4928,16 @@ def _loop(user_id, alert_fn, gen=None):
                             # fix it remotely — the client has to be told, now,
                             # and told exactly what to do.
                             order_ok = False
+                            # The intent written before the send says a stop was
+                            # asked for. There is none: record the position as
+                            # open WITHOUT one, as `force_trade` does, so the
+                            # management logic does not believe a stop is held.
+                            _persist_open_snapshot({
+                                "side": action, "entryPrice": _order_res.get("fillPrice") or price,
+                                "symbol": symbol, "units": units,
+                                "stopLoss": None, "takeProfit": tp_price,
+                                "initialStop": None, "entrySpreadPips": spread,
+                                "openedAt": now_str})
                             print(f"[UserLoop:{user_id}] {symbol} is OPEN AND "
                                   f"UNPROTECTED — alerting the client")
                             if alert_fn:
@@ -4912,6 +4952,7 @@ def _loop(user_id, alert_fn, gen=None):
                             # cycle on the same broken symbol every ~5min).
                             # Price and log it like any other closed trade.
                             order_ok = False
+                            _persist_open_snapshot(_prev_snap)   # withdraw the intent
                             entry_fill = _order_res.get("fillPrice") or price
                             exit_fill = _order_res.get("exitFillPrice") or entry_fill
                             gross = forex.pnl_usd(action, entry_fill, exit_fill, units, symbol)
@@ -5420,6 +5461,11 @@ def start(user_id, alert_fn=None):
 class _StopBeforeSend(Exception):
     """A stop was requested after an order was authorised and before it was
     sent. Nothing reached the broker."""
+
+
+class _IntentNotRecorded(Exception):
+    """The order's restart-recovery snapshot could not be written for a live
+    account, so nothing was sent."""
 
 
 # Order origins that are the AUTOMATION's own: a rule's setup and an approval
