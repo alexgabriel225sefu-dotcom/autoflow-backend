@@ -1118,11 +1118,16 @@ def _persist_open_position(user_id, cfg, pos):
     except Exception:
         pass
     if getattr(cfg, "PAPER_TRADING", False):
-        return
+        return True                 # a simulation has nothing to recover
     try:
-        user_store.update(user_id, {"open_position_snapshot": pos})
+        _ok = user_store.update(user_id, {"open_position_snapshot": pos})
     except Exception as e:
         print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
+        return False
+    # `update` answers False when the write did not land. Callers that do not
+    # care keep ignoring the value, as before; the send path in `force_trade`
+    # needs it, because an order must not leave without its intent on record.
+    return _ok is not False
 
 
 def _setting_number(user, key, default, *, integer=False):
@@ -1846,7 +1851,7 @@ def _loop(user_id, alert_fn, gen=None):
         _persist_risk_state()
 
     def _persist_open_snapshot(pos):
-        _persist_open_position(user_id, cfg, pos)
+        return _persist_open_position(user_id, cfg, pos)
 
     def _with_initial_stop(pos, sym):
         """Re-persist a broker-read position without losing its original stop.
@@ -4791,6 +4796,7 @@ def _loop(user_id, alert_fn, gen=None):
                             pass
                         order_ok = True
                         _order_res = None
+                        _prev_snap = None
                         # Ownership, revalidated at the last possible moment.
                         # The lease is renewed on a timer, so between that
                         # renewal and this order another container may have
@@ -4872,14 +4878,43 @@ def _loop(user_id, alert_fn, gen=None):
                                                          "rid": _rid})
                                 except Exception as _e3:
                                     print(f"[UserLoop:{user_id}] decision log (submit) failed: {_e3}")
+                                # THE INTENT GOES ON RECORD BEFORE THE ORDER LEAVES
+                                # (same rule as `force_trade`; see there). A crash
+                                # between the send and the confirmed snapshot below
+                                # then leaves something for restart recovery to
+                                # adopt, with the original stop. A live order whose
+                                # intent cannot be written is not sent.
+                                try:
+                                    _prev_snap = (user_store.load(user_id) or {}).get(
+                                        "open_position_snapshot")
+                                except Exception:
+                                    _prev_snap = None
+                                if _persist_open_snapshot({
+                                        "side": action, "entryPrice": price,
+                                        "symbol": symbol, "units": units,
+                                        "stopLoss": sl_price, "takeProfit": tp_price,
+                                        "initialStop": sl_price,
+                                        "entrySpreadPips": spread,
+                                        "openedAt": now_str,
+                                        "pending": True}) is False and _is_live_cfg(cfg):
+                                    raise _IntentNotRecorded()
                                 _order_res = broker.place_order(action, units, symbol, sl=sl_price, tp=tp_price)
                                 ledger.record(_rid, _order_res)
                             except _StopBeforeSend:
                                 order_ok = False
                                 print(f"[UserLoop:{user_id}] stop requested - "
                                       f"{action} {symbol} was not sent")
+                            except _IntentNotRecorded:
+                                order_ok = False
+                                print(f"[UserLoop:{user_id}] {action} {symbol} not "
+                                      f"sent: the order intent could not be recorded")
                             except Exception as oe:
                                 order_ok = False
+                                # A definite rejection withdraws the intent; an
+                                # ambiguous answer keeps it so recovery asks the
+                                # broker.
+                                if not broker_result_ambiguous(oe):
+                                    _persist_open_snapshot(_prev_snap)
                                 # The claim stands. A submit that raised may
                                 # still have reached the broker, and retrying
                                 # in the next few seconds is exactly how one
@@ -4893,6 +4928,16 @@ def _loop(user_id, alert_fn, gen=None):
                             # fix it remotely — the client has to be told, now,
                             # and told exactly what to do.
                             order_ok = False
+                            # The intent written before the send says a stop was
+                            # asked for. There is none: record the position as
+                            # open WITHOUT one, as `force_trade` does, so the
+                            # management logic does not believe a stop is held.
+                            _persist_open_snapshot({
+                                "side": action, "entryPrice": _order_res.get("fillPrice") or price,
+                                "symbol": symbol, "units": units,
+                                "stopLoss": None, "takeProfit": tp_price,
+                                "initialStop": None, "entrySpreadPips": spread,
+                                "openedAt": now_str})
                             print(f"[UserLoop:{user_id}] {symbol} is OPEN AND "
                                   f"UNPROTECTED — alerting the client")
                             if alert_fn:
@@ -4907,6 +4952,7 @@ def _loop(user_id, alert_fn, gen=None):
                             # cycle on the same broken symbol every ~5min).
                             # Price and log it like any other closed trade.
                             order_ok = False
+                            _persist_open_snapshot(_prev_snap)   # withdraw the intent
                             entry_fill = _order_res.get("fillPrice") or price
                             exit_fill = _order_res.get("exitFillPrice") or entry_fill
                             gross = forex.pnl_usd(action, entry_fill, exit_fill, units, symbol)
@@ -5417,6 +5463,11 @@ class _StopBeforeSend(Exception):
     sent. Nothing reached the broker."""
 
 
+class _IntentNotRecorded(Exception):
+    """The order's restart-recovery snapshot could not be written for a live
+    account, so nothing was sent."""
+
+
 # Order origins that are the AUTOMATION's own: a rule's setup and an approval
 # of one. A Stop must be honoured by these right up to the broker call, the way
 # the loop honours it (`_StopBeforeSend`). A "manual" order is a person
@@ -5872,6 +5923,33 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
     # which is the safe direction); nothing is sent.
     if origin in _STOPPABLE_ORIGINS and _stop_requested(user_id):
         return _stopped_refusal(user_id, origin, side, sym)
+    # THE INTENT GOES ON RECORD BEFORE THE ORDER LEAVES.
+    #
+    # The restart-recovery snapshot used to be written AFTER the broker call, so
+    # a process that died in between left a real position and nothing for
+    # startup recovery to find: it never asked the broker, and `initialStop`
+    # (which the broker cannot give back) was lost, so trailing degraded. The
+    # snapshot is now written first, marked `pending`, and the confirmed result
+    # overwrites it below. If the send definitely failed, the snapshot that was
+    # there before is put back; if the answer was ambiguous (a timeout may have
+    # filled) the intent stays, and recovery asks the broker and either adopts
+    # the position or clears it.
+    #
+    # On a LIVE account an order whose intent could not be written is not sent:
+    # a position with no record is exactly what this exists to prevent. A demo
+    # order proceeds, as it always has, with the snapshot best-effort.
+    _prev_snapshot = (user or {}).get("open_position_snapshot")
+    _live_acct = not (user or {}).get("paper", True)
+    _intent = {"side": side, "entryPrice": price, "symbol": sym,
+               "units": units, "stopLoss": sl_price, "takeProfit": tp_price,
+               "initialStop": sl_price, "entrySpreadPips": spread,
+               "openedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+               "pending": True}
+    if _persist_open_position(user_id, cfg, _intent) is False and _live_acct:
+        print(f"[UserLoop:{user_id}] {origin} {side} {sym} refused: the order "
+              f"intent could not be recorded, so nothing was sent")
+        return {"ok": False, "error": "SNAPSHOT_UNAVAILABLE",
+                "side": side, "symbol": sym}
     try:
         _res = broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
         ledger.record(_rid, _res)
@@ -5880,8 +5958,11 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         # called, so an identical retry is refused by the ledger rather than
         # reaching the broker a second time — which is the whole reason the
         # claim is taken first.
+        _ambiguous = broker_result_ambiguous(e)
+        if not _ambiguous:
+            _persist_open_position(user_id, cfg, _prev_snapshot)
         return {"ok": False, "error": str(e), "side": side, "symbol": sym,
-                "ambiguous": broker_result_ambiguous(e)}
+                "ambiguous": _ambiguous}
 
     # WHAT THE BROKER ACTUALLY DID, WHICH THIS FUNCTION USED TO THROW AWAY.
     #
@@ -5939,6 +6020,8 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
     if _status == "SAFETY_CLOSED":
         # NOT persisted as open: it is not. Reported as refused rather than
         # placed, so the client is not told they hold something they do not.
+        # The intent written before the send is withdrawn.
+        _persist_open_position(user_id, cfg, _prev_snapshot)
         return {"ok": False, "error": "OPENED_AND_CLOSED", "side": side,
                 "symbol": sym, "units": units,
                 "entryPrice": _res.get("fillPrice"),
