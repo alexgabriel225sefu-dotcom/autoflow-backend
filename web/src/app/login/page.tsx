@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { safeNext } from "@/lib/supabase/middleware";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordField } from "@/components/auth/password-field";
+import { AuthSubmit } from "@/components/auth/auth-submit";
 import { GoogleButton } from "@/components/auth/google-button";
 
 function LoginPageInner() {
@@ -48,15 +50,10 @@ function LoginPageInner() {
           <input type="email" required value={email} autoComplete="email"
                  onChange={(e) => setEmail(e.target.value)} />
         </label>
-        <label className="field">
-          <span>Password</span>
-          <input type="password" required value={password} autoComplete="current-password"
-                 onChange={(e) => setPassword(e.target.value)} />
-        </label>
+        <PasswordField label="Password" value={password} onChange={setPassword}
+                       autoComplete="current-password" />
         {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
-        <button className="btn btn-lg" type="submit" disabled={busy} style={{ width: "100%" }}>
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
+        <AuthSubmit busy={busy} idle="Sign in" busyLabel="Signing in…" />
       </form>
     </AuthShell>
   );
