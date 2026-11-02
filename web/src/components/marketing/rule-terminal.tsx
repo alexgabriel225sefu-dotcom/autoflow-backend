@@ -55,7 +55,6 @@ export function RuleTerminal({ rule, reply }: { rule: string; reply: readonly st
     <div className={styles.window} ref={rootRef}>
       <div className={styles.bar} aria-hidden>
         <i /><i /><i />
-        <span>rule: read back</span>
       </div>
 
       <div className={styles.sr}>
@@ -69,9 +68,17 @@ export function RuleTerminal({ rule, reply }: { rule: string; reply: readonly st
           <span>{frame.typed}</span>
           {!frame.done && frame.lines.length === 0 ? <span className={styles.caret} /> : null}
         </p>
-        {frame.lines.map((l) => (
-          <p key={l} className={styles.out}>{l}</p>
-        ))}
+        {frame.lines.map((l) => {
+          // The closing line is a note, the others are checks that passed:
+          // the same two kinds the original prints (a tick, and an "i").
+          const note = l.startsWith("Preview only");
+          return (
+            <p key={l} className={note ? styles.note : styles.out}>
+              <span className={styles.mark} aria-hidden>{note ? "\u2139" : "\u2714"}</span>
+              <span>{l}</span>
+            </p>
+          );
+        })}
       </div>
     </div>
   );

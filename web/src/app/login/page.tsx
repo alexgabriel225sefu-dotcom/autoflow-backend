@@ -42,7 +42,7 @@ function LoginPageInner() {
     >
       <div className="auth-alt">
         <GoogleButton next={params.get("next")} onError={(m) => setError(m || null)} />
-        <p className="auth-or"><span>or with email</span></p>
+        <p className="auth-or"><span>or</span></p>
       </div>
       <form onSubmit={onSubmit} className="card">
         <label className="field">

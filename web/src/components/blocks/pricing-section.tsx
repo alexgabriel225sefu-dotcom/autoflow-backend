@@ -117,8 +117,11 @@ export function PricingSection() {
     <section id="pricing" className="w-full">
       {offer ? (
         <PricingCards
-          title="Pricing"
-          subtitle="Demo accounts are free. One paid plan, bought once."
+          eyebrow="Pricing"
+          title={offer.periodDays === null ? "One price. Lifetime access." : "Pricing"}
+          subtitle={offer.periodDays === null
+            ? "Pay once. No subscriptions and no renewals. Demo accounts are free."
+            : "Demo accounts are free. One paid plan, bought once."}
           groups={[{ key: "all", label: "Plans", plans: planFor(offer) }]}
         />
       ) : result && !result.ok ? (

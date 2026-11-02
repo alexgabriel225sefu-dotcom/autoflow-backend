@@ -13,12 +13,23 @@
   background: var(--pc-head-accent-fg);
 }
 
+/* Centred head: badges, name, description, the price in a ring, the button. */
+.lifetime :global(.pc-top) { text-align: center; padding-top: 1.6rem; padding-bottom: 1.6rem; }
+.lifetime .badges { justify-content: center; }
+.lifetime :global(.pc-name) { font-size: 1.15rem; margin-top: .9rem; }
+.lifetime :global(.pc-desc) { max-width: 44ch; margin-inline: auto; }
+.lifetime :global(.pc-cta) { width: 100%; max-width: 420px; margin-inline: auto; }
+.lifetime :global(.pc-cta-note) { max-width: 52ch; margin-inline: auto; }
 .priceBlock {
-  margin-top: 1.2rem; padding: 1rem 1.1rem;
-  border-radius: 12px; border: 1px solid rgba(255, 255, 255, .22);
-  background: rgba(0, 0, 0, .18);
+  justify-content: center; margin: 1.3rem auto 0; padding: 1.5rem 1.1rem;
+  max-width: 420px; border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  /* The thick pale ring the original wears around its price. */
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .06);
+  background: rgba(0, 0, 0, .22);
 }
-.priceBlock :global(.pc-price) { font-size: clamp(2.3rem, 8vw, 2.9rem); }
+.priceBlock :global(.pc-price) { font-size: clamp(3rem, 11vw, 4.2rem); line-height: 1; }
+.lifetime :global(.pc-price-note) { margin-top: .9rem; }
 
 .lifetime :global(.pc-features) { gap: 0; }
 .lifetime :global(.pc-features li) {
@@ -28,4 +39,9 @@
 .lifetime :global(.pc-features .ico) {
   box-sizing: content-box; padding: 3px; border-radius: 50%;
   background: var(--mkt-accent-wash); margin-top: 0;
+}
+
+@media (min-width: 640px) {
+  .lifetime :global(.pc-features) { grid-template-columns: 1fr 1fr; column-gap: 2rem; }
+  .lifetime :global(.pc-features li:nth-child(2)) { border-top: 0; padding-top: .2rem; }
 }

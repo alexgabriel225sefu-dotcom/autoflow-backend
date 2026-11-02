@@ -1,28 +1,23 @@
+/* A small floating card: a rounded rail and the minutes still to read. */
 .track {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  z-index: 50;
-  background: var(--a4t-line-soft);
+  position: fixed; top: .75rem; left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100% - 2rem)); z-index: 50;
+  display: flex; align-items: center; gap: .9rem;
+  padding: .55rem .9rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--a4t-surface) 88%, transparent);
+  border: 1px solid var(--a4t-line);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
   pointer-events: none;
 }
-
+.rail { flex: 1; height: 6px; border-radius: 999px; background: var(--a4t-line-soft); overflow: hidden; }
 .bar {
-  height: 100%;
-  width: 100%;
-  background: var(--a4t-link);
-  transform-origin: left center;
-  transform: scaleX(0);
-  transition: transform 90ms linear;
-  will-change: transform;
+  height: 100%; width: 100%; border-radius: 999px; background: var(--a4t-text);
+  transform-origin: left center; transform: scaleX(0);
+  transition: transform 90ms linear; will-change: transform;
 }
-
-/* Reduced motion: the bar still shows the position, it just does not glide. */
-@media (prefers-reduced-motion: reduce) {
-  .bar {
-    transition: none;
-    will-change: auto;
-  }
+.time {
+  flex: none; font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: .72rem; color: var(--a4t-muted); min-width: 5.2em; text-align: right;
 }
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; will-change: auto; } }

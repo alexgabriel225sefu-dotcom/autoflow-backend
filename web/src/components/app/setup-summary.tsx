@@ -40,6 +40,11 @@ export function SetupSummary({ choice, accountId, children }: {
   return (
     <section className={styles.card} aria-label="Automation summary">
       <span className={styles.shine} aria-hidden="true" />
+      <header className={styles.head}>
+        <span className={styles.badge}>Review</span>
+        <h3>Your automation</h3>
+        <p>Nothing runs until you press Start.</p>
+      </header>
       <dl className={styles.grid}>
         {tiles.map((t) => (
           <div key={t.key} className={styles.tile}>

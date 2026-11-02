@@ -71,7 +71,7 @@ export default function SignUpPage() {
       <p className="muted" style={{ fontSize: ".84rem", marginTop: "1rem" }}>{PLAN_NOTICE}</p>
       <div className="auth-alt">
         <GoogleButton label="Sign up with Google" onError={(m) => setError(m || null)} />
-        <p className="auth-or"><span>or with email</span></p>
+        <p className="auth-or"><span>or</span></p>
       </div>
       <form onSubmit={onSubmit} className="card">
         <label className="field">

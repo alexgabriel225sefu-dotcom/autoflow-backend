@@ -8,6 +8,14 @@ import styles from "./reading-progress.module.css";
  * ddoemonn. Written natively for this codebase: no dependencies.
  */
 
+const WORDS_PER_MINUTE = 220;
+
+/** Whole minutes still to read at `fraction` read, or 0 when finished. */
+export function minutesLeft(words: number, fraction: number): number {
+  if (!Number.isFinite(words) || words <= 0 || fraction >= 0.995) return 0;
+  return Math.max(1, Math.ceil((words * (1 - fraction)) / WORDS_PER_MINUTE));
+}
+
 /** Fraction (0..1) of the scrollable distance already travelled. */
 export function readingProgress(
   scrollTop: number,
@@ -26,6 +34,8 @@ export function readingProgress(
 export function ReadingProgress({ label = "Reading progress" }: { label?: string }) {
   const barRef = useRef<HTMLDivElement>(null);
   const [percent, setPercent] = useState(0);
+  const [left, setLeft] = useState(0);
+  const words = useRef(0);
 
   useEffect(() => {
     let frame = 0;
@@ -38,7 +48,9 @@ export function ReadingProgress({ label = "Reading progress" }: { label?: string
         el.clientHeight,
       );
       if (barRef.current) barRef.current.style.transform = `scaleX(${fraction})`;
+      words.current = (document.querySelector("main")?.innerText ?? "").split(/\s+/).filter(Boolean).length;
       setPercent(Math.round(fraction * 100));
+      setLeft(minutesLeft(words.current, fraction));
     };
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(measure);
@@ -68,7 +80,8 @@ export function ReadingProgress({ label = "Reading progress" }: { label?: string
       aria-valuenow={percent}
       aria-valuetext={`${percent}% read`}
     >
-      <div ref={barRef} className={styles.bar} />
+      <div className={styles.rail}><div ref={barRef} className={styles.bar} /></div>
+      <span className={styles.time} aria-hidden>{left > 0 ? `${left} min left` : "Finished"}</span>
     </div>
   );
 }

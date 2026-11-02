@@ -2,16 +2,16 @@
   color: inherit;
   background-image: linear-gradient(
     100deg,
-    currentColor 0%, currentColor 38%,
-    color-mix(in srgb, currentColor 35%, transparent) 50%,
-    currentColor 62%, currentColor 100%
+    currentColor 0%, currentColor 34%,
+    #FF9484 45%, #FFD9D2 50%, #FF9484 55%,
+    currentColor 66%, currentColor 100%
   );
   background-size: 250% 100%;
   background-position: 100% 0;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: glint 2.2s linear infinite;
+  animation: glint 2.4s linear infinite;
 }
 @keyframes glint {
   from { background-position: 100% 0; }

@@ -1,8 +1,18 @@
-.controls {
-  display: flex;
-  gap: .5rem;
-  margin: 1.2rem 0 .6rem;
+/* One rounded card; the sections are hairline-divided rows inside it. */
+.group {
+  margin-top: 1.2rem;
+  border: 1px solid var(--a4t-line);
+  border-radius: 20px;
+  background: var(--a4t-surface);
+  overflow: hidden;
 }
+.controls {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .75rem 1.1rem;
+  border-bottom: 1px solid var(--a4t-line-soft);
+}
+.groupLabel { font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--a4t-dim); }
+.controlBtns { display: flex; gap: .5rem; }
 
 .controlBtn {
   font: inherit;
@@ -24,15 +34,17 @@
 }
 
 .card {
-  border: 1px solid var(--a4t-line);
-  background: var(--a4t-surface);
-  border-radius: var(--a4t-radius);
-  margin-top: .6rem;
+  border: 0;
+  border-top: 1px solid var(--a4t-line-soft);
+  background: transparent;
+  border-radius: 0;
+  margin: 0;
   scroll-margin-top: 1rem;
 }
+.group > .card:first-child, .controls + .card { border-top: 0; }
 
 /* Overrides the page-level `.legacy h2` margin for the heading in a card. */
-.card .heading { margin: 0; font-size: .95rem; }
+.card .heading { margin: 0; font-size: 1rem; }
 
 .trigger {
   display: flex;
@@ -46,9 +58,9 @@
   color: var(--a4t-text);
   background: transparent;
   border: 0;
-  border-radius: var(--a4t-radius);
-  padding: .85rem 1rem;
-  min-height: 44px;
+  border-radius: 0;
+  padding: 1rem 1.3rem;
+  min-height: 52px;
   cursor: pointer;
 }
 .trigger:hover { background: var(--a4t-bg-2); }
@@ -73,7 +85,7 @@
 .closed .panel { grid-template-rows: 0fr; }
 
 .inner { overflow: hidden; min-height: 0; }
-.body { padding: 0 1rem .9rem; }
+.body { padding: 0 1.3rem 1.2rem; }
 .body > :first-child { margin-top: 0; }
 
 @media (prefers-reduced-motion: reduce) {
