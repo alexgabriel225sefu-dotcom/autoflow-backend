@@ -25,9 +25,15 @@ recovery_verdict, and only the broker and the shared store simulated:
   * the platform's live ledger keeps the claim when the outcome write is lost,
     and an UNKNOWN outcome never releases it.
 
-KNOWN GAPS, asserted at their CURRENT behaviour so the suite stays green and
-the gap stays visible. Each is named `KNOWN GAP` and says what the better
-behaviour would be. No production code is changed by this file.
+THE WINDOW BEFORE THE SNAPSHOT IS CLOSED (section [5]): the snapshot is
+written BEFORE the broker call, marked `pending`, and the confirmed result
+overwrites it. A crash between send and confirm therefore leaves something for
+restart recovery to adopt, with the original stop. A definite rejection puts the
+previous snapshot back; an ambiguous one keeps the intent; a live account whose
+intent cannot be written sends nothing.
+
+The steps above are therefore, in order: claim, INTENT SNAPSHOT, send, record,
+confirmed snapshot.
 
 Run: python3 tests/test_crash_window_send_to_journal.py
 """
@@ -115,6 +121,7 @@ STORE.install()
 
 USER = "cccccccc-7777-4777-8777-cccccccccccc"
 _REAL_CFG = UL._make_broker({"paper": True})[1]
+LIVE_CFG = types.SimpleNamespace(PAPER_TRADING=False)
 _CANDLES = [{"open": 1.0920, "high": 1.0940, "low": 1.0910, "close": 1.0930,
              "time": 1_700_000_000 + i * 300} for i in range(60)]
 
@@ -167,7 +174,15 @@ def trade(broker, persist):
         GATES.live_entitlement = _ent
 
 
-def die_before_snapshot(uid, cfg, pos):
+def real_persist(uid, cfg, pos):
+    """The REAL snapshot writer, as a cTrader account would use it."""
+    return _REAL_PERSIST(uid, LIVE_CFG, pos)
+
+
+def die_after_send(uid, cfg, pos):
+    """The intent is written (really); the confirmed snapshot never is."""
+    if pos and pos.get("pending"):
+        return real_persist(uid, cfg, pos)
     raise Crash("process killed after the broker accepted the order")
 
 
@@ -185,7 +200,7 @@ try:
     broker = Broker()
     crashed = False
     try:
-        trade(broker, die_before_snapshot)
+        trade(broker, die_after_send)
     except Crash:
         crashed = True
     check("the 'crash' reached the caller (nothing swallowed it)", crashed)
@@ -220,11 +235,12 @@ try:
     STORE.kv.clear(); restart()
     STORE.users[USER] = {"id": USER, "paper": True}
     broker = Broker()
-    live_cfg = types.SimpleNamespace(PAPER_TRADING=False)
 
     def snapshot_then_die(uid, cfg, pos):
-        _REAL_PERSIST(uid, live_cfg, pos)       # the REAL writer
-        raise Crash("killed before the journal write")
+        real_persist(uid, cfg, pos)             # the REAL writer
+        if pos and not pos.get("pending"):
+            raise Crash("killed before the journal write")
+        return True
 
     try:
         trade(broker, snapshot_then_die)
@@ -246,28 +262,110 @@ try:
     check("and the retry is still refused", trade(broker, lambda *a: None).get("ok") is False)
     check("the broker was asked once in total", len(broker.orders) == 1)
 
-    # ── 5. KNOWN GAP: the window before the snapshot ───────────────────────
-    print("\n[5] KNOWN GAP: a crash between send and snapshot leaves nothing to adopt")
-    # Step 2 happens BEFORE step 4, so a process killed in between leaves a
-    # real position and no `open_position_snapshot`. Startup recovery in
-    # `_loop` keys on that snapshot (`if _snap and _snap.get("symbol")`), so it
-    # never asks the broker; the position is first noticed by the tick's own
-    # sync, and only for the focused symbol (or the watchlist when maxpos==1).
-    # What is lost in the meantime is `initialStop`, so trailing falls back to
-    # the live stop ("noise-tight trailing", per the _loop comments).
-    # BETTER BEHAVIOUR: write the snapshot (or an intent record) BEFORE the
-    # broker call and clear it on a confirmed rejection.
+    # ── 5. the window before the snapshot is closed ────────────────────────
+    print("\n[5] a crash between send and confirm leaves an intent for recovery to adopt")
     STORE.kv.clear(); restart()
     STORE.users[USER] = {"id": USER, "paper": True}
     broker = Broker()
     try:
-        trade(broker, die_before_snapshot)
+        trade(broker, die_after_send)
     except Crash:
         pass
-    check("(current) a position exists at the broker", broker.position is not None)
-    check("(current) there is NO snapshot for restart recovery to find",
-          not STORE.users[USER].get("open_position_snapshot"),
+    check("a position exists at the broker", broker.position is not None)
+    snap = STORE.users[USER].get("open_position_snapshot") or {}
+    check("and an INTENT snapshot is on record for restart recovery to find",
+          snap.get("symbol") == "EURUSD" and snap.get("pending") is True, str(snap))
+    check("with the original stop, which the broker cannot give back",
+          snap.get("initialStop") == 1.09, str(snap.get("initialStop")))
+    check("restart recovery adopts the broker's position",
+          UL.recovery_verdict(broker.get_open_position("EURUSD"), True) == UL.ADOPT)
+    check("the initial risk is recoverable, so trailing resumes on the real R",
+          (UL._risk_from_snapshot(snap.get("entryPrice"), snap.get("initialStop")) or 0) > 0)
+
+    print("\n[5b] a confirmed fill replaces the intent; a definite rejection restores the old snapshot")
+    STORE.kv.clear(); restart()
+    PREV = {"symbol": "GBPUSD", "side": "SELL", "entryPrice": 1.25, "units": 1000,
+            "stopLoss": 1.26, "initialStop": 1.26, "openedAt": "2026-11-02 08:00:00"}
+    STORE.users[USER] = {"id": USER, "paper": True, "open_position_snapshot": dict(PREV)}
+    broker = Broker()
+    out = trade(broker, real_persist)
+    snap = STORE.users[USER].get("open_position_snapshot") or {}
+    check("a filled order succeeded", out.get("ok") is True, str(out))
+    check("and the confirmed snapshot is no longer pending",
+          snap.get("symbol") == "EURUSD" and not snap.get("pending"), str(snap))
+
+    STORE.kv.clear(); restart()
+    STORE.users[USER] = {"id": USER, "paper": True, "open_position_snapshot": dict(PREV)}
+
+    class Rejecting(Broker):
+        def place_order(self, side, units, sym, sl=None, tp=None):
+            self.orders.append((side, units, sym, sl, tp))
+            raise RuntimeError("order rejected: invalid volume")
+
+    broker = Rejecting()
+    out = trade(broker, real_persist)
+    check("the order was refused by the broker", out.get("ok") is False and out.get("ambiguous") is False, str(out))
+    check("the broker was asked once", len(broker.orders) == 1)
+    check("the PREVIOUS snapshot is put back, exactly",
+          STORE.users[USER].get("open_position_snapshot") == PREV,
           str(STORE.users[USER].get("open_position_snapshot")))
+
+    print("\n[5c] an ambiguous answer keeps the intent (a timeout may have filled)")
+    STORE.kv.clear(); restart()
+    STORE.users[USER] = {"id": USER, "paper": True, "open_position_snapshot": dict(PREV)}
+
+    class TimedOut(Broker):
+        def place_order(self, side, units, sym, sl=None, tp=None):
+            self.orders.append((side, units, sym, sl, tp))
+            raise RuntimeError("connection timed out")
+
+    broker = TimedOut()
+    out = trade(broker, real_persist)
+    snap = STORE.users[USER].get("open_position_snapshot") or {}
+    check("reported as ambiguous", out.get("ambiguous") is True, str(out))
+    check("the intent stays on record for recovery to resolve",
+          snap.get("symbol") == "EURUSD" and snap.get("pending") is True, str(snap))
+
+    print("\n[5d] a safety-closed order withdraws its intent")
+    STORE.kv.clear(); restart()
+    STORE.users[USER] = {"id": USER, "paper": True, "open_position_snapshot": dict(PREV)}
+
+    class SafetyClosed(Broker):
+        def place_order(self, side, units, sym, sl=None, tp=None):
+            self.orders.append((side, units, sym, sl, tp))
+            return {"orderId": "o9", "status": "SAFETY_CLOSED", "fillPrice": 1.093,
+                    "exitFillPrice": 1.0929, "reason": "no stop accepted"}
+
+    out = trade(SafetyClosed(), real_persist)
+    check("reported as opened-and-closed", out.get("error") == "OPENED_AND_CLOSED", str(out))
+    check("the previous snapshot is back, not an open EURUSD",
+          STORE.users[USER].get("open_position_snapshot") == PREV)
+
+    print("\n[5e] a LIVE account whose intent cannot be written sends nothing")
+    STORE.kv.clear(); restart()
+    STORE.users[USER] = {"id": USER, "paper": False}
+    _own, _auth, _upd = UL.ownership.may_trade, GATES.authorize_order, user_store.update
+    UL.ownership.may_trade = lambda uid, live: (True, "OWNER")
+    GATES.authorize_order = lambda *a, **k: (GATES.Decision(True, "ALLOWED", ""), "rid-5e")
+    user_store.update = lambda uid, patch, **k: False       # the write does not land
+    try:
+        broker = Broker()
+        out = trade(broker, real_persist)
+    finally:
+        UL.ownership.may_trade, GATES.authorize_order, user_store.update = _own, _auth, _upd
+    check("the order is refused as SNAPSHOT_UNAVAILABLE", out.get("error") == "SNAPSHOT_UNAVAILABLE", str(out))
+    check("and the broker was never asked", broker.orders == [], str(broker.orders))
+    STORE.users[USER] = {"id": USER, "paper": True}
+    STORE.kv.clear(); restart()
+    _upd = user_store.update
+    user_store.update = lambda uid, patch, **k: False
+    try:
+        broker = Broker()
+        out = trade(broker, real_persist)
+    finally:
+        user_store.update = _upd
+    check("(control) the same failure on a DEMO account still sends, as before",
+          out.get("ok") is True and len(broker.orders) == 1, str(out))
 finally:
     pass
 

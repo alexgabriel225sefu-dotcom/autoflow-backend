@@ -1118,11 +1118,16 @@ def _persist_open_position(user_id, cfg, pos):
     except Exception:
         pass
     if getattr(cfg, "PAPER_TRADING", False):
-        return
+        return True                 # a simulation has nothing to recover
     try:
-        user_store.update(user_id, {"open_position_snapshot": pos})
+        _ok = user_store.update(user_id, {"open_position_snapshot": pos})
     except Exception as e:
         print(f"[UserLoop:{user_id}] open-position snapshot persist failed: {e}")
+        return False
+    # `update` answers False when the write did not land. Callers that do not
+    # care keep ignoring the value, as before; the send path in `force_trade`
+    # needs it, because an order must not leave without its intent on record.
+    return _ok is not False
 
 
 def _setting_number(user, key, default, *, integer=False):
@@ -5872,6 +5877,33 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
     # which is the safe direction); nothing is sent.
     if origin in _STOPPABLE_ORIGINS and _stop_requested(user_id):
         return _stopped_refusal(user_id, origin, side, sym)
+    # THE INTENT GOES ON RECORD BEFORE THE ORDER LEAVES.
+    #
+    # The restart-recovery snapshot used to be written AFTER the broker call, so
+    # a process that died in between left a real position and nothing for
+    # startup recovery to find: it never asked the broker, and `initialStop`
+    # (which the broker cannot give back) was lost, so trailing degraded. The
+    # snapshot is now written first, marked `pending`, and the confirmed result
+    # overwrites it below. If the send definitely failed, the snapshot that was
+    # there before is put back; if the answer was ambiguous (a timeout may have
+    # filled) the intent stays, and recovery asks the broker and either adopts
+    # the position or clears it.
+    #
+    # On a LIVE account an order whose intent could not be written is not sent:
+    # a position with no record is exactly what this exists to prevent. A demo
+    # order proceeds, as it always has, with the snapshot best-effort.
+    _prev_snapshot = (user or {}).get("open_position_snapshot")
+    _live_acct = not (user or {}).get("paper", True)
+    _intent = {"side": side, "entryPrice": price, "symbol": sym,
+               "units": units, "stopLoss": sl_price, "takeProfit": tp_price,
+               "initialStop": sl_price, "entrySpreadPips": spread,
+               "openedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+               "pending": True}
+    if _persist_open_position(user_id, cfg, _intent) is False and _live_acct:
+        print(f"[UserLoop:{user_id}] {origin} {side} {sym} refused: the order "
+              f"intent could not be recorded, so nothing was sent")
+        return {"ok": False, "error": "SNAPSHOT_UNAVAILABLE",
+                "side": side, "symbol": sym}
     try:
         _res = broker.place_order(side, units, sym, sl=sl_price, tp=tp_price)
         ledger.record(_rid, _res)
@@ -5880,8 +5912,11 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         # called, so an identical retry is refused by the ledger rather than
         # reaching the broker a second time — which is the whole reason the
         # claim is taken first.
+        _ambiguous = broker_result_ambiguous(e)
+        if not _ambiguous:
+            _persist_open_position(user_id, cfg, _prev_snapshot)
         return {"ok": False, "error": str(e), "side": side, "symbol": sym,
-                "ambiguous": broker_result_ambiguous(e)}
+                "ambiguous": _ambiguous}
 
     # WHAT THE BROKER ACTUALLY DID, WHICH THIS FUNCTION USED TO THROW AWAY.
     #
@@ -5939,6 +5974,8 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
     if _status == "SAFETY_CLOSED":
         # NOT persisted as open: it is not. Reported as refused rather than
         # placed, so the client is not told they hold something they do not.
+        # The intent written before the send is withdrawn.
+        _persist_open_position(user_id, cfg, _prev_snapshot)
         return {"ok": False, "error": "OPENED_AND_CLOSED", "side": side,
                 "symbol": sym, "units": units,
                 "entryPrice": _res.get("fillPrice"),

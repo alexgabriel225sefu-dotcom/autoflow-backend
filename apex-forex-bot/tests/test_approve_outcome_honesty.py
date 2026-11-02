@@ -106,6 +106,9 @@ class _Broker:
                           "position closed immediately for safety"}
 
 
+ALL = []        # every snapshot write of the latest run(), in order
+
+
 def run(status, symbol="EURUSD"):
     """Drive the real force_trade against that broker.
 
@@ -118,12 +121,20 @@ def run(status, symbol="EURUSD"):
               "_alert_fn_for")}
     _ent = GATES.live_entitlement
     persisted = []
+    ALL.clear()
     alerts = []
     br = _Broker(status)
     user_store.save(USER, {"id": USER, "paper": True})
     try:
         UL._make_broker = lambda user, user_id=None: (br, _REAL_CFG)
-        UL._persist_open_position = lambda uid, cfg, pos: persisted.append(pos)
+        def _rec(uid, cfg, pos):
+            # Every write is kept in ALL; `persisted` holds only the positions
+            # recorded as OPEN, not the pending intent written before the send
+            # and not the withdrawal of it.
+            ALL.append(pos)
+            if pos and not pos.get("pending"):
+                persisted.append(pos)
+        UL._persist_open_position = _rec
         UL.get_dash = lambda uid: {}
         UL._alert_fn_for = lambda uid, fn: (
             lambda u, payload: alerts.append(payload))
@@ -187,6 +198,8 @@ check("NOTHING is persisted as open", not persisted,
       f"and the next tick would manage one that is gone")
 check("the detail says it was closed again",
       "closed" in str(out.get("detail")).lower(), str(out.get("detail")))
+check("the intent written before the send is WITHDRAWN (the last write is the old, empty snapshot)",
+      len(ALL) == 2 and ALL[0] and ALL[0].get("pending") is True and ALL[1] is None, str(ALL))
 
 
 # ── 5. a real fill is still a real fill ─────────────────────────────────────
@@ -199,6 +212,8 @@ if persisted:
           persisted[0].get("stopLoss") == 1.0900,
           str(persisted[0].get("stopLoss")))
 check("and nothing was alerted", not alerts, str(alerts))
+check("the first write was the pending intent, the second the confirmed position",
+      len(ALL) == 2 and ALL[0].get("pending") is True and not ALL[1].get("pending"), str(ALL))
 
 # ── 6. a Stop that lands before the order is sent is honoured ───────────────
 print("\n[6] Approve and Stop in flight together: nothing is sent after a Stop")
