@@ -1,0 +1,28 @@
+/* Magnified bento: transform and background only, so neighbours never move. */
+.root :global([data-spot]) {
+  transition: transform .32s cubic-bezier(.2, .8, .2, 1), background-color .32s ease;
+  transform-origin: center;
+}
+
+.root[data-engaged] :global([data-spot]:not([data-lit])) {
+  transform: scale(.985);
+}
+
+.root :global([data-spot][data-lit]) {
+  transform: scale(1.025);
+  z-index: 2;
+  background-color: var(--mkt-surface);
+  box-shadow: 0 0 0 1px var(--mkt-accent-line);
+}
+
+@media (max-width: 859px) {
+  .root[data-engaged] :global([data-spot]:not([data-lit])) { transform: scale(.992); }
+  .root :global([data-spot][data-lit]) { transform: scale(1.012); }
+}
+
+/* Highlight only: no scale, no movement. */
+@media (prefers-reduced-motion: reduce) {
+  .root :global([data-spot]) { transition: background-color .01s; }
+  .root[data-engaged] :global([data-spot]:not([data-lit])),
+  .root :global([data-spot][data-lit]) { transform: none; }
+}

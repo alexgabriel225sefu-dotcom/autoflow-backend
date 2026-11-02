@@ -24,7 +24,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const { PricingSection } = await import("./pricing-section");
+const { PricingSection, planFor } = await import("./pricing-section");
 
 const OFFER: PublicOffer = {
   sku: "founder_lifetime",
@@ -117,5 +117,40 @@ describe("the call to action", () => {
     const signup = await screen.findByRole("link", { name: /create an account/i });
     expect(signup.getAttribute("href")).toBe("/signup");
     expect(screen.getByText("Free")).toBeTruthy();
+  });
+});
+
+describe("the Founder card as a lifetime-deal card", () => {
+  const founder = (o: Partial<PublicOffer>) =>
+    planFor({ ...OFFER, ...o }).find((p) => p.palette === "accent")!;
+
+  it("carries the not-on-sale badge only while purchase is closed", () => {
+    expect(founder({ checkoutEnabled: false }).statusBadge).toBe("Not on sale yet");
+    expect(founder({ checkoutEnabled: true, checkoutImplemented: false }).statusBadge)
+      .toBe("Not on sale yet");
+    expect(founder({ checkoutEnabled: true, checkoutImplemented: true }).statusBadge)
+      .toBeUndefined();
+  });
+
+  it("is a lifetime card only when the server offer has no period", () => {
+    expect(founder({ periodDays: null }).variant).toBe("lifetime");
+    expect(founder({ periodDays: 365 }).variant).toBeUndefined();
+  });
+
+  it("invents no discount, strike-through price or countdown", () => {
+    const f = founder({});
+    expect(f.originalPrice).toBeUndefined();
+    expect(JSON.stringify(f)).not.toMatch(/countdown|% off|save \d/i);
+  });
+
+  it("takes its price from the offer, not from the component", () => {
+    expect(founder({ priceMinor: 125000 }).price).not.toBe(founder({ priceMinor: 49900 }).price);
+  });
+
+  it("shows the badge on screen next to the inert button", async () => {
+    publicApi.mockResolvedValue(answer({}));
+    const { container } = render(<PricingSection />);
+    await screen.findByRole("button", { name: /not on sale yet/i });
+    expect(container.textContent?.match(/Not on sale yet/g)?.length).toBe(2);
   });
 });

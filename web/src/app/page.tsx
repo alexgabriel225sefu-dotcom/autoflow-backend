@@ -12,6 +12,8 @@ import {
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
+import { MagnifiedBento } from "@/components/marketing/magnified-bento";
+import { RuleTerminal } from "@/components/marketing/rule-terminal";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -103,7 +105,7 @@ export default function Landing() {
             prediction.
           </p>
 
-          <SpotlightGrid className="mkt-rails" label="What it does">
+          <MagnifiedBento className="mkt-rails" label="What it does">
             <article className="mkt-rail mkt-rail-7" data-spot>
               <span className="mkt-card-ico"><Link2 size={17} aria-hidden /></span>
               <h3>Connect your own account</h3>
@@ -146,7 +148,7 @@ export default function Landing() {
                 Each evaluation is recorded with the reason it acted or did not. When nothing happens, the journal tells you which condition stopped it.
               </p>
             </article>
-          </SpotlightGrid>
+          </MagnifiedBento>
         </section>
 
         <section id="resources" className="mkt-section mkt-flow">
@@ -177,11 +179,20 @@ export default function Landing() {
             The builder writes a plain-language summary of whatever you
             configured, so you can check it before it ever runs.
           </p>
-          <div className="mkt-rule">
-            Buy or sell EURUSD on 1h when Price vs MA(ema, 50, above) AND
-            RSI(14, above, 55); risk 1.0% per trade; stop 1.5&times; ATR;
-            target 2.0R; at most 1 open position.
-          </div>
+          <RuleTerminal
+            rule={
+              "Buy or sell EURUSD on 1h when Price vs MA(ema, 50, above) AND " +
+              "RSI(14, above, 55); risk 1.0% per trade; stop 1.5\u00d7 ATR; " +
+              "target 2.0R; at most 1 open position."
+            }
+            reply={[
+              "Market: EURUSD, 1h",
+              "Entry: Price vs MA(ema, 50, above) AND RSI(14, above, 55)",
+              "Risk: 1.0% per trade; stop 1.5\u00d7 ATR; target 2.0R",
+              "Limit: at most 1 open position",
+              "Preview only. Nothing is placed.",
+            ]}
+          />
           <p className="mkt-plain" style={{ marginTop: "1rem" }}>
             An example of the summary the builder produces from your own
             configuration. It is not a recommendation, and it is not a rule we

@@ -30,6 +30,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
+import styles from "./lifetime-card.module.css";
 
 /** `accent` is the plan being argued for. At most one card should wear it. */
 export type PricingPalette = "neutral" | "accent";
@@ -60,6 +61,10 @@ export type PricingPlan = {
   /** Shown under the button. The place to say why a CTA is inert. */
   ctaNote?: string;
   featuredLabel?: string;
+  /** "lifetime" restyles the card as a lifetime-deal card. */
+  variant?: "lifetime";
+  /** A status pill ("Not on sale yet"), given by the caller from the server's state. */
+  statusBadge?: string;
   features: string[];
   footerNote?: string;
   footerDesc?: string;
@@ -71,20 +76,39 @@ export type PricingGroup = {
   plans: PricingPlan[];
 };
 
+/**
+ * The lifetime variant follows the "Lifetime Deal Pricing Card" pattern by
+ * diarmuradi (21st.dev): a badge row, a price block, a checklist. Written
+ * natively; every figure and label is still the caller's.
+ */
 export function PlanCard({ plan }: { plan: PricingPlan }) {
   const ctaClass = `pc-cta${plan.ctaQuiet ? " pc-cta-quiet" : ""}`;
+  const lifetime = plan.variant === "lifetime";
 
   return (
-    <div className={`pc-card${plan.palette === "accent" ? " pc-card-accent" : ""}`}>
+    <div
+      className={[
+        "pc-card",
+        plan.palette === "accent" ? "pc-card-accent" : "",
+        lifetime ? styles.lifetime : "",
+      ].filter(Boolean).join(" ")}
+    >
       <div className="pc-top">
-        {plan.featuredLabel ? (
-          <span className="pc-badge">{plan.featuredLabel}</span>
+        {plan.featuredLabel || plan.statusBadge ? (
+          <div className={styles.badges}>
+            {plan.featuredLabel ? (
+              <span className="pc-badge">{plan.featuredLabel}</span>
+            ) : null}
+            {plan.statusBadge ? (
+              <span className={styles.status}>{plan.statusBadge}</span>
+            ) : null}
+          </div>
         ) : null}
 
         <h3 className="pc-name">{plan.name}</h3>
         <p className="pc-desc">{plan.description}</p>
 
-        <div className="pc-price-row">
+        <div className={`pc-price-row${lifetime ? ` ${styles.priceBlock}` : ""}`}>
           <span className="pc-price">{plan.price}</span>
           {plan.originalPrice ? (
             <span className="pc-was">{plan.originalPrice}</span>
