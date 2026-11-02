@@ -173,3 +173,11 @@ npx @claude-flow/cli@latest doctor --fix
 ```
 
 **Agent tool** handles execution (agents, files, code, git). **MCP tools** handle coordination (swarm, memory, hooks). **CLI** is the same via Bash.
+
+## Repository agreements with Codex
+
+Read `AGENTS.md` and `docs/CODEX_CLAUDE_PROTOCOL.md` before writing code. Work that
+arrives as a GitHub issue (labels `ready` + `apex-claude`) follows
+`docs/ORCHESTRATOR_PROTOCOL.md`: branch `claude/issue-<N>-<slug>`, PR only, no
+deploy, no merge, no edits to `.github/workflows/**` or `render.yaml`. Nothing
+polls the queue yet (Phase 1).

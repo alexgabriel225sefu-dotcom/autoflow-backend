@@ -1,4 +1,16 @@
-.env
+# Environment files. Real values never belong in the tree. A tracked
+# *.env.example that is already committed stays tracked; this stops any new
+# .env, .env.local, or .env.production from being added.
+.env*
+
+# Local agent/session files. .project-config.json has carried live cloud
+# credentials (cloud keys, Stripe secrets). .manus-logs/ has carried session
+# cookies and tokens. They are not in the current tree. History still has the
+# old copies; these rules only stop them from coming back. Do not rewrite
+# history to drop them — revoke the credentials instead.
+.project-config.json
+.manus-logs/
+
 node_modules/
 outputs/
 logs/
@@ -18,3 +30,19 @@ web/node_modules/
 __pycache__/
 *.pyc
 *.pyo
+
+# Collected OHLC history — rebuildable from the provider, not source.
+apex-forex-bot/data/history/
+
+# Subagent git worktrees. Each is a full second checkout of THIS repo (~34MB)
+# created and locked while an agent runs, then removed. Committing one nests a
+# working copy inside the repo it was cut from.
+.claude/worktrees/
+
+# Browser session cookies for video-eyes. A cookies.txt is a live login for
+# whatever account exported it — committing one hands over the account.
+cookies.txt
+*cookies*.txt
+
+# Local UI audit output (screenshots, harness results) — not part of the product.
+ui-audit/

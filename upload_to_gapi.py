@@ -4,7 +4,21 @@
 import os, sys, time, json, requests
 from pathlib import Path
 
-API_KEY = os.environ.get("GOOGLE_AI_API_KEY", "AIzaSyAEk3AtQMQMq6gqV1hWr_ezW2LfVQMNMVU")
+def require_google_api_key():
+    """The key lives in the environment, never in this file.
+
+    GOOGLE_API_KEY is the name to set. GOOGLE_AI_API_KEY is accepted because
+    existing deploy config already uses it. The value is not printed.
+    """
+    key = (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_AI_API_KEY") or "").strip()
+    if not key:
+        raise SystemExit(
+            "GOOGLE_API_KEY is not set. Export GOOGLE_API_KEY or "
+            "GOOGLE_AI_API_KEY and run this script again."
+        )
+    return key
+
+API_KEY = require_google_api_key()
 
 VIDEOS = [
     ("v1", "outputs/tiktok-videos/ugc_v1.mp4"),
@@ -27,10 +41,12 @@ def upload_file(vid_id, filepath):
     size = len(data)
     print(f"[{vid_id}] Uploading {size/1024/1024:.1f}MB...", flush=True)
 
-    init_url = f"https://generativelanguage.googleapis.com/upload/v1beta/files?key={API_KEY}"
+    init_url = "https://generativelanguage.googleapis.com/upload/v1beta/files"
     init_resp = requests.post(
         init_url,
         headers={
+            # Header, not a query parameter: a failed request's URL must not carry the key.
+            "x-goog-api-key": API_KEY,
             "X-Goog-Upload-Protocol": "resumable",
             "X-Goog-Upload-Command": "start",
             "X-Goog-Upload-Header-Content-Length": str(size),

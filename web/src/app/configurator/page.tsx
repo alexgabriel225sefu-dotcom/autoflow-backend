@@ -1,30 +1,71 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { BrandLockup } from "@/components/brand/logo";
 
+/**
+ * The post-purchase landing page.
+ *
+ * It used to say "Setup Your Bot", "deploy your Apex Trade Bot" and "check
+ * your email for the source code download link" — three statements about a
+ * product that no longer exists. Nothing is downloaded, nothing is deployed
+ * by the client, and there is no bot.
+ *
+ * The route is kept rather than deleted because it is the return URL the
+ * previous checkout used, and a paid customer following an old link should
+ * land somewhere that makes sense rather than on a 404.
+ */
 function ConfiguratorContent() {
-  const params = useSearchParams();
-  const key = params.get("key");
+  const key = useSearchParams().get("key");
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--background)" }}>
-      <div className="max-w-lg w-full text-center space-y-6">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
-          <ShieldCheck className="w-8 h-8 text-amber-500" />
+    <main className="a4t">
+      <div className="legacy">
+        <div style={{ marginBottom: "var(--sp-5)" }}>
+          <Link href="/"><BrandLockup size={24} /></Link>
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Setup Your Bot</h1>
-        <p className="text-white/50 leading-relaxed">
-          Your purchase was successful. Follow the instructions below to configure and deploy your Apex Trade Bot.
+
+        <h1>Setting up your account</h1>
+        <p>
+          Apex4Traders runs in your browser. There is nothing to download and
+          nothing to install.
         </p>
-        {key && (
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/05 p-4 text-left">
-            <p className="text-[10px] uppercase tracking-widest text-white/40 font-semibold mb-1">License Key</p>
-            <p className="font-mono text-sm text-amber-400 break-all">{key}</p>
+
+        {key ? (
+          <div className="notice" style={{ marginTop: "var(--sp-4)" }}>
+            <p className="label-xs">Reference</p>
+            <p className="mono" style={{ wordBreak: "break-all" }}>{key}</p>
+            <p className="muted" style={{ fontSize: ".82rem", marginTop: ".4rem" }}>
+              {/* Never "your licence is active". Only the verified payment
+                  webhook decides that, and this page cannot see it. */}
+              Keep this reference if you need to contact support. Your licence
+              state is shown on the Licence page once your payment has been
+              confirmed by the payment provider.
+            </p>
           </div>
-        )}
-        <p className="text-xs text-white/30">Check your email for full setup instructions and source code download link.</p>
+        ) : null}
+
+        <h2>What happens next</h2>
+        <ol className="muted" style={{ fontSize: ".9rem", lineHeight: 1.8, paddingLeft: "1.2rem" }}>
+          <li>Sign in and confirm your email address.</li>
+          <li>Connect a cTrader demo account — you keep control of it, and can
+            disconnect it at any time.</li>
+          <li>Build a rule from named conditions and preview what it would
+            decide on real bars.</li>
+          <li>Activate the rule, then start automation on the demo account.</li>
+        </ol>
+
+        <div className="btn-row" style={{ marginTop: "var(--sp-5)" }}>
+          <Link className="btn" href="/dashboard">Go to the dashboard</Link>
+          <Link className="btn btn-ghost" href="/license">Check your licence</Link>
+        </div>
+
+        <p className="dim" style={{ fontSize: ".8rem", marginTop: "var(--sp-5)" }}>
+          Live trading is not available in this release. Automation runs on
+          demo accounts only.
+        </p>
       </div>
     </main>
   );

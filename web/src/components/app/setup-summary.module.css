@@ -1,0 +1,44 @@
+@property --a4t-shine-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.card {
+  position: relative; padding: var(--sp-4, 1rem); margin-top: var(--sp-3, .75rem);
+  border: 1px solid var(--a4t-line); border-radius: var(--a4t-radius-lg, .9rem);
+  background: var(--a4t-surface);
+}
+.shine {
+  position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--a4t-shine-angle),
+    var(--a4t-line) 0deg, var(--a4t-accent) 70deg, var(--a4t-line) 140deg,
+    var(--a4t-line) 200deg, var(--a4t-accent) 270deg, var(--a4t-line) 340deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: shine-turn 8s linear infinite;
+}
+@keyframes shine-turn { to { --a4t-shine-angle: 360deg; } }
+.grid {
+  position: relative; margin: 0; display: grid; gap: .6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.tile {
+  min-width: 0; padding: .65rem .75rem; border-radius: .5rem;
+  background: var(--a4t-bg-2); border: 1px solid var(--a4t-line-soft);
+}
+.tile dt { font-size: .72rem; color: var(--a4t-muted); margin: 0; }
+.tile dd {
+  margin: .15rem 0 0; font-size: 1rem; font-weight: 700; color: var(--a4t-text);
+  overflow-wrap: anywhere;
+}
+.action { position: relative; margin-top: var(--sp-3, .75rem); }
+@media (min-width: 720px) {
+  .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shine { animation: none; }
+}

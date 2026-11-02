@@ -1,0 +1,344 @@
+/**
+ * The shell's navigation contract.
+ *
+ * The defect this guards against shipped once: the shell was a single
+ * horizontally scrolling strip which, measured at 390px, showed 135px of a
+ * 599px list. One destination out of eight was on screen, with no overflow
+ * menu, no bottom bar and no scroll affordance — and because the page itself
+ * did not overflow, nothing hinted the other seven existed.
+ *
+ * So the assertions below are about REACHABILITY, not about layout. A route
+ * that exists on disk but is in no menu is unreachable however pretty the
+ * menu is, which is why the first test reads the filesystem.
+ */
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const push = vi.fn();
+const refresh = vi.fn();
+let pathname = "/dashboard";
+const shellState = vi.hoisted(() => ({
+  emailVerified: true as boolean | undefined,
+  operator: false,
+  signOut: vi.fn(async (): Promise<{ error?: { message: string } }> => ({})),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => pathname,
+  useRouter: () => ({ push, refresh }),
+}));
+
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...rest}>{children}</a>
+  ),
+}));
+
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({ auth: { signOut: () => shellState.signOut() } }),
+}));
+
+vi.mock("@/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    api: vi.fn(async (path: string) => {
+      if (path.startsWith("notifications")) {
+        return { ok: true, data: { status: "ok", notifications: [], total: 0, unread: 3, hasMore: false } };
+      }
+      if (path === "me") {
+        return { ok: true, data: {
+          user: { userId: "u1", email: "trader@example.test", emailVerified: shellState.emailVerified },
+          licence: { state: "active", expiresAt: null, plan: "demo" },
+        } };
+      }
+      if (path === "ctrader/status" || path === "accounts") {
+        return { ok: true, data: {
+          connected: true, accounts: [{ ctid: 501, mode: "demo" }],
+          selected: { ctid: 501, mode: "demo" }, liveAllowed: false,
+        } };
+      }
+      if (path === "automation") {
+        return { ok: true, data: { state: "running", ruleDocId: "r1", mode: "demo", startedAt: 0 } };
+      }
+      if (path === "live/queue") {
+        if (shellState.operator) return { ok: true, data: { requests: [] } };
+        return { ok: false, status: 403, code: "NOT_OPERATOR", message: "this action is limited to an operator" };
+      }
+      return { ok: false, status: 404, code: "NOT_FOUND", message: "no stub" };
+    }),
+  };
+});
+
+import { AppShell } from "./shell";
+import { NAV, PRIMARY, SECONDARY, isActive, titleFor } from "./nav";
+
+afterEach(() => {
+  pathname = "/dashboard";
+  shellState.emailVerified = true;
+  shellState.operator = false;
+  shellState.signOut.mockReset();
+  shellState.signOut.mockResolvedValue({});
+  vi.clearAllMocks();
+});
+
+const APP_DIR = join(__dirname, "..", "..", "app", "(app)");
+
+/** Every route under app/(app) that is a page, as a URL path. */
+function routesOnDisk(dir = APP_DIR, prefix = ""): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      out.push(...routesOnDisk(full, `${prefix}/${entry}`));
+    } else if (entry === "page.tsx") {
+      out.push(prefix || "/");
+    }
+  }
+  return out;
+}
+
+describe("navigation model", () => {
+  it("every page under app/(app) is reachable from a menu", () => {
+    // Dynamic and nested routes are reached from their parent, not from the
+    // nav — /rules/[id] is opened from the rules list.
+    const top = routesOnDisk()
+      .filter((r) => !r.includes("[") && r.split("/").filter(Boolean).length === 1);
+    const known = new Set(NAV.map((n) => n.href));
+    // /connect is reached from the account chip and from every not-connected
+    // state, which the status bar and ReadPanel both link to.
+    known.add("/connect");
+    known.add("/license");
+    for (const r of top) {
+      expect(known.has(r), `${r} exists on disk but is in no menu`).toBe(true);
+    }
+  });
+
+  it("the primary bar is small enough for a phone and the rest is not dropped", () => {
+    expect(PRIMARY.length).toBeLessThanOrEqual(4);
+    // Nothing may be lost between the two lists.
+    expect([...PRIMARY, ...SECONDARY].map((n) => n.href).sort())
+      .toEqual(NAV.map((n) => n.href).sort());
+  });
+
+  it("isActive matches a section and its children, not a prefix by accident", () => {
+    expect(isActive("/rules", "/rules")).toBe(true);
+    expect(isActive("/rules/abc", "/rules")).toBe(true);
+    expect(isActive("/rules", "/orders")).toBe(false);
+    // "/orders" must not light up for "/ordersomething".
+    expect(isActive("/ordersomething", "/orders")).toBe(false);
+  });
+
+  it("every destination has a title, so the top bar always says where you are", () => {
+    for (const n of NAV) expect(titleFor(n.href)).toBe(n.label);
+    expect(titleFor("/connect")).toBe("Connect cTrader");
+    expect(titleFor("/admin/audit")).toBe("Audit");
+  });
+});
+
+describe("application shell", () => {
+  it("renders the sidebar, the bottom bar, and the whole of NAV in each", () => {
+    render(<AppShell><p>page</p></AppShell>);
+
+    const sidebar = document.querySelector("aside.side")!;
+    for (const n of NAV) {
+      expect(
+        within(sidebar as HTMLElement).getByRole("link", { name: new RegExp(`^${n.label}`) }),
+        `${n.label} missing from the sidebar`,
+      ).toBeDefined();
+    }
+
+    const bottom = screen.getByRole("navigation", { name: "Primary" });
+    for (const n of PRIMARY) {
+      expect(within(bottom).getByRole("link", { name: new RegExp(`^${n.label}`) })).toBeDefined();
+    }
+    // The overflow control is the promise that the other four still exist.
+    expect(within(bottom).getByRole("button", { name: /More destinations/ })).toBeDefined();
+  });
+
+  it("the More drawer exposes EVERY destination, not only the overflow", () => {
+    render(<AppShell><p>page</p></AppShell>);
+    fireEvent.click(screen.getByRole("button", { name: /More destinations/ }));
+
+    const drawer = screen.getByRole("dialog", { name: /More destinations/ });
+    for (const n of NAV) {
+      expect(
+        within(drawer).getByRole("link", { name: new RegExp(`^${n.label}`) }),
+        `${n.label} is not reachable from the drawer`,
+      ).toBeDefined();
+    }
+    // Signing out must not require finding the desktop sidebar.
+    expect(within(drawer).getByRole("button", { name: /Sign out/ })).toBeDefined();
+  });
+
+  it("puts Audit in the sidebar only when the server accepts the operator", async () => {
+    const { unmount } = render(<AppShell><p>page</p></AppShell>);
+    await screen.findByRole("status", { name: "Platform status" });
+    expect(screen.queryByRole("link", { name: /^Audit/ })).toBeNull();
+    unmount();
+    shellState.operator = true;
+    render(<AppShell><p>page</p></AppShell>);
+    expect(await screen.findByRole("link", { name: /^Audit/ })).toBeTruthy();
+  });
+
+  it("the drawer is a modal dialog and closes on Escape", () => {
+    render(<AppShell><p>page</p></AppShell>);
+    fireEvent.click(screen.getByRole("button", { name: /More destinations/ }));
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("the user menu is on every screen and reaches settings, licence and sign out", () => {
+    render(<AppShell><p>page</p></AppShell>);
+    fireEvent.click(screen.getByRole("button", { name: /Account|trader@example/ }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "Settings" })).toBeDefined();
+    expect(within(menu).getByRole("menuitem", { name: "Licence" })).toBeDefined();
+    expect(within(menu).getByRole("menuitem", { name: /Sign out/ })).toBeDefined();
+  });
+
+  it("the status strip states the account, the mode and the automation state", async () => {
+    render(<AppShell><p>page</p></AppShell>);
+    const strip = await screen.findByRole("status", { name: "Platform status" });
+    expect(within(strip).getByText("DEMO")).toBeDefined();
+    expect(within(strip).getByText("#501")).toBeDefined();
+    expect(within(strip).getByText("RUNNING")).toBeDefined();
+    // Demo-only is a property of the release, stated on every screen.
+    expect(within(strip).getByText(/Demo/)).toBeDefined();
+  });
+
+  it("marks the active destination in both menus", () => {
+    pathname = "/journal";
+    render(<AppShell><p>page</p></AppShell>);
+    const active = [...document.querySelectorAll('[data-active="true"]')]
+      .map((e) => (e as HTMLAnchorElement).getAttribute("href"));
+    expect(active).toContain("/journal");
+    expect(active).not.toContain("/dashboard");
+  });
+
+  it("warns when the address is not confirmed and links to settings", async () => {
+    shellState.emailVerified = false;
+    render(<AppShell><p>page</p></AppShell>);
+    const note = await screen.findByText(/refused until the address is confirmed/i);
+    expect(note.textContent).toContain("Connecting cTrader and activating a rule");
+    const link = within(note.parentElement as HTMLElement).getByRole("link", { name: /settings/i });
+    expect(link.getAttribute("href")).toBe("/settings");
+  });
+
+  it("does not warn while the address confirmation field is missing", async () => {
+    shellState.emailVerified = undefined;
+    render(<AppShell><p>page</p></AppShell>);
+    await screen.findByRole("status", { name: "Platform status" });
+    expect(screen.queryByText(/refused until the address is confirmed/i)).toBeNull();
+  });
+
+  it("does not leave the app when sign-out fails", async () => {
+    shellState.signOut.mockResolvedValue({ error: { message: "network down" } });
+    render(<AppShell><p>page</p></AppShell>);
+    fireEvent.click(screen.getAllByRole("button", { name: /Sign out/ })[0]);
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("network down");
+    expect(push).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("the sidebar timeline", () => {
+  const sidebarLinks = () => [...document.querySelectorAll("aside.side a.side-link")] as HTMLAnchorElement[];
+  const list = (el: Element) => el.closest(".side-list") as HTMLElement;
+
+  it("lights the rail down to the current page when nothing is hovered", () => {
+    pathname = "/positions";
+    render(<AppShell><p>page</p></AppShell>);
+    const links = sidebarLinks();
+    const here = links.findIndex((a) => a.getAttribute("href") === "/positions");
+    expect(list(links[here]).style.getPropertyValue("--ri")).toBe(String(here));
+    expect(links[here].getAttribute("aria-current")).toBe("page");
+    expect(links[here].closest("li")!.getAttribute("data-lit")).toBe("true");
+    expect(links[here + 1].closest("li")!.getAttribute("data-lit")).toBe("false");
+  });
+
+  it("follows the pointer and the keyboard, and goes back when they leave", () => {
+    pathname = "/dashboard";
+    render(<AppShell><p>page</p></AppShell>);
+    const links = sidebarLinks();
+    const rules = links.findIndex((a) => a.getAttribute("href") === "/rules");
+    const ul = list(links[rules]);
+    expect(ul.getAttribute("data-hover")).toBe("false");
+
+    fireEvent.pointerEnter(links[3]);
+    expect(ul.getAttribute("data-hover")).toBe("true");
+    expect(ul.style.getPropertyValue("--hi")).toBe("3");
+    expect(ul.style.getPropertyValue("--ri")).toBe("3");
+
+    fireEvent.focus(links[rules]);              // keyboard drives the same state
+    expect(ul.style.getPropertyValue("--hi")).toBe(String(rules));
+
+    fireEvent.pointerLeave(ul);
+    expect(ul.getAttribute("data-hover")).toBe("false");
+    expect(ul.style.getPropertyValue("--ri")).toBe("0");     // back to /dashboard
+  });
+
+  it("a page in no group lights nothing instead of a wrong node", () => {
+    pathname = "/connect";
+    render(<AppShell><p>page</p></AppShell>);
+    for (const a of sidebarLinks()) expect(a.closest("li")!.getAttribute("data-lit")).toBe("false");
+  });
+});
+
+describe("the logo button", () => {
+  it("opens the appearance controls, and Escape closes them", () => {
+    render(<AppShell><p>page</p></AppShell>);
+    const btn = screen.getByRole("button", { name: /appearance/i });
+    expect(btn.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(btn);
+    const dialog = screen.getByRole("dialog", { name: "Appearance" });
+    expect(within(dialog).getByRole("radiogroup", { name: "Theme" })).toBeDefined();
+    expect(within(dialog).getAllByRole("radio", { name: /cream|ice|lilac|orchid|volt/i }).length).toBe(5);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Appearance" })).toBeNull();
+  });
+});
+
+describe("stylesheet obligations", () => {
+  const CSS = readFileSync(join(__dirname, "..", "..", "app", "globals.css"), "utf8");
+
+  it("honours prefers-reduced-motion", () => {
+    expect(CSS).toContain("prefers-reduced-motion: reduce");
+    // Not just present — it has to actually stop the animations.
+    const block = CSS.slice(CSS.indexOf("prefers-reduced-motion"));
+    expect(block).toContain("animation-duration");
+    expect(block).toContain("transition-duration");
+  });
+
+  it("gives keyboard users a visible focus ring", () => {
+    expect(CSS).toContain(":focus-visible");
+    expect(CSS).toMatch(/:focus-visible\s*\{[^}]*outline:/);
+  });
+
+  it("declares a type scale and a spacing scale rather than loose literals", () => {
+    for (const t of ["--fs-sm", "--fs-md", "--fs-lg", "--sp-2", "--sp-4"]) {
+      expect(CSS, `${t} is not declared`).toContain(t);
+    }
+  });
+
+  it("wraps segmented controls on a narrow screen without changing the desktop rule", () => {
+    expect(CSS).toMatch(/\.seg \{ display: inline-flex/);
+    const start = CSS.indexOf("@media (max-width: 720px)");
+    expect(start).toBeGreaterThan(-1);
+    const block = CSS.slice(start, start + 500);
+    expect(block).toContain(".seg { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; }");
+    expect(block).toContain(".page-head > *");
+    expect(block).toContain(".btn-row { min-width: 0; max-width: 100%; }");
+    expect(block).toContain(".tbl-kv td { overflow-wrap: anywhere; }");
+  });
+
+  it("targets touch-sized controls", () => {
+    // 44px is the smallest reliable touch target; the bottom bar and the
+    // drawer links are the ones a thumb actually uses.
+    expect(CSS).toMatch(/\.bottomnav a, \.bottomnav button \{[^}]*min-height: 44px/);
+  });
+});

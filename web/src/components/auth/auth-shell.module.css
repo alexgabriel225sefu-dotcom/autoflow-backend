@@ -1,0 +1,79 @@
+/* Motion layer for the sign-in screens. Pattern after "Modern Animated Sign In"
+   (21st.dev, arunachalam). Existing --a4t-* tokens only; transform/opacity only. */
+
+.shell { position: relative; isolation: isolate; overflow: hidden; }
+
+/* Three drifting glows. Static radial gradients, moved with transform, so
+   there is no blur filter and no layout or paint work per frame. */
+.backdrop { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.glow { position: absolute; border-radius: 50%; will-change: transform; }
+.g1 {
+  width: 62vmax; height: 62vmax; left: -22vmax; top: -26vmax;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--a4t-brand) 20%, transparent), transparent 72%);
+  animation: drift1 26s ease-in-out infinite alternate;
+}
+.g2 {
+  width: 54vmax; height: 54vmax; right: -20vmax; bottom: -24vmax;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--a4t-link) 11%, transparent), transparent 72%);
+  animation: drift2 32s ease-in-out infinite alternate;
+}
+.g3 {
+  width: 40vmax; height: 40vmax; left: 30%; top: 40%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--a4t-brand) 9%, transparent), transparent 72%);
+  animation: drift3 38s ease-in-out infinite alternate;
+}
+@keyframes drift1 { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(14vmax, 10vmax, 0) scale(1.12); } }
+@keyframes drift2 { from { transform: translate3d(0, 0, 0) scale(1.05); } to { transform: translate3d(-12vmax, -8vmax, 0) scale(.95); } }
+@keyframes drift3 { from { transform: translate3d(-6vmax, 4vmax, 0); } to { transform: translate3d(8vmax, -6vmax, 0); } }
+
+/* Staggered entrance: each direct child of the card block rises in turn. */
+.block > * { animation: rise .55s cubic-bezier(.2, .7, .2, 1) backwards; }
+.block > :nth-child(1) { animation-delay: .05s; }
+.block > :nth-child(2) { animation-delay: .12s; }
+.block > :nth-child(3) { animation-delay: .19s; }
+.block > :nth-child(4) { animation-delay: .26s; }
+.block > :nth-child(5) { animation-delay: .33s; }
+.block > :nth-child(n + 6) { animation-delay: .4s; }
+@keyframes rise { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+
+/* Inputs: the label warms and an underline sweeps in on focus. */
+.field > span:first-child { transition: color .2s ease; }
+.field:focus-within > span:first-child { color: var(--a4t-text); }
+.block :global(.field) { position: relative; }
+.block :global(.field input) { transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.block :global(.field)::after {
+  content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; border-radius: 2px;
+  background: var(--a4t-brand); transform: scaleX(0); transform-origin: left; transition: transform .3s ease;
+  pointer-events: none;
+}
+.block :global(.field):focus-within::after { transform: scaleX(1); }
+
+/* Password field: input with the toggle inside its right edge. */
+.row { position: relative; }
+.row input { padding-right: 3.2rem; }
+.toggle {
+  position: absolute; right: .35rem; top: 50%; translate: 0 -50%;
+  width: 2.75rem; height: 2.75rem; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 10px; background: transparent; color: var(--a4t-muted); cursor: pointer;
+  transition: color .15s ease, background-color .15s ease;
+}
+.toggle:hover { color: var(--a4t-text); background: var(--a4t-surface-2); }
+.toggle:focus-visible { outline: 2px solid var(--a4t-link); outline-offset: 1px; }
+.toggle[aria-pressed="true"] { color: var(--a4t-text); }
+
+/* Submit: spinner while busy. */
+.submit { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; }
+.submit[aria-busy="true"] { cursor: progress; }
+.spinner {
+  width: 1.05rem; height: 1.05rem; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .glow, .block > * { animation: none; }
+  .block :global(.field)::after, .block :global(.field input), .field > span:first-child { transition: none; }
+  /* A static ring still says "busy" without rotating. */
+  .spinner { animation: none; border-right-color: currentColor; opacity: .6; }
+}
