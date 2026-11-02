@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand/logo";
+import { LegalSection, LegalSections } from "@/components/legal/legal-section";
+import { ReadingProgress } from "@/components/legal/reading-progress";
 
 export const metadata: Metadata = { title: "Privacy Policy — Apex4Traders" };
 
@@ -27,6 +29,7 @@ export const metadata: Metadata = { title: "Privacy Policy — Apex4Traders" };
 export default function PrivacyPage() {
   return (
     <main className="a4t">
+      <ReadingProgress />
       <div className="legacy">
         <div style={{ marginBottom: "var(--sp-5)" }}>
           <Link href="/"><BrandLockup size={24} /></Link>
@@ -43,7 +46,8 @@ export default function PrivacyPage() {
           and are listed in the project&rsquo;s legal launch blockers.
         </div>
 
-        <section>
+        <LegalSections>
+<LegalSection>
           <h2>1. What we collect when you have an account</h2>
           <p>
             Your email address and password, held by our authentication
@@ -53,9 +57,9 @@ export default function PrivacyPage() {
             the identifier and mode of your cTrader account together with the
             access tokens needed to reach it.
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>2. If you join the early-access list</h2>
           <p>
             You do not need an account to join, and joining does not create
@@ -80,9 +84,9 @@ export default function PrivacyPage() {
             that message, and the address to write to in order to be removed.]
             </strong>
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>3. Your broker tokens</h2>
           <p>
             cTrader access and refresh tokens are encrypted at rest on the
@@ -91,9 +95,9 @@ export default function PrivacyPage() {
             Disconnecting your account from the Accounts page removes them from
             the platform.
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>4. What we do not collect</h2>
           <p>
             We do not read your broker account&rsquo;s cash flow history —
@@ -103,9 +107,9 @@ export default function PrivacyPage() {
             tracking in the platform, and no third-party script or iframe runs
             on the pages you use while signed in.
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>5. Processors</h2>
           <p>
             Authentication and account storage are provided by Supabase. Market
@@ -118,9 +122,9 @@ export default function PrivacyPage() {
             email provider, and the full list of sub-processors with their
             locations.]</strong>
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>6. Why we hold it</h2>
           <p>
             To sign you in, to run the rules you configured, to show you what
@@ -128,17 +132,17 @@ export default function PrivacyPage() {
             licensed. The journal exists so that a decision can be explained
             afterwards; that is its purpose and it is kept for that reason.
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>7. How long</h2>
           <p>
             <strong>[TO BE CONFIRMED — retention periods for account data,
             journal entries and disconnected broker links.]</strong>
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>8. Your rights</h2>
           <p>
             You can disconnect your broker account at any time, and you can ask
@@ -147,23 +151,24 @@ export default function PrivacyPage() {
             <strong> [TO BE CONFIRMED — the rights that apply under the
             governing jurisdiction, and how to exercise them.]</strong>
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>9. Cookies</h2>
           <p>
             Session cookies are used to keep you signed in. There are no
             advertising or tracking cookies.
           </p>
-        </section>
+        </LegalSection>
 
-        <section>
+        <LegalSection>
           <h2>10. Who is responsible, and how to reach us</h2>
           <p>
             <strong>[TO BE CONFIRMED — data controller name, registered
             address, and a contact address for privacy requests.]</strong>
           </p>
-        </section>
+        </LegalSection>
+</LegalSections>
 
         <p style={{ marginTop: "var(--sp-6)" }}>
           <Link href="/terms">Terms of Service</Link>

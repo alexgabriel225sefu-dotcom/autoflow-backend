@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLockup } from "@/components/brand/logo";
+import { ReadingProgress } from "./reading-progress";
 import {
   DRAFT_NOTICE,
   LEGAL_VERSION,
@@ -24,6 +25,7 @@ export function DraftShell({
   const published = legalPublished();
   return (
     <main className="a4t">
+      <ReadingProgress />
       <div className="legacy">
         <div style={{ marginBottom: "var(--sp-5)" }}>
           <Link href="/"><BrandLockup size={24} /></Link>

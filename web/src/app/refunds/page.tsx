@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CompanyBlock, DraftShell } from "@/components/legal/draft-shell";
+import { LegalSection, LegalSections } from "@/components/legal/legal-section";
 
 export const metadata: Metadata = { title: "Refund policy — Apex4Traders" };
 
@@ -20,7 +21,8 @@ export default function RefundsPage() {
         a promise that any payment will be refunded. [TO BE CONFIRMED]
       </div>
 
-      <section>
+      <LegalSections>
+<LegalSection>
         <h2>1. What you are paying for</h2>
         <p>
           A payment, when the purchase is on sale, is for a software licence
@@ -29,9 +31,9 @@ export default function RefundsPage() {
           of the money on your broker account. A loss on that account is not
           a charge this policy can return.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>2. What a refund does to the licence</h2>
         <p>
           If the payment provider tells us a charge was refunded in full, or
@@ -42,9 +44,9 @@ export default function RefundsPage() {
           Withdrawing a licence does not close positions at your broker and
           does not move money.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>3. Whether you can ask for a refund</h2>
         <p>
           <strong>[TO BE CONFIRMED — whether a customer may request a refund,
@@ -60,9 +62,9 @@ export default function RefundsPage() {
           It does not promise a result that a refund could be measured
           against.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>4. How to ask, once a contact exists</h2>
         <CompanyBlock />
         <p>
@@ -71,9 +73,9 @@ export default function RefundsPage() {
           on this draft. Sending a request to an address that is not listed
           here will not reach anyone.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>5. Chargebacks</h2>
         <p>
           A card dispute is treated as a full withdrawal of the licence while
@@ -81,7 +83,8 @@ export default function RefundsPage() {
           between you and the payment provider. It does not move funds on
           your broker account.
         </p>
-      </section>
+      </LegalSection>
+</LegalSections>
     </DraftShell>
   );
 }

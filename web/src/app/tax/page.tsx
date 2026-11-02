@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CompanyBlock, DraftShell } from "@/components/legal/draft-shell";
+import { LegalSection, LegalSections } from "@/components/legal/legal-section";
 
 export const metadata: Metadata = { title: "Tax notice — Apex4Traders" };
 
@@ -19,7 +20,8 @@ export default function TaxPage() {
         tax advice. [TO BE CONFIRMED]
       </div>
 
-      <section>
+      <LegalSections>
+<LegalSection>
         <h2>1. No tax registration is in place</h2>
         <CompanyBlock />
         <p>
@@ -28,9 +30,9 @@ export default function TaxPage() {
           equivalent registration is stated here. A number must not be
           inferred from this page.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>2. What the price does and does not include</h2>
         <p>
           The price a visitor sees is the figure the server publishes for the
@@ -41,9 +43,9 @@ export default function TaxPage() {
           Until that is decided, this notice does not say that tax is
           included and does not say that a further tax will be added.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>3. Your own tax position</h2>
         <p>
           You are responsible for any tax you owe on your trading or on your
@@ -51,9 +53,9 @@ export default function TaxPage() {
           calculate that tax, does not file it, and does not advise you on
           it. Nothing here is a statement of your liability.
         </p>
-      </section>
+      </LegalSection>
 
-      <section>
+      <LegalSection>
         <h2>4. Jurisdiction</h2>
         <p>
           Which tax regime applies depends on {"{{JURISDICTION}}"} and on
@@ -61,7 +63,8 @@ export default function TaxPage() {
           <strong> [TO BE CONFIRMED]</strong>. The platform does not choose
           a country in order to make this notice look complete.
         </p>
-      </section>
+      </LegalSection>
+</LegalSections>
     </DraftShell>
   );
 }

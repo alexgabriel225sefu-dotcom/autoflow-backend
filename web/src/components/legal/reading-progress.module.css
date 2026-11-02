@@ -1,0 +1,28 @@
+.track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 50;
+  background: var(--a4t-line-soft);
+  pointer-events: none;
+}
+
+.bar {
+  height: 100%;
+  width: 100%;
+  background: var(--a4t-link);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 90ms linear;
+  will-change: transform;
+}
+
+/* Reduced motion: the bar still shows the position, it just does not glide. */
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+    will-change: auto;
+  }
+}

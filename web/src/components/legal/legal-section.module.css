@@ -1,0 +1,82 @@
+.controls {
+  display: flex;
+  gap: .5rem;
+  margin: 1.2rem 0 .6rem;
+}
+
+.controlBtn {
+  font: inherit;
+  font-size: .78rem;
+  color: var(--a4t-muted);
+  background: transparent;
+  border: 1px solid var(--a4t-line);
+  border-radius: var(--a4t-radius-sm);
+  padding: .4rem .7rem;
+  min-height: 36px;
+  cursor: pointer;
+}
+.controlBtn:hover:not(:disabled) { color: var(--a4t-text); background: var(--a4t-bg-2); }
+.controlBtn:disabled { opacity: .55; cursor: default; }
+.controlBtn:focus-visible,
+.trigger:focus-visible {
+  outline: 2px solid var(--a4t-link);
+  outline-offset: 2px;
+}
+
+.card {
+  border: 1px solid var(--a4t-line);
+  background: var(--a4t-surface);
+  border-radius: var(--a4t-radius);
+  margin-top: .6rem;
+  scroll-margin-top: 1rem;
+}
+
+/* Overrides the page-level `.legacy h2` margin for the heading in a card. */
+.card .heading { margin: 0; font-size: .95rem; }
+
+.trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: var(--a4t-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--a4t-radius);
+  padding: .85rem 1rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+.trigger:hover { background: var(--a4t-bg-2); }
+
+.chevron {
+  flex: none;
+  width: .55rem;
+  height: .55rem;
+  border-right: 2px solid var(--a4t-dim);
+  border-bottom: 2px solid var(--a4t-dim);
+  transform: rotate(45deg);
+  transition: transform 200ms ease;
+}
+.open .chevron { transform: rotate(-135deg); }
+
+/* Animated height: a one-row grid that goes from 1fr to 0fr. */
+.panel {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.animate .panel { transition: grid-template-rows 220ms ease; }
+.closed .panel { grid-template-rows: 0fr; }
+
+.inner { overflow: hidden; min-height: 0; }
+.body { padding: 0 1rem .9rem; }
+.body > :first-child { margin-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate .panel,
+  .chevron { transition: none; }
+}
