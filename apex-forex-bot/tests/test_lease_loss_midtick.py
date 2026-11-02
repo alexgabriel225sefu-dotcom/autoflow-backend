@@ -16,9 +16,10 @@ which cannot be called without a live tick, so it is pinned the way the
 neighbouring tests pin it: by reading the shipped source for the branch and
 its position relative to the first trading step.
 
-KNOWN GAP (asserted at current behaviour): between the takeover and the
-renewer's next heartbeat, `ownership.holds()` trusts its local record and
-`may_trade` answers OWNER. The window is RENEW_EVERY_S. See section [5].
+A LIVE order does not trust the local record (section [5]): it reads the lease
+key itself at the moment of sending, so the window between a takeover and the
+renewer's next heartbeat cannot let it through. A demo order keeps the cached
+answer, deliberately.
 
 Run: python3 tests/test_lease_loss_midtick.py
 """
@@ -207,28 +208,64 @@ try:
     check("a fresh acquire succeeds", ownership.acquire(USER) is True)
     check("and trading is permitted again", ownership.may_trade(USER, live=True)[0] is True)
 
-    # ── 5. KNOWN GAP ───────────────────────────────────────────────────────
-    print("\n[5] KNOWN GAP: the takeover is invisible to may_trade until the renewer runs")
+    # ── 5. a live order re-reads the lease; a demo order keeps the cache ───
+    print("\n[5] a takeover is visible to a LIVE order at once, without a heartbeat")
     # `holds()` answers from the local `_held` timestamp while it is fresher
-    # than RENEW_EVERY_S, to keep a network hop off the money path. The
-    # renewer thread is what corrects it. So for up to RENEW_EVERY_S after
-    # another container takes the lease, an order from THIS container still
-    # passes the ownership gate - two owners for that interval, on the very
-    # path (live orders) where the docstring says unknown ownership fails
-    # closed. BETTER BEHAVIOUR: a live order re-reads the key (one GET) when
-    # it is about to send, instead of trusting the cached timestamp.
+    # than RENEW_EVERY_S, to keep a network hop off the money path. For demo
+    # that is right. For a live order it left up to RENEW_EVERY_S in which two
+    # containers could both pass the ownership gate, so `may_trade(live=True)`
+    # now reads the key itself (one GET) and ignores the cached timestamp.
     reset()
     ownership.RENEW_EVERY_S = 3600          # no renewer will run in this test
     check("we hold the lease", ownership.acquire(USER) is True)
+    check("(control) while it is ours a live order is allowed",
+          ownership.may_trade(USER, live=True) == (True, "OWNER"))
     FAKE.kv[KEY] = OTHER                    # B takes over; no heartbeat has run
     verdict = ownership.may_trade(USER, live=True)
-    check("(current) a LIVE order is still allowed: OWNER from the stale local record",
-          verdict == (True, "OWNER"), str(verdict))
-    check("(current) the store itself already says someone else holds it",
-          FAKE.kv[KEY] == OTHER)
-    ownership._held.pop(USER, None)         # what the next heartbeat does
-    check("(corrected by the renewer) the same call then refuses",
-          ownership.may_trade(USER, live=True) == (False, "NOT_OWNER"))
+    check("a LIVE order is refused at once: NOT_OWNER, with a fresh local record",
+          verdict == (False, "NOT_OWNER"), str(verdict))
+    check("and the local record is dropped, as the next heartbeat would",
+          USER not in ownership._held)
+    reset()
+    ownership.RENEW_EVERY_S = 3600
+    ownership.acquire(USER)
+    FAKE.kv[KEY] = OTHER
+    check("a DEMO order still answers from the cache (unchanged, by design)",
+          ownership.may_trade(USER, live=False) == (True, "OWNER"),
+          str(ownership.may_trade(USER, live=False)))
+    reset()
+    ownership.RENEW_EVERY_S = 3600
+    ownership.acquire(USER)
+    FAKE.kv.pop(KEY)                        # key gone: expired or unreadable
+    check("a LIVE order with no readable lease fails closed (OWNERSHIP_UNKNOWN)",
+          ownership.may_trade(USER, live=True) == (False, "OWNERSHIP_UNKNOWN"),
+          str(ownership.may_trade(USER, live=True)))
+    reset()
+    ownership.RENEW_EVERY_S = 3600
+    ownership.acquire(USER)
+    _gb = user_store.get_blob
+    def _boom(k):
+        raise RuntimeError("redis down")
+    user_store.get_blob = _boom
+    try:
+        check("a LIVE order whose lease read raises fails closed",
+              ownership.may_trade(USER, live=True) == (False, "OWNERSHIP_UNKNOWN"))
+    finally:
+        user_store.get_blob = _gb
+    reset()
+    ownership.RENEW_EVERY_S = 3600
+    ownership.acquire(USER)
+    FAKE.kv[KEY] = OTHER
+    FAKE.users[USER] = {"id": USER, "paper": False}     # a live account
+    broker = Broker()
+    try:
+        out = order(broker)
+    finally:
+        FAKE.users[USER] = {"id": USER, "paper": True}
+    check("end to end: a live account's order, with the lease just taken and no "
+          "heartbeat yet, is refused for ownership and sends nothing",
+          out.get("ok") is False and "owning instance" in str(out.get("error"))
+          and broker.orders == [], str(out))
 finally:
     ownership.RENEW_EVERY_S = _real_renew_every
     reset()
