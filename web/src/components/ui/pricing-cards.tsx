@@ -29,7 +29,7 @@
  */
 import { useState } from "react";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import styles from "./lifetime-card.module.css";
 
 /** `accent` is the plan being argued for. At most one card should wear it. */
@@ -125,10 +125,12 @@ export function PlanCard({ plan }: { plan: PricingPlan }) {
         {plan.ctaDisabled || !plan.ctaHref ? (
           <button type="button" className={ctaClass} disabled aria-disabled="true">
             {plan.ctaLabel}
+            {lifetime ? <ArrowUpRight size={18} aria-hidden /> : null}
           </button>
         ) : (
           <Link className={ctaClass} href={plan.ctaHref}>
             {plan.ctaLabel}
+            {lifetime ? <ArrowUpRight size={18} aria-hidden /> : null}
           </Link>
         )}
 

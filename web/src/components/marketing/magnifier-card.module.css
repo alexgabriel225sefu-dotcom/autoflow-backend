@@ -1,65 +1,75 @@
-/* Magnifier card. Colours are the landing tokens; sizes that the script also
-   needs (the lens radius) arrive as --lens from the component. */
+/* Magnified Bento (0xUrvish, 21st.dev) in the landing tokens. */
 .card {
-  display: flex; flex-direction: column; overflow: hidden;
-  background: var(--mkt-surface);
-  border: 1px solid var(--mkt-line);
-  border-radius: 20px;
-  transition: border-color .25s ease;
+  position: relative; display: flex; flex-direction: column;
+  padding: 6px; border-radius: 2rem;
+  background: var(--mkt-surface); border: 1px solid var(--mkt-line);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, .35);
+  transition: transform .5s ease, box-shadow .5s ease;
 }
-.card:hover { border-color: var(--mkt-accent-line); }
+@media (hover: hover) { .card:hover { transform: translateY(-4px); box-shadow: 0 28px 60px rgba(0, 0, 0, .45); } }
 
 .stage {
-  position: relative; height: 176px; overflow: hidden;
-  background: var(--mkt-bg-2);
-  border-bottom: 1px solid var(--mkt-line-soft);
-  touch-action: pan-y; cursor: none;
+  --lx: 0px; --ly: 0px;
+  position: relative; overflow: hidden; height: 200px; border-radius: 1.6rem;
+  background: color-mix(in srgb, var(--mkt-bg-2) 70%, transparent);
+}
+@media (min-width: 640px) { .stage { height: 240px; } }
+.fieldBox { position: absolute; inset: 0; }
+
+/* Both layers fill the stage and centre their rows vertically. */
+.field { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 1rem; }
+/* Empty inside the lens circle, so the base shows a hole under the glass. */
+.base {
+  --hole: radial-gradient(circle 30px at calc(50% + var(--lx) - 10px) calc(50% + var(--ly) - 10px), transparent 100%, #000 100%);
+  -webkit-mask-image: var(--hole); mask-image: var(--hole);
+}
+/* Only the lens circle; larger, brighter pills. */
+.reveal {
+  clip-path: circle(30px at calc(50% + var(--lx) - 10px) calc(50% + var(--ly) - 10px));
+  pointer-events: none; user-select: none; z-index: 10;
 }
 
-.layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding-top: 22px; }
-/* The unmagnified labels fade at both edges, as the original does. */
-.base {
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-          mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-}
-.row { display: flex; gap: .55rem; white-space: nowrap; margin-bottom: .7rem; width: max-content; }
-.row[data-row="0"] { transform: translateX(-1.4rem); }
-.row[data-row="1"] { transform: translateX(1.1rem); }
-.row[data-row="2"] { transform: translateX(-.5rem); }
+.row { display: flex; gap: 1rem; width: max-content; animation: slide 25s linear infinite; }
+.row[data-dir="rtl"] { animation-name: slideBack; }
+@keyframes slide { from { transform: translateX(0); } to { transform: translateX(-33.333%); } }
+@keyframes slideBack { from { transform: translateX(-33.333%); } to { transform: translateX(0); } }
 
 .pill {
-  padding: .42rem .85rem; border-radius: 999px; font-size: .78rem; line-height: 1.2;
-  color: var(--mkt-dim); background: var(--mkt-surface);
-  border: 1px solid var(--mkt-line);
+  display: flex; align-items: center; gap: .5rem; width: fit-content; white-space: nowrap;
+  padding: .5rem .75rem; border-radius: 999px; font-size: .75rem; line-height: 1;
+  color: var(--mkt-dim); background: color-mix(in srgb, var(--mkt-bg) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mkt-line) 60%, transparent);
+}
+.pillIcon { flex: none; display: inline-flex; }
+.reveal .pill {
+  transform: scale(1.25); margin-left: 1.5rem; font-weight: 500;
+  color: var(--mkt-text); background: var(--mkt-bg);
+  border-color: var(--mkt-accent-line); box-shadow: 0 1px 2px rgba(0, 0, 0, .4);
+}
+.reveal .pillIcon { color: var(--mkt-accent-text); }
+
+/* The lens: centred on the stage, moved by --lx/--ly while it is dragged. */
+.lens {
+  position: absolute; left: 50%; top: 50%; z-index: 40;
+  width: 92px; height: 92px; margin: -46px 0 0 -46px;
+  transform: translate(var(--lx), var(--ly));
+  cursor: grab; touch-action: none; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .5));
+}
+.lens:active { cursor: grabbing; }
+.sheen {
+  position: absolute; left: 6px; top: 6px; width: 60px; height: 60px; border-radius: 50%;
+  background: rgba(255, 255, 255, .08); pointer-events: none;
 }
 
-/* The lens. */
-.lens { position: absolute; left: 0; top: 0; width: calc(var(--lens) * 2); height: calc(var(--lens) * 2); pointer-events: none; will-change: transform; }
-.glass {
-  position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
-  border: 3px solid var(--mkt-text);
-  background: var(--mkt-bg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .55), inset 0 0 12px rgba(255, 255, 255, .08);
-}
-.zoom { position: absolute; left: 0; top: 0; width: var(--w); height: var(--h); transform-origin: 0 0; will-change: transform; }
-.big .pill { color: var(--mkt-text); background: var(--mkt-surface-2); border-color: var(--mkt-accent-line); }
-.big .row[data-row="0"] { transform: translateX(-1.4rem); }
-.handle {
-  position: absolute; left: calc(var(--lens) * 1.68); top: calc(var(--lens) * 1.68);
-  width: 8px; height: 30px; border-radius: 5px; background: var(--mkt-text);
-  transform-origin: 50% 0; transform: rotate(-45deg);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, .5);
-}
+.fade { position: absolute; top: 0; bottom: 0; width: 25%; pointer-events: none; z-index: 20; }
+.fadeL { left: 0; background: linear-gradient(to right, var(--mkt-surface), transparent); }
+.fadeR { right: 0; background: linear-gradient(to left, var(--mkt-surface), transparent); }
 
-/* Returning to the middle eases; following the pointer never lags behind it. */
-.stage[data-idle] .lens, .stage[data-idle] .zoom { transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
+.copy { padding: 1.1rem 1rem 1.6rem; }
+.copy h3 { font-size: 1.25rem; font-weight: 500; letter-spacing: -.02em; margin: 0; color: var(--mkt-text); }
+.copy p { margin: .5rem 0 0; font-size: .875rem; line-height: 1.65; color: var(--mkt-muted); }
 
-.copy { padding: 1.15rem 1.3rem 1.4rem; }
-.copy h3 { font-size: 1.05rem; font-weight: 650; margin: 0 0 .45rem; color: var(--mkt-text); }
-.copy p { font-size: .9rem; line-height: 1.65; color: var(--mkt-muted); margin: 0; }
-
-@media (hover: none) { .stage { cursor: auto; } }
 @media (prefers-reduced-motion: reduce) {
-  .stage[data-idle] .lens, .stage[data-idle] .zoom { transition: none; }
+  .row { animation: none; }
   .card { transition: none; }
 }

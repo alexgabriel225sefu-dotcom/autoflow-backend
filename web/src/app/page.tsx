@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import {
   ArrowRight,
   ArrowUpRight,
+  Eye,
+  GaugeCircle,
+  Link2,
+  ListChecks,
+  PlayCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
@@ -101,36 +107,42 @@ export default function Landing() {
 
           <div className="mkt-lens-grid">
             <MagnifierCard
+              icon={<Link2 size={14} aria-hidden />}
               title="Connect your own account"
               rows={[["You authorise", "cTrader", "Demo first"], ["Disconnect any time", "No broker password"], ["Token stays on the server", "Your own account"]]}
             >
               You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password, and the access token never reaches your browser.
             </MagnifierCard>
             <MagnifierCard
+              icon={<ListChecks size={14} aria-hidden />}
               title="Write rules in named conditions"
               rows={[["Moving averages", "RSI", "MACD"], ["ATR", "Bollinger Bands", "Stochastic"], ["Sessions", "Weekdays", "Spread", "Position limits"]]}
             >
               Moving averages, RSI, MACD, ATR, Bollinger Bands, Stochastic, sessions, weekdays, spread and position limits.
             </MagnifierCard>
             <MagnifierCard
+              icon={<Eye size={14} aria-hidden />}
               title="Preview before it runs"
               rows={[["Condition passed", "Condition failed"], ["Rule would decide", "Nothing is placed"], ["Real candles", "Preview only"]]}
             >
               Read which conditions passed, which failed, and what the rule would decide. Nothing is placed by a preview.
             </MagnifierCard>
             <MagnifierCard
+              icon={<GaugeCircle size={14} aria-hidden />}
               title="Risk limits you set"
               rows={[["Risk per trade", "Stop distance"], ["Target", "Open position cap"], ["Enforced on the server", "Daily stop"]]}
             >
               Risk per trade, stop distance, target, and a cap on open positions are enforced on the server.
             </MagnifierCard>
             <MagnifierCard
+              icon={<PlayCircle size={14} aria-hidden />}
               title="Start, pause, stop"
               rows={[["Start", "Pause", "Stop"], ["You press Start", "Recorded in the journal"], ["Unknown when unsure", "Never guessed"]]}
             >
               Automation runs only while you have started it. The panel says unknown rather than guessing when it cannot tell.
             </MagnifierCard>
             <MagnifierCard
+              icon={<ShieldCheck size={14} aria-hidden />}
               title="A journal of every decision"
               rows={[["Acted", "Did not act"], ["Reason recorded", "Condition that stopped it"], ["Every evaluation", "Readable later"]]}
             >
