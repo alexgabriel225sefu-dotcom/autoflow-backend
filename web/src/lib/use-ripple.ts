@@ -61,10 +61,24 @@ export function spawnRipple(
   dot.style.setProperty("--ripple-size", `${g.size}px`);
   host.appendChild(dot);
   el.appendChild(host);
-  const done = () => host.remove();
-  dot.addEventListener("animationend", done, { once: true });
-  window.setTimeout(done, 900);
+  host.dataset.born = String(performance.now());
+  // A press nobody lets go of (lost focus, a dropped pointer) must not stay.
+  window.setTimeout(() => releaseRipple(host), 6000);
   return host;
+}
+
+const MIN_VISIBLE_MS = 220;
+const FADE_MS = 320;
+
+/** Let a held ripple go: it stays at least a moment, fades, then is removed. */
+export function releaseRipple(host: HTMLElement | null | undefined) {
+  if (!host || host.hasAttribute("data-released") || !host.isConnected) return;
+  const born = Number(host.dataset.born ?? 0);
+  const wait = Math.max(0, MIN_VISIBLE_MS - (performance.now() - born));
+  window.setTimeout(() => {
+    host.setAttribute("data-released", "");
+    window.setTimeout(() => host.remove(), FADE_MS);
+  }, wait);
 }
 
 /** For a single element: spread the returned handler onto it. */

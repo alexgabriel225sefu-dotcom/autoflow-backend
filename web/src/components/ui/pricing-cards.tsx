@@ -29,7 +29,7 @@
  */
 import { useState } from "react";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import styles from "./lifetime-card.module.css";
 
 /** `accent` is the plan being argued for. At most one card should wear it. */
@@ -125,10 +125,12 @@ export function PlanCard({ plan }: { plan: PricingPlan }) {
         {plan.ctaDisabled || !plan.ctaHref ? (
           <button type="button" className={ctaClass} disabled aria-disabled="true">
             {plan.ctaLabel}
+            {lifetime ? <ArrowUpRight size={18} aria-hidden /> : null}
           </button>
         ) : (
           <Link className={ctaClass} href={plan.ctaHref}>
             {plan.ctaLabel}
+            {lifetime ? <ArrowUpRight size={18} aria-hidden /> : null}
           </Link>
         )}
 
@@ -160,20 +162,30 @@ export function PricingCards({
   groups,
   title,
   subtitle,
+  eyebrow,
   defaultGroup,
 }: {
   groups: PricingGroup[];
   title?: string;
   subtitle?: string;
+  /** A small pill above the title ("Pricing"). */
+  eyebrow?: string;
   defaultGroup?: string;
 }) {
   const [active, setActive] = useState(defaultGroup ?? groups[0]?.key ?? "");
   const current = groups.find((g) => g.key === active) ?? groups[0];
   const plans = current?.plans ?? [];
+  // A lifetime offer is laid out as one wide card, centred, with the free
+  // plan under it; any other set of plans keeps the side-by-side grid.
+  const hasLifetime = plans.some((p) => p.variant === "lifetime");
+  const ordered = hasLifetime
+    ? [...plans].sort((a, b) => Number(b.variant === "lifetime") - Number(a.variant === "lifetime"))
+    : plans;
 
   return (
-    <div className="pc">
+    <div className={`pc${hasLifetime ? " pc-lt" : ""}`}>
       <div className="pc-head-row">
+        {eyebrow ? <span className="pc-eyebrow">{eyebrow}</span> : null}
         {title ? <h2>{title}</h2> : null}
         {subtitle ? <p>{subtitle}</p> : null}
 
@@ -207,13 +219,13 @@ export function PricingCards({
           So the layout uses the house classes, which is what `.grid` is for in
           this codebase, and `grid-2`/`grid-3` carry their own breakpoints. */}
       <div
-        className={[
+        className={hasLifetime ? "pc-lt-grid" : [
           "grid",
           plans.length === 2 ? "grid-2" : "",
           plans.length >= 3 ? "grid-3" : "",
         ].filter(Boolean).join(" ")}
       >
-        {plans.map((plan) => (
+        {ordered.map((plan) => (
           <PlanCard key={plan.id} plan={plan} />
         ))}
       </div>

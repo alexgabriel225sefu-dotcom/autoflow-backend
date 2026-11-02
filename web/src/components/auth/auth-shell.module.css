@@ -77,3 +77,21 @@
   /* A static ring still says "busy" without rotating. */
   .spinner { animation: none; border-right-color: currentColor; opacity: .6; }
 }
+
+/* ── Centred single-column sign-in (M3) ─────────────────────────────────── */
+.shell { grid-template-columns: minmax(0, 1fr) !important; }
+.shell :global(.auth-main) { align-items: center; }
+.shell :global(.auth-logo) { align-self: flex-start; }
+.block { max-width: 440px; }
+.block :global(h1) { font-size: clamp(1.9rem, 4vw, 2.4rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.1; }
+.block :global(.auth-lead) { font-size: 1rem; margin-top: .6rem; }
+/* Sentence-case labels with a red star on the required ones. */
+.block :global(.field) > span:first-child { font-size: .9rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--a4t-text); }
+.block :global(.field):has(input[required]) > span:first-child::after { content: " *"; color: #F87171; }
+.block :global(.field input) { height: 3rem; border-radius: 10px; font-size: .98rem; background: var(--a4t-surface); border-width: 1px; }
+.block :global(.btn-lg) { height: 3rem; border-radius: 10px; font-size: 1rem; font-weight: 600; }
+.block :global(.btn-google) { height: 3rem; border-radius: 10px; font-weight: 600; }
+/* "or" between dotted rules. */
+.block :global(.auth-or) { font-size: .9rem; font-weight: 500; letter-spacing: 0; text-transform: none; margin: 1.3rem 0 .2rem; }
+.block :global(.auth-or)::before, .block :global(.auth-or)::after { height: 0; background: none; border-top: 1px dotted var(--a4t-dim); }
+.shell :global(.auth-legal) { margin-top: 1rem; text-align: center; max-width: 440px; }

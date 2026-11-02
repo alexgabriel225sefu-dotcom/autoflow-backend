@@ -69,14 +69,18 @@ export function LegalSections({ children }: { children: ReactNode }) {
 
   return (
     <SectionsContext.Provider value={{ ready, animate, open, setOpen }}>
+     <div className={styles.group}>
       {ready ? (
         <div className={styles.controls}>
+          <span className={styles.groupLabel}>Sections</span>
+          <span className={styles.controlBtns}>
           <button type="button" className={styles.controlBtn} disabled={allOpen} onClick={() => setAll(true)}>
             Expand all
           </button>
           <button type="button" className={styles.controlBtn} disabled={allClosed} onClick={() => setAll(false)}>
             Collapse all
           </button>
+          </span>
         </div>
       ) : null}
       {items.map((child, i) => (
@@ -84,6 +88,7 @@ export function LegalSections({ children }: { children: ReactNode }) {
           {child}
         </IndexContext.Provider>
       ))}
+     </div>
     </SectionsContext.Provider>
   );
 }

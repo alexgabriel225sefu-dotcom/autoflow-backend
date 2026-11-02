@@ -12,7 +12,7 @@ import {
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
-import { MagnifiedBento } from "@/components/marketing/magnified-bento";
+import { MagnifierCard } from "@/components/marketing/magnifier-card";
 import { RuleTerminal } from "@/components/marketing/rule-terminal";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
@@ -105,50 +105,50 @@ export default function Landing() {
             prediction.
           </p>
 
-          <MagnifiedBento className="mkt-rails" label="What it does">
-            <article className="mkt-rail mkt-rail-7" data-spot>
-              <span className="mkt-card-ico"><Link2 size={17} aria-hidden /></span>
-              <h3>Connect your own account</h3>
-              <p>
-                You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password, and the access token never reaches your browser.
-              </p>
-            </article>
-            <article className="mkt-rail mkt-rail-5" data-spot>
-              <span className="mkt-card-ico"><ListChecks size={17} aria-hidden /></span>
-              <h3>Write rules in named conditions</h3>
-              <p>
-                Moving averages, RSI, MACD, ATR, Bollinger Bands, Stochastic, sessions, weekdays, spread and position limits.
-              </p>
-            </article>
-            <article className="mkt-rail mkt-rail-5" data-spot>
-              <span className="mkt-card-ico"><Eye size={17} aria-hidden /></span>
-              <h3>Preview before it runs</h3>
-              <p>
-                Read which conditions passed, which failed, and what the rule would decide. Nothing is placed by a preview.
-              </p>
-            </article>
-            <article className="mkt-rail mkt-rail-7" data-spot>
-              <span className="mkt-card-ico"><GaugeCircle size={17} aria-hidden /></span>
-              <h3>Risk limits you set</h3>
-              <p>
-                Risk per trade, stop distance, target, and a cap on open positions are enforced on the server.
-              </p>
-            </article>
-            <article className="mkt-rail mkt-rail-6" data-spot>
-              <span className="mkt-card-ico"><PlayCircle size={17} aria-hidden /></span>
-              <h3>Start, pause, stop</h3>
-              <p>
-                Automation runs only while you have started it. The panel says unknown rather than guessing when it cannot tell.
-              </p>
-            </article>
-            <article className="mkt-rail mkt-rail-6" data-spot>
-              <span className="mkt-card-ico"><ShieldCheck size={17} aria-hidden /></span>
-              <h3>A journal of every decision</h3>
-              <p>
-                Each evaluation is recorded with the reason it acted or did not. When nothing happens, the journal tells you which condition stopped it.
-              </p>
-            </article>
-          </MagnifiedBento>
+          <div className="mkt-lens-grid">
+            <MagnifierCard
+              icon={<Link2 size={14} aria-hidden />}
+              title="Connect your own account"
+              rows={[["You authorise", "cTrader", "Demo first"], ["Disconnect any time", "No broker password"], ["Token stays on the server", "Your own account"]]}
+            >
+              You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password, and the access token never reaches your browser.
+            </MagnifierCard>
+            <MagnifierCard
+              icon={<ListChecks size={14} aria-hidden />}
+              title="Write rules in named conditions"
+              rows={[["Moving averages", "RSI", "MACD"], ["ATR", "Bollinger Bands", "Stochastic"], ["Sessions", "Weekdays", "Spread", "Position limits"]]}
+            >
+              Moving averages, RSI, MACD, ATR, Bollinger Bands, Stochastic, sessions, weekdays, spread and position limits.
+            </MagnifierCard>
+            <MagnifierCard
+              icon={<Eye size={14} aria-hidden />}
+              title="Preview before it runs"
+              rows={[["Condition passed", "Condition failed"], ["Rule would decide", "Nothing is placed"], ["Real candles", "Preview only"]]}
+            >
+              Read which conditions passed, which failed, and what the rule would decide. Nothing is placed by a preview.
+            </MagnifierCard>
+            <MagnifierCard
+              icon={<GaugeCircle size={14} aria-hidden />}
+              title="Risk limits you set"
+              rows={[["Risk per trade", "Stop distance"], ["Target", "Open position cap"], ["Enforced on the server", "Daily stop"]]}
+            >
+              Risk per trade, stop distance, target, and a cap on open positions are enforced on the server.
+            </MagnifierCard>
+            <MagnifierCard
+              icon={<PlayCircle size={14} aria-hidden />}
+              title="Start, pause, stop"
+              rows={[["Start", "Pause", "Stop"], ["You press Start", "Recorded in the journal"], ["Unknown when unsure", "Never guessed"]]}
+            >
+              Automation runs only while you have started it. The panel says unknown rather than guessing when it cannot tell.
+            </MagnifierCard>
+            <MagnifierCard
+              icon={<ShieldCheck size={14} aria-hidden />}
+              title="A journal of every decision"
+              rows={[["Acted", "Did not act"], ["Reason recorded", "Condition that stopped it"], ["Every evaluation", "Readable later"]]}
+            >
+              Each evaluation is recorded with the reason it acted or did not. When nothing happens, the journal tells you which condition stopped it.
+            </MagnifierCard>
+          </div>
         </section>
 
         <section id="resources" className="mkt-section mkt-flow">

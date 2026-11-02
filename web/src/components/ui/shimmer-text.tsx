@@ -1,13 +1,13 @@
-import styles from "./shimmer-text.module.css";
+"use client";
+import { GradientShimmer } from "gradient-shimmer";
 
 /**
- * Gradient Shimmer by mona_biasia (21st.dev), written natively: a glint that
- * passes over text. Used only on "running" states. The text keeps its own
- * colour (currentColor) so it works on every button and chip; the glint is a
- * dip in that colour's alpha. Static under prefers-reduced-motion.
+ * Gradient Shimmer by mona_biasia (21st.dev): the published `gradient-shimmer`
+ * package (MIT), used as it ships. A multi-stop gradient band sweeps across the
+ * text; it pauses off screen, while scrolling and under prefers-reduced-motion.
+ * Used only on "running" states. The text is real DOM text, so assistive tech
+ * reads it normally. `children` must be a string.
  */
-export function ShimmerText({ children, className }: {
-  children: React.ReactNode; className?: string;
-}) {
-  return <span className={`${styles.shimmer} ${className ?? ""}`.trim()}>{children}</span>;
+export function ShimmerText({ children, className }: { children: string; className?: string }) {
+  return <GradientShimmer className={className}>{children}</GradientShimmer>;
 }

@@ -1,31 +1,51 @@
-/* Lifetime-deal restyle of the Founder card. Existing --mkt-* / --pc-* tokens only. */
-.badges { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
-
+/* The lifetime plan, after "Lifetime Deal Pricing Card" (diarmuradi, 21st.dev):
+   a recessed ring, a calm card inside it, the price large and plain, one wide
+   button, hairlines between the parts and a two-column checklist with filled
+   check discs. Only --mkt-* / --pc-* tokens. Nothing here states a figure. */
+.badges { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; justify-content: center; }
 .status {
   display: inline-flex; align-items: center; gap: .4rem;
-  font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
-  padding: .2rem .6rem; border-radius: 999px;
-  color: var(--pc-head-accent-fg);
-  border: 1px dashed rgba(255, 255, 255, .45);
+  font-size: .72rem; font-weight: 600; letter-spacing: .02em;
+  padding: .25rem .65rem; border-radius: 999px;
+  color: var(--mkt-text); background: var(--mkt-surface-2); border: 1px solid var(--mkt-line);
 }
-.status::before {
-  content: ""; width: 6px; height: 6px; border-radius: 50%;
-  background: var(--pc-head-accent-fg);
-}
+.status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mkt-accent-text); }
 
-.priceBlock {
-  margin-top: 1.2rem; padding: 1rem 1.1rem;
-  border-radius: 12px; border: 1px solid rgba(255, 255, 255, .22);
-  background: rgba(0, 0, 0, .18);
+/* The ring and the card inside it. */
+.lifetime.lifetime { padding: 6px; border-radius: 2rem; background: var(--mkt-surface-2); border-color: var(--mkt-line); }
+.lifetime.lifetime :global(.pc-top) {
+  background: var(--mkt-surface); border: 0; border-radius: 1.6rem 1.6rem 0 0;
+  text-align: center; padding: 2.2rem 1.6rem 1.6rem;
 }
-.priceBlock :global(.pc-price) { font-size: clamp(2.3rem, 8vw, 2.9rem); }
+.lifetime.lifetime :global(.pc-top)::after { display: none; }
+.lifetime.lifetime :global(.pc-body) {
+  background: var(--mkt-surface); border-radius: 0 0 1.6rem 1.6rem;
+  padding: 0 1.6rem 1.8rem; border-top: 0;
+}
+.lifetime :global(.pc-name), .lifetime :global(.pc-price) { color: var(--mkt-text); }
+.lifetime :global(.pc-name) { font-size: 1rem; font-weight: 600; margin-top: 1rem; }
+.lifetime :global(.pc-desc), .lifetime :global(.pc-price-note), .lifetime :global(.pc-cta-note) { color: var(--mkt-muted); }
+.lifetime :global(.pc-desc) { max-width: 44ch; margin-inline: auto; }
 
-.lifetime :global(.pc-features) { gap: 0; }
-.lifetime :global(.pc-features li) {
-  padding: .65rem 0; border-top: 1px solid var(--mkt-line-soft);
+/* The price: big, plain, no box. */
+.priceBlock { justify-content: center; margin: 1.1rem 0 0; padding: 0; border: 0; background: none; }
+.priceBlock :global(.pc-price) { font-size: clamp(3.4rem, 12vw, 4.6rem); line-height: 1; font-weight: 600; letter-spacing: -.03em; }
+.lifetime :global(.pc-price-note) { margin-top: .9rem; font-size: .85rem; }
+
+/* One wide button with an arrow, then a hairline. */
+.lifetime :global(.pc-cta) {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  width: 100%; max-width: none; height: 3.2rem; margin-top: 1.5rem; border-radius: 14px; font-size: 1rem; font-weight: 600;
 }
-.lifetime :global(.pc-features li:first-child) { border-top: 0; padding-top: .2rem; }
+.lifetime :global(.pc-cta-note) { max-width: 52ch; margin-inline: auto; }
+.lifetime :global(.pc-features) { gap: 0; margin-top: 1.4rem; padding-top: 1.4rem; border-top: 1px solid var(--mkt-line-soft); }
+.lifetime :global(.pc-features li) { padding: .5rem 0; border: 0; gap: .75rem; color: var(--mkt-muted); }
 .lifetime :global(.pc-features .ico) {
-  box-sizing: content-box; padding: 3px; border-radius: 50%;
-  background: var(--mkt-accent-wash); margin-top: 0;
+  box-sizing: content-box; padding: 3px; width: 12px; height: 12px; border-radius: 50%; margin-top: 1px;
+  background: var(--mkt-text); color: var(--mkt-bg);
+}
+.lifetime :global(.pc-foot) { border-top: 1px solid var(--mkt-line-soft); margin-top: 1.2rem; padding-top: 1.2rem; text-align: center; }
+
+@media (min-width: 640px) {
+  .lifetime :global(.pc-features) { grid-template-columns: 1fr 1fr; column-gap: 2rem; }
 }
