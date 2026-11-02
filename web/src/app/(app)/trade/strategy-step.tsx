@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import type { ApiError, RuleSummary, SetupLibrary, StrategyPreset } from "@/lib/api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { SegmentedControl } from "@/components/app/segmented";
+import { BorderRay } from "@/components/ui/border-ray";
 import { onSpot } from "@/components/app/spotlight";
 import type { FamilyGroup } from "../rules/new/strategy/catalog";
 import type { CustomMethod, TradeChoice } from "./trade-model";
@@ -75,6 +76,7 @@ export function StrategyStep({
             {myMethods.map((r) => (
               <div key={r.ruleDocId} className="strat spot" data-chosen={custom?.ruleDocId === r.ruleDocId}
                    onPointerMove={onSpot} onPointerDown={onSpot}>
+                {custom?.ruleDocId === r.ruleDocId ? <BorderRay /> : null}
                 <button type="button" role="radio" className="strat-pick"
                         aria-checked={custom?.ruleDocId === r.ruleDocId}
                         onClick={() => onMethod(r)}>
@@ -116,6 +118,7 @@ export function StrategyStep({
           {shown.flatMap((g) => g.strategies).map((s) => (
             <div key={s.id} className="strat spot" data-chosen={choice.strategy?.id === s.id}
                  onPointerMove={onSpot} onPointerDown={onSpot}>
+              {choice.strategy?.id === s.id ? <BorderRay /> : null}
               <button type="button" role="radio" className="strat-pick"
                       aria-checked={choice.strategy?.id === s.id}
                       onClick={() => onPick(s)}>

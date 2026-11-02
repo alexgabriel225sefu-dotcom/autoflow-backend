@@ -9,6 +9,7 @@ import { api, type AutomationState, type CtraderStatus, type Me, type Notificati
 import { useRead } from "@/lib/use-api";
 import { isActive, NAV, PRIMARY, titleFor } from "./nav";
 import { StatusBar } from "./status-bar";
+import { ShimmerText } from "@/components/ui/shimmer-text";
 import { AppearanceControls } from "./appearance-controls";
 import type { NavItem } from "./nav";
 
@@ -349,7 +350,7 @@ function AppearanceMenu() {
  * before the request came back.
  */
 export function ConfirmAction({
-  label, question, onConfirm, disabled, danger, disabledReason,
+  label, question, onConfirm, disabled, danger, disabledReason, busyLabel = "Working…",
 }: {
   label: string;
   question: string;
@@ -357,6 +358,8 @@ export function ConfirmAction({
   disabled?: boolean;
   danger?: boolean;
   disabledReason?: string;
+  /** What the confirm button reads while the request is out. */
+  busyLabel?: string;
 }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -385,7 +388,7 @@ export function ConfirmAction({
             setBusy(false);
             setAsking(false);
             setOutcome(msg);
-          }}>{busy ? "Working…" : "Yes"}</button>
+          }}>{busy ? <ShimmerText>{busyLabel}</ShimmerText> : "Yes"}</button>
           <button className="btn btn-ghost" disabled={busy} onClick={() => setAsking(false)}>Cancel</button>
         </>
       )}

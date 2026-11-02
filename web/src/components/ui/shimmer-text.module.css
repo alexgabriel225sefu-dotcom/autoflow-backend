@@ -1,0 +1,25 @@
+.shimmer {
+  color: inherit;
+  background-image: linear-gradient(
+    100deg,
+    currentColor 0%, currentColor 38%,
+    color-mix(in srgb, currentColor 35%, transparent) 50%,
+    currentColor 62%, currentColor 100%
+  );
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: glint 2.2s linear infinite;
+}
+@keyframes glint {
+  from { background-position: 100% 0; }
+  to { background-position: -50% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none; background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
