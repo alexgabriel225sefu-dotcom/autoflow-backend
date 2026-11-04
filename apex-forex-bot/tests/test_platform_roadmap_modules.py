@@ -24,7 +24,7 @@ class pytest:                                   # tests/run_all.py runs files as
         raise AssertionError(f"{exc.__name__} was not raised")
 
 
-from apex.platform import backtest, forward, health_score, incidents, multi_account
+from apex.platform import backtest, broker_read, forward, health_score, incidents, multi_account, ruledoc
 from apex.platform import overfit, replay, risk_guard, risk_map, rule_layer
 
 
@@ -63,8 +63,41 @@ def test_backtest_replay_forward_are_read_only():
     assert forward.record([{"symbol": "EURUSD"}])["readOnly"] is True
 
 
+def test_backtest_runs_the_shared_rule_evaluator():
+    rule = ruledoc.blank(user_id="u", account_id="a", symbols=["EUR_USD"], timeframe="1h")
+    rule["state"] = "active"
+    rule["sides"] = "BUY"
+    rule["entry"] = {"combine": "AND", "conditions": [
+        {"id": "weekday", "params": {"days": [0, 1, 2, 3, 4, 5, 6]}}]}
+    rule["exit"] = {"combine": "OR", "conditions": [
+        {"id": "rsi", "params": {"op": "above", "value": 100}}]}
+    candles = [{"time": 1758542400 + i * 3600, "open": 1.1,
+                "high": 1.11, "low": 1.09, "close": 1.105}
+               for i in range(20)]
+    result = backtest.run(candles, rule=rule, symbol="EUR_USD", timeframe="1h")
+    assert result["tradeCount"] > 0
+
+
+def test_replay_reads_are_anchored_to_the_requested_past_window():
+    calls = []
+
+    class Broker:
+        def get_candles(self, *args, **kwargs):
+            calls.append((args, kwargs))
+            return [{"open": 1, "high": 2, "low": 0.5, "close": 1.5}]
+
+    result = broker_read.candles(
+        "u", symbol="EUR_USD", timeframe="1h", limit=2,
+        to_ts=1_700_000_000, connection_fn=lambda _uid, ctid=None: {
+            "ctid": "a", "mode": "demo", "accessToken": "secret"},
+        broker_fn=lambda: Broker())
+    assert result["status"] == "ok"
+    assert calls == [(("EUR_USD", "1h", 2), {"to_ts": 1_700_000_000.0})]
+
+
 def test_overfit_and_multi_account_are_scoped():
     assert overfit.analyse({"conditionCount": 10})["warnings"]
+    assert "unknown" in " ".join(overfit.analyse({})["warnings"])
     result = multi_account.isolate("u1", [{"ctid": 42, "mode": "demo"}])
     assert result["accounts"][0]["scope"] == "u1:42"
 

@@ -661,7 +661,8 @@ def _dispatch(method, route, headers, body, query=None):
             q = query or {}
             return _ok(_read.candles(
                 p.user_id, ctid=ctid, symbol=q.get("symbol"),
-                timeframe=q.get("timeframe"), limit=q.get("limit")))
+                timeframe=q.get("timeframe"), limit=q.get("limit"),
+                to_ts=q.get("to")))
         return _ok(_read.account(p.user_id, ctid=ctid))
 
     if route == "symbols" and method == "GET":
@@ -1131,7 +1132,8 @@ def _roadmap_analysis(route, payload):
             commission=float(payload.get("commission") or 0),
             slippage_pips=float(payload.get("slippagePips") or 0),
             latency_bars=int(payload.get("latencyBars") or 0),
-            symbol=payload.get("symbol")))
+            symbol=payload.get("symbol"), timeframe=payload.get("timeframe"),
+            rule=payload.get("rule")))
     if route == "replay":
         from apex.platform import replay as _replay
         return _ok(_replay.timeline(payload.get("candles")))

@@ -7,6 +7,12 @@ def analyse(sample: dict[str, Any]) -> dict[str, Any]:
     conditions = sample.get("conditionCount")
     trades = sample.get("tradeCount")
     periods = sample.get("periodCount")
+    if conditions is None:
+        warnings.append("condition count is unknown; evidence cannot be judged")
+    if trades is None:
+        warnings.append("trade count is unknown; evidence cannot be judged")
+    if periods is None:
+        warnings.append("period count is unknown; evidence cannot be judged")
     if conditions is not None and int(conditions) > 8:
         warnings.append("many conditions can make a rule fragile")
     if trades is not None and int(trades) < 30:

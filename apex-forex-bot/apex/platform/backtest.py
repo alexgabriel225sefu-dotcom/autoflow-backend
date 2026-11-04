@@ -8,7 +8,8 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
         initial_balance: float | None = None, spread_pips: float = 0.0,
         commission: float = 0.0, slippage_pips: float = 0.0,
         latency_bars: int = 0, max_bars: int = 5000,
-        symbol: str | None = None) -> dict[str, Any]:
+        symbol: str | None = None, timeframe: str | None = None,
+        rule: dict[str, Any] | None = None) -> dict[str, Any]:
     """Cost-adjusted hypothetical results over supplied candles.
 
     P&L here is in PRICE POINTS per unit (exit minus entry). Spread and
@@ -19,9 +20,13 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
     """
     if not isinstance(candles, list) or not candles:
         raise ValueError("at least one candle is required")
-    if signal is None:
+    if signal is None and rule is None:
         raise ValueError("no strategy was supplied: a backtest needs a rule or "
                          "strategy to run, and none is attached to this request")
+    if rule is not None:
+        if not symbol or not timeframe:
+            raise ValueError("symbol and timeframe are required to run a rule")
+        signal = _rule_signal(rule, symbol, timeframe)
     cost_pips = abs(float(spread_pips)) + abs(float(slippage_pips))
     if cost_pips and not symbol:
         raise ValueError("a symbol is required to convert spread and slippage "
@@ -53,6 +58,8 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
                        "latencyBars": max(0, int(latency_bars))})
         if balance is not None:
             balance += pnl
+    # Keep the data path explicit even when every bar was malformed: the
+    # result says how many bars were skipped rather than claiming no signals.
     total = sum(t["pnl"] for t in trades)
     return {"status": "ok", "hypothetical": True, "trades": trades,
             "tradeCount": len(trades), "skippedCandles": skipped,
@@ -61,6 +68,51 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
                             "slippagePips": slippage_pips, "latencyBars": latency_bars},
             "unit": "price points per unit",
             "notModelled": _not_modelled(latency_bars)}
+
+
+def _rule_signal(rule: dict[str, Any], symbol: str, timeframe: str):
+    """Build a pure evaluator-backed signal function for a RuleDoc or preset.
+
+    This reuses the platform evaluator/strategy registry; it does not copy
+    condition maths and it never imports an order or close path.
+    """
+    if not isinstance(rule, dict):
+        raise ValueError("rule must be an object")
+    preset = str(rule.get("strategy") or "").strip()
+    if preset:
+        from apex import strategy_api
+        strategy_api.load_builtins()
+        strategy = strategy_api.get(preset)
+        if strategy is None:
+            raise ValueError(f"strategy {preset!r} is not registered")
+        history: list[dict[str, Any]] = []
+        def preset_signal(candle):
+            from apex.strategy_api import Market
+            history.append(candle)
+            market = Market(history, symbol=symbol, timeframe=timeframe,
+                            price=candle.get("close"))
+            action = (strategy.signal(market) or {}).get("action")
+            return {"side": action} if action in ("BUY", "SELL") else None
+        return preset_signal
+    from apex.platform import decision as _decision
+    from apex.platform import evaluator as _evaluator
+    from apex.platform.snapshot import MarketSnapshot
+    history: list[dict[str, Any]] = []
+    def rule_signal(candle):
+        history.append(candle)
+        stamp = candle.get("time")
+        if stamp is None:
+            raise ValueError("rule backtests require candle timestamps")
+        verdict = _evaluator.evaluate(
+            dict(rule, state="active"),
+            MarketSnapshot(symbol=symbol, timeframe=timeframe,
+                           candles=history, price=candle.get("close"),
+                           ts=float(stamp)))
+        if verdict.verdict in (_decision.BUY, _decision.SELL):
+            return {"side": verdict.verdict, "entry": candle.get("open"),
+                    "reason": verdict.reason}
+        return None
+    return rule_signal
 
 
 def _not_modelled(latency_bars):

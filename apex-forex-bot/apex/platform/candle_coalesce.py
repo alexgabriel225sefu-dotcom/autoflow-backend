@@ -88,7 +88,10 @@ def key_for(method, path, headers):
     symbol = (parsed.get("symbol") or [""])[0].strip().upper()
     timeframe = (parsed.get("timeframe") or [""])[0].strip().lower()
     limit = (parsed.get("limit") or [""])[0].strip()
-    return (token, match.group(1), symbol, timeframe, limit)
+    # Historical replay reads are anchored by `to`; omitting it would serve a
+    # cached present-window answer for a different past window.
+    to_ts = (parsed.get("to") or [""])[0].strip()
+    return (token, match.group(1), symbol, timeframe, limit, to_ts)
 
 
 def _snapshot(result):

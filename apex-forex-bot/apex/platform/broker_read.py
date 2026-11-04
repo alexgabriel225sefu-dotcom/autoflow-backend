@@ -434,7 +434,7 @@ def validate_candle_query(symbol, timeframe, limit):
     return sym, tf, n
 
 
-def candles(user_id, *, symbol, timeframe, limit=None, **kw):
+def candles(user_id, *, symbol, timeframe, limit=None, to_ts=None, **kw):
     """Trendbars for a preview. Read-only, and it places nothing.
 
     The bars come from the SAME connector the trading loop uses, through the
@@ -447,8 +447,21 @@ def candles(user_id, *, symbol, timeframe, limit=None, **kw):
     that a preview would then evaluate as if it were the market.
     """
     sym, tf, n = validate_candle_query(symbol, timeframe, limit)
-    out = _read(user_id, "candles",
-                lambda b: _shape(b.get_candles(sym, tf, n)), **kw)
+    end = None
+    if to_ts not in (None, ""):
+        try:
+            end = float(to_ts)
+        except (TypeError, ValueError):
+            raise ValueError("to must be a unix timestamp")
+        if end <= 0 or end > time.time() + 60:
+            raise ValueError("to must be a past unix timestamp")
+    def _fetch(b):
+        # Keep the old call shape for test doubles and connectors that do not
+        # expose historical anchoring; cTrader's broker does accept to_ts.
+        if end is None:
+            return _shape(b.get_candles(sym, tf, n))
+        return _shape(b.get_candles(sym, tf, n, to_ts=end))
+    out = _read(user_id, "candles", _fetch, **kw)
     if out.get("status") == OK:
         out["symbol"] = sym
         out["timeframe"] = tf

@@ -125,6 +125,11 @@ st, reordered = _get(EUR_REORDERED)
 check("parameter order and case are the same query",
       st == 200 and len(_calls) == 1 and _limiter_checks["n"] == spent,
       f"calls={len(_calls)} units={_limiter_checks['n']}")
+check("a historical anchor is a distinct cache query",
+      C.key_for("GET", "/api/v1/" + EUR + "&to=1700000000",
+                {"Authorization": "Bearer alice"})
+      != C.key_for("GET", "/api/v1/" + EUR,
+                   {"Authorization": "Bearer alice"}))
 
 print("\n[2] a different query is limited on its own")
 st, _ = _get("accounts/501/candles?symbol=GBPUSD&timeframe=1h&limit=200")
