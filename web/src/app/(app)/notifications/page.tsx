@@ -16,6 +16,9 @@ const TYPES = ["", "order", "rule", "account", "risk", "system", "signal"];
 
 export default function NotificationsPage() {
   const [type, setType] = useState("");
+  // Warning and critical only. The level is the server's; this only filters
+  // what it already sent, so "nothing needs attention" can mean only that.
+  const [attention, setAttention] = useState(false);
   const qs = new URLSearchParams({ limit: "50" });
   if (type) qs.set("type", type);
   const r = useRead<NotificationPage>(`notifications?${qs.toString()}`, 60_000);
@@ -54,6 +57,10 @@ export default function NotificationsPage() {
               </button>
             ))}
           </div>
+          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={attention}
+                  onClick={() => setAttention(!attention)}>
+            Needs attention
+          </button>
           {r.result?.ok && r.result.data.unread > 0 ? (
             <button className="btn btn-ghost btn-sm" onClick={markAll} disabled={busy}>
               <CheckCheck className="ico" aria-hidden /> Mark all read ({r.result.data.unread})
@@ -66,9 +73,9 @@ export default function NotificationsPage() {
       {r.result && !r.result.ok ? <ErrorNotice error={r.result} onRetry={r.reload} /> : null}
       {markErr ? <ErrorNotice error={markErr} /> : null}
       {r.result?.ok ? (
-        r.result.data.notifications.length ? (
+        r.result.data.notifications.filter((n) => !attention || n.level === "warning" || n.level === "critical").length ? (
           <div className="records">
-            {r.result.data.notifications.map((n) => (
+            {r.result.data.notifications.filter((n) => !attention || n.level === "warning" || n.level === "critical").map((n) => (
               <article
                 className={(n.level === "critical" || n.level === "warning" || /error/i.test(n.title)) ? "record halo" : "record"}
                 key={n.id}
@@ -112,7 +119,7 @@ export default function NotificationsPage() {
             ))}
           </div>
         ) : (
-          <section className="card"><p className="empty">No alerts.</p></section>
+          <section className="card"><p className="empty">{attention ? "Nothing in this list needs attention." : "No alerts."}</p></section>
         )
       ) : null}
     </main>

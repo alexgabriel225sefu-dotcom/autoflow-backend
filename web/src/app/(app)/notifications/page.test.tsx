@@ -149,3 +149,23 @@ describe("the type filter", () => {
     expect(screen.getByRole("button", { name: "Signal" })).toBeTruthy();
   });
 });
+
+describe("Needs attention", () => {
+  const WARN: Notification = {
+    id: "n3", type: "risk", level: "warning", title: "Daily loss limit reached",
+    body: "New entries are paused.", ts: 1760000002, readAt: null, link: null,
+  };
+  it("keeps only warnings and critical alerts", async () => {
+    page([SIGNAL, SYSTEM, WARN]);
+    await show();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Needs attention" })); });
+    expect(document.querySelectorAll(".record").length).toBe(1);
+    expect(row()).toContain("Daily loss limit reached");
+  });
+  it("says so when nothing needs attention, not that there are no alerts", async () => {
+    page([SIGNAL, SYSTEM]);
+    await show();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Needs attention" })); });
+    expect(screen.getByText("Nothing in this list needs attention.")).toBeTruthy();
+  });
+});
