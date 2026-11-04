@@ -16,7 +16,7 @@ function Head({ title, detail, reload, loading }: { title: string; detail: strin
 }
 
 function Failure({ result, retry }: { result: ApiResult<unknown> | null; retry?: () => unknown }) {
-  return result && !result.ok ? <ErrorNotice error={result} onRetry={retry} /> : null;
+  return result && !result.ok ? <div><p className="muted">Could not be read.</p><ErrorNotice error={result} onRetry={retry} /></div> : null;
 }
 
 function ReadStatus({ data, empty }: { data: CandlesRead | null; empty: string }) {
