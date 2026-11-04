@@ -459,7 +459,20 @@ def _amount_matches(obj, cfg):
     ccy = str(obj.get("currency") or "").strip().lower()
     if got is None:
         return True, "no amount on this object; not compared"
-    if got != want_minor:
+    # TAX IS NOT A DISCOUNT. A price set "tax exclusive" with tax collection on
+    # charges the offer PLUS the tax, so the total is above the approved
+    # amount for a buyer in a taxed place. That payment is the full price and
+    # must not be held as an overcharge. `total_details.amount_tax` is what
+    # the provider says the tax was; the offer is met when the total is the
+    # offer, or when the total less that tax is the offer (exclusive pricing).
+    # A discount still fails: it lowers the total below the offer, and
+    # subtracting tax only lowers it further. A total ABOVE the offer with no
+    # declared tax still fails, as before.
+    details = obj.get("total_details")
+    tax = details.get("amount_tax") if isinstance(details, dict) else None
+    tax = int(tax) if (isinstance(tax, (int, float)) and not isinstance(tax, bool)
+                       and tax > 0) else 0
+    if got != want_minor and not (tax and got - tax == want_minor):
         return False, f"charged {got}, the approved offer is {want_minor}"
     if ccy and ccy != want_ccy:
         return False, f"charged in {ccy}, the approved offer is {want_ccy}"

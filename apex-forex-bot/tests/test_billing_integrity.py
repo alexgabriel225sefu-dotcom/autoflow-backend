@@ -200,6 +200,47 @@ check("the licence stays withdrawn",
       LIC.status_for(USER)["state"] == LIC.REVOKED,
       str(LIC.status_for(USER)))
 
+print("\n[6b] tax on top of the offer is still the full price")
+# A price set tax-exclusive, with tax collected, charges the offer plus the tax.
+# Held as an "overcharge" it would withdraw the licence from a paying buyer.
+LIC.revoke(USER)
+taxed = session(obj={"amount_total": B.APPROVED_PRICE_MINOR + 9443,
+                     "total_details": {"amount_tax": 9443}})
+taxed["id"] = "evt_taxed_1"
+st, payload = deliver(taxed)
+check("a taxed full-price payment is granted",
+      (payload or {}).get("outcome") == "granted", str(payload))
+
+print("\n[6c] a tax-inclusive total equal to the offer is granted too")
+LIC.revoke(USER)
+incl = session(obj={"amount_total": B.APPROVED_PRICE_MINOR,
+                    "total_details": {"amount_tax": 7937}})
+incl["id"] = "evt_incl_1"
+st, payload = deliver(incl)
+check("granted", (payload or {}).get("outcome") == "granted", str(payload))
+
+print("\n[6d] tax does not rescue a discount, and an unexplained extra is not tax")
+LIC.revoke(USER)
+disc = session(obj={"amount_total": 8000 + 1680,
+                    "total_details": {"amount_tax": 1680}})   # 80.00 net of tax
+disc["id"] = "evt_disc_tax_1"
+st, payload = deliver(disc)
+check("a discounted, taxed payment is not granted",
+      (payload or {}).get("handled") is False, str(payload))
+extra = session(obj={"amount_total": B.APPROVED_PRICE_MINOR + 5000})
+extra["id"] = "evt_extra_1"
+st, payload = deliver(extra)
+check("a total above the offer with no declared tax is not granted",
+      (payload or {}).get("handled") is False, str(payload))
+wrong_tax = session(obj={"amount_total": B.APPROVED_PRICE_MINOR + 5000,
+                         "total_details": {"amount_tax": 4000}})
+wrong_tax["id"] = "evt_wrongtax_1"
+st, payload = deliver(wrong_tax)
+check("tax that does not account for the difference is not granted",
+      (payload or {}).get("handled") is False, str(payload))
+check("the licence stays withdrawn", LIC.status_for(USER)["state"] == LIC.REVOKED,
+      str(LIC.status_for(USER)))
+
 print("\n[7] and nor does one in a different currency")
 wrong_ccy = session(obj={"currency": "eur"})
 wrong_ccy["id"] = "evt_eur_1"
