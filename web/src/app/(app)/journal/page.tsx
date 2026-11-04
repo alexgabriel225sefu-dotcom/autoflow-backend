@@ -36,6 +36,11 @@ function tone(e: JournalEntry): string {
   return "";
 }
 
+const STOPPED_BY: Record<string, string> = {
+  strategy: "your rule", risk_guard: "a risk guard", broker: "the broker",
+  infrastructure: "our systems", account: "your account", unknown: "an unclassified cause",
+};
+
 export default function JournalView() {
   const [status, setStatus] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -154,6 +159,13 @@ export default function JournalView() {
                       {typeof e.decision?.confidence === "number"
                         ? ` · confidence ${e.decision.confidence}%`
                         : null}
+                    </p>
+                  ) : null}
+
+                  {e.explanation?.blockedBy ? (
+                    <p className="muted" style={{ fontSize: ".78rem", margin: ".2rem 0 0" }} data-testid="entry-stopped-by">
+                      Stopped by {STOPPED_BY[e.explanation.blockedBy.category] ?? e.explanation.blockedBy.category}
+                      {e.explanation.blockedBy.guard ? ` · ${e.explanation.blockedBy.guard}` : ""}
                     </p>
                   ) : null}
 

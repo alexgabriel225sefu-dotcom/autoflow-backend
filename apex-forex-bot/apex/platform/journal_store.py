@@ -33,6 +33,7 @@ import time
 import uuid
 
 from apex import user_store
+from apex.platform import explain as _explain
 from apex.platform import journal as _j
 from apex.platform import store as _store
 
@@ -117,10 +118,16 @@ def _present(row):
     path in an old error is as exposed as a new one. So the text is cleaned
     again on the way out, on a copy.
     """
-    if not isinstance(row, dict) or not row.get("error"):
+    if not isinstance(row, dict):
         return row
     out = dict(row)
-    out["error"] = _j.clean_error(row.get("error"))
+    if row.get("error"):
+        out["error"] = _j.clean_error(row.get("error"))
+    # Who stopped it, derived on the way out from the decision the entry
+    # already holds. Never stored, so the evidence is not rewritten and an
+    # improved explanation applies to old entries too.
+    if isinstance(row.get("decision"), dict):
+        out["explanation"] = _explain.explain(row["decision"])
     return out
 
 

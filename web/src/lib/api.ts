@@ -685,6 +685,8 @@ export type JournalEntry = {
   entryId: string; kind: string; status: string | null; ts: number;
   symbol: string | null; accountId: string | null; ruleDocId: string | null;
   decision?: Decision; error?: string | null; correlationId: string;
+  /** Derived by the server from `decision` when read; not part of the stored record. */
+  explanation?: DecisionExplanation;
   /** The market reading the entry was made against. A `signal` entry carries
    *  the price the setup qualified at, which is the one number a client needs
    *  to act on it themselves — at that level nothing else will. */
