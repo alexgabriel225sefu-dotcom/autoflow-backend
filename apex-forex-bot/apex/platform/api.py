@@ -173,7 +173,9 @@ _POSITION_CLOSE_RE = re.compile(
 _RULE_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})$")
 _RULE_ACTION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/(validate|activate|pause|resume|archive"
-    r"|version|preview)$")
+    r"|version|preview|revert)$")
+_RULE_VERSIONS_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})/versions$")
+_RULE_DIFF_RE = re.compile(r"^rules/([A-Za-z0-9_-]{1,64})/diff$")
 _RULE_VERSION_RE = re.compile(
     r"^rules/([A-Za-z0-9_-]{1,64})/versions/(\d{1,9})$")
 
@@ -1003,6 +1005,31 @@ def _dispatch(method, route, headers, body, query=None):
             return _ok({"rule": _store.save_draft(p.user_id, doc)})
         return _err(405, "METHOD_NOT_ALLOWED", f"{method} is not allowed here")
 
+    m = _RULE_VERSIONS_RE.match(route)
+    if m and method == "GET":
+        p = _authenticate(headers)
+        return _ok({"versions": _store.versions(p.user_id, m.group(1))})
+
+    m = _RULE_DIFF_RE.match(route)
+    if m and method == "GET":
+        p = _authenticate(headers)
+        q = query or {}
+        try:
+            a, b = int(q.get("from")), int(q.get("to"))
+        except (TypeError, ValueError):
+            return _err(400, "BAD_REQUEST", "from and to must be version numbers")
+        cur = _store.get(p.user_id, m.group(1))
+
+        def _at(v):
+            try:
+                return _store.get_version(p.user_id, m.group(1), v)
+            except _store.NotFound:
+                return cur if int(cur.get("version") or 0) == v else None
+        da, db = _at(a), _at(b)
+        if da is None or db is None:
+            return _err(404, "NOT_FOUND", "one of those versions is not stored")
+        return _ok({"from": a, "to": b, "changes": _rd.diff(da, db)})
+
     m = _RULE_VERSION_RE.match(route)
     if m and method == "GET":
         p = _authenticate(headers)
@@ -1128,6 +1155,13 @@ def _rule_action(action, rid, headers, body):
 
     if action == "version":
         return _ok({"rule": _store.next_version(p.user_id, rid)})
+
+    if action == "revert":
+        try:
+            ver = int((_body(body) or {}).get("version"))
+        except (TypeError, ValueError):
+            return _err(400, "BAD_REQUEST", "version must be a number")
+        return _ok({"rule": _store.revert_to_version(p.user_id, rid, ver)})
 
     if action == "preview":
         # Read-only, and it stays that way because of what it does NOT touch:

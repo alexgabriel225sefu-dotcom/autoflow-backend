@@ -567,5 +567,56 @@ def next_version(owner_id, rule_doc_id, *, now=None):
     return draft
 
 
+def versions(owner_id, rule_doc_id):
+    """Every version this owner can look at: the frozen (activated) ones, then
+    the current document if it is not already among them. Newest first.
+
+    A version that was never activated has no frozen copy, so it appears only
+    while it is the current draft. Nothing is invented for the gaps.
+    """
+    owner_id, rid = str(owner_id), str(rule_doc_id)
+    cur = get(owner_id, rid)
+    seen, out = set(), []
+    for v in range(int(cur.get("version") or 1), 0, -1):
+        try:
+            doc = get_version(owner_id, rid, v)
+        except NotFound:
+            doc = None
+        if doc is None and v == int(cur.get("version") or 1):
+            doc = cur
+        if doc is None or v in seen:
+            continue
+        seen.add(v)
+        out.append({"version": v, "state": doc.get("state"),
+                    "activatedAt": doc.get("activatedAt"),
+                    "frozen": doc is not cur})
+    return out
+
+
+def revert_to_version(owner_id, rule_doc_id, version, *, now=None):
+    """Make a DRAFT whose terms are those of an earlier activated version.
+
+    Nothing already recorded is touched: the old version stays frozen, and the
+    running version keeps running until the draft is activated. If the current
+    document is already an editable draft its terms are replaced; otherwise a
+    new version is started first, exactly as editing an active rule does.
+    """
+    owner_id, rid = str(owner_id), str(rule_doc_id)
+    old = get_version(owner_id, rid, int(version))
+    if old is None:
+        raise NotFound(f"no version {version} of {rid}")
+    cur = get(owner_id, rid)
+    base = cur if cur.get("state") in ruledoc.EDITABLE_STATES \
+        else ruledoc.next_version(cur, now=now)
+    keep = ruledoc._DIFF_IGNORED
+    out = {k: v for k, v in base.items() if k in keep}
+    out.update({k: json.loads(json.dumps(v)) for k, v in old.items()
+                if k not in keep})
+    out["state"] = ruledoc.DRAFT
+    out["updatedAt"] = now if now is not None else time.time()
+    _write(_k_current(owner_id, rid), out)
+    return out
+
+
 def active_docs(owner_id):
     return list_docs(owner_id, states=(ruledoc.ACTIVE,))
