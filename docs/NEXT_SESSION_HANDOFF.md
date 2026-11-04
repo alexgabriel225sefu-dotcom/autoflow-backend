@@ -690,13 +690,15 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 
 # Roadmap, Codex items
 
-- Strategy Replay: added bounded, read-only candle timeline endpoint and protected `/replay` screen.
-- Realistic Backtest: added hypothetical cost/slippage/latency-aware bounded runner and `/backtest` screen.
-- Forward Testing: added hypothetical signal ledger endpoint and `/forward` screen.
-- Advanced Risk Guard: added fail-closed pure guard evaluator for drawdown, loss, exposure, slippage and cooldown.
-- Portfolio Risk Map: added explicit unknown/unavailable handling and protected `/risk` screen.
-- Multi-account control: added authenticated account-isolation view and protected `/multi-account` screen.
-- Broker-agnostic rule layer: added validated instrument/volume/risk calculations and `/rule-layer` screen.
-- Incident Center: added observable-facts incident derivation and protected `/incidents` screen.
-- Automation health score: added conservative dependency score and protected `/health` screen.
-- Anti-overfitting assistant: added diagnostic warnings endpoint through the protected roadmap panel.
+- Item 3, Strategy Replay — **partial** in `b8ed65c` and `37b6a5e`: bounded historical candle reads reuse the candles rate-limit/cache bucket, and `/replay` now has chart, play/pause/step, loading, empty and failed-read states. Strategy-condition annotations and stop-move explanations are still next.
+- Item 4, Realistic Backtest — **partial** in `b8ed65c` and `37b6a5e`: a selected rule now runs through the shared evaluator over bounded candles, with pip costs, assumptions and `notModelled`. Partial fills, sessions/news/weekend filters, bid/ask, stale-data handling and the requested richer metrics remain.
+- Item 5, Forward Testing — **partial** in `37b6a5e`: the raw JSON panel is a usable read-only signal recorder with explicit empty/error/unknown states. A real-time strategy watcher and later executable-price comparison remain.
+- Item 6, Advanced Risk Guard — **done before this slice**: the fail-closed evaluator remains unchanged; the new screen in `37b6a5e` does not touch live gates or execution.
+- Item 7, Portfolio Risk Map — **done before this slice** in the merged Claude changes; unreadable positions remain visibly unreadable.
+- Item 8, Multi-account control — **isolation contract done** in `7678ea7` and enforced in `ed0a4a4`: per-user/per-account data and kill switches are copy-on-write and isolated. The UI was deliberately removed until the isolation tests are green in CI; per-account risk and kill-switch UI are next.
+- Item 9, Broker-agnostic rule layer — **done before this slice**; `/rule-layer` now presents the calculation as a real screen in `37b6a5e`.
+- Item 11, Incident Center — **done before this slice** in the merged Claude changes.
+- Item 12, Automation health score — **done before this slice** in the merged Claude changes.
+- Item 16, Anti-overfitting assistant — **partial** in `37b6a5e`: the screen replaces the raw JSON panel and missing inputs are shown as unknown/warnings; richer sample-history evidence is next.
+
+Next: run the complete backend and web CI commands, fix any environment-independent failures, then rebase and push these commits. Do not deploy. Do not add multi-account UI until CI has exercised the isolation suite.
