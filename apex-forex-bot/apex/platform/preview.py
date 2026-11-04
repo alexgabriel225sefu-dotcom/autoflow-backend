@@ -24,6 +24,7 @@ verdict reached on data that was not there.
 from apex.platform import conditions as _cond
 from apex.platform import decision as _dec
 from apex.platform import evaluator as _eval
+from apex.platform import explain as _explain
 from apex.platform import ruledoc as _rd
 from apex.platform.snapshot import MarketSnapshot
 
@@ -120,6 +121,7 @@ def preview(rule_doc, payload):
     return {
         "status": "ok",
         "decision": d.as_dict(),
+        "explanation": _explain.explain(d.as_dict()),
         # The rule was NOT run live. Stated, not implied.
         "executable": False,
         "wouldTrade": d.verdict in (_dec.BUY, _dec.SELL),
