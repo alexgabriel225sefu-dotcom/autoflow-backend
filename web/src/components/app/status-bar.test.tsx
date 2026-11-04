@@ -47,9 +47,9 @@ describe("the account chip", () => {
       .toContain("47765456");
   });
 
-  it("hides the status emoji from assistive tech", () => {
+  it("hides the status icons from assistive tech", () => {
     strip({ ok: true, data: CONNECTED });
-    const emojis = document.querySelectorAll(".status-emoji");
+    const emojis = document.querySelectorAll(".status-icon");
     expect(emojis.length).toBeGreaterThan(0);
     for (const el of emojis) expect(el.getAttribute("aria-hidden")).toBe("true");
   });

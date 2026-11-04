@@ -70,7 +70,6 @@ export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () 
   return (
     <div className="notice notice-error" role="alert">
       <div className="notice-head">
-        <span aria-hidden="true">⚠️</span>
         <CircleAlert className="ico" aria-hidden
                      style={{ width: 12, height: 12, verticalAlign: "-2px", marginRight: 4 }} />
         <strong>{error.code}</strong>
