@@ -59,6 +59,7 @@ _UID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _A4T_CATEGORY = {
     "rule": "rules", "rulev": "rules", "rules": "rules",
     "jentry": "journal", "jindex": "journal", "jlock": "journal",
+    "jnote": "journal",
     "notify": "notifications", "notifylock": "notifications",
     "licence": "licence",
     "ctrader": "ctraderLink", "ctlink": "ctraderLink",

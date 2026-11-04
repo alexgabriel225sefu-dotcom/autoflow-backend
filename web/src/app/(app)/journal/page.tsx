@@ -7,6 +7,7 @@ import { humanise } from "@/components/app/rule-summary";
 import { collapseRepeated, plainDecision } from "@/components/app/plain";
 import type { JournalEntry, JournalPage } from "@/lib/api";
 import { downloadText, journalToCsv } from "./csv";
+import { JournalNote } from "@/components/app/journal-note";
 
 const STATUSES = [
   "", "evaluated", "hold", "reject", "execution_requested", "order_sent",
@@ -199,6 +200,7 @@ export default function JournalView() {
                       <span className="pill pill-muted mono">#{e.accountId}</span>
                     ) : null}
                   </div>
+                  <JournalNote entryId={e.entryId} />
                   </article>
                 );
               })}
