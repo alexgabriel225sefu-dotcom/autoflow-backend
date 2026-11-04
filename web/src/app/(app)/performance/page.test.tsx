@@ -136,3 +136,13 @@ describe("PerformancePage", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/INTERNAL_ERROR|boom/));
   });
 });
+
+describe("evidence wording", () => {
+  it("prints the server's evidence sentence for each group", async () => {
+    answer = ok({
+      byStrategy: [{ ...group("trend", "Trend Following"), evidence: { level: "early", trades: 8, text: "Early: 8 trades. Results at this size can come from luck, in either direction." } }],
+    } as never);
+    render(<PerformancePage />);
+    await waitFor(() => expect(screen.queryByText(/Early: 8 trades/)).not.toBeNull());
+  });
+});
