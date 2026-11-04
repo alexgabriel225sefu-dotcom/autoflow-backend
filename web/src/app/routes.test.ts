@@ -81,7 +81,6 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/risk/guard": "protected",
   "/incidents": "protected",
   "/health": "protected",
-  "/multi-account": "protected",
   "/rule-layer": "protected",
   "/overfit": "protected",
   "/trades": "protected",

@@ -43,7 +43,6 @@ export const NAV: NavItem[] = [
   { href: "/risk", label: "Risk map", icon: ShieldCheck, group: "operations" },
   { href: "/incidents", label: "Incidents", icon: Bell, group: "operations" },
   { href: "/health", label: "Automation health", icon: ShieldCheck, group: "operations" },
-  { href: "/multi-account", label: "Multi-account", icon: Wallet, group: "account" },
   { href: "/rule-layer", label: "Rule layer", icon: ListChecks, group: "operations" },
   { href: "/overfit", label: "Overfit check", icon: ShieldCheck, group: "operations" },
   { href: "/journal", label: "Journal", icon: BookOpen, primary: true, group: "account" },
