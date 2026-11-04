@@ -54,6 +54,11 @@ function Groups({ title, rows, minTrades }: { title: string; rows: PerfGroup[]; 
           <li key={g.id} data-thin={g.thin ? "true" : undefined}>
             <strong>{g.label}</strong>
             {g.thin ? <span className="dim"> · too few to judge</span> : null}
+            {g.evidence ? (
+              <span className="dim" data-evidence={g.evidence.level} style={{ display: "block", fontSize: ".78rem" }}>
+                {g.evidence.text}
+              </span>
+            ) : null}
             <br />
             <span className="muted">
               {g.trades} trade{g.trades === 1 ? "" : "s"} · {g.wins} won ({pct(g.win_rate)}) ·

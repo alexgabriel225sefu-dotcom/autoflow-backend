@@ -778,7 +778,8 @@ export type PerfSummary = {
   best: number | null; worst: number | null; noLosses: boolean;
   r: { trades: number; expectancy_R: number | null; win_rate_R: number | null } | null;
 };
-export type PerfGroup = PerfSummary & { id: string; label: string; thin: boolean };
+export type PerfEvidence = { level: "insufficient" | "early" | "readable"; trades: number; text: string };
+export type PerfGroup = PerfSummary & { id: string; label: string; thin: boolean; evidence?: PerfEvidence };
 export type PerformanceRead =
   | { status: "unavailable"; reason: string; brokerStatus?: string | null }
   | {

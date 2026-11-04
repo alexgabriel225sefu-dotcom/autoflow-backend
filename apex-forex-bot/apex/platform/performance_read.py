@@ -94,12 +94,33 @@ def _label(strategy_id):
     return str(strategy_id)
 
 
+EARLY_TRADES = 30
+
+
+def evidence(trades):
+    """How much a trade count can support, in words. Never a verdict on the
+    strategy: it says how much weight the numbers can bear, and nothing about
+    whether the strategy is good."""
+    n = trades if isinstance(trades, int) and not isinstance(trades, bool) else 0
+    if n < MIN_TRADES:
+        return {"level": "insufficient", "trades": n,
+                "text": "Not enough evidence to judge this strategy."}
+    if n < EARLY_TRADES:
+        return {"level": "early", "trades": n,
+                "text": f"Early: {n} trades. Results at this size can come "
+                        f"from luck, in either direction."}
+    return {"level": "readable", "trades": n,
+            "text": f"{n} trades: enough to read with care. Past results do "
+                    f"not predict future ones."}
+
+
 def _ranked(groups, label_fn):
     out = []
     for name, s in _perf.ranked(groups, min_trades=MIN_TRADES):
         row = _clean(s)
         row["id"] = name
         row["label"] = label_fn(name)
+        row["evidence"] = evidence(row.get("trades"))
         out.append(row)
     return out
 
