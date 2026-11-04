@@ -572,31 +572,10 @@ def _dispatch(method, route, headers, body, query=None):
         if method != "POST":
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
         payload = _body(body) or {}
-        if route == "backtest":
-            from apex.platform import backtest as _backtest
-            candles = payload.get("candles")
-            return _ok(_backtest.run(
-                candles, initial_balance=payload.get("initialBalance"),
-                spread_pips=float(payload.get("spreadPips") or 0),
-                commission=float(payload.get("commission") or 0),
-                slippage_pips=float(payload.get("slippagePips") or 0),
-                latency_bars=int(payload.get("latencyBars") or 0)))
-        if route == "replay":
-            from apex.platform import replay as _replay
-            return _ok(_replay.timeline(payload.get("candles")))
-        if route == "forward":
-            from apex.platform import forward as _forward
-            return _ok(_forward.record(payload.get("signals") or []))
-        if route == "overfit":
-            from apex.platform import overfit as _overfit
-            return _ok(_overfit.analyse(payload))
-        from apex.platform import rule_layer as _rules
-        return _ok(_rules.risk_units(
-            balance=float(payload.get("balance")),
-            risk_fraction=float(payload.get("riskFraction")),
-            stop_pips=float(payload.get("stopPips")),
-            symbol=payload.get("symbol"), price=float(payload.get("price")),
-            leverage=float(payload.get("leverage") or 30)))
+        try:
+            return _roadmap_analysis(route, payload)
+        except (TypeError, KeyError) as e:
+            raise ValueError("the input is missing a field or has the wrong type") from e
 
     if route == "risk/guard" and method == "POST":
         _authenticate(headers)
@@ -1139,6 +1118,36 @@ def _dispatch(method, route, headers, body, query=None):
         return _rule_action(m.group(2), m.group(1), headers, body)
 
     return _err(404, "NOT_FOUND", "no such endpoint")
+
+
+def _roadmap_analysis(route, payload):
+    """The read-only analysis routes. Pure computation over the posted
+    snapshot; none of them reaches a broker or an order path."""
+    if route == "backtest":
+        from apex.platform import backtest as _backtest
+        return _ok(_backtest.run(
+            payload.get("candles"), initial_balance=payload.get("initialBalance"),
+            spread_pips=float(payload.get("spreadPips") or 0),
+            commission=float(payload.get("commission") or 0),
+            slippage_pips=float(payload.get("slippagePips") or 0),
+            latency_bars=int(payload.get("latencyBars") or 0),
+            symbol=payload.get("symbol")))
+    if route == "replay":
+        from apex.platform import replay as _replay
+        return _ok(_replay.timeline(payload.get("candles")))
+    if route == "forward":
+        from apex.platform import forward as _forward
+        return _ok(_forward.record(payload.get("signals") or []))
+    if route == "overfit":
+        from apex.platform import overfit as _overfit
+        return _ok(_overfit.analyse(payload))
+    from apex.platform import rule_layer as _rules
+    return _ok(_rules.risk_units(
+        balance=float(payload.get("balance")),
+        risk_fraction=float(payload.get("riskFraction")),
+        stop_pips=float(payload.get("stopPips")),
+        symbol=payload.get("symbol"), price=float(payload.get("price")),
+        leverage=float(payload.get("leverage") or 30)))
 
 
 def _summary(doc):
