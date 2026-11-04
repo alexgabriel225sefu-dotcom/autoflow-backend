@@ -665,3 +665,25 @@ Read `docs/RELEASE_READINESS.md` for the gates,
 `docs/PRODUCTION_RUNBOOK.md` for operating it, `docs/BETA_CONFIGURATION.md`
 for standing up a beta, and `docs/CTRADER_DEMO_SMOKE_TEST.md` for the thing
 to do next.
+
+## Roadmap, Claude items (2026-11-04, tracking issue #112)
+
+The owner's list of 20 premium-product items is split between Claude and Codex.
+Codex's half and its prompt: `docs/CODEX_ROADMAP_PROMPT.md`. Status of Claude's
+ten:
+
+| # | Item | State |
+|---|---|---|
+| 1 | Rule versions: list, compare, go back | Done: `store.versions/revert_to_version`, `ruledoc.diff`, Version history panel (#114). Revert opens a draft; frozen versions are never rewritten. |
+| 2 | Explain each decision | Done for rule previews: `platform/explain.py`, `WhyBlock` on the rule page (#115). Not yet on journal entries or live decisions. |
+| 10 | Journal tags and comments | Done: `journal_notes.py`, `journal/{id}/note`, panel on the journal page (#117). Notes are erased and exported with the journal. CSV of visible rows already existed. PDF export and weekly review not built. |
+| 13 | Approvals | Done: `ifApprove` / `ifIgnore` on the approval card (#116). Expiry, duplicate prevention, stale refusal and audit already existed. |
+| 14 | Safe presets | Nothing to build: `strategy_catalog.py` already states what each does, decides and refuses. |
+| 15 | Strategy health | Partly: evidence wording per group (#119). Deviation from backtest and regime change need Codex item 4. |
+| 17 | Rearrangeable dashboard | Not started. |
+| 18 | Mobile control | Partly: a Stop link in the top bar on every page (#120). Approve/refuse and incidents on mobile not reviewed. |
+| 19 | Alerts by category | Partly: categories existed; added a Needs attention view (#118). |
+| 20 | Audit export | Exists: Settings, Your data (`account/export`, JSON). No PDF. |
+
+Rules kept: live switches, checkout flags and env vars untouched; every refusal
+is explained or left "unknown", never guessed; a failed read is shown as failed.
