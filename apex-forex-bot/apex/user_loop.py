@@ -5871,6 +5871,16 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         return {"ok": False, "side": side, "symbol": sym,
                 "error": "minimum lot on this instrument would risk more than "
                          "your configured risk per trade"}
+    # On live money the 1% cap holds for an approved or manual order too, not
+    # only for the loop's own entries. An explicit `lots` is still measured.
+    if _is_live_cfg(cfg):
+        _cap_bal = min((b for b in (sizing_balance, balance) if b and b > 0),
+                       default=0.0)
+        _live_why = forex.live_risk_refusal(units, sym, price, stop_pips_eff,
+                                            _cap_bal)
+        if _live_why:
+            return {"ok": False, "side": side, "symbol": sym,
+                    "error": _live_why}
 
     try:
         from apex import control as _ctl
@@ -5939,7 +5949,9 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
     # a position with no record is exactly what this exists to prevent. A demo
     # order proceeds, as it always has, with the snapshot best-effort.
     _prev_snapshot = (user or {}).get("open_position_snapshot")
-    _live_acct = not (user or {}).get("paper", True)
+    # Platform user records carry no `paper` key, so the record cannot say
+    # "live"; the configuration the order is sent under does.
+    _live_acct = _is_live_cfg(cfg) or not (user or {}).get("paper", True)
     _intent = {"side": side, "entryPrice": price, "symbol": sym,
                "units": units, "stopLoss": sl_price, "takeProfit": tp_price,
                "initialStop": sl_price, "entrySpreadPips": spread,
