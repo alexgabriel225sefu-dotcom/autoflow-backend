@@ -106,6 +106,12 @@ class Halted(RuntimeError):
 _last_store_log = 0.0
 
 
+def _norm_sym(symbol):
+    """EUR_USD, EUR/USD and EURUSD are one instrument to a halt."""
+    return (str(symbol or "").upper().replace("_", "").replace("/", "")
+            .replace("-", ""))
+
+
 def _k():
     return f"{_store.namespace_prefix()}emergency"
 
@@ -258,7 +264,7 @@ def check(*, user_id=None, symbol=None, mode=NOT_RESOLVED, st=None):
                      "live accounts are stopped by an emergency switch",
                      scope=LIVE, source=st["source"], reason=st.get("reason"))
 
-    if symbol and str(symbol).upper() in st["instruments"]:
+    if symbol and _norm_sym(symbol) in {_norm_sym(i) for i in st["instruments"]}:
         raise Halted("HALTED_INSTRUMENT",
                      f"{str(symbol).upper()} is stopped by an emergency "
                      f"switch", scope=st["scope"], source=SRC_STORE,
