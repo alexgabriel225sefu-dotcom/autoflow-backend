@@ -564,6 +564,88 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         return _ok(_link.public_status(p.user_id))
 
+    # Roadmap analysis surfaces. These endpoints are intentionally read-only:
+    # they accept bounded snapshots or read the broker through broker_read and
+    # never call an order, close, or automation-control function.
+    if route in ("backtest", "replay", "forward", "overfit", "rule-layer"):
+        p = _authenticate(headers)
+        if method != "POST":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        payload = _body(body) or {}
+        if route == "backtest":
+            from apex.platform import backtest as _backtest
+            candles = payload.get("candles")
+            return _ok(_backtest.run(
+                candles, initial_balance=payload.get("initialBalance"),
+                spread_pips=float(payload.get("spreadPips") or 0),
+                commission=float(payload.get("commission") or 0),
+                slippage_pips=float(payload.get("slippagePips") or 0),
+                latency_bars=int(payload.get("latencyBars") or 0)))
+        if route == "replay":
+            from apex.platform import replay as _replay
+            return _ok(_replay.timeline(payload.get("candles")))
+        if route == "forward":
+            from apex.platform import forward as _forward
+            return _ok(_forward.record(payload.get("signals") or []))
+        if route == "overfit":
+            from apex.platform import overfit as _overfit
+            return _ok(_overfit.analyse(payload))
+        from apex.platform import rule_layer as _rules
+        return _ok(_rules.risk_units(
+            balance=float(payload.get("balance")),
+            risk_fraction=float(payload.get("riskFraction")),
+            stop_pips=float(payload.get("stopPips")),
+            symbol=payload.get("symbol"), price=float(payload.get("price")),
+            leverage=float(payload.get("leverage") or 30)))
+
+    if route == "risk/guard" and method == "POST":
+        _authenticate(headers)
+        from apex.platform import risk_guard as _risk_guard
+        payload = _body(body) or {}
+        limits = payload.get("limits") or {}
+        allowed = {"weekly_loss_fraction", "max_drawdown_fraction",
+                   "max_consecutive_losses", "max_symbol_exposure",
+                   "max_trades_day", "max_slippage_pips", "cooldown_seconds"}
+        clean = {k: v for k, v in limits.items() if k in allowed}
+        return _ok(_risk_guard.evaluate(payload.get("state") or {},
+                                        _risk_guard.GuardLimits(**clean)))
+
+    if route == "risk" and method == "GET":
+        p = _authenticate(headers)
+        from apex.platform import risk_map as _risk_map
+        positions = _read.positions(p.user_id)
+        if positions.get("status") != _read.OK:
+            return _ok(_risk_map.build([], unreadable=True))
+        account = _read.account(p.user_id)
+        balance = account.get("balance") if account.get("status") == _read.OK else None
+        return _ok(_risk_map.build(positions.get("positions") or [], balance=balance))
+
+    if route == "health-score" and method == "GET":
+        p = _authenticate(headers)
+        from apex.platform import health_score as _health_score
+        accounts = _link.public_status(p.user_id)
+        return _ok(_health_score.score({
+            "brokerConnected": accounts.get("connected"),
+            "sessionValid": True, "storeAvailable": True,
+            "ruleValid": None, "riskGuardReady": None,
+            "dataFresh": None, "criticalIncidents": None,
+        }))
+
+    if route == "incidents" and method == "GET":
+        p = _authenticate(headers)
+        from apex.platform import incidents as _incidents
+        accounts = _link.public_status(p.user_id)
+        return _ok(_incidents.derive({
+            "brokerStatus": "ok" if accounts.get("connected") else "unavailable",
+            "storeAvailable": True, "riskBlocked": None,
+        }))
+
+    if route == "multi-account" and method == "GET":
+        p = _authenticate(headers)
+        from apex.platform import multi_account as _multi
+        status = _link.public_status(p.user_id)
+        return _ok(_multi.isolate(p.user_id, status.get("accounts") or []))
+
     # A manual close is deliberately a separate route from the read-only
     # account views. It authenticates first, verifies the linked account is a
     # DEMO account, and then delegates to the shared close gate.

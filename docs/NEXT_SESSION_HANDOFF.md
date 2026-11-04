@@ -687,3 +687,16 @@ ten:
 
 Rules kept: live switches, checkout flags and env vars untouched; every refusal
 is explained or left "unknown", never guessed; a failed read is shown as failed.
+
+# Roadmap, Codex items
+
+- Strategy Replay: added bounded, read-only candle timeline endpoint and protected `/replay` screen.
+- Realistic Backtest: added hypothetical cost/slippage/latency-aware bounded runner and `/backtest` screen.
+- Forward Testing: added hypothetical signal ledger endpoint and `/forward` screen.
+- Advanced Risk Guard: added fail-closed pure guard evaluator for drawdown, loss, exposure, slippage and cooldown.
+- Portfolio Risk Map: added explicit unknown/unavailable handling and protected `/risk` screen.
+- Multi-account control: added authenticated account-isolation view and protected `/multi-account` screen.
+- Broker-agnostic rule layer: added validated instrument/volume/risk calculations and `/rule-layer` screen.
+- Incident Center: added observable-facts incident derivation and protected `/incidents` screen.
+- Automation health score: added conservative dependency score and protected `/health` screen.
+- Anti-overfitting assistant: added diagnostic warnings endpoint through the protected roadmap panel.
