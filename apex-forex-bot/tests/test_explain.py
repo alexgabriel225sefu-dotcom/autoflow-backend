@@ -75,5 +75,18 @@ for bad in (None, "x", 5, {}, {"verdict": "HOLD", "conditions": [None, 3]}):
     except Exception as e:  # noqa: BLE001
         check(f"survives {bad!r}", False, repr(e))
 
+print("[6] stored journal entries carry the explanation, derived not stored")
+import tempfile
+os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="a4t-expl-"))
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
+os.environ["APP_ENV"] = "dev"
+os.environ["PRODUCT"] = "forex"
+from apex.platform import journal_store as JS   # noqa: E402
+row = {"entryId": "e", "userId": "u", "decision": {**base, "verdict": "HOLD", "conditions": [cond("ema", False)]}}
+out = JS._present(row)
+check("explanation added to a copy", out["explanation"]["outcome"] == "no_setup" and "explanation" not in row)
+check("an entry with no decision gets none", "explanation" not in JS._present({"entryId": "x", "userId": "u"}))
+
 print("\nFAILED: " + ", ".join(fails) if fails else "\nALL OK")
 sys.exit(1 if fails else 0)

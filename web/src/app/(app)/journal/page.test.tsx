@@ -222,3 +222,15 @@ describe("a page the server could not fully read", () => {
     expect(document.body.textContent).not.toContain("This page is incomplete");
   });
 });
+
+describe("who stopped an entry", () => {
+  it("prints the server's classification and invents none", async () => {
+    // Source-level: the page reads explanation.blockedBy and holds no table of
+    // refusal codes of its own.
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(process.cwd(), "src/app/(app)/journal/page.tsx"), "utf8");
+    expect(src).toContain("e.explanation?.blockedBy");
+    expect(src).not.toMatch(/SPREAD_LIMIT_EXCEEDED|MODE_UNVERIFIED|LEDGER_UNAVAILABLE/);
+  });
+});
