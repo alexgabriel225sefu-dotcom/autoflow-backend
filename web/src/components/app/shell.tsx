@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ClipboardList, LogOut, MoreHorizontal, User, X } from "lucide-react";
+import { ClipboardList, LogOut, MoreHorizontal, OctagonAlert, User, X } from "lucide-react";
 import { BrandLockup, BrandMark } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
 import { api, type AutomationState, type CtraderStatus, type Me, type NotificationPage } from "@/lib/api";
@@ -123,6 +123,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <span className="topbar-title">{titleFor(path)}</span>
           <span className="topbar-spacer" />
+
+          {/* One tap from any screen to the stop controls. It only navigates:
+              the stop itself, with its confirmations and its measured result,
+              stays on the dashboard, so no money-moving logic lives here. */}
+          <Link className="btn btn-ghost btn-sm" href="/dashboard#stop"
+                aria-label="Stop automation: go to the stop controls">
+            <OctagonAlert className="ico" aria-hidden />
+            <span>Stop</span>
+          </Link>
 
           {/* The user menu. Present on every screen, so signing out and
               reaching settings never depend on which page you are on. */}
