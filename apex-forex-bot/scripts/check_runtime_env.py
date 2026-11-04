@@ -19,10 +19,12 @@ WHERE THE LIST COMES FROM (so it can be audited, not trusted)
   user_store.py        REDIS_URL / UPSTASH_REDIS_REST_URL + _TOKEN, PRODUCT, APP_ENV
   platform_server.py   A4T_ALLOWED_ORIGIN (CORS; unset blocks every web call)
   entitlement.py       A4T_LIVE_EXECUTION is the live switch
+  live_gate.py         A4T_OPERATOR_USER_IDS (optional: who is an operator)
 The env file is parsed here and never exported or executed.
 """
 import argparse
 import os
+import re
 import sys
 
 OK, MISSING, UNSAFE, SKIPPED = "OK", "MISSING", "UNSAFE", "SKIPPED"
@@ -52,6 +54,12 @@ UNSAFE_IF_SET = {
     "RATE_LIMIT_STORE": lambda v: v.strip().lower() == "memory",
     "A4T_CHECKOUT_ENABLED": _truthy,              # no checkout path in this build
 }
+
+
+OPERATOR_NAME = "A4T_OPERATOR_USER_IDS"
+# A Supabase user id. An e-mail address or text with spaces in the list never
+# matches anyone, and the owner would believe they were an operator.
+_OPERATOR_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 
 def _val(env, name):
@@ -97,6 +105,16 @@ def evaluate(env):
             rows.append((name, UNSAFE, "must not be set in production"))
         else:
             rows.append((name, OK, "not set" if not v else "acceptable"))
+    # Optional. An empty list is the normal state and never an error. A list is
+    # reported by how many entries it has, never by what they are.
+    ids = [x.strip() for x in _val(env, OPERATOR_NAME).split(",") if x.strip()]
+    if not ids:
+        rows.append((OPERATOR_NAME, SKIPPED, "optional: no operator is set"))
+    elif any(not _OPERATOR_ID.match(i) for i in ids):
+        rows.append((OPERATOR_NAME, UNSAFE,
+                     "an entry is not a Supabase user id and will never match"))
+    else:
+        rows.append((OPERATOR_NAME, OK, f"{len(ids)} operator id(s)"))
     return rows
 
 

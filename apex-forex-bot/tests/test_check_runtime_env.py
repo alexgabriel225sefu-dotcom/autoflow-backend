@@ -99,6 +99,33 @@ check("a non-https redirect URI is UNSAFE",
 check("unset flags are not reported as problems",
       status(run(GOOD), "ALLOW_LOCAL_BACKEND_DEV") in ("OK", None))
 
+print("\n[3b] the operator list is optional and is never printed")
+OP = "A4T_OPERATOR_USER_IDS"
+UID = "27d43c19-3477-417d-a4dc-d377da44ee0c"
+check("an unset operator list is SKIPPED, not a problem",
+      status(run(GOOD), OP) == "SKIPPED" and C.exit_code(run(GOOD)) == 0)
+check("a blank operator list is SKIPPED too",
+      status(run(dict(GOOD, **{OP: "  , "})), OP) == "SKIPPED")
+rows = run(dict(GOOD, **{OP: UID}))
+check("one user id is OK", status(rows, OP) == "OK" and C.exit_code(rows) == 0)
+rows = run(dict(GOOD, **{OP: f"{UID}, other-id_2"}))
+check("several user ids are OK", status(rows, OP) == "OK")
+check("the count is reported, not the ids",
+      [r[2] for r in rows if r[0] == OP] == ["2 operator id(s)"])
+for bad in ("owner@example.com", f"{UID} extra", f"{UID},*", "a/b"):
+    rows = run(dict(GOOD, **{OP: bad}))
+    check(f"an entry that is not a user id is UNSAFE: {bad!r}",
+          status(rows, OP) == "UNSAFE" and C.exit_code(rows) != 0)
+buf = io.StringIO()
+with redirect_stdout(buf):
+    C.report(C.evaluate(dict(GOOD, **{OP: f"{UID},owner@example.com"})))
+check("neither a valid id nor a bad entry is printed",
+      UID not in buf.getvalue() and "owner@example.com" not in buf.getvalue())
+src_gate = open(os.path.join(ROOT, "apex", "platform", "live_gate.py"),
+                encoding="utf-8").read()
+check("the name matches the one live_gate reads",
+      f'OPERATOR_ENV = "{OP}"' in src_gate)
+
 print("\n[4] output never contains a value")
 secretish = dict(GOOD)
 buf = io.StringIO()
