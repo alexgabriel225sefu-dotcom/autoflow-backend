@@ -16,6 +16,7 @@ import {
 } from "@/components/app/rule-summary";
 import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
 import { TIMEFRAMES } from "@/components/app/rule-form";
+import { RuleHistory } from "@/components/app/rule-history";
 import { PriceChart } from "@/components/chart/price-chart";
 import type { ChartMarker } from "@/components/chart/chart-data";
 
@@ -586,6 +587,8 @@ export default function RuleDetail({ params }: { params: Promise<{ id: string }>
                    notApplied={rule.result?.ok
                      ? rule.result.data.notApplied ?? [] : null} />
       </section>
+
+      <RuleHistory id={id} onChanged={() => void rule.reload()} />
     </main>
   );
 }

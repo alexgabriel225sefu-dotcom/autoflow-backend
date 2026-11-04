@@ -561,6 +561,56 @@ def next_version(doc, *, now=None):
     return out
 
 
+# Bookkeeping that changes with every save or activation. It is not a change to
+# what the rule DOES, so a comparison of two versions leaves it out.
+_DIFF_IGNORED = frozenset({"version", "state", "createdAt", "updatedAt",
+                           "activatedAt", "ruleDocId", "userId", "accountId"})
+
+
+def diff(before, after):
+    """What differs between two RuleDocs, as a list of plain changes.
+
+    Each change is {"path", "kind", "before", "after"} with kind one of
+    "added", "removed" or "changed". Paths are dotted, with list positions in
+    brackets ("conditions[1].params.period"). Lists are compared position by
+    position, so inserting at the front reads as several changes, which is true
+    to what the stored document says. Read-only; neither input is modified.
+    """
+    out = []
+
+    def walk(path, a, b):
+        if isinstance(a, dict) and isinstance(b, dict):
+            for k in sorted(set(a) | set(b)):
+                if not path and k in _DIFF_IGNORED:
+                    continue
+                sub = f"{path}.{k}" if path else k
+                if k not in a:
+                    out.append({"path": sub, "kind": "added", "before": None,
+                                "after": b[k]})
+                elif k not in b:
+                    out.append({"path": sub, "kind": "removed",
+                                "before": a[k], "after": None})
+                else:
+                    walk(sub, a[k], b[k])
+        elif isinstance(a, list) and isinstance(b, list):
+            for i in range(max(len(a), len(b))):
+                sub = f"{path}[{i}]"
+                if i >= len(a):
+                    out.append({"path": sub, "kind": "added", "before": None,
+                                "after": b[i]})
+                elif i >= len(b):
+                    out.append({"path": sub, "kind": "removed",
+                                "before": a[i], "after": None})
+                else:
+                    walk(sub, a[i], b[i])
+        elif a != b:
+            out.append({"path": path, "kind": "changed", "before": a,
+                        "after": b})
+
+    walk("", before or {}, after or {})
+    return out
+
+
 def assert_editable(doc):
     """Raise unless `doc` may be edited in place."""
     st = (doc or {}).get("state")
