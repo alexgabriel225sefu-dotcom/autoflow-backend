@@ -42,9 +42,23 @@ operator's live-access review queue is not edited. The web app should sign
 the user out after a successful erasure: if the auth user still exists, the
 next authenticated request starts a fresh empty account.
 
-Unverified: the Redis/Upstash path (`SCAN <ns>:*<uid>*`) is covered only by
-reasoning; tests run on the file backend. The Supabase admin call is tested
-with an injected transport, not against Supabase.
+Tested: the Redis path (`SCAN <ns>:*<uid>*`, `DEL`, the active-user set) in
+`tests/test_account_erasure_redis.py`, which runs the real `user_store`
+functions against an in-memory stand-in for the redis-py client, with a paged
+SCAN. It shows a user's keys of every kind are erased, another user's are not
+(including an id that contains the caller's id), an unreachable store raises
+instead of answering "deleted", and a second erasure reports zeros. The same
+file fails when a new key kind is written under `a4t:` that is neither mapped
+to a category in `account_data` nor exempted there with a reason.
+
+Not erased, and a decision for the owner: `billing:review:<stripe event>`
+records hold `claimedUserId` in their value and are keyed by the event, so a
+scan on the user id does not find them. They are payment records held for
+manual review, and keeping or deleting them is a legal retention question.
+
+Unverified: the real Upstash/Redis service (the stand-in is not a server), and
+the Supabase admin call, which is tested with an injected transport, not
+against Supabase.
 
 ## Other fixes in the same audit
 
