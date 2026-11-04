@@ -46,6 +46,16 @@ repository. See `docs/ORCHESTRATOR_PHASE1_AUDIT.md`.
 An issue carries **exactly one** of `apex-claude` / `apex-codex`. An agent that
 finds both, or neither, does nothing and comments once.
 
+### How the owner queues a task
+
+1. **Open an issue from the dev-task form.** Fill in every field, in particular
+   the acceptance criteria, the base branch and the files in and out of scope.
+2. **Review it.** Read the issue as the agent will: if the acceptance criteria
+   are missing or vague, fix them now. An agent does not guess; it stops and
+   sets `needs-owner`.
+3. **Add `ready` plus exactly one of `apex-claude` / `apex-codex`.** Only this
+   step authorises an agent to pick the issue up.
+
 ## 3. Lifecycle
 
 ```
