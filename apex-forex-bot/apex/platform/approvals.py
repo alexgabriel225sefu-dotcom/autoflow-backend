@@ -394,6 +394,17 @@ def pending(user_id, *, now=None):
         # itself what the rules are.
         "actionable": refusal is None,
         "refusal": refusal,
+        # What each answer does, in the server's words, so the card never
+        # promises more than the gates allow. Approving asks the engine to
+        # try; it is not a guarantee of an open position.
+        "ifApprove": (
+            f"The engine tries to open a {side} on {symbol} now, at your "
+            f"configured size and stop. It is checked again first, and a "
+            f"risk check or the broker can still refuse it."),
+        "ifIgnore": (
+            f"Nothing opens. This setup expires "
+            f"{int(EXPIRY_S // 60)} minutes after it was found, and until "
+            f"then no other setup is proposed."),
     }}
 
 

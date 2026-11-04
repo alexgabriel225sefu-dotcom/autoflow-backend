@@ -270,3 +270,22 @@ describe("answering it", () => {
     await waitFor(() => expect(calls.some((c) => c.path === "approvals/reject")).toBe(true));
   });
 });
+
+describe("what each answer does", () => {
+  it("prints the server's words for approving and for doing nothing", async () => {
+    routes.approvals = waiting({
+      ifApprove: "The engine tries to open a BUY on EURUSD now.",
+      ifIgnore: "Nothing opens. This setup expires 5 minutes after it was found.",
+    });
+    await renderCard();
+    await waitFor(() => expect(screen.getByTestId("approval-consequences")).toBeTruthy());
+    expect(screen.getByText(/tries to open a BUY on EURUSD/)).toBeTruthy();
+    expect(screen.getByText(/Nothing opens/)).toBeTruthy();
+  });
+  it("shows nothing invented when an older server sends neither", async () => {
+    routes.approvals = waiting();
+    await renderCard();
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Approve$/ })).toBeTruthy());
+    expect(screen.queryByTestId("approval-consequences")).toBeNull();
+  });
+});

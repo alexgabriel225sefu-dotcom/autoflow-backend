@@ -741,6 +741,9 @@ export type PendingApproval = {
   expired: boolean;
   actionable: boolean;
   refusal: string | null;
+  /** What each answer does, in the server's words. Absent on an older server. */
+  ifApprove?: string;
+  ifIgnore?: string;
 };
 export type ApprovalRead = {
   /** "ok" means we read the account. "unknown" means we could not. */

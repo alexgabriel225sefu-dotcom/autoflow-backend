@@ -204,6 +204,13 @@ export function PendingApproval() {
         </p>
       ) : null}
 
+      {a.ifApprove || a.ifIgnore ? (
+        <dl style={{ fontSize: ".82rem", margin: "var(--sp-2) 0 0" }} data-testid="approval-consequences">
+          {a.ifApprove ? (<><dt className="dim">If you approve</dt><dd style={{ margin: "0 0 .35rem" }}>{a.ifApprove}</dd></>) : null}
+          {a.ifIgnore ? (<><dt className="dim">If you do nothing</dt><dd style={{ margin: 0 }}>{a.ifIgnore}</dd></>) : null}
+        </dl>
+      ) : null}
+
       {why ? (
         <div className="notice notice-warn" role="status">
           <p className="muted" style={{ fontSize: ".82rem", margin: 0 }}>{why}</p>
