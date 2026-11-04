@@ -500,8 +500,8 @@ body {
 }
 .segc button {
   position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
-  min-height: 34px; border: 0; background: none; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700;
-  color: var(--a4t-muted); border-radius: 999px; transition: color .2s;
+  min-height: 34px; min-width: 3.6rem; padding: 0 .95rem; border: 0; background: none; cursor: pointer; font: inherit; font-size: .82rem; font-weight: 700;
+  color: var(--a4t-muted); border-radius: 999px; transition: color .2s; white-space: nowrap;
 }
 .segc button .ico { width: 14px; height: 14px; }
 .segc button[aria-checked="true"] { color: var(--a4t-on-accent); }
@@ -2289,8 +2289,20 @@ body {
    Pointer-spotlight cells follow the pattern of the 21st.dev feature grids.
    The light is two custom properties set on the hovered cell by
    SpotlightGrid; without a pointer (touch, reduced motion) it never shows. */
-.mkt-hero-mark { overflow: visible; min-height: min(68vh, 600px); display: flex; align-items: center; padding-top: clamp(2rem, 6vw, 3.5rem); padding-bottom: clamp(2rem, 5vw, 3rem); }
+.mkt-hero-mark { overflow: visible; min-height: min(68vh, 600px); display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(2rem, 5vw, 3.5rem); align-items: center; padding-top: clamp(2rem, 6vw, 3.5rem); padding-bottom: clamp(2rem, 5vw, 3rem); }
 .mkt-hero-mark .mkt-hero-copy { max-width: 40rem; }
+@media (min-width: 1000px) {
+  .mkt-hero-mark { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+  .mkt-hero-mark h1 { font-size: clamp(2.6rem, 4.6vw, 4.2rem); }
+}
+/* The real product screen next to the promise. */
+.mkt-hero-shot { margin: 0; }
+.mkt-hero-shot img {
+  display: block; width: 100%; height: auto; border-radius: 14px;
+  border: 1px solid var(--mkt-line);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .55), 0 0 0 6px rgba(247, 246, 242, .03);
+}
+.mkt-hero-shot figcaption { margin-top: .8rem; font-size: .8rem; color: var(--mkt-dim); }
 /* The hero background: a quiet generated light sweep over a dark grid floor,
    no logo in it. Full width of the viewport, darkest where the copy sits. */
 .mkt-hero > .mkt-hero-photo {
@@ -2505,7 +2517,7 @@ body {
   .spot::before, .spot::after { display: none; }
 }
 
-.status-emoji { font-size: .85em; line-height: 1; }
+.status-icon { flex: none; opacity: .85; }
 
 .ticker { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ticker-d {

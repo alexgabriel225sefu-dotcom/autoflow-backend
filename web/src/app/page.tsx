@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -53,8 +54,6 @@ export default function Landing() {
         </nav>
 
         <section className="mkt-hero mkt-hero2 mkt-hero-mark" id="product">
-          {/* A quiet generated background. Decoration only. */}
-          <span className="mkt-hero-photo" aria-hidden />
           <div className="mkt-hero-copy">
             <p className="mkt-kicker">YOUR RULES, YOUR BROKER</p>
             <h1>Trade like you planned&nbsp;to.</h1>
@@ -71,6 +70,22 @@ export default function Landing() {
               </a>
             </div>
           </div>
+          {/* The product itself, not a picture about it. A real screen of the
+              setup flow on a demo account (the account number is a
+              placeholder). It shows no result, balance or return. */}
+          <figure className="mkt-hero-shot">
+            <Image
+              src="/product/setup-review.jpg"
+              alt="The Apex4Traders setup flow at its review step: instrument EURUSD, 1h, Trend pullback, 1% risk per trade, stop the day at 2%, on a demo account, with a Start on demo button."
+              width={2040}
+              height={1143}
+              priority
+              sizes="(min-width: 1000px) 56vw, 100vw"
+            />
+            <figcaption>
+              The setup flow, on a demo account. Nothing runs until you press Start.
+            </figcaption>
+          </figure>
         </section>
 
         <section className="mkt-partners" id="partners" aria-label="Broker integrations">

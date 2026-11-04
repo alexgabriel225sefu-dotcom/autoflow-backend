@@ -57,7 +57,7 @@ describe("spotlight card", () => {
 });
 
 describe("halo alert", () => {
-  it("uses the glowing error notice and hides the warning emoji", () => {
+  it("uses the glowing error notice with a decorative icon that is hidden from assistive tech", () => {
     render(<ErrorNotice error={{
       ok: false, status: 500, code: "ENGINE_REFUSED",
       message: "the trading engine refused to start this loop (another instance already owns this loop)",
@@ -65,6 +65,7 @@ describe("halo alert", () => {
     const alert = screen.getByRole("alert");
     expect(alert.className).toContain("notice-error");
     expect(alert.textContent).toContain("another instance already owns this loop");
-    expect(alert.querySelector("[aria-hidden='true']")?.textContent).toBe("⚠️");
+    expect(alert.querySelector("svg[aria-hidden='true']")).toBeTruthy();
+    expect(alert.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });
