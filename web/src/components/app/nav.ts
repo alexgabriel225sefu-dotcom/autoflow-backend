@@ -10,7 +10,7 @@
  */
 import {
   BarChart3, Bell, BookOpen, Crosshair, LayoutDashboard, ListChecks, Receipt, Settings,
-  CircleHelp, ShieldCheck, TrendingUp, Wallet, type LucideIcon,
+  CircleHelp, History, ShieldCheck, TrendingUp, Wallet, type LucideIcon,
 } from "lucide-react";
 
 export type NavItem = {
@@ -35,6 +35,7 @@ export const NAV: NavItem[] = [
   { href: "/rules", label: "Rules", icon: ListChecks, group: "operations" },
   { href: "/positions", label: "Positions", icon: TrendingUp, primary: true, group: "operations" },
   { href: "/orders", label: "Orders", icon: Receipt, group: "operations" },
+  { href: "/trades", label: "Closed trades", icon: History, group: "operations" },
   { href: "/performance", label: "Performance", icon: BarChart3, group: "operations" },
   { href: "/journal", label: "Journal", icon: BookOpen, primary: true, group: "account" },
   { href: "/notifications", label: "Alerts", icon: Bell, group: "account" },

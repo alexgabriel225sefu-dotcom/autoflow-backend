@@ -777,6 +777,31 @@ export type PerformanceRead =
               attributed: number; unattributed: number };
   };
 
+/** GET trades. Closed trades from the broker's deal history, newest first, with
+ *  the daily and equity series the server built from them. Amounts carry no
+ *  currency (`currency` is null: it is not read). `unavailable` is never to be
+ *  shown as "no trades". */
+export type TradeRow = {
+  positionId: string | null; symbol: string | null; side: string | null; units: number | null;
+  openedAt: number | null; closedAt: number; durationS: number | null;
+  entry: number | null; exit: number | null; net: number | null;
+  gross: number | null; swap: number | null; commission: number | null;
+  strategyId: string | null; strategy: string | null;
+  slPips: number | null; tpPips: number | null; slPrice: number | null; tpPrice: number | null;
+};
+export type TradesRead =
+  | { status: "unavailable"; reason: string; brokerStatus?: string | null }
+  | {
+    status: "ok"; mode: "demo" | "live" | "all"; accountMode: string; accountId?: string | null;
+    days: number; currency: string | null; trades: TradeRow[];
+    summary: { trades: number; net: number; wins: number; losses: number };
+    daily: { date: string; net: number; trades: number; wins: number; losses: number }[];
+    equity: { t: number; equity: number }[];
+    excluded: { otherMode: number; undated: number; unusableForCurve: number };
+    source: { closedTrades: string; journalReadable: boolean; labelled: number };
+    note: string;
+  };
+
 /** POST emergency/stop. Every claim here is the server's and was measured:
  *  `allFlat` is true only when a fresh read of the account found nothing open,
  *  `closes` is null when the client chose to stop without closing, and a
