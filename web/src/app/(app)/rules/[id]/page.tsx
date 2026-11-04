@@ -28,6 +28,33 @@ import type { ChartMarker } from "@/components/chart/chart-data";
  * happen" are the same thing, and they are not — one of them is a bug in
  * their rule.
  */
+const STOPPED_BY: Record<string, string> = {
+  strategy: "Your rule", risk_guard: "A risk guard", broker: "The broker",
+  infrastructure: "Our systems", account: "Your account", unknown: "Not classified",
+};
+
+/** Who stopped this, said in one place. The server decides; this prints it. */
+function WhyBlock({ e }: { e: NonNullable<PreviewResult["explanation"]> }) {
+  return (
+    <div data-testid="why-block" style={{ margin: ".7rem 0 .2rem" }}>
+      <p style={{ fontWeight: 600, margin: 0 }}>{e.headline}</p>
+      {e.blockedBy ? (
+        <p className="muted" style={{ fontSize: ".82rem", margin: ".25rem 0 0" }}>
+          Stopped by: {STOPPED_BY[e.blockedBy.category] ?? e.blockedBy.category}
+          {e.blockedBy.guard ? ` · ${e.blockedBy.guard}` : ""}
+          {" "}<code>{e.blockedBy.code}</code>
+        </p>
+      ) : null}
+      <p className="dim" style={{ fontSize: ".74rem", margin: ".25rem 0 0" }}>
+        Decided on {e.dataUsed.symbol ?? "—"}
+        {e.dataUsed.ruleDocVersion != null ? `, rule v${e.dataUsed.ruleDocVersion}` : ""}
+        {e.dataUsed.snapshotTs != null
+          ? `, data from ${new Date(e.dataUsed.snapshotTs * 1000).toLocaleString()}` : ""}.
+      </p>
+    </div>
+  );
+}
+
 function Verdict({ p, specs }: { p: PreviewResult; specs: Record<string, ConditionSpec> | null }) {
   const v = p.decision.verdict;
   const kind = v === "BUY" || v === "SELL" ? v.toLowerCase()
@@ -66,6 +93,8 @@ function Verdict({ p, specs }: { p: PreviewResult; specs: Record<string, Conditi
           {unknown ? <div className="cond-unknown" style={{ fontSize: ".72rem" }}>{unknown} unknown</div> : null}
         </div>
       </div>
+
+      {p.explanation ? <WhyBlock e={p.explanation} /> : null}
 
       <p className="muted" style={{ fontSize: ".85rem", margin: ".7rem 0 .3rem" }}>
         {p.decision.reason}

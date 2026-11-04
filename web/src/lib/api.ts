@@ -667,7 +667,19 @@ export type Decision = {
   reason: string; conditions: ConditionResult[];
   executable: boolean; refusalCode: string | null; confidence: number | null;
 };
-export type PreviewResult = { decision: Decision; executable: false; wouldTrade: boolean };
+/** Server-built explanation of a decision. `blockedBy.category` says who
+ *  stopped it; "unknown" means the code has no description yet. */
+export type DecisionExplanation = {
+  outcome: "setup" | "no_setup" | "refused" | "close" | "unknown";
+  headline: string;
+  met: { id: string; params: Record<string, unknown>; detail: string | null }[];
+  unmet: { id: string; params: Record<string, unknown>; detail: string | null }[];
+  unknown: { id: string; params: Record<string, unknown>; detail: string | null }[];
+  blockedBy: { category: "strategy" | "risk_guard" | "broker" | "infrastructure" | "account" | "unknown";
+               code: string; guard: string | null; sentence: string } | null;
+  dataUsed: { symbol: string | null; snapshotTs: number | null; ruleDocId: string | null; ruleDocVersion: number | null };
+};
+export type PreviewResult = { decision: Decision; explanation?: DecisionExplanation; executable: false; wouldTrade: boolean };
 
 export type JournalEntry = {
   entryId: string; kind: string; status: string | null; ts: number;
