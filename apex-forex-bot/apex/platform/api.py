@@ -42,6 +42,7 @@ from apex.platform import entitlement as _ent
 from apex.platform import health as _health
 from apex.platform import identity as _id
 from apex.platform import journal_store as _jstore
+from apex.platform import journal_notes as _jnotes
 from apex.platform import notifications as _notify
 from apex.platform import performance_read as _perfread
 from apex.platform import trades_read as _tradesread
@@ -166,6 +167,7 @@ def _authenticate(headers, *, fresh=False, start_trial=True):
 # ── routes ──────────────────────────────────────────────────────────────────
 _NOTIFY_RE = re.compile(r"^notifications/([A-Za-z0-9_-]{1,64})/read$")
 _JOURNAL_RE = re.compile(r"^journal/([A-Za-z0-9_-]{1,64})$")
+_JOURNAL_NOTE_RE = re.compile(r"^journal/([A-Za-z0-9_-]{1,64})/note$")
 _ACCOUNT_RE = re.compile(
     r"^accounts/([A-Za-z0-9_-]{1,64})(?:/(positions|orders|deals|candles))?$")
 _POSITION_CLOSE_RE = re.compile(
@@ -834,6 +836,18 @@ def _dispatch(method, route, headers, body, query=None):
             rule_doc_id=q.get("ruleDocId"), status=q.get("status"),
             limit=_num(q.get("limit"), "limit") or 50,
             offset=_num(q.get("offset"), "offset") or 0))
+
+    m = _JOURNAL_NOTE_RE.match(route)
+    if m and method in ("GET", "PUT"):
+        p = _authenticate(headers)
+        if method == "GET":
+            return _ok({"note": _jnotes.get(p.user_id, m.group(1))})
+        b = _body(body) or {}
+        try:
+            return _ok({"note": _jnotes.put(p.user_id, m.group(1),
+                                            b.get("tags"), b.get("comment"))})
+        except _jnotes.NoteInvalid as e:
+            return _err(400, "BAD_REQUEST", str(e))
 
     m = _JOURNAL_RE.match(route)
     if m and method == "GET":
