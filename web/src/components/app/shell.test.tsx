@@ -342,3 +342,16 @@ describe("stylesheet obligations", () => {
     expect(CSS).toMatch(/\.bottomnav a, \.bottomnav button \{[^}]*min-height: 44px/);
   });
 });
+
+describe("one tap to the stop controls", () => {
+  it("the top bar links to the dashboard's stop controls from any page", () => {
+    pathname = "/journal";
+    render(<AppShell><p>page</p></AppShell>);
+    const bar = document.querySelector("header.topbar") as HTMLElement;
+    const link = within(bar).getByRole("link", { name: /Stop automation/ });
+    expect(link.getAttribute("href")).toBe("/dashboard#stop");
+    // It navigates; it is not a button that stops anything from here.
+    expect(link.tagName).toBe("A");
+    pathname = "/dashboard";
+  });
+});

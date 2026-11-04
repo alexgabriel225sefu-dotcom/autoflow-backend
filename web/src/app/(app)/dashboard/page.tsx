@@ -410,7 +410,9 @@ export default function Dashboard() {
                       account only: closing is a demo capability in this
                       release, and a button that closes nothing on a live
                       selection would be a worse lie than no button. */}
-                  {isDemo ? <EmergencyStop ctid={selected?.ctid ?? null} reloadAutomation={auto.reload} /> : null}
+                  <div id="stop" style={{ scrollMarginTop: "4.5rem" }}>
+                    {isDemo ? <EmergencyStop ctid={selected?.ctid ?? null} reloadAutomation={auto.reload} /> : null}
+                  </div>
                 </>
               )}
           </section>
