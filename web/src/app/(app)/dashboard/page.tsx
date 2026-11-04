@@ -30,6 +30,8 @@ import { liveCleared as gateCleared, liveNotice } from "@/components/app/live-ac
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { WhyCard } from "@/components/app/why-card";
 import { EmergencyStop } from "@/components/app/emergency-stop";
+import { DashboardCustomise } from "@/components/app/dashboard-customise";
+import { useHiddenWidgets, type WidgetId } from "@/lib/dashboard-layout";
 import { runAutomationControl, type ControlAction, type ControlResult } from "@/components/app/automation-control";
 import { collapseRepeated, plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
@@ -66,6 +68,8 @@ function Unavailable({ status, reason }: { status: string; reason?: string }) {
 }
 
 export default function Dashboard() {
+  const hidden = useHiddenWidgets();
+  const show = (id: WidgetId) => !hidden.has(id);
   const me = useRead<Me>("me", 120_000);
   const ct = useRead<CtraderStatus>("ctrader/status", 60_000);
   const auto = useRead<AutomationState>("automation", 30_000);
@@ -186,6 +190,8 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <span className="sub">Last synced {whenSynced(lastSync)}</span>
         </div>
+        <span className="btn-row">
+        <DashboardCustomise hidden={hidden} />
         <button className="btn btn-ghost btn-sm" onClick={() => {
           void ct.reload(); void auto.reload(); void pos.reload(); void ord.reload();
           void jr.reload(); void rules.reload(); void me.reload();
@@ -193,6 +199,7 @@ export default function Dashboard() {
         }}>
           <RefreshCw className="ico" aria-hidden /> Refresh
         </button>
+        </span>
       </div>
 
       <FirstRunChecklist
@@ -418,6 +425,7 @@ export default function Dashboard() {
           </section>
 
           {/* ── 3: the market the active rule is watching ───────────── */}
+          {show("market") ? (
           <MarketPanel
             title="Market"
             ctid={selected?.ctid ?? null}
@@ -425,8 +433,11 @@ export default function Dashboard() {
             symbols={(activeRule?.symbols as string[] | undefined) ?? []}
             timeframe={activeRule?.timeframe}
           />
+          ) : null}
 
+          {show("why") ? (
           <WhyCard />
+          ) : null}
 
           <section className="mobile-dashboard-cards" aria-label="Trading context">
             <Link className="mobile-context-card" href="/rules">
@@ -454,6 +465,7 @@ export default function Dashboard() {
           </section>
 
           {/* ── 4 + 5: what did it decide, and was anything placed ──── */}
+          {show("decisions") ? (
           <section className="card">
             <div className="card-head">
               <h2>What the rule decided</h2>
@@ -494,12 +506,14 @@ export default function Dashboard() {
               )
             ) : jr.result ? null : <Spinner />}
           </section>
+          ) : null}
         </div>
 
         {/* ── inspector ───────────────────────────────────────────────── */}
         <aside className="inspector">
 
           {/* 3: what rule is active */}
+          {show("rule") ? (
           <section className="card">
             <div className="card-head">
               <h2>Active rule</h2>
@@ -531,8 +545,10 @@ export default function Dashboard() {
               )
             ) : <Spinner />}
           </section>
+          ) : null}
 
           {/* 5: positions and orders, from the broker or not at all */}
+          {show("positions") ? (
           <section className="card">
             <div className="card-head">
               <h2>Open positions</h2>
@@ -561,7 +577,9 @@ export default function Dashboard() {
               )
             ) : <Spinner />}
           </section>
+          ) : null}
 
+          {show("orders") ? (
           <section className="card">
             <div className="card-head">
               <h2>Pending orders</h2>
@@ -578,6 +596,7 @@ export default function Dashboard() {
               )
             ) : <Spinner />}
           </section>
+          ) : null}
 
           <section className="card card-flat">
             <p className="muted" style={{ fontSize: ".8rem", lineHeight: 1.6 }}>
