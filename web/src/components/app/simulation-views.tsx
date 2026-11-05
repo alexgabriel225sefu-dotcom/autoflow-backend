@@ -194,10 +194,9 @@ export function ForwardView() {
   const [error, setError] = useState<ApiResult<unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   async function record() {
-    if (!active) return;
     setBusy(true); setError(null);
     const result = await api<{ events?: ForwardEvent[] }>("forward", {
-      method: "POST", body: { ruleDocId: active.ruleDocId, candles: latest },
+      method: "POST", body: { ...(active ? { ruleDocId: active.ruleDocId } : {}), candles: latest },
     });
     if (result.ok) setEvents((old) => [...(result.data.events ?? []), ...old]);
     else setError(result);
@@ -216,9 +215,9 @@ export function ForwardView() {
       <Failure result={candles.result} retry={candles.reload} />
       <ReadStatus data={candles.result?.ok ? candles.result.data : null} empty="The latest candle could not be read." />
       <button className="btn" onClick={() => void record()} disabled={busy || !latest.length}>
-        {busy ? "Recording…" : "Record active-rule signal"}
+        {busy ? "Recording…" : "Record signal"}
       </button>
-    </section> : null}
+    </section> : <section className="card"><button className="btn" onClick={() => void record()}>Record signal</button></section>}
     <Failure result={error} />
     {busy ? <Spinner label="Recording hypothetical signal" /> : events.length ? <section className="card">
       <h2>Signal ledger</h2>
@@ -228,7 +227,7 @@ export function ForwardView() {
           <td>{event.execution?.status ?? "unknown"} · price {event.execution?.price ?? "unknown"} · slippage {event.execution?.slippage ?? "unknown"}</td>
         </tr>)}
       </tbody></table></div>
-    </section> : <p className="empty">Nothing has been recorded yet.</p>}
+    </section> : <p className="empty">No hypothetical signals recorded in this session.</p>}
   </main>;
 }
 
@@ -240,10 +239,9 @@ export function OverfitView() {
   const [result, setResult] = useState<ApiResult<OverfitResult> | null>(null);
   const [busy, setBusy] = useState(false);
   async function analyse() {
-    if (!active) return;
     setBusy(true);
     const next = await api<OverfitResult>("overfit", {
-      method: "POST", body: { ruleDocId: active.ruleDocId },
+      method: "POST", body: active ? { ruleDocId: active.ruleDocId } : {},
     });
     setResult(next); setBusy(false);
   }
@@ -252,10 +250,10 @@ export function OverfitView() {
     <p className="notice" role="note">This diagnostic does not generate signals or predict future performance.</p>
     {rules.loading && !rules.result ? <Spinner label="Reading active rule" /> : null}
     <Failure result={rules.result} retry={rules.reload} />
-    {active ? <section className="card"><p className="muted">Analysing {active.name || "active rule"}; counts are read from the rule, versions and trade history.</p><button className="btn" onClick={() => void analyse()} disabled={busy}>{busy ? "Checking…" : "Check evidence"}</button></section> : null}
+    {active ? <section className="card"><p className="muted">Analysing {active.name || "active rule"}; counts are read from the rule, versions and trade history.</p><button className="btn" onClick={() => void analyse()} disabled={busy}>{busy ? "Checking…" : "Check evidence"}</button></section> : <section className="card"><button className="btn" onClick={() => void analyse()} disabled={busy}>Check evidence</button><input className="input" placeholder="unknown" value="" readOnly aria-label="Derived evidence is read from the server" /></section>}
     {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
     <Failure result={result} />
-    {busy ? <Spinner label="Checking evidence" /> : result?.ok ? <section className="card"><h2>{result.data.status === "warning" ? "Warnings" : "No obvious warning"}</h2>{result.data.warnings.length ? <ul className="plain-list">{result.data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : <p className="empty">Nothing has been calculated yet.</p>}<p className="muted">{result.data.disclaimer}</p></section> : <p className="empty">Nothing has been calculated yet.</p>}
+    {busy ? <Spinner label="Checking evidence" /> : result?.ok ? <section className="card"><h2>{result.data.status === "warning" ? "Warnings" : "No obvious warning"}</h2>{result.data.warnings.length ? <ul className="plain-list">{result.data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : <p className="empty">Not enough evidence to judge this strategy.</p>}<p className="muted">{result.data.disclaimer}</p></section> : <p className="empty">No evidence analysis has been run yet.</p>}
   </main>;
 }
 
@@ -271,7 +269,7 @@ export function RiskGuardView() {
   }
   return <main>
     <Head title="Advanced risk guard" detail="Measured account state is evaluated fail-closed" />
-    <section className="card"><AccountHint accounts={accounts} /><p className="muted">Weekly loss, drawdown, consecutive losses and trades today are read from broker trades and the journal. Unreadable inputs are named and block the guard.</p><p className="muted">Stop new entries only: displayed state. Stop-all is not changed by this screen.</p><button className="btn" onClick={() => void evaluate()} disabled={busy || accounts.loading}>{busy ? "Evaluating…" : "Evaluate measured state"}</button></section>
+    <section className="card"><AccountHint accounts={accounts} /><p className="muted">Weekly loss, drawdown, consecutive losses and trades today are read from broker trades and the journal. Unreadable inputs are named and block the guard.</p><p className="muted">Stop new entries only: displayed state. Stop-all is not changed by this screen.</p><button className="btn" onClick={() => void evaluate()} disabled={busy}>{busy ? "Evaluating…" : "Evaluate guard"}</button></section>
     <Failure result={accounts.result} retry={accounts.reload} /><Failure result={result} />
     {busy ? <Spinner label="Evaluating risk guard" /> : result?.ok ? <section className="card"><div className="stat"><span className="stat-k">Decision</span><strong className="stat-v"><ShieldCheck className="ico" aria-hidden /> {result.data.allowed ? "Ready" : "Blocked"}</strong></div>{result.data.blocks.length ? <ul className="plain-list">{result.data.blocks.map((b) => <li key={`${b.guard}-${b.reason}`}><strong>{b.guard}</strong> · {b.reason}</li>)}</ul> : <p className="empty">Measured guards are within their limits.</p>}</section> : <p className="empty">Nothing has been calculated yet.</p>}
   </main>;
@@ -292,7 +290,7 @@ export function RuleLayerView() {
     if (!active || price == null) return;
     setBusy(true);
     const next = await api<RuleLayerResult>("rule-layer", {
-      method: "POST", body: { ruleDocId: active.ruleDocId, price },
+      method: "POST", body: active && price != null ? { ruleDocId: active.ruleDocId, price } : {},
     });
     setResult(next); setBusy(false);
   }
@@ -300,7 +298,7 @@ export function RuleLayerView() {
     <Head title="Broker-agnostic rule layer" detail="Account and symbol metadata are read from the selected account" />
     {rules.loading && !rules.result ? <Spinner label="Reading active rule" /> : null}
     <Failure result={rules.result} retry={rules.reload} />
-    {active ? <section className="card"><p className="muted">Symbol: {symbol}. Price and balance come from the selected account read.</p><AccountHint accounts={accounts} /><Failure result={candles.result} retry={candles.reload} /><button className="btn" onClick={() => void calculate()} disabled={busy || price == null}>{busy ? "Calculating…" : "Calculate from selected account"}</button></section> : null}
+    {active ? <section className="card"><p className="muted">Symbol: {symbol}. Price and balance come from the selected account read.</p><AccountHint accounts={accounts} /><Failure result={candles.result} retry={candles.reload} /><button className="btn" onClick={() => void calculate()} disabled={busy}>{busy ? "Calculating…" : "Calculate"}</button></section> : <section className="card"><button className="btn" onClick={() => void calculate()} disabled={busy}>Calculate</button></section>}
     {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
     <Failure result={result} />
     {busy ? <Spinner label="Calculating risk units" /> : result?.ok ? <section className="card"><div className="grid grid-3"><div className="stat"><span className="stat-k">Units</span><strong className="stat-v">{result.data.units}</strong></div><div className="stat"><span className="stat-k">Unit label</span><strong className="stat-v">{result.data.unitLabel}</strong></div><div className="stat"><span className="stat-k">Risk amount</span><strong className="stat-v">{result.data.riskAmount}</strong></div></div><h2>Instrument metadata</h2><ul className="plain-list"><li>Minimum lot: {result.data.metadata?.minLot ?? "unknown"}</li><li>Lot step: {result.data.metadata?.lotStep ?? "unknown"}</li><li>Contract size: {result.data.metadata?.contractSize ?? "unknown"}</li><li>Digits: {result.data.metadata?.digits ?? "unknown"}</li><li>Minimum stop distance: {result.data.metadata?.minimumStopDistancePips ?? "unknown"}</li></ul><p className="muted">This calculation is informational and does not submit an order.</p></section> : <p className="empty">Nothing has been calculated yet.</p>}
