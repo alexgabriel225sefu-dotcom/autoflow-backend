@@ -76,7 +76,7 @@ describe("the account chip", () => {
 describe("the automation chip", () => {
   it("reports the state the API gave", () => {
     expect(strip({ ok: true, data: CONNECTED }, { ok: true, data: STOPPED })
-      .textContent).toContain("STOPPED");
+      .textContent).toContain("Stopped");
   });
 
   it("says Unknown when it could not be read, never STOPPED", () => {
@@ -85,7 +85,7 @@ describe("the automation chip", () => {
     // Reading a failed automation query as "stopped" is the dangerous
     // direction: it tells the operator nothing is running when something
     // may well be.
-    expect(text).not.toContain("STOPPED");
+    expect(text).not.toContain("Stopped");
   });
 });
 
@@ -113,7 +113,7 @@ describe("the level chip, which says what RUNNING means", () => {
   it("names a running level that does not place orders", () => {
     const text = strip({ ok: true, data: CONNECTED },
                        { ok: true, data: RUNNING_SIGNALS }).textContent ?? "";
-    expect(text).toContain("RUNNING");
+    expect(text).toContain("Running");
     // The whole point: RUNNING must not be the only thing on the strip for a
     // level that trades nothing.
     expect(text).toContain("Signals Only");
@@ -125,7 +125,7 @@ describe("the level chip, which says what RUNNING means", () => {
     // chip people stop reading.
     const text = strip({ ok: true, data: CONNECTED },
                        { ok: true, data: RUNNING_FULL }).textContent ?? "";
-    expect(text).toContain("RUNNING");
+    expect(text).toContain("Running");
     expect(text).not.toContain("Full Automation");
   });
 
@@ -160,7 +160,7 @@ describe("the Risk Guard chip", () => {
   it("shows HOLDING with its reasons when the guard is holding", () => {
     const t = text(running({ state: "holding", reasons: ["daily loss limit"] }));
     expect(t).toContain("Risk Guard");
-    expect(t).toContain("HOLDING");
+    expect(t).toContain("Holding");
     expect(document.querySelector('[title="daily loss limit"]')).not.toBeNull();
   });
 
@@ -190,8 +190,8 @@ describe("the Risk Guard chip", () => {
     expect(t).not.toContain("No report yet");
     // The automation chip agrees. RUNNING next to "Market closed" was the
     // contradiction on the owner's phone.
-    expect(t).toContain("MARKET CLOSED");
-    expect(t).not.toContain("RUNNING");
+    expect(t).toContain("Market closed");
+    expect(t).not.toContain("Running");
   });
 
   it.each([[false], [null], [undefined]])(
@@ -209,8 +209,9 @@ describe("the Risk Guard chip", () => {
       data: { state: "running", ruleDocId: "r1", marketClosed: true,
               riskGuard: { state: "holding", reasons: ["daily loss limit"] } } as unknown as AutomationState,
     });
-    expect(t).toContain("HOLDING");
-    expect(t).not.toContain("Market closed");
+    expect(t).toContain("Holding");
+    // Only the automation chip says the market is closed; the guard does not.
+    expect(t.split("Market closed").length - 1).toBe(1);
   });
 
   it("is not shown at all when nothing is running (there is no report to show)", () => {
@@ -231,8 +232,8 @@ describe("the Risk Guard chip", () => {
         marketMessage: "Market closed (weekend), reopens Sun 22:00 UTC",
       } as unknown as AutomationState,
     });
-    expect(t).toContain("BLOCKED");
-    expect(t).not.toContain("RUNNING");
+    expect(t).toContain("Blocked");
+    expect(t).not.toContain("Running");
     expect(t).toContain("Market closed (weekend), reopens Sun 22:00 UTC");
   });
 });

@@ -44,7 +44,7 @@ describe("the status strip at 390x844: loading → ready, and loading → failed
     const { rerender } = render(bar(null));
     rerender(bar({ ok: true, data: DEMO }));
     expect(skeletons()).toBe(0);
-    expect(text()).toContain("DEMO");
+    expect(text()).toContain("Demo account");
     expect(text()).toContain("47765456");
   });
 

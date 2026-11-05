@@ -203,9 +203,9 @@ describe("application shell", () => {
   it("the status strip states the account, the mode and the automation state", async () => {
     render(<AppShell><p>page</p></AppShell>);
     const strip = await screen.findByRole("status", { name: "Platform status" });
-    expect(within(strip).getByText("DEMO")).toBeDefined();
+    expect(within(strip).getByText("Demo account")).toBeDefined();
     expect(within(strip).getByText("#501")).toBeDefined();
-    expect(within(strip).getByText("RUNNING")).toBeDefined();
+    expect(within(strip).getByText("Running")).toBeDefined();
     // Demo-only is a property of the release, stated on every screen.
     expect(within(strip).getByText(/Demo/)).toBeDefined();
   });
