@@ -117,6 +117,64 @@ def test_backtest_converts_pips_and_refuses_when_nothing_to_run():
     assert "partial fills" in costly["notModelled"]
 
 
+def test_risk_guard_derives_real_trade_state_and_blocks_unreadable():
+    measured = risk_guard.state_from_trades({
+        "status": "ok", "trades": [
+            {"closedAt": 1_800_000_000, "net": -20},
+            {"closedAt": 1_800_000_100, "net": -10},
+        ]}, {"balance": 1000}, now=1_800_000_200)
+    assert measured["readable"] is True
+    assert measured["consecutiveLosses"] == 2
+    assert measured["tradesToday"] == 2
+    assert risk_guard.evaluate(measured)["stopNewEntriesOnly"] is True
+    unknown = risk_guard.state_from_trades({"status": "unavailable"}, {})
+    assert risk_guard.evaluate(unknown)["allowed"] is False
+
+
+def test_forward_persists_three_distinct_read_only_fields():
+    import apex.user_store as us
+    tmp_path = tempfile.mkdtemp(prefix="a4t-forward-")
+    old_dir, old_redis = us._DIR, us._USE_REDIS
+    us._DIR, us._USE_REDIS = str(tmp_path), False
+    try:
+        rule = ruledoc.blank(user_id="u", account_id="a", symbols=["EUR_USD"], timeframe="1h")
+        rule["state"] = "active"
+        rule["entry"] = {"combine": "AND", "conditions": [
+            {"id": "weekday", "params": {"days": [0, 1, 2, 3, 4, 5, 6]}}]}
+        result = forward.record_for_user("u", rule=rule,
+                                         candles=[{"time": 1_800_000_000,
+                                                   "open": 1.1, "high": 1.2,
+                                                   "low": 1.0, "close": 1.15}],
+                                         executable_price=1.151)
+        event = result["events"][0]
+        assert set(("signal", "decision", "execution")) <= set(event)
+        assert event["execution"]["price"] == 1.151
+        assert us.load("u")["forwardEvents"]
+    finally:
+        us._DIR, us._USE_REDIS = old_dir, old_redis
+
+
+def test_overfit_counts_rule_history_without_typed_form_values():
+    rule = {"symbols": ["EUR_USD", "GBP_USD"],
+            "entry": {"conditions": [{"id": "a"}, {"id": "b"}]},
+            "exit": {"conditions": [{"id": "c"}]}}
+    result = overfit.analyse({"rule": rule, "versions": [],
+                              "trades": [{"closedAt": 1_700_000_000, "net": 1}]})
+    assert result["evidence"]["conditionCount"] == 3
+    assert result["evidence"]["tradeCount"] == 1
+
+
+def test_rule_layer_exposes_metadata_sources_and_unknown_stop_distance():
+    out = rule_layer.risk_units(balance=1000, risk_fraction=.01,
+                                stop_pips=10, symbol="EURUSD", price=1.1)
+    meta = out["metadata"]
+    assert meta["minLot"] == 1000
+    assert meta["lotStep"] == 1000
+    assert meta["contractSize"] == 100000
+    assert meta["minimumStopDistancePips"] is None
+    assert "minimumStopDistance" in meta["sources"]
+
+
 def test_incidents_do_not_reassure_about_what_was_not_checked():
     nothing = incidents.derive({})
     assert "not an all-clear" in nothing["message"]

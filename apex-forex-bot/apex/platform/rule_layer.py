@@ -16,6 +16,10 @@ class InstrumentSpec:
     unit_label: str
     min_units: float
     step_units: float
+    contract_size: float | None
+    digits: int | None
+    min_stop_distance_pips: float | None
+    sources: dict[str, str]
 
 
 def normalise_instrument(symbol: Any, *, price: float | None = None) -> InstrumentSpec:
@@ -23,9 +27,17 @@ def normalise_instrument(symbol: Any, *, price: float | None = None) -> Instrume
     compact = name.replace("_", "")
     if not name or not forex.is_tradeable(compact):
         raise ValueError("instrument metadata is unknown or not supported")
-    return InstrumentSpec(name, forex.pip_size(compact, price),
-                          forex.unit_label(compact), float(forex.min_units(compact)),
-                          float(forex.min_units(compact)))
+    pip = float(forex.pip_size(compact, price))
+    units = float(forex.min_units(compact))
+    label = forex.unit_label(compact)
+    contract = 100000.0 if label == "lot" else 1.0 if label == "oz" else None
+    digits = max(0, len(str(pip).rstrip("0").split(".")[-1])) if pip < 1 else 0
+    return InstrumentSpec(
+        name, pip, label, units, units, contract, digits, None,
+        {"pipSize": "apex.forex.pip_size", "unit": "apex.forex.unit_label",
+         "minimum": "apex.forex.min_units", "step": "broker metadata unavailable",
+         "contractSize": "instrument convention", "digits": "pip-size convention",
+         "minimumStopDistance": "broker metadata unavailable"})
 
 
 def round_volume(units: float, spec: InstrumentSpec) -> float:
@@ -55,4 +67,8 @@ def risk_units(*, balance: float, risk_fraction: float, stop_pips: float,
     units = round_volume(raw, spec)
     return {"symbol": spec.symbol, "units": units, "unitLabel": spec.unit_label,
             "stopPips": stop_pips, "riskAmount": round(balance * risk_fraction, 8),
-            "unknown": False}
+            "unknown": False,
+            "metadata": {"minLot": spec.min_units, "lotStep": spec.step_units,
+                          "contractSize": spec.contract_size, "digits": spec.digits,
+                          "minimumStopDistancePips": spec.min_stop_distance_pips,
+                          "sources": spec.sources}}

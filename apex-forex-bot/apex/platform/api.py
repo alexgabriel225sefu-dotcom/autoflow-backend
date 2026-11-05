@@ -573,12 +573,12 @@ def _dispatch(method, route, headers, body, query=None):
             return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
         payload = _body(body) or {}
         try:
-            return _roadmap_analysis(route, payload)
+            return _roadmap_analysis(route, payload, user_id=p.user_id)
         except (TypeError, KeyError) as e:
             raise ValueError("the input is missing a field or has the wrong type") from e
 
     if route == "risk/guard" and method == "POST":
-        _authenticate(headers)
+        p = _authenticate(headers)
         from apex.platform import risk_guard as _risk_guard
         payload = _body(body) or {}
         limits = payload.get("limits") or {}
@@ -586,8 +586,15 @@ def _dispatch(method, route, headers, body, query=None):
                    "max_consecutive_losses", "max_symbol_exposure",
                    "max_trades_day", "max_slippage_pips", "cooldown_seconds"}
         clean = {k: v for k, v in limits.items() if k in allowed}
-        return _ok(_risk_guard.evaluate(payload.get("state") or {},
-                                        _risk_guard.GuardLimits(**clean)))
+        try:
+            trades = _tradesread.read(p.user_id, days=payload.get("days", 7),
+                                      mode=payload.get("mode") or "demo",
+                                      ctid=payload.get("accountId") or None)
+            account = _read.account(p.user_id, ctid=payload.get("accountId") or None)
+            state = _risk_guard.state_from_trades(trades, account)
+            return _ok(_risk_guard.evaluate(state, _risk_guard.GuardLimits(**clean)))
+        except (TypeError, ValueError) as e:
+            return _err(400, "BAD_REQUEST", str(e))
 
     if route == "risk" and method == "GET":
         p = _authenticate(headers)
@@ -1121,7 +1128,7 @@ def _dispatch(method, route, headers, body, query=None):
     return _err(404, "NOT_FOUND", "no such endpoint")
 
 
-def _roadmap_analysis(route, payload):
+def _roadmap_analysis(route, payload, *, user_id=None):
     """The read-only analysis routes. Pure computation over the posted
     snapshot; none of them reaches a broker or an order path."""
     if route == "backtest":
@@ -1139,10 +1146,54 @@ def _roadmap_analysis(route, payload):
         return _ok(_replay.timeline(payload.get("candles")))
     if route == "forward":
         from apex.platform import forward as _forward
-        return _ok(_forward.record(payload.get("signals") or []))
+        rule = _selected_rule(user_id, payload.get("ruleDocId"))
+        if rule is None:
+            return _err(409, "RULE_REQUIRED", "an active rule could not be read")
+        if payload.get("signals") is not None:
+            return _ok(_forward.record(payload.get("signals") or []))
+        return _ok(_forward.record_for_user(
+            user_id, rule=rule, candles=payload.get("candles"),
+            executable_price=_number(payload.get("executablePrice"))))
     if route == "overfit":
         from apex.platform import overfit as _overfit
-        return _ok(_overfit.analyse(payload))
+        rule = _selected_rule(user_id, payload.get("ruleDocId"))
+        if rule is None:
+            return _err(409, "RULE_REQUIRED", "a selected rule could not be read")
+        try:
+            versions = _store.versions(user_id, rule.get("ruleDocId"))
+        except Exception:
+            versions = []
+        history = _tradesread.read(user_id, days=3650,
+                                   mode=payload.get("mode") or "demo",
+                                   ctid=payload.get("accountId") or None)
+        rows = history.get("trades") or [] if history.get("status") == "ok" else []
+        return _ok(_overfit.analyse({"rule": rule, "versions": versions,
+                                     "trades": rows,
+                                     "backtest": payload.get("backtest") or {}}))
+    if route == "rule-layer":
+        from apex.platform import rule_layer as _rules
+        rule = _selected_rule(user_id, payload.get("ruleDocId"))
+        status = _link.public_status(user_id)
+        selected = (status or {}).get("selected") or {}
+        symbols = (rule or {}).get("symbols") or []
+        symbol = payload.get("symbol") or (symbols[0] if symbols else None)
+        if not symbol:
+            return _err(409, "SYMBOL_REQUIRED", "the selected rule has no symbol")
+        account = _read.account(user_id, ctid=selected.get("ctid"))
+        if account.get("status") != _read.OK:
+            return _ok({"status": "unavailable", "reason": "account data could not be read",
+                        "metadata": {"symbol": symbol, "readable": False}})
+        balance = _number(account.get("balance"))
+        price = _number(payload.get("price"))
+        limits = (rule or {}).get("limits") or {}
+        stop_pips = _number(payload.get("stopPips")) or _number(limits.get("stopPips"))
+        risk_fraction = _number(payload.get("riskFraction")) or _number(limits.get("riskFraction"))
+        if balance is None or price is None or stop_pips is None or risk_fraction is None:
+            return _err(400, "UNREADABLE_INPUT",
+                        "balance, price, risk fraction and stop distance could not be read")
+        return _ok(_rules.risk_units(balance=balance, risk_fraction=risk_fraction,
+                                     stop_pips=stop_pips, symbol=symbol, price=price,
+                                     leverage=_number(account.get("leverage")) or 30))
     from apex.platform import rule_layer as _rules
     return _ok(_rules.risk_units(
         balance=float(payload.get("balance")),
@@ -1150,6 +1201,26 @@ def _roadmap_analysis(route, payload):
         stop_pips=float(payload.get("stopPips")),
         symbol=payload.get("symbol"), price=float(payload.get("price")),
         leverage=float(payload.get("leverage") or 30)))
+
+
+def _number(value):
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if result == result and abs(result) != float("inf") else None
+
+
+def _selected_rule(user_id, rule_doc_id=None):
+    """Read one caller-owned active rule; never accept a browser rule copy."""
+    try:
+        if rule_doc_id:
+            doc = _store.get(user_id, str(rule_doc_id))
+            return doc if doc.get("state") == _rd.ACTIVE else None
+        docs = _store.active_docs(user_id)
+        return docs[0] if docs else None
+    except Exception:
+        return None
 
 
 def _summary(doc):
