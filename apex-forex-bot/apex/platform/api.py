@@ -632,6 +632,11 @@ def _dispatch(method, route, headers, body, query=None):
         status = _link.public_status(p.user_id)
         return _ok(_multi.isolate(p.user_id, status.get("accounts") or []))
 
+    if route == "account-kinds" and method == "GET":
+        p = _authenticate(headers)
+        from apex.platform import account_kind as _kinds
+        return _ok(_kinds.classify(p.user_id, _link.public_status(p.user_id)))
+
     # A manual close is deliberately a separate route from the read-only
     # account views. It authenticates first, verifies the linked account is a
     # DEMO account, and then delegates to the shared close gate.

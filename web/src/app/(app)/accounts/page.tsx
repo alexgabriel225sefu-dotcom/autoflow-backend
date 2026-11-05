@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Check, Plug, RefreshCw } from "lucide-react";
 import { plainError } from "@/components/app/plain";
+import { AccountKinds } from "@/components/app/account-kinds";
 import { api, type ApiError, type CtraderStatus } from "@/lib/api";
 import { invalidateBrokerViews, useRead, whenSynced } from "@/lib/use-api";
 import {
@@ -110,6 +111,8 @@ export default function AccountsPage() {
                 })}
               </div>
             </section>
+
+            <AccountKinds />
 
             <MoreAccountsSection plan={data.accountPlan} />
 

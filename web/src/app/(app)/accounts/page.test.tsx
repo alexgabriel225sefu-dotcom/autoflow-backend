@@ -31,7 +31,15 @@ async function mount() {
   await act(async () => { await Promise.resolve(); });
 }
 
-beforeEach(() => { routes = { "ctrader/status": STATUS() }; calls.length = 0; });
+beforeEach(() => {
+  routes = {
+    "ctrader/status": STATUS(),
+    // The type panel reads its own endpoint; an empty, connected answer keeps
+    // these tests about the account list and the select action.
+    "account-kinds": { ok: true, data: { status: "ok", connected: true, accounts: [], summary: { demo: 0, live: 0, unverified: 0 } } },
+  };
+  calls.length = 0;
+});
 
 describe("accounts", () => {
   it("not connected: says so and offers Connect", async () => {

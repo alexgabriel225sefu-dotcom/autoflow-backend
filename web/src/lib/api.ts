@@ -820,6 +820,18 @@ export type TradesRead =
     note: string;
   };
 
+/** GET account-kinds. The type of each linked account as cTrader reported it. */
+export type AccountKind = {
+  ctid: number | string; label?: string | null; kind: "demo" | "live" | "unverified";
+  basis: string; selected: boolean;
+  liveState: "not_enabled" | "pilot_unconfigured" | "in_pilot" | "not_in_pilot" | "unverified" | null;
+  liveText: string;
+};
+export type AccountKindsRead = {
+  status: "ok"; connected: boolean; accounts: AccountKind[];
+  summary: { demo: number; live: number; unverified: number };
+};
+
 /** POST emergency/stop. Every claim here is the server's and was measured:
  *  `allFlat` is true only when a fresh read of the account found nothing open,
  *  `closes` is null when the client chose to stop without closing, and a
