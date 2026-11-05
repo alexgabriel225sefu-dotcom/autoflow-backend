@@ -1,108 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Pause, Play, RefreshCw, ShieldCheck, SkipForward } from "lucide-react";
-import type { ApiResult, Candle, CandlesRead, CtraderStatus, RuleSummary } from "@/lib/api";
+import { useMemo, useState } from "react";
+import { ShieldCheck } from "lucide-react";
+import type { ApiResult, Candle, CtraderStatus, RuleSummary } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
 import { PriceChart } from "@/components/chart/price-chart";
 import { TIMEFRAMES } from "@/components/app/rule-form";
+import { ReplayView } from "@/components/app/simulation-replay";
+import {
+  AccountHint, CandleReadStatus, SimulationFailure, SimulationHead, useCandleRead,
+} from "@/components/app/simulation-shared";
 
 const DISCLAIMER = "Backtest results are hypothetical and do not predict future performance.";
-
-function Head({ title, detail, reload, loading }: { title: string; detail: string; reload?: () => unknown; loading?: boolean }) {
-  return <div className="page-head"><div><h1>{title}</h1><span className="sub">{detail}</span></div>{reload ? <button className="btn btn-ghost btn-sm" onClick={() => void reload()} disabled={loading}><RefreshCw className="ico" aria-hidden /> Refresh</button> : null}</div>;
-}
-
-function Failure({ result, retry }: { result: ApiResult<unknown> | null; retry?: () => unknown }) {
-  return result && !result.ok ? <div><p className="muted">Could not be read.</p><ErrorNotice error={result} onRetry={retry} /></div> : null;
-}
-
-function ReadStatus({ data, empty }: { data: CandlesRead | null; empty: string }) {
-  if (!data) return null;
-  if (data.status === "unavailable" || data.status === "reauth_required" || data.status === "not_connected") {
-    return <div className="notice notice-error" role="alert"><strong>Market data could not be read</strong><p className="muted">{data.reason ?? "The broker did not answer."}</p></div>;
-  }
-  if (!data.candles?.length) return <p className="empty">{empty}</p>;
-  return null;
-}
-
-function useCandleRead(symbol: string, timeframe: string, days: number) {
-  const accounts = useRead<CtraderStatus>("accounts", 60_000);
-  const ctid = accounts.result?.ok ? String(accounts.result.data.selected?.ctid ?? "") : "";
-  // Captured once when the screen opens; the window is measured back from then.
-  const [openedAt] = useState(() => Math.floor(Date.now() / 1000));
-  const to = openedAt - days * 86400;
-  const path = ctid && symbol && timeframe
-    ? `accounts/${encodeURIComponent(ctid)}/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=500&to=${to}`
-    : null;
-  const candles = useRead<CandlesRead>(path, 0);
-  return { accounts, candles, ctid };
-}
-
-function AccountHint({ accounts }: { accounts: ReturnType<typeof useRead<CtraderStatus>> }) {
-  const d = accounts.result?.ok ? accounts.result.data : null;
-  if (accounts.loading && !accounts.result) return <Spinner label="Checking connected accounts" />;
-  if (accounts.result && !accounts.result.ok) return <Failure result={accounts.result} retry={accounts.reload} />;
-  if (!d || !d.connected || !d.accounts?.length) return <p className="empty">No connected account is available for this read.</p>;
-  return <p className="muted">Using account {String(d.selected?.ctid ?? d.accounts[0]?.ctid)} · {d.selected?.mode ?? d.accounts[0]?.mode}</p>;
-}
-
-export function ReplayView() {
-  const [symbol, setSymbol] = useState("EUR_USD");
-  const [timeframe, setTimeframe] = useState("1h");
-  const [days, setDays] = useState(7);
-  // The position and the play state belong to one set of bars. When the bars
-  // change, both fall back to the end and to paused without an effect.
-  const [pos, setPos] = useState<{ n: number; len: number } | null>(null);
-  const [playingFor, setPlayingFor] = useState<number | null>(null);
-  const { accounts, candles } = useCandleRead(symbol, timeframe, days);
-  const data = candles.result?.ok ? candles.result.data : null;
-  const bars = data?.status === "ok" ? (data.candles ?? []) : [];
-  const last = Math.max(0, bars.length - 1);
-  const cursor = pos && pos.len === bars.length ? pos.n : last;
-  const playing = playingFor === bars.length && bars.length > 0 && cursor < last;
-  const setCursor = (fn: (n: number) => number) => setPos({ n: fn(cursor), len: bars.length });
-  const setPlaying = (fn: (v: boolean) => boolean) => setPlayingFor(fn(playing) ? bars.length : null);
-  const visible = bars.slice(0, Math.max(0, cursor + 1));
-  useEffect(() => {
-    if (!playing) return;
-    const len = bars.length;
-    const id = window.setInterval(() => setPos((p) => {
-      const at = p && p.len === len ? p.n : last;
-      return { n: Math.min(at + 1, last), len };
-    }), 650);
-    return () => window.clearInterval(id);
-  }, [playing, bars.length, last]);
-  return <main>
-    <Head title="Strategy replay" detail="Read-only candle-by-candle inspection" reload={candles.reload} loading={candles.loading} />
-    <p className="notice" role="note">{DISCLAIMER}</p>
-    <section className="card">
-      <div className="grid grid-3">
-        <label>Symbol<input className="input" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} /></label>
-        <label>Timeframe<select className="input" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>{TIMEFRAMES.map((t) => <option key={t}>{t}</option>)}</select></label>
-        <label>Past window<select className="input" value={days} onChange={(e) => setDays(Number(e.target.value))}><option value={1}>1 day</option><option value={7}>7 days</option><option value={30}>30 days</option></select></label>
-      </div>
-      <AccountHint accounts={accounts} />
-    </section>
-    {candles.loading && !candles.result ? <Spinner label="Reading historical candles" /> : null}
-    <Failure result={candles.result} retry={candles.reload} />
-    <ReadStatus data={data} empty="The broker returned no candles for this window." />
-    {bars.length ? <>
-      <section className="card">
-        <div className="card-head"><h2>Replay controls</h2><span className="muted">Bar {cursor + 1} of {bars.length}</span></div>
-        <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
-          <button className="btn btn-ghost" onClick={() => setPlaying((v) => !v)}>{playing ? <Pause className="ico" aria-hidden /> : <Play className="ico" aria-hidden />}{playing ? "Pause" : "Play"}</button>
-          <button className="btn btn-ghost" onClick={() => setCursor((n) => Math.min(n + 1, last))} disabled={cursor >= last}><SkipForward className="ico" aria-hidden /> Step</button>
-          <button className="btn btn-ghost" onClick={() => { setCursor(() => 0); setPlaying(() => false); }}>Restart</button>
-        </div>
-        <p className="muted" role="status">{visible.length ? "Data available at this replay point." : "No candle is available at this replay point."}</p>
-      </section>
-      <section className="card"><PriceChart candles={visible as Candle[]} symbol={symbol} timeframe={timeframe} height={340} /></section>
-    </> : null}
-  </main>;
-}
+const Head = SimulationHead;
+const Failure = SimulationFailure;
+const ReadStatus = CandleReadStatus;
+export { ReplayView };
 
 type RuleRead = { rule: Record<string, unknown> };
 type BacktestResult = { status: string; hypothetical: boolean; tradeCount: number; totalPnl: number; endingBalance: number | null; assumptions: Record<string, number>; notModelled: string[]; unit?: string; trades: { pnl: number; timestamp?: number; side?: string }[]; netProfit?: number | null; maxDrawdown?: number | null; profitFactor?: number | null; expectancy?: number | null; averageWin?: number | null; averageLoss?: number | null; longestLosingStreak?: number | null; recoveryFactor?: number | null; equityCurve?: { index?: number; timestamp?: number; equity?: number | null; pnl?: number }[]; resultsPerMonth?: { month: string; trades: number; pnl: number }[]; longVsShort?: { long: { trades: number; pnl: number | null }; short: { trades: number; pnl: number | null } } };
