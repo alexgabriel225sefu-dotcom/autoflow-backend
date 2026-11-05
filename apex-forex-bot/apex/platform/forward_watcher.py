@@ -19,6 +19,12 @@ MAX_SYMBOLS_PER_RULE = 8
 _lock = threading.Lock()
 _stop = threading.Event()
 _thread = None
+# (user, symbol, timeframe) -> the bar boundary last processed. A rule on a 1h
+# chart closes one bar an hour; reading 200 candles from the broker every 30
+# seconds to notice that is 120 reads for one fact, on the account the trading
+# loop also uses. So a symbol is read only when a new bar can have closed (or
+# while a hypothetical execution still waits for its later quote).
+_seen: dict = {}
 
 
 def start() -> bool:
@@ -78,20 +84,29 @@ def run_once(*, now: float | None = None,
             timeframe = str(rule.get("timeframe") or "")
             if not isinstance(symbol, str) or not symbol.strip() or not timeframe:
                 continue
+            seen_key = (user_id, _norm(symbol), timeframe)
             try:
+                seconds = rule_strategy._sentinel.timeframe_seconds(timeframe, default=0)
+                if not seconds:
+                    continue
+                boundary = int(now // seconds) * int(seconds)
+                if _seen.get(seen_key) == boundary and _norm(symbol) not in pending:
+                    continue        # nothing new can have closed since the last read
                 read = candle_reader(user_id, symbol=symbol, timeframe=timeframe,
                                      limit=200)
                 summary["reads"] += 1
                 if not isinstance(read, dict) or read.get("status") != broker_read.OK:
                     continue
                 candles = read.get("candles") or []
-                seconds = rule_strategy._sentinel.timeframe_seconds(timeframe, default=0)
-                if not seconds:
-                    continue
                 closed = rule_strategy._closed_candles(candles, seconds, now)
                 if not closed or closed[-1].get("time") is None:
                     continue
                 bar_close_time = float(closed[-1]["time"]) + float(seconds)
+                if bar_close_time >= boundary:
+                    # The bar that closed at this boundary is in hand. If the
+                    # broker had not published it yet, the symbol is read again
+                    # on the next cycle instead of waiting for the next bar.
+                    _seen[seen_key] = boundary
                 quote = None
                 if _norm(symbol) in pending:
                     candidate = quote_reader(user_id, symbol=symbol)
