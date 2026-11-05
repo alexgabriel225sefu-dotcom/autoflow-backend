@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/auth/password-field";
 import { AuthSubmit } from "@/components/auth/auth-submit";
 import { GoogleButton } from "@/components/auth/google-button";
+import { inboxLink } from "@/lib/inbox-link";
 import { ResendConfirmation } from "@/components/auth/resend-confirmation";
 
 export default function SignUpPage() {
@@ -39,6 +40,7 @@ export default function SignUpPage() {
   }
 
   if (sent) {
+    const inbox = inboxLink(email);
     return (
       <AuthShell
         title="Check your email."
@@ -52,8 +54,16 @@ export default function SignUpPage() {
           You will need to confirm it before connecting a cTrader account
           or activating a rule.
         </p>
+        {inbox ? (
+          <p className="auth-lead">
+            <a className="btn" href={inbox.href} target="_blank" rel="noopener noreferrer">
+              Open {inbox.name}
+            </a>
+          </p>
+        ) : null}
         <p className="auth-lead">
-          Nothing arrived? Check your spam folder, then ask for another link.
+          The email comes from Supabase Auth, the service that handles our
+          sign-in. Nothing arrived? Check your spam folder, then ask for another link.
         </p>
         <ResendConfirmation email={email} />
       </AuthShell>
