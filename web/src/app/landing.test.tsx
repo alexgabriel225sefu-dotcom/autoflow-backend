@@ -23,7 +23,8 @@ describe("landing page", () => {
 
   it("states cTrader as available and the MetaTrader platforms as coming soon", () => {
     render(<Landing />);
-    expect(screen.getByText("Available now")).toBeTruthy();
+    // Once in the hero card and once in the partner row.
+    expect(screen.getAllByText("Available now")).toHaveLength(2);
     expect(screen.getAllByText("Coming soon")).toHaveLength(2);
   });
 
