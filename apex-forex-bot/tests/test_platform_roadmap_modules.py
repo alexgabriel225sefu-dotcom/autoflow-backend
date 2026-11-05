@@ -48,6 +48,54 @@ def test_risk_map_does_not_turn_missing_stops_into_zero():
     assert "unknown stop risk" in result["warnings"][0]
 
 
+def test_risk_map_reports_currency_and_correlation_exposure():
+    result = risk_map.build([
+        {"symbol": "EUR_USD", "side": "BUY", "units": 1000, "riskToStop": 12},
+        {"symbol": "GBP_USD", "side": "BUY", "units": 500, "riskToStop": 8},
+    ], balance=1000)
+    assert result["currencyExposure"]["USD"] == -1500
+    assert result["lossIfEveryStopHit"] == 20
+    assert result["correlatedPairs"]
+    assert result["gapScenario"]["status"] == "unknown"
+
+
+def test_incidents_persist_observed_fields_for_account_data_lifecycle():
+    import apex.user_store as us
+    old_dir, old_redis = us._DIR, us._USE_REDIS
+    us._DIR, us._USE_REDIS = tempfile.mkdtemp(prefix="a4t-incidents-"), False
+    try:
+        out = incidents.record("incident-user", {"brokerStatus": "unavailable",
+                                                  "affectedScope": "demo account",
+                                                  "systemAction": "paused reads",
+                                                  "traderActionRequired": True})
+        row = out["incidents"][0]
+        assert {"startedAt", "affectedScope", "systemAction", "traderActionRequired",
+                "recoveredAt"} <= set(row)
+        assert us.load("incident-user")["incidents"]
+    finally:
+        us._DIR, us._USE_REDIS = old_dir, old_redis
+
+
+def test_multi_account_isolation_uses_user_store_adapter():
+    import apex.user_store as us
+    old_dir, old_redis = us._DIR, us._USE_REDIS
+    us._DIR, us._USE_REDIS = tempfile.mkdtemp(prefix="a4t-accounts-"), False
+    try:
+        store = multi_account.UserStoreIsolation()
+        store.put("alice", "a", {"balance": 1})
+        store.put("alice", "b", {"balance": 2})
+        store.put("bob", "a", {"balance": 99})
+        store.set_kill("alice", "a", True, reason="one account")
+        assert store.get("alice", "a")["balance"] == 1
+        assert store.get("alice", "b")["balance"] == 2
+        assert store.get("bob", "a")["balance"] == 99
+        assert store.is_killed("alice", "a") is True
+        assert store.is_killed("alice", "b") is False
+        assert store.is_killed("bob", "a") is False
+    finally:
+        us._DIR, us._USE_REDIS = old_dir, old_redis
+
+
 def test_health_and_incident_outputs_are_conservative():
     result = health_score.score({"brokerConnected": True})
     assert result["score"] < 100
@@ -173,6 +221,39 @@ def test_rule_layer_exposes_metadata_sources_and_unknown_stop_distance():
     assert meta["contractSize"] == 100000
     assert meta["minimumStopDistancePips"] is None
     assert "minimumStopDistance" in meta["sources"]
+
+
+def test_backtest_reports_risk_metrics_and_directional_breakdowns():
+    candles = [{"time": 1_700_000_000 + i * 86400, "open": 1.1,
+                "high": 1.2, "low": 1.0, "close": close}
+               for i, close in enumerate((1.11, 1.09, 1.12))]
+    signals = iter(({"side": "BUY", "entry": 1.10, "exit": 1.11},
+                    {"side": "SELL", "entry": 1.10, "exit": 1.09},
+                    {"side": "BUY", "entry": 1.10, "exit": 1.12}))
+    result = backtest.run(candles, signal=lambda _c: next(signals), initial_balance=100)
+    assert result["netProfit"] == result["totalPnl"]
+    assert result["maxDrawdown"] is not None
+    assert "profitFactor" in result
+    assert len(result["equityCurve"]) == 3
+    assert result["longVsShort"]["long"]["trades"] == 2
+    assert result["longVsShort"]["short"]["trades"] == 1
+
+
+def test_replay_explains_conditions_and_stop_without_lookahead():
+    rule = ruledoc.blank(user_id="u", account_id="a", symbols=["EUR_USD"], timeframe="1h")
+    rule["state"] = "active"
+    rule["sides"] = "BUY"
+    rule["entry"] = {"combine": "AND", "conditions": [
+        {"id": "weekday", "params": {"days": [0, 1, 2, 3, 4, 5, 6]}}]}
+    rule["stopLoss"] = {"mode": "pips", "pips": 10}
+    candles = [{"time": 1_758_542_400 + i * 3600, "open": 1.1,
+                "high": 1.11, "low": 1.09, "close": 1.105}
+               for i in range(3)]
+    out = replay.timeline(candles, rule=rule, symbol="EUR_USD", timeframe="1h")
+    assert out["events"][0]["dataAvailableThrough"] == candles[0]["time"]
+    assert out["events"][0]["entry"]["price"] == candles[0]["open"]
+    assert out["events"][0]["stop"] == 1.099
+    assert out["events"][0]["conditions"]["met"]
 
 
 def test_incidents_do_not_reassure_about_what_was_not_checked():

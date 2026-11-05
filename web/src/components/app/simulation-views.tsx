@@ -105,10 +105,10 @@ export function ReplayView() {
 }
 
 type RuleRead = { rule: Record<string, unknown> };
-type BacktestResult = { status: string; hypothetical: boolean; tradeCount: number; totalPnl: number; endingBalance: number | null; assumptions: Record<string, number>; notModelled: string[]; unit?: string; trades: { pnl: number }[] };
+type BacktestResult = { status: string; hypothetical: boolean; tradeCount: number; totalPnl: number; endingBalance: number | null; assumptions: Record<string, number>; notModelled: string[]; unit?: string; trades: { pnl: number; timestamp?: number; side?: string }[]; netProfit?: number | null; maxDrawdown?: number | null; profitFactor?: number | null; expectancy?: number | null; averageWin?: number | null; averageLoss?: number | null; longestLosingStreak?: number | null; recoveryFactor?: number | null; equityCurve?: { index?: number; timestamp?: number; equity?: number | null; pnl?: number }[]; resultsPerMonth?: { month: string; trades: number; pnl: number }[]; longVsShort?: { long: { trades: number; pnl: number | null }; short: { trades: number; pnl: number | null } } };
 type OverfitResult = { status: string; warnings: string[]; disclaimer: string };
-type RiskGuardResult = { allowed: boolean; mode: string; blocks: { guard: string; reason: string }[] };
-type RuleLayerResult = { units: number; unitLabel: string; riskAmount: number };
+type RiskGuardResult = { allowed: boolean; mode: string; blocks: { guard: string; reason: string }[]; state?: Record<string, unknown>; stopNewEntriesOnly?: boolean };
+type RuleLayerResult = { units: number; unitLabel: string; riskAmount: number; metadata?: { minLot?: number | null; lotStep?: number | null; contractSize?: number | null; digits?: number | null; minimumStopDistancePips?: number | null; sources?: Record<string, string> } };
 
 export function BacktestView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
@@ -129,6 +129,10 @@ export function BacktestView() {
   const { accounts, candles } = useCandleRead(symbol, timeframe, 30);
   const rule = useRead<RuleRead>(ruleId ? `rules/${encodeURIComponent(ruleId)}` : null, 0);
   const candleData = candles.result?.ok ? candles.result.data : null;
+  const equityCandles = useMemo(() => (result?.ok ? (result.data.equityCurve ?? [])
+    .filter((point): point is { equity: number; timestamp?: number } => typeof point.equity === "number")
+    .map((point) => ({ open: point.equity, high: point.equity, low: point.equity,
+      close: point.equity, time: point.timestamp })) : []), [result]);
   async function run() {
     if (!rule.result?.ok || candleData?.status !== "ok" || !candleData.candles?.length) return;
     setBusy(true);
@@ -164,7 +168,10 @@ export function BacktestView() {
     <ReadStatus data={candleData} empty="The broker returned no candles for this window." />
     {result && !result.ok ? <ErrorNotice error={result} /> : null}
     {result?.ok ? <section className="card" aria-live="polite">
-      <div className="grid grid-3"><div className="stat"><span className="stat-k">Trades</span><strong className="stat-v">{result.data.tradeCount}</strong></div><div className="stat"><span className="stat-k">Net</span><strong className="stat-v">{result.data.totalPnl}</strong></div><div className="stat"><span className="stat-k">Ending balance</span><strong className="stat-v">{result.data.endingBalance == null ? "unknown" : result.data.endingBalance}</strong></div></div>
+      <div className="grid grid-3"><div className="stat"><span className="stat-k">Trades</span><strong className="stat-v">{result.data.tradeCount}</strong></div><div className="stat"><span className="stat-k">Net profit</span><strong className="stat-v">{result.data.netProfit ?? "unknown"}</strong></div><div className="stat"><span className="stat-k">Max drawdown</span><strong className="stat-v">{result.data.maxDrawdown ?? "unknown"}</strong></div></div>
+      <div className="grid grid-3"><div className="stat"><span className="stat-k">Profit factor</span><strong className="stat-v">{result.data.profitFactor ?? "unknown"}</strong></div><div className="stat"><span className="stat-k">Expectancy</span><strong className="stat-v">{result.data.expectancy ?? "unknown"}</strong></div><div className="stat"><span className="stat-k">Losing streak</span><strong className="stat-v">{result.data.longestLosingStreak ?? "unknown"}</strong></div></div>
+      {equityCandles.length ? <><h2>Equity curve</h2><PriceChart candles={equityCandles} symbol="equity" timeframe="trade" height={260} /></> : null}
+      <p className="muted">Ending balance: {result.data.endingBalance == null ? "unknown" : result.data.endingBalance}; average win {result.data.averageWin ?? "unknown"}; average loss {result.data.averageLoss ?? "unknown"}; recovery factor {result.data.recoveryFactor ?? "unknown"}.</p>
       {!result.data.tradeCount ? <p className="empty">The selected rule produced no hypothetical trades in this window.</p> : null}
       <h2>Assumptions</h2><ul className="plain-list">{Object.entries(result.data.assumptions).map(([k, v]) => <li key={k}><strong>{k}</strong> <span className="muted">{v}</span></li>)}</ul>
       <h2>Not modelled</h2><ul className="plain-list">{result.data.notModelled.map((v) => <li key={v}>{v}</li>)}</ul>
@@ -172,38 +179,130 @@ export function BacktestView() {
   </main>;
 }
 
+type ForwardEvent = { symbol?: string; signal?: string; decision?: string; execution?: { status?: string; price?: number | null; slippage?: number | null } };
+
 export function ForwardView() {
-  const [symbol, setSymbol] = useState("EUR_USD");
-  const [decision, setDecision] = useState("BUY");
-  const [slippage, setSlippage] = useState("");
-  const [events, setEvents] = useState<{ symbol?: string; decision?: string; execution?: string; slippage?: number | null }[]>([]);
+  const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
+  const active = useMemo(() => rules.result?.ok
+    ? rules.result.data.rules.find((rule) => rule.state === "active")
+    : undefined, [rules.result]);
+  const symbol = active?.symbols?.[0] ?? "";
+  const { accounts, candles } = useCandleRead(symbol, active?.timeframe ?? "1h", 1);
+  const latest = candles.result?.ok && candles.result.data.status === "ok"
+    ? candles.result.data.candles?.slice(-1) ?? [] : [];
+  const [events, setEvents] = useState<ForwardEvent[]>([]);
   const [error, setError] = useState<ApiResult<unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   async function record() {
+    if (!active) return;
     setBusy(true); setError(null);
-    const r = await api<{ events: typeof events }>("forward", { method: "POST", body: { signals: [{ symbol, decision, slippage: slippage === "" ? null : Number(slippage), timestamp: Math.floor(Date.now() / 1000) }] } });
-    if (r.ok) setEvents((old) => [...old, ...(r.data.events ?? [])]); else setError(r);
+    const result = await api<{ events?: ForwardEvent[] }>("forward", {
+      method: "POST", body: { ruleDocId: active.ruleDocId, candles: latest },
+    });
+    if (result.ok) setEvents((old) => [...(result.data.events ?? []), ...old]);
+    else setError(result);
     setBusy(false);
   }
-  return <main><Head title="Forward testing" detail="Signals are recorded separately from hypothetical execution" /><p className="notice" role="note">Forward testing is hypothetical and does not place orders.</p><section className="card"><div className="grid grid-3"><label>Symbol<input className="input" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} /></label><label>Decision<select className="input" value={decision} onChange={(e) => setDecision(e.target.value)}><option>BUY</option><option>SELL</option><option>HOLD</option></select></label><label>Hypothetical slippage (pips)<input className="input" inputMode="decimal" placeholder="unknown" value={slippage} onChange={(e) => setSlippage(e.target.value)} /></label></div><button className="btn" onClick={() => void record()} disabled={busy}>{busy ? "Recording…" : "Record signal"}</button></section><Failure result={error} />{busy ? <Spinner label="Recording hypothetical signal" /> : events.length ? <section className="card"><h2>Recorded signals</h2><ul className="plain-list">{events.map((e, i) => <li key={`${e.symbol}-${i}`}><strong>{e.symbol ?? "unknown symbol"}</strong> · {e.decision ?? "unknown decision"} · {e.execution ?? "unknown execution"} · slippage {e.slippage == null ? "unknown" : e.slippage}</li>)}</ul></section> : <p className="empty">No hypothetical signals recorded in this session.</p>}</main>;
+  return <main>
+    <Head title="Forward testing" detail="Active-rule signals are recorded separately from hypothetical execution" />
+    <p className="notice" role="note">Forward testing is hypothetical and does not place orders.</p>
+    {rules.loading && !rules.result ? <Spinner label="Reading active rule" /> : null}
+    <Failure result={rules.result} retry={rules.reload} />
+    {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
+    {active ? <section className="card">
+      <p className="muted">Using {active.name || "active rule"} on {symbol}.</p>
+      <AccountHint accounts={accounts} />
+      {candles.loading && !candles.result ? <Spinner label="Reading the latest candle" /> : null}
+      <Failure result={candles.result} retry={candles.reload} />
+      <ReadStatus data={candles.result?.ok ? candles.result.data : null} empty="The latest candle could not be read." />
+      <button className="btn" onClick={() => void record()} disabled={busy || !latest.length}>
+        {busy ? "Recording…" : "Record active-rule signal"}
+      </button>
+    </section> : null}
+    <Failure result={error} />
+    {busy ? <Spinner label="Recording hypothetical signal" /> : events.length ? <section className="card">
+      <h2>Signal ledger</h2>
+      <div className="table-wrap"><table><thead><tr><th>Signal</th><th>Decision</th><th>Execution</th></tr></thead><tbody>
+        {events.map((event, index) => <tr key={`${event.symbol ?? "unknown"}-${index}`}>
+          <td>{event.signal ?? "unknown"}</td><td>{event.decision ?? "unknown"}</td>
+          <td>{event.execution?.status ?? "unknown"} · price {event.execution?.price ?? "unknown"} · slippage {event.execution?.slippage ?? "unknown"}</td>
+        </tr>)}
+      </tbody></table></div>
+    </section> : <p className="empty">Nothing has been recorded yet.</p>}
+  </main>;
 }
 
 export function OverfitView() {
-  const [conditions, setConditions] = useState(""); const [trades, setTrades] = useState(""); const [periods, setPeriods] = useState(""); const [changed, setChanged] = useState(false); const [single, setSingle] = useState(false);
-  const [result, setResult] = useState<ApiResult<{ status: string; warnings: string[]; disclaimer: string }> | null>(null); const [busy, setBusy] = useState(false);
-  async function analyse() { setBusy(true); const r = await api<OverfitResult>("overfit", { method: "POST", body: { ...(conditions ? { conditionCount: Number(conditions) } : {}), ...(trades ? { tradeCount: Number(trades) } : {}), ...(periods ? { periodCount: Number(periods) } : {}), changedAfterLosses: changed, singleSymbol: single } }); setResult(r); setBusy(false); }
-  return <main><Head title="Anti-overfitting assistant" detail="Evidence checks for a testing sample" /><p className="notice" role="note">This diagnostic does not generate signals or predict future performance.</p><section className="card"><div className="grid grid-3"><label>Conditions tested<input className="input" inputMode="numeric" placeholder="unknown" value={conditions} onChange={(e) => setConditions(e.target.value)} /></label><label>Trades in sample<input className="input" inputMode="numeric" placeholder="unknown" value={trades} onChange={(e) => setTrades(e.target.value)} /></label><label>Independent periods<input className="input" inputMode="numeric" placeholder="unknown" value={periods} onChange={(e) => setPeriods(e.target.value)} /></label></div><label><input type="checkbox" checked={changed} onChange={(e) => setChanged(e.target.checked)} /> Rule changed after losses</label><label><input type="checkbox" checked={single} onChange={(e) => setSingle(e.target.checked)} /> Single symbol only</label><button className="btn" onClick={() => void analyse()} disabled={busy}>{busy ? "Checking…" : "Check evidence"}</button></section><Failure result={result} />{busy ? <Spinner label="Checking evidence" /> : result?.ok ? <section className="card"><h2>{result.data.status === "warning" ? "Warnings" : "No obvious warning"}</h2>{result.data.warnings.length ? <ul className="plain-list">{result.data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : <p className="empty">Not enough evidence to judge this strategy.</p>}<p className="muted">{result.data.disclaimer}</p></section> : <p className="empty">No evidence analysis has been run yet.</p>}</main>;
+  const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
+  const active = useMemo(() => rules.result?.ok
+    ? rules.result.data.rules.find((rule) => rule.state === "active")
+    : undefined, [rules.result]);
+  const [result, setResult] = useState<ApiResult<OverfitResult> | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function analyse() {
+    if (!active) return;
+    setBusy(true);
+    const next = await api<OverfitResult>("overfit", {
+      method: "POST", body: { ruleDocId: active.ruleDocId },
+    });
+    setResult(next); setBusy(false);
+  }
+  return <main>
+    <Head title="Anti-overfitting assistant" detail="Evidence is derived from the active rule and its history" />
+    <p className="notice" role="note">This diagnostic does not generate signals or predict future performance.</p>
+    {rules.loading && !rules.result ? <Spinner label="Reading active rule" /> : null}
+    <Failure result={rules.result} retry={rules.reload} />
+    {active ? <section className="card"><p className="muted">Analysing {active.name || "active rule"}; counts are read from the rule, versions and trade history.</p><button className="btn" onClick={() => void analyse()} disabled={busy}>{busy ? "Checking…" : "Check evidence"}</button></section> : null}
+    {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
+    <Failure result={result} />
+    {busy ? <Spinner label="Checking evidence" /> : result?.ok ? <section className="card"><h2>{result.data.status === "warning" ? "Warnings" : "No obvious warning"}</h2>{result.data.warnings.length ? <ul className="plain-list">{result.data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : <p className="empty">Nothing has been calculated yet.</p>}<p className="muted">{result.data.disclaimer}</p></section> : <p className="empty">Nothing has been calculated yet.</p>}
+  </main>;
 }
 
 export function RiskGuardView() {
-  const [stopAll, setStopAll] = useState(false); const [loss, setLoss] = useState(""); const [drawdown, setDrawdown] = useState(""); const [consecutive, setConsecutive] = useState(""); const [trades, setTrades] = useState("");
-  const [result, setResult] = useState<ApiResult<{ allowed: boolean; mode: string; blocks: { guard: string; reason: string }[] }> | null>(null); const [busy, setBusy] = useState(false);
-  async function evaluate() { setBusy(true); const number = (v: string) => v === "" ? undefined : Number(v); const r = await api<RiskGuardResult>("risk/guard", { method: "POST", body: { state: { stopAll, weeklyLossFraction: number(loss), drawdownFraction: number(drawdown), consecutiveLosses: number(consecutive), tradesToday: number(trades) } } }); setResult(r); setBusy(false); }
-  return <main><Head title="Advanced risk guard" detail="A missing input blocks rather than appearing safe" /><section className="card"><label><input type="checkbox" checked={stopAll} onChange={(e) => setStopAll(e.target.checked)} /> Stop new entries and show a stop-all state</label><div className="grid grid-3"><label>Weekly loss fraction<input className="input" inputMode="decimal" placeholder="unknown" value={loss} onChange={(e) => setLoss(e.target.value)} /></label><label>Drawdown fraction<input className="input" inputMode="decimal" placeholder="unknown" value={drawdown} onChange={(e) => setDrawdown(e.target.value)} /></label><label>Consecutive losses<input className="input" inputMode="numeric" placeholder="unknown" value={consecutive} onChange={(e) => setConsecutive(e.target.value)} /></label></div><label>Trades today<input className="input" inputMode="numeric" placeholder="unknown" value={trades} onChange={(e) => setTrades(e.target.value)} /></label><button className="btn" onClick={() => void evaluate()} disabled={busy}>{busy ? "Evaluating…" : "Evaluate guard"}</button></section><Failure result={result} />{busy ? <Spinner label="Evaluating risk guard" /> : result?.ok ? <section className="card"><div className="stat"><span className="stat-k">Decision</span><strong className="stat-v"><ShieldCheck className="ico" aria-hidden /> {result.data.allowed ? "Ready" : "Blocked"}</strong></div>{result.data.blocks.length ? <ul className="plain-list">{result.data.blocks.map((b) => <li key={`${b.guard}-${b.reason}`}><strong>{b.guard}</strong> · {b.reason}</li>)}</ul> : <p className="empty">All supplied guards are within their limits.</p>}</section> : <p className="empty">No guard evaluation has been run yet.</p>}</main>;
+  const accounts = useRead<CtraderStatus>("accounts", 60_000);
+  const [result, setResult] = useState<ApiResult<RiskGuardResult> | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function evaluate() {
+    setBusy(true);
+    const accountId = accounts.result?.ok ? accounts.result.data.selected?.ctid : undefined;
+    const next = await api<RiskGuardResult>("risk/guard", { method: "POST", body: { accountId } });
+    setResult(next); setBusy(false);
+  }
+  return <main>
+    <Head title="Advanced risk guard" detail="Measured account state is evaluated fail-closed" />
+    <section className="card"><AccountHint accounts={accounts} /><p className="muted">Weekly loss, drawdown, consecutive losses and trades today are read from broker trades and the journal. Unreadable inputs are named and block the guard.</p><p className="muted">Stop new entries only: displayed state. Stop-all is not changed by this screen.</p><button className="btn" onClick={() => void evaluate()} disabled={busy || accounts.loading}>{busy ? "Evaluating…" : "Evaluate measured state"}</button></section>
+    <Failure result={accounts.result} retry={accounts.reload} /><Failure result={result} />
+    {busy ? <Spinner label="Evaluating risk guard" /> : result?.ok ? <section className="card"><div className="stat"><span className="stat-k">Decision</span><strong className="stat-v"><ShieldCheck className="ico" aria-hidden /> {result.data.allowed ? "Ready" : "Blocked"}</strong></div>{result.data.blocks.length ? <ul className="plain-list">{result.data.blocks.map((b) => <li key={`${b.guard}-${b.reason}`}><strong>{b.guard}</strong> · {b.reason}</li>)}</ul> : <p className="empty">Measured guards are within their limits.</p>}</section> : <p className="empty">Nothing has been calculated yet.</p>}
+  </main>;
 }
 
 export function RuleLayerView() {
-  const [symbol, setSymbol] = useState("EUR_USD"); const [price, setPrice] = useState("1.1"); const [balance, setBalance] = useState(""); const [risk, setRisk] = useState("0.01"); const [stop, setStop] = useState(""); const [result, setResult] = useState<ApiResult<{ units: number; unitLabel: string; riskAmount: number }> | null>(null); const [busy, setBusy] = useState(false);
-  async function calculate() { setBusy(true); const r = await api<RuleLayerResult>("rule-layer", { method: "POST", body: { symbol, price: Number(price), balance: balance === "" ? undefined : Number(balance), riskFraction: Number(risk), stopPips: stop === "" ? undefined : Number(stop) } }); setResult(r); setBusy(false); }
-  return <main><Head title="Broker-agnostic rule layer" detail="One read-only risk-unit calculation across instruments" /><section className="card"><div className="grid grid-3"><label>Symbol<input className="input" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} /></label><label>Price<input className="input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></label><label>Balance<input className="input" inputMode="decimal" placeholder="unknown" value={balance} onChange={(e) => setBalance(e.target.value)} /></label></div><div className="grid grid-3"><label>Risk fraction<input className="input" inputMode="decimal" value={risk} onChange={(e) => setRisk(e.target.value)} /></label><label>Stop distance (pips)<input className="input" inputMode="decimal" placeholder="unknown" value={stop} onChange={(e) => setStop(e.target.value)} /></label></div><button className="btn" onClick={() => void calculate()} disabled={busy}>{busy ? "Calculating…" : "Calculate"}</button></section><Failure result={result} />{busy ? <Spinner label="Calculating risk units" /> : result?.ok ? <section className="card"><div className="grid grid-3"><div className="stat"><span className="stat-k">Units</span><strong className="stat-v">{result.data.units}</strong></div><div className="stat"><span className="stat-k">Unit label</span><strong className="stat-v">{result.data.unitLabel}</strong></div><div className="stat"><span className="stat-k">Risk amount</span><strong className="stat-v">{result.data.riskAmount}</strong></div></div><p className="muted">This calculation is informational and does not submit an order.</p></section> : <p className="empty">Nothing has been calculated yet.</p>}</main>;
+  const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
+  const active = useMemo(() => rules.result?.ok
+    ? rules.result.data.rules.find((rule) => rule.state === "active")
+    : undefined, [rules.result]);
+  const symbol = active?.symbols?.[0] ?? "";
+  const { accounts, candles } = useCandleRead(symbol, active?.timeframe ?? "1h", 1);
+  const price = candles.result?.ok && candles.result.data.status === "ok"
+    ? candles.result.data.candles?.[candles.result.data.candles.length - 1]?.close : undefined;
+  const [result, setResult] = useState<ApiResult<RuleLayerResult> | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function calculate() {
+    if (!active || price == null) return;
+    setBusy(true);
+    const next = await api<RuleLayerResult>("rule-layer", {
+      method: "POST", body: { ruleDocId: active.ruleDocId, price },
+    });
+    setResult(next); setBusy(false);
+  }
+  return <main>
+    <Head title="Broker-agnostic rule layer" detail="Account and symbol metadata are read from the selected account" />
+    {rules.loading && !rules.result ? <Spinner label="Reading active rule" /> : null}
+    <Failure result={rules.result} retry={rules.reload} />
+    {active ? <section className="card"><p className="muted">Symbol: {symbol}. Price and balance come from the selected account read.</p><AccountHint accounts={accounts} /><Failure result={candles.result} retry={candles.reload} /><button className="btn" onClick={() => void calculate()} disabled={busy || price == null}>{busy ? "Calculating…" : "Calculate from selected account"}</button></section> : null}
+    {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
+    <Failure result={result} />
+    {busy ? <Spinner label="Calculating risk units" /> : result?.ok ? <section className="card"><div className="grid grid-3"><div className="stat"><span className="stat-k">Units</span><strong className="stat-v">{result.data.units}</strong></div><div className="stat"><span className="stat-k">Unit label</span><strong className="stat-v">{result.data.unitLabel}</strong></div><div className="stat"><span className="stat-k">Risk amount</span><strong className="stat-v">{result.data.riskAmount}</strong></div></div><h2>Instrument metadata</h2><ul className="plain-list"><li>Minimum lot: {result.data.metadata?.minLot ?? "unknown"}</li><li>Lot step: {result.data.metadata?.lotStep ?? "unknown"}</li><li>Contract size: {result.data.metadata?.contractSize ?? "unknown"}</li><li>Digits: {result.data.metadata?.digits ?? "unknown"}</li><li>Minimum stop distance: {result.data.metadata?.minimumStopDistancePips ?? "unknown"}</li></ul><p className="muted">This calculation is informational and does not submit an order.</p></section> : <p className="empty">Nothing has been calculated yet.</p>}
+  </main>;
 }

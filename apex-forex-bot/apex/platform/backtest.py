@@ -1,4 +1,5 @@
 """Deterministic, hypothetical backtest engine over supplied candles only."""
+from collections import defaultdict
 from typing import Any, Callable
 
 from apex import forex
@@ -33,7 +34,8 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
                          "from pips to price")
     if len(candles) > max_bars:
         raise ValueError("candle limit exceeded")
-    balance = float(initial_balance) if initial_balance is not None else None
+    starting_balance = float(initial_balance) if initial_balance is not None else None
+    balance = starting_balance
     trades: list[dict[str, Any]] = []
     skipped = 0
     for index, candle in enumerate(candles):
@@ -54,20 +56,83 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
             pnl -= forex.from_pips(cost_pips, symbol.replace("_", "").upper(),
                                    float(entry))
         pnl -= abs(float(commission))
-        trades.append({"index": index, "pnl": round(pnl, 8), "hypothetical": True,
+        trades.append({"index": index, "timestamp": candle.get("time", candle.get("timestamp")),
+                       "pnl": round(pnl, 8), "side": "BUY" if direction == 1 else "SELL",
+                       "entry": entry, "exit": exit_price, "hypothetical": True,
                        "latencyBars": max(0, int(latency_bars))})
         if balance is not None:
             balance += pnl
     # Keep the data path explicit even when every bar was malformed: the
     # result says how many bars were skipped rather than claiming no signals.
     total = sum(t["pnl"] for t in trades)
+    metrics = _metrics(trades, initial_balance=starting_balance)
     return {"status": "ok", "hypothetical": True, "trades": trades,
             "tradeCount": len(trades), "skippedCandles": skipped,
             "totalPnl": round(total, 8), "endingBalance": balance,
+            **metrics,
             "assumptions": {"spreadPips": spread_pips, "commission": commission,
                             "slippagePips": slippage_pips, "latencyBars": latency_bars},
             "unit": "price points per unit",
             "notModelled": _not_modelled(latency_bars)}
+
+
+def _metrics(trades: list[dict[str, Any]], *, initial_balance: float | None) -> dict[str, Any]:
+    """Return requested diagnostics without inventing values for empty data."""
+    pnls = [float(t["pnl"]) for t in trades if isinstance(t.get("pnl"), (int, float))]
+    if not pnls:
+        return {"netProfit": None, "maxDrawdown": None, "profitFactor": None,
+                "expectancy": None, "averageWin": None, "averageLoss": None,
+                "longestLosingStreak": None, "recoveryFactor": None,
+                "equityCurve": [], "resultsPerMonth": [],
+                "longVsShort": {"long": {"trades": 0, "pnl": None},
+                                "short": {"trades": 0, "pnl": None}}}
+    equity = float(initial_balance) if initial_balance is not None else 0.0
+    peak = equity
+    curve = []
+    max_dd = 0.0
+    streak = longest = 0
+    for row in trades:
+        pnl = float(row["pnl"])
+        equity += pnl
+        peak = max(peak, equity)
+        max_dd = max(max_dd, peak - equity)
+        if pnl < 0:
+            streak += 1
+            longest = max(longest, streak)
+        else:
+            streak = 0
+        curve.append({"index": row.get("index"), "timestamp": row.get("timestamp"),
+                      "equity": round(equity, 8), "pnl": round(pnl, 8)})
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p < 0]
+    gross_win, gross_loss = sum(wins), abs(sum(losses))
+    by_month = defaultdict(lambda: {"trades": 0, "pnl": 0.0})
+    direction = {"long": {"trades": 0, "pnl": 0.0},
+                 "short": {"trades": 0, "pnl": 0.0}}
+    from datetime import datetime, timezone
+    for row in trades:
+        stamp = row.get("timestamp")
+        try:
+            month = datetime.fromtimestamp(float(stamp), timezone.utc).strftime("%Y-%m")
+        except (TypeError, ValueError, OverflowError):
+            month = "unknown"
+        by_month[month]["trades"] += 1
+        by_month[month]["pnl"] += float(row["pnl"])
+        bucket = "long" if row.get("side") == "BUY" else "short"
+        direction[bucket]["trades"] += 1
+        direction[bucket]["pnl"] += float(row["pnl"])
+    for value in list(by_month.values()) + list(direction.values()):
+        value["pnl"] = round(value["pnl"], 8)
+    recovery = None if max_dd == 0 else sum(pnls) / max_dd
+    return {"netProfit": round(sum(pnls), 8), "maxDrawdown": round(max_dd, 8),
+            "profitFactor": None if gross_loss == 0 else round(gross_win / gross_loss, 8),
+            "expectancy": round(sum(pnls) / len(pnls), 8),
+            "averageWin": None if not wins else round(sum(wins) / len(wins), 8),
+            "averageLoss": None if not losses else round(sum(losses) / len(losses), 8),
+            "longestLosingStreak": longest, "recoveryFactor": None if recovery is None else round(recovery, 8),
+            "equityCurve": curve,
+            "resultsPerMonth": [{"month": k, **v} for k, v in sorted(by_month.items())],
+            "longVsShort": direction}
 
 
 def _rule_signal(rule: dict[str, Any], symbol: str, timeframe: str):

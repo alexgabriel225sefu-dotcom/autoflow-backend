@@ -26,6 +26,7 @@ match on English text.
 import contextvars
 import json
 import re
+import time
 
 from apex.platform import account_data as _acct
 from apex.platform import conditions as _cond
@@ -610,21 +611,65 @@ def _dispatch(method, route, headers, body, query=None):
         p = _authenticate(headers)
         from apex.platform import health_score as _health_score
         accounts = _link.public_status(p.user_id)
+        selected = (accounts or {}).get("selected") or {}
+        rule = _selected_rule(p.user_id)
+        rule_valid = None
+        if rule is not None:
+            try:
+                rule_valid = not bool(_rd.validate(rule, known_condition_ids=_cond.available()))
+            except Exception:
+                rule_valid = False
+        token_exp = (accounts or {}).get("expiresAt")
+        session_valid = None
+        if accounts.get("connected") is True and token_exp is not None:
+            try:
+                session_valid = float(token_exp) > time.time()
+            except (TypeError, ValueError):
+                session_valid = None
+        data_fresh = None
+        if rule and selected.get("ctid") and rule.get("symbols"):
+            got = _read.candles(p.user_id, symbol=rule["symbols"][0],
+                                timeframe=rule.get("timeframe") or "1h", limit=2,
+                                ctid=selected.get("ctid"))
+            if got.get("status") == _read.OK and got.get("candles"):
+                stamp = got["candles"][-1].get("time", got["candles"][-1].get("timestamp"))
+                try:
+                    data_fresh = time.time() - float(stamp) <= 120
+                except (TypeError, ValueError):
+                    data_fresh = None
+        try:
+            store_health = _ustore.redis_health()
+            store_available = store_health.get("reachable") if store_health.get("configured") else None
+        except Exception:
+            store_available = None
+        incidents = __import__("apex.platform.incidents", fromlist=["derive"])
+        incident_view = incidents.derive({
+            "brokerStatus": "ok" if accounts.get("connected") else None,
+            "storeAvailable": store_available,
+            "riskBlocked": None})
         return _ok(_health_score.score({
             "brokerConnected": accounts.get("connected"),
-            "sessionValid": True, "storeAvailable": True,
-            "ruleValid": None, "riskGuardReady": None,
-            "dataFresh": None, "criticalIncidents": None,
+            "sessionValid": session_valid, "storeAvailable": store_available,
+            "ruleValid": rule_valid, "riskGuardReady": None,
+            "dataFresh": data_fresh,
+            "criticalIncidents": any(i.get("severity") == "critical"
+                                      for i in incident_view.get("incidents", [])),
         }))
 
     if route == "incidents" and method == "GET":
         p = _authenticate(headers)
         from apex.platform import incidents as _incidents
         accounts = _link.public_status(p.user_id)
-        return _ok(_incidents.derive({
-            "brokerStatus": "ok" if accounts.get("connected") else "unavailable",
-            "storeAvailable": True, "riskBlocked": None,
-        }))
+        try:
+            store_health = _ustore.redis_health()
+            store_available = store_health.get("reachable") if store_health.get("configured") else None
+        except Exception:
+            store_available = None
+        facts = {"brokerStatus": "ok" if accounts.get("connected") else "unavailable",
+                 "storeAvailable": store_available, "riskBlocked": None,
+                 "affectedScope": f"account {((accounts.get('selected') or {}).get('ctid') or 'unknown')}",
+                 "systemAction": "read-only surfaces report the dependency state"}
+        return _ok(_incidents.record(p.user_id, facts))
 
     if route == "multi-account" and method == "GET":
         p = _authenticate(headers)
@@ -1148,7 +1193,11 @@ def _roadmap_analysis(route, payload, *, user_id=None):
             rule=payload.get("rule")))
     if route == "replay":
         from apex.platform import replay as _replay
-        return _ok(_replay.timeline(payload.get("candles")))
+        rule = _selected_rule(user_id, payload.get("ruleDocId"))
+        return _ok(_replay.timeline(
+            payload.get("candles"), rule=rule,
+            symbol=payload.get("symbol") or ((rule or {}).get("symbols") or [None])[0],
+            timeframe=payload.get("timeframe") or (rule or {}).get("timeframe")))
     if route == "forward":
         from apex.platform import forward as _forward
         rule = _selected_rule(user_id, payload.get("ruleDocId"))

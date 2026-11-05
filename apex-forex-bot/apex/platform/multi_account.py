@@ -7,6 +7,8 @@ maps, but it must preserve the user/account key and copy-on-write behaviour.
 from copy import deepcopy
 from typing import Any
 
+from apex import user_store
+
 
 def _part(value: Any, name: str) -> str:
     text = str(value or "").strip()
@@ -78,6 +80,54 @@ class AccountIsolation:
 
     def is_killed(self, user_id: str, ctid: str) -> bool:
         return bool(self.kill_state(user_id, ctid)["active"])
+
+
+class UserStoreIsolation:
+    """Persistence adapter exercising the same contract against user_store.
+
+    The browser never calls this directly.  Keeping the adapter here makes
+    the isolation tests run against the real durable record shape before any
+    multi-account controls are exposed.
+    """
+
+    FIELD = "platformAccountScopes"
+
+    def _read(self, user_id: str) -> dict[str, Any]:
+        return dict((user_store.load(_part(user_id, "user id")) or {}).get(self.FIELD) or {})
+
+    def put(self, user_id: str, ctid: str, data: dict[str, Any]) -> None:
+        if not isinstance(data, dict):
+            raise ValueError("account data must be an object")
+        uid, aid = _part(user_id, "user id"), _part(ctid, "account id")
+        scopes = self._read(uid)
+        scopes[aid] = {"data": deepcopy(data), "kill": scopes.get(aid, {}).get("kill", {})}
+        user_store.update(uid, {self.FIELD: scopes})
+
+    def get(self, user_id: str, ctid: str) -> dict[str, Any] | None:
+        row = self._read(user_id).get(_part(ctid, "account id"))
+        return deepcopy(row.get("data")) if isinstance(row, dict) and "data" in row else None
+
+    def set_kill(self, user_id: str, ctid: str | None, active: bool,
+                 *, reason: str = "") -> None:
+        uid = _part(user_id, "user id")
+        key = "__global__" if ctid is None else _part(ctid, "account id")
+        scopes = self._read(uid)
+        row = dict(scopes.get(key) or {})
+        row["kill"] = {"active": True, "reason": str(reason or "")} if active else {}
+        scopes[key] = row
+        user_store.update(uid, {self.FIELD: scopes})
+
+    def kill_state(self, user_id: str, ctid: str) -> dict[str, Any]:
+        uid, aid = _part(user_id, "user id"), _part(ctid, "account id")
+        scopes = self._read(uid)
+        specific = (scopes.get(aid) or {}).get("kill") or {}
+        global_state = (scopes.get("__global__") or {}).get("kill") or {}
+        state = specific or global_state
+        return {"active": bool(state.get("active")), "scope": scope_key(uid, aid),
+                "reason": state.get("reason", "")}
+
+    def is_killed(self, user_id: str, ctid: str) -> bool:
+        return self.kill_state(user_id, ctid)["active"]
 
 
 def isolate(user_id: str, accounts: list[dict[str, Any]]) -> dict[str, Any]:
