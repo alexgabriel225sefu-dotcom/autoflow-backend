@@ -691,8 +691,8 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 # Roadmap, Codex items
 
 Current branch: `claude/apex4traders-platform-v1`  
-Current commit: `1f92a32`  
-CI: green on all four Tests jobs (python, node, web, config-drift) for `1f92a32`.
+Current commit: `fd4cfc0`  
+CI: green on all four Tests jobs (python, node, web, config-drift) for `fd4cfc0`.
 
 Done in this slice:
 
@@ -708,10 +708,12 @@ Done in this slice:
 
 Still partial:
 
-- Item 3, Strategy Replay — `ce390bc`: the backend explains met/unmet/unknown conditions, hypothetical entry and stop without look-ahead, while the current web replay view still needs to call that annotation response at the cursor.
-- Item 5, Forward Testing — persistence and later-price fields are implemented, but a background real-time watcher is not present; the screen records on an explicit read/record action.
+- Item 3, Strategy Replay — `ce390bc` and `ba587b1`: the backend and web cursor view explain met/unmet/unknown conditions, hypothetical entry and stop without look-ahead. The web screen now reads the selected bar on Step or “Explain current bar” and shows failed/unknown evidence explicitly.
+- Item 5, Forward Testing — `43be736` and `fd4cfc0`: persistence and later-price fields are implemented, and the UI separates signal, decision and execution in a responsive ledger. A background real-time watcher is not present; the screen records on an explicit read/record action.
 - Item 4, Backtest — sessions, news, partial fills, rejected orders, market impact and stale-data modelling remain explicitly listed as not modelled.
 
-Local verification: focused roadmap tests pass; the full Python runner reports 265/266 files, with only the pre-existing `test_loadtest_loops.py` RSS read failure. Local web dependencies are incomplete, so web type/lint/vitest/build were judged by the green CI run above.
+Item 3/5 UI design pass — `ba587b1` and `fd4cfc0`: shared simulation read states, replay evidence, and result cards are split into files below 500 lines and retain the Trades/Health card hierarchy at mobile widths. No multi-account UI was added.
 
-Next: wire the replay annotation response into the cursor view, then add the remaining honest backtest assumptions only when the engine can actually model them. Do not deploy, change env vars/flags, or expose multi-account controls until a separately reviewed UI slice is ready.
+Local verification: focused roadmap tests pass; the full Python runner reports 265/266 files, with only the pre-existing `test_loadtest_loops.py` RSS read failure. Local web dependencies are incomplete, so web type/lint/vitest/build were judged by the green CI run above for `fd4cfc0`.
+
+Next: add a server-owned forward-test watcher only when a safe scheduler and later executable-price read are available; then add remaining honest backtest assumptions only when the engine can actually model them. Do not deploy, change env vars/flags, or expose multi-account controls.
