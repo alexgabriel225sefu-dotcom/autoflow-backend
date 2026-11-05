@@ -30,7 +30,7 @@ const cards: TunnelCardData[] = [
     name: "MetaTrader 4",
     logo: "/metatrader-4-light.png",
     alt: "MetaTrader 4",
-    status: "On the roadmap",
+    status: "Coming soon",
     statusTone: "soon",
     start: 0.28,
     finalX: "0%",
