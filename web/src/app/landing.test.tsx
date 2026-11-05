@@ -23,9 +23,9 @@ describe("landing page", () => {
 
   it("states cTrader as available and the MetaTrader platforms as coming soon", () => {
     render(<Landing />);
-    // Once in the hero card and once in the partner row.
+    // Each status appears in the hero cards and again in the partner row.
     expect(screen.getAllByText("Available now")).toHaveLength(2);
-    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+    expect(screen.getAllByText("Coming soon")).toHaveLength(4);
   });
 
   it("says demo-only and makes no profit claim", () => {
