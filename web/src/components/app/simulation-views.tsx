@@ -1,17 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ShieldCheck } from "lucide-react";
 import type { ApiResult, Candle, CtraderStatus, RuleSummary } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
-import { PriceChart } from "@/components/chart/price-chart";
 import { TIMEFRAMES } from "@/components/app/rule-form";
 import { ReplayView } from "@/components/app/simulation-replay";
 import {
   AccountHint, CandleReadStatus, SimulationFailure, SimulationHead, useCandleRead,
 } from "@/components/app/simulation-shared";
+import {
+  BacktestResultCard, ForwardLedger, OverfitResultCard, RiskGuardResultCard, RuleLayerResultCard,
+  type BacktestResult, type ForwardEvent, type OverfitResult, type RiskGuardResult, type RuleLayerResult,
+} from "@/components/app/simulation-result-cards";
 
 const DISCLAIMER = "Backtest results are hypothetical and do not predict future performance.";
 const Head = SimulationHead;
@@ -20,11 +22,6 @@ const ReadStatus = CandleReadStatus;
 export { ReplayView };
 
 type RuleRead = { rule: Record<string, unknown> };
-type BacktestResult = { status: string; hypothetical: boolean; tradeCount: number; totalPnl: number; endingBalance: number | null; assumptions: Record<string, number>; notModelled: string[]; unit?: string; trades: { pnl: number; timestamp?: number; side?: string }[]; netProfit?: number | null; maxDrawdown?: number | null; profitFactor?: number | null; expectancy?: number | null; averageWin?: number | null; averageLoss?: number | null; longestLosingStreak?: number | null; recoveryFactor?: number | null; equityCurve?: { index?: number; timestamp?: number; equity?: number | null; pnl?: number }[]; resultsPerMonth?: { month: string; trades: number; pnl: number }[]; longVsShort?: { long: { trades: number; pnl: number | null }; short: { trades: number; pnl: number | null } } };
-type OverfitResult = { status: string; warnings: string[]; disclaimer: string };
-type RiskGuardResult = { allowed: boolean; mode: string; blocks: { guard: string; reason: string }[]; state?: Record<string, unknown>; stopNewEntriesOnly?: boolean };
-type RuleLayerResult = { units: number; unitLabel: string; riskAmount: number; metadata?: { minLot?: number | null; lotStep?: number | null; contractSize?: number | null; digits?: number | null; minimumStopDistancePips?: number | null; sources?: Record<string, string> } };
-
 export function BacktestView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
   const list = useMemo(() => (rules.result?.ok && Array.isArray(rules.result.data?.rules) ? rules.result.data.rules : []), [rules.result]);
@@ -82,19 +79,9 @@ export function BacktestView() {
     <Failure result={candles.result} retry={candles.reload} />
     <ReadStatus data={candleData} empty="The broker returned no candles for this window." />
     {result && !result.ok ? <ErrorNotice error={result} /> : null}
-    {result?.ok ? <section className="card" aria-live="polite">
-      <div className="grid grid-3"><div className="stat"><span className="stat-k">Trades</span><strong className="stat-v">{result.data.tradeCount}</strong></div><div className="stat"><span className="stat-k">Net profit</span><strong className="stat-v">{result.data.netProfit ?? "unknown"}</strong></div><div className="stat"><span className="stat-k">Max drawdown</span><strong className="stat-v">{result.data.maxDrawdown ?? "unknown"}</strong></div></div>
-      <div className="grid grid-3"><div className="stat"><span className="stat-k">Profit factor</span><strong className="stat-v">{result.data.profitFactor ?? "unknown"}</strong></div><div className="stat"><span className="stat-k">Expectancy</span><strong className="stat-v">{result.data.expectancy ?? "unknown"}</strong></div><div className="stat"><span className="stat-k">Losing streak</span><strong className="stat-v">{result.data.longestLosingStreak ?? "unknown"}</strong></div></div>
-      {equityCandles.length ? <><h2>Equity curve</h2><PriceChart candles={equityCandles} symbol="equity" timeframe="trade" height={260} /></> : null}
-      <p className="muted">Ending balance: {result.data.endingBalance == null ? "unknown" : result.data.endingBalance}; average win {result.data.averageWin ?? "unknown"}; average loss {result.data.averageLoss ?? "unknown"}; recovery factor {result.data.recoveryFactor ?? "unknown"}.</p>
-      {!result.data.tradeCount ? <p className="empty">The selected rule produced no hypothetical trades in this window.</p> : null}
-      <h2>Assumptions</h2><ul className="plain-list">{Object.entries(result.data.assumptions).map(([k, v]) => <li key={k}><strong>{k}</strong> <span className="muted">{v}</span></li>)}</ul>
-      <h2>Not modelled</h2><ul className="plain-list">{result.data.notModelled.map((v) => <li key={v}>{v}</li>)}</ul>
-    </section> : null}
+    {result?.ok ? <BacktestResultCard result={result.data} equityCandles={equityCandles} /> : null}
   </main>;
 }
-
-type ForwardEvent = { symbol?: string; signal?: string; decision?: string; execution?: { status?: string; price?: number | null; slippage?: number | null } };
 
 export function ForwardView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
@@ -135,15 +122,7 @@ export function ForwardView() {
       </button>
     </section> : <section className="card"><button className="btn" onClick={() => void record()}>Record signal</button></section>}
     <Failure result={error} />
-    {busy ? <Spinner label="Recording hypothetical signal" /> : events.length ? <section className="card">
-      <h2>Signal ledger</h2>
-      <div className="table-wrap"><table><thead><tr><th>Signal</th><th>Decision</th><th>Execution</th></tr></thead><tbody>
-        {events.map((event, index) => <tr key={`${event.symbol ?? "unknown"}-${index}`}>
-          <td>{event.signal ?? "unknown"}</td><td>{event.decision ?? "unknown"}</td>
-          <td>{event.execution?.status ?? "unknown"} · price {event.execution?.price ?? "unknown"} · slippage {event.execution?.slippage ?? "unknown"}</td>
-        </tr>)}
-      </tbody></table></div>
-    </section> : <p className="empty">No hypothetical signals recorded in this session.</p>}
+    {busy ? <Spinner label="Recording hypothetical signal" /> : <ForwardLedger events={events} />}
   </main>;
 }
 
@@ -169,7 +148,7 @@ export function OverfitView() {
     {active ? <section className="card"><p className="muted">Analysing {active.name || "active rule"}; counts are read from the rule, versions and trade history.</p><button className="btn" onClick={() => void analyse()} disabled={busy}>{busy ? "Checking…" : "Check evidence"}</button></section> : <section className="card"><button className="btn" onClick={() => void analyse()} disabled={busy}>Check evidence</button><input className="input" placeholder="unknown" value="" readOnly aria-label="Derived evidence is read from the server" /></section>}
     {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
     <Failure result={result} />
-    {busy ? <Spinner label="Checking evidence" /> : result?.ok ? <section className="card"><h2>{result.data.status === "warning" ? "Warnings" : "No obvious warning"}</h2>{result.data.warnings.length ? <ul className="plain-list">{result.data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : <p className="empty">Not enough evidence to judge this strategy.</p>}<p className="muted">{result.data.disclaimer}</p></section> : <p className="empty">No evidence analysis has been run yet.</p>}
+    {busy ? <Spinner label="Checking evidence" /> : result?.ok ? <OverfitResultCard result={result.data} /> : <p className="empty">No evidence analysis has been run yet.</p>}
   </main>;
 }
 
@@ -187,7 +166,7 @@ export function RiskGuardView() {
     <Head title="Advanced risk guard" detail="Measured account state is evaluated fail-closed" />
     <section className="card"><AccountHint accounts={accounts} /><p className="muted">Weekly loss, drawdown, consecutive losses and trades today are read from broker trades and the journal. Unreadable inputs are named and block the guard.</p><p className="muted">Stop new entries only: displayed state. Stop-all is not changed by this screen.</p><button className="btn" onClick={() => void evaluate()} disabled={busy}>{busy ? "Evaluating…" : "Evaluate guard"}</button></section>
     <Failure result={accounts.result} retry={accounts.reload} /><Failure result={result} />
-    {busy ? <Spinner label="Evaluating risk guard" /> : result?.ok ? <section className="card"><div className="stat"><span className="stat-k">Decision</span><strong className="stat-v"><ShieldCheck className="ico" aria-hidden /> {result.data.allowed ? "Ready" : "Blocked"}</strong></div>{result.data.blocks.length ? <ul className="plain-list">{result.data.blocks.map((b) => <li key={`${b.guard}-${b.reason}`}><strong>{b.guard}</strong> · {b.reason}</li>)}</ul> : <p className="empty">Measured guards are within their limits.</p>}</section> : <p className="empty">Nothing has been calculated yet.</p>}
+    {busy ? <Spinner label="Evaluating risk guard" /> : result?.ok ? <RiskGuardResultCard result={result.data} /> : <p className="empty">Nothing has been calculated yet.</p>}
   </main>;
 }
 
@@ -217,6 +196,6 @@ export function RuleLayerView() {
     {active ? <section className="card"><p className="muted">Symbol: {symbol}. Price and balance come from the selected account read.</p><AccountHint accounts={accounts} /><Failure result={candles.result} retry={candles.reload} /><button className="btn" onClick={() => void calculate()} disabled={busy}>{busy ? "Calculating…" : "Calculate"}</button></section> : <section className="card"><button className="btn" onClick={() => void calculate()} disabled={busy}>Calculate</button></section>}
     {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
     <Failure result={result} />
-    {busy ? <Spinner label="Calculating risk units" /> : result?.ok ? <section className="card"><div className="grid grid-3"><div className="stat"><span className="stat-k">Units</span><strong className="stat-v">{result.data.units}</strong></div><div className="stat"><span className="stat-k">Unit label</span><strong className="stat-v">{result.data.unitLabel}</strong></div><div className="stat"><span className="stat-k">Risk amount</span><strong className="stat-v">{result.data.riskAmount}</strong></div></div><h2>Instrument metadata</h2><ul className="plain-list"><li>Minimum lot: {result.data.metadata?.minLot ?? "unknown"}</li><li>Lot step: {result.data.metadata?.lotStep ?? "unknown"}</li><li>Contract size: {result.data.metadata?.contractSize ?? "unknown"}</li><li>Digits: {result.data.metadata?.digits ?? "unknown"}</li><li>Minimum stop distance: {result.data.metadata?.minimumStopDistancePips ?? "unknown"}</li></ul><p className="muted">This calculation is informational and does not submit an order.</p></section> : <p className="empty">Nothing has been calculated yet.</p>}
+    {busy ? <Spinner label="Calculating risk units" /> : result?.ok ? <RuleLayerResultCard result={result.data} /> : <p className="empty">Nothing has been calculated yet.</p>}
   </main>;
 }
