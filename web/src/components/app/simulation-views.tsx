@@ -112,7 +112,7 @@ type RuleLayerResult = { units: number; unitLabel: string; riskAmount: number; m
 
 export function BacktestView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
-  const list = useMemo(() => (rules.result?.ok ? rules.result.data.rules : []), [rules.result]);
+  const list = useMemo(() => (rules.result?.ok && Array.isArray(rules.result.data?.rules) ? rules.result.data.rules : []), [rules.result]);
   const [chosenRule, setRuleId] = useState("");
   const [symbolPick, setSymbol] = useState<string | null>(null);
   const [timeframePick, setTimeframe] = useState<string | null>(null);
@@ -183,7 +183,7 @@ type ForwardEvent = { symbol?: string; signal?: string; decision?: string; execu
 
 export function ForwardView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
-  const active = useMemo(() => rules.result?.ok
+  const active = useMemo(() => rules.result?.ok && Array.isArray(rules.result.data?.rules)
     ? rules.result.data.rules.find((rule) => rule.state === "active")
     : undefined, [rules.result]);
   const symbol = active?.symbols?.[0] ?? "";
@@ -210,7 +210,8 @@ export function ForwardView() {
     {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
     {active ? <section className="card">
       <p className="muted">Using {active.name || "active rule"} on {symbol}.</p>
-      <AccountHint accounts={accounts} />
+      {accounts.loading && !accounts.result ? <Spinner label="Checking connected accounts" /> : null}
+      {accounts.result && !accounts.result.ok ? <p className="muted">The connected account could not be read.</p> : null}
       {candles.loading && !candles.result ? <Spinner label="Reading the latest candle" /> : null}
       <Failure result={candles.result} retry={candles.reload} />
       <ReadStatus data={candles.result?.ok ? candles.result.data : null} empty="The latest candle could not be read." />
@@ -233,7 +234,7 @@ export function ForwardView() {
 
 export function OverfitView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
-  const active = useMemo(() => rules.result?.ok
+  const active = useMemo(() => rules.result?.ok && Array.isArray(rules.result.data?.rules)
     ? rules.result.data.rules.find((rule) => rule.state === "active")
     : undefined, [rules.result]);
   const [result, setResult] = useState<ApiResult<OverfitResult> | null>(null);
@@ -277,7 +278,7 @@ export function RiskGuardView() {
 
 export function RuleLayerView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
-  const active = useMemo(() => rules.result?.ok
+  const active = useMemo(() => rules.result?.ok && Array.isArray(rules.result.data?.rules)
     ? rules.result.data.rules.find((rule) => rule.state === "active")
     : undefined, [rules.result]);
   const symbol = active?.symbols?.[0] ?? "";
