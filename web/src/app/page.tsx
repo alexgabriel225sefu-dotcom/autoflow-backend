@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import {
-  ArrowRight,
   ArrowUpRight,
   Eye,
   GaugeCircle,
@@ -15,6 +13,7 @@ import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { MagnifierCard } from "@/components/marketing/magnifier-card";
 import { RuleTerminal } from "@/components/marketing/rule-terminal";
+import { PerspectiveTunnelHero } from "@/components/marketing/perspective-tunnel-hero";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -53,40 +52,7 @@ export default function Landing() {
           </span>
         </nav>
 
-        <section className="mkt-hero mkt-hero2 mkt-hero-mark" id="product">
-          <div className="mkt-hero-copy">
-            <p className="mkt-kicker">YOUR RULES, YOUR BROKER</p>
-            <h1>Trade like you planned&nbsp;to.</h1>
-            <p className="mkt-lede">
-              Connect your cTrader account, then set your market, method and
-              risk. Automation follows your rules and stops when you say.
-            </p>
-            <div className="mkt-hero-cta">
-              <a className="mkt-btn mkt-btn-lg" href="/signup">
-                Get started <ArrowRight className="mkt-ico" aria-hidden />
-              </a>
-              <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#features">
-                See how it works
-              </a>
-            </div>
-          </div>
-          {/* The product itself, not a picture about it. A real screen of the
-              setup flow on a demo account (the account number is a
-              placeholder). It shows no result, balance or return. */}
-          <figure className="mkt-hero-shot">
-            <Image
-              src="/product/setup-review.jpg"
-              alt="The Apex4Traders setup flow at its review step: instrument EURUSD, 1h, Trend pullback, 1% risk per trade, stop the day at 2%, on a demo account, with a Start on demo button."
-              width={2040}
-              height={1143}
-              priority
-              sizes="(min-width: 1000px) 56vw, 100vw"
-            />
-            <figcaption>
-              The setup flow, on a demo account. Nothing runs until you press Start.
-            </figcaption>
-          </figure>
-        </section>
+        <PerspectiveTunnelHero />
 
         <section className="mkt-partners" id="partners" aria-label="Broker integrations">
           <SpotlightGrid className="mkt-partner-grid">
