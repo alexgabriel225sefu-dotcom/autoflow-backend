@@ -691,13 +691,13 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 # Roadmap, Codex items
 
 Current branch: `claude/apex4traders-platform-v1`  
-Current commit: `fd4cfc0`  
-CI: green on all four Tests jobs (python, node, web, config-drift) for `fd4cfc0`.
+Current commit: `d7574a2`  
+CI: green on all four Tests jobs (python, node, web, config-drift) for `d7574a2`.
 
 Done in this slice:
 
 - Item 4, Realistic Backtest — `ce390bc`: shared-evaluator rule runs now include net profit, drawdown, profit factor, expectancy, average win/loss, losing streak, recovery factor, equity curve, monthly results, long/short breakdown, and an honest not-modelled list. The web screen renders the equity curve and unknown metrics as unknown.
-- Item 5, Forward Testing — `43be736` and `49b586b`: the screen uses the caller's active rule and latest readable candle, records per-user hypothetical events, and separates signal, decision and execution fields. No order path is called.
+- Item 5, Forward Testing — `43be736`, `49b586b`, and `d7574a2`: the screen uses the caller's active rule and latest readable candle, records per-user hypothetical events, and separates signal, decision and execution fields. The platform server now runs a bounded read-only watcher that evaluates each active rule on closed candles, deduplicates bars, and resolves pending hypothetical executions against a later readable bid/ask with directional slippage. No order path is called.
 - Item 6, Advanced Risk Guard — `43be736`: weekly loss, drawdown, consecutive losses and trades today are derived from broker trades/account reads; unreadable values block with named reasons. “Stop new entries only” is display-only.
 - Item 7, Portfolio Risk Map — `ce390bc`: currency exposure, correlated pairs and loss-if-every-readable-stop-hits are reported; unreadable stops remain excluded from totals and the gap scenario remains unknown without a supplied gap.
 - Item 8, Multi-account — `ce390bc`: isolation tests now exercise a `user_store` persistence adapter in addition to the in-memory reference. The UI remains off and no cross-account automation control was added.
@@ -709,11 +709,11 @@ Done in this slice:
 Still partial:
 
 - Item 3, Strategy Replay — `ce390bc` and `ba587b1`: the backend and web cursor view explain met/unmet/unknown conditions, hypothetical entry and stop without look-ahead. The web screen now reads the selected bar on Step or “Explain current bar” and shows failed/unknown evidence explicitly.
-- Item 5, Forward Testing — `43be736` and `fd4cfc0`: persistence and later-price fields are implemented, and the UI separates signal, decision and execution in a responsive ledger. A background real-time watcher is not present; the screen records on an explicit read/record action.
+- Item 5, Forward Testing — `d7574a2`: the server-owned watcher and persistence path are implemented and covered by a plain-script test. A live cTrader demo smoke check is still an operational follow-up; broker read failures remain failed/unknown and do not create events.
 - Item 4, Backtest — sessions, news, partial fills, rejected orders, market impact and stale-data modelling remain explicitly listed as not modelled.
 
 Item 3/5 UI design pass — `ba587b1` and `fd4cfc0`: shared simulation read states, replay evidence, and result cards are split into files below 500 lines and retain the Trades/Health card hierarchy at mobile widths. No multi-account UI was added.
 
 Local verification: focused roadmap tests pass; the full Python runner reports 265/266 files, with only the pre-existing `test_loadtest_loops.py` RSS read failure. Local web dependencies are incomplete, so web type/lint/vitest/build were judged by the green CI run above for `fd4cfc0`.
 
-Next: add a server-owned forward-test watcher only when a safe scheduler and later executable-price read are available; then add remaining honest backtest assumptions only when the engine can actually model them. Do not deploy, change env vars/flags, or expose multi-account controls.
+Next: run an operational cTrader demo smoke check for the read-only watcher and add remaining honest backtest assumptions only when the engine can actually model them. Do not deploy, change env vars/flags, or expose multi-account controls.
