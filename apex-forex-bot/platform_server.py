@@ -530,6 +530,18 @@ def _supervise_platform_loops():
     threading.Thread(target=_run, name="loop-supervisor", daemon=True).start()
 
 
+def _start_forward_watcher():
+    """Start the platform's read-only bar-close forward-test observer."""
+    try:
+        from apex.platform import forward_watcher
+        if forward_watcher.start():
+            print("[API] forward-test watcher started (read-only)")
+    except Exception as e:                              # noqa: BLE001
+        # Forward testing is an analysis surface. Its failure must not stop
+        # the API or change the automation supervisor's decision.
+        print(f"[API] forward-test watcher could not start: {type(e).__name__}")
+
+
 def _release_for_shutdown(budget_s=5.0):
     """Stop this process's trading loops and hand back their leases.
 
@@ -548,8 +560,10 @@ def _release_for_shutdown(budget_s=5.0):
 
     def _work():
         try:
+            from apex.platform import forward_watcher
             from apex import ownership as _own
             from apex import user_loop as _ul
+            forward_watcher.stop(timeout=min(1.0, budget_s))
             result["suspended"] = _ul.suspend_all_for_shutdown()
             result["released"] = _own.begin_shutdown()
         except Exception as e:                               # noqa: BLE001
@@ -583,6 +597,7 @@ def main():
 
     _start_broker_probe()
     _supervise_platform_loops()
+    _start_forward_watcher()
 
     server = build_server()
 

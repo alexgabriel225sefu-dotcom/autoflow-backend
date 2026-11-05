@@ -473,6 +473,28 @@ def candles(user_id, *, symbol, timeframe, limit=None, to_ts=None, **kw):
     return out
 
 
+def quote(user_id, *, symbol, **kw):
+    """The current bid/ask quote for a read-only hypothetical comparison."""
+    sym = str(symbol or "").strip().upper().replace("/", "_")
+    if not sym:
+        raise ValueError("symbol is required")
+    broker, other = _open(user_id, ctid=kw.get("ctid"),
+                          connection_fn=kw.get("connection_fn"),
+                          broker_fn=kw.get("broker_fn"))
+    if broker is None:
+        return other
+    conn = other
+    try:
+        bid, ask, received = _quote(broker, sym)
+    except Exception as e:  # noqa: BLE001
+        return {"connected": True, "status": UNAVAILABLE,
+                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                "reason": _human_broker_fault(e, conn.get("accessToken"))}
+    return {"connected": True, "status": OK, "accountId": conn.get("ctid"),
+            "mode": conn.get("mode"), "symbol": sym,
+            "bid": bid, "ask": ask, "receivedAt": received}
+
+
 # The multiple of ATR the engine puts its stop at when it places ATR stops
 # (user_loop). The estimate below uses the same number, which is why it says
 # "typical" and "estimate": a rule that sets its own stop in pips, or a
