@@ -690,15 +690,28 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 
 # Roadmap, Codex items
 
-- Item 3, Strategy Replay — **partial** in `b8ed65c` and `37b6a5e`: bounded historical candle reads reuse the candles rate-limit/cache bucket, and `/replay` now has chart, play/pause/step, loading, empty and failed-read states. Strategy-condition annotations and stop-move explanations are still next.
-- Item 4, Realistic Backtest — **partial** in `b8ed65c` and `37b6a5e`: a selected rule now runs through the shared evaluator over bounded candles, with pip costs, assumptions and `notModelled`. Partial fills, sessions/news/weekend filters, bid/ask, stale-data handling and the requested richer metrics remain.
-- Item 5, Forward Testing — **partial** in `37b6a5e`: the raw JSON panel is a usable read-only signal recorder with explicit empty/error/unknown states. A real-time strategy watcher and later executable-price comparison remain.
-- Item 6, Advanced Risk Guard — **done before this slice**: the fail-closed evaluator remains unchanged; the new screen in `37b6a5e` does not touch live gates or execution.
-- Item 7, Portfolio Risk Map — **done before this slice** in the merged Claude changes; unreadable positions remain visibly unreadable.
-- Item 8, Multi-account control — **isolation contract done** in `7678ea7` and enforced in `ed0a4a4`: per-user/per-account data and kill switches are copy-on-write and isolated. The UI was deliberately removed until the isolation tests are green in CI; per-account risk and kill-switch UI are next.
-- Item 9, Broker-agnostic rule layer — **done before this slice**; `/rule-layer` now presents the calculation as a real screen in `37b6a5e`.
-- Item 11, Incident Center — **done before this slice** in the merged Claude changes.
-- Item 12, Automation health score — **done before this slice** in the merged Claude changes.
-- Item 16, Anti-overfitting assistant — **partial** in `37b6a5e`: the screen replaces the raw JSON panel and missing inputs are shown as unknown/warnings; richer sample-history evidence is next.
+Current branch: `claude/apex4traders-platform-v1`  
+Current commit: `1f92a32`  
+CI: green on all four Tests jobs (python, node, web, config-drift) for `1f92a32`.
 
-Next: run the complete backend and web CI commands, fix any environment-independent failures, then rebase and push these commits. Do not deploy. Do not add multi-account UI until CI has exercised the isolation suite.
+Done in this slice:
+
+- Item 4, Realistic Backtest — `ce390bc`: shared-evaluator rule runs now include net profit, drawdown, profit factor, expectancy, average win/loss, losing streak, recovery factor, equity curve, monthly results, long/short breakdown, and an honest not-modelled list. The web screen renders the equity curve and unknown metrics as unknown.
+- Item 5, Forward Testing — `43be736` and `49b586b`: the screen uses the caller's active rule and latest readable candle, records per-user hypothetical events, and separates signal, decision and execution fields. No order path is called.
+- Item 6, Advanced Risk Guard — `43be736`: weekly loss, drawdown, consecutive losses and trades today are derived from broker trades/account reads; unreadable values block with named reasons. “Stop new entries only” is display-only.
+- Item 7, Portfolio Risk Map — `ce390bc`: currency exposure, correlated pairs and loss-if-every-readable-stop-hits are reported; unreadable stops remain excluded from totals and the gap scenario remains unknown without a supplied gap.
+- Item 8, Multi-account — `ce390bc`: isolation tests now exercise a `user_store` persistence adapter in addition to the in-memory reference. The UI remains off and no cross-account automation control was added.
+- Item 9, Broker-agnostic rule layer — `43be736` and `49b586b`: symbol, price and balance come from the selected rule/account; minimum lot, lot step, contract size, digits and minimum stop distance are shown with sources. Unknown broker metadata stays unknown.
+- Item 11, Incident Center — `ce390bc`: observed incidents persist per user with start time, affected scope, system action, trader action requirement and recovery field. They live in the owned user record and therefore follow account export/erasure.
+- Item 12, Automation health — `ce390bc`: health inputs now come from token expiry, rule validation, latest candle age and the real shared-store probe; unknown dependencies lower the score.
+- Item 16, Anti-overfitting — `43be736`: condition, trade and period counts are derived from the active rule, backtest/trade history and rule versions; changes after losses are flagged from stored timestamps.
+
+Still partial:
+
+- Item 3, Strategy Replay — `ce390bc`: the backend explains met/unmet/unknown conditions, hypothetical entry and stop without look-ahead, while the current web replay view still needs to call that annotation response at the cursor.
+- Item 5, Forward Testing — persistence and later-price fields are implemented, but a background real-time watcher is not present; the screen records on an explicit read/record action.
+- Item 4, Backtest — sessions, news, partial fills, rejected orders, market impact and stale-data modelling remain explicitly listed as not modelled.
+
+Local verification: focused roadmap tests pass; the full Python runner reports 265/266 files, with only the pre-existing `test_loadtest_loops.py` RSS read failure. Local web dependencies are incomplete, so web type/lint/vitest/build were judged by the green CI run above.
+
+Next: wire the replay annotation response into the cursor view, then add the remaining honest backtest assumptions only when the engine can actually model them. Do not deploy, change env vars/flags, or expose multi-account controls until a separately reviewed UI slice is ready.
