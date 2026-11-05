@@ -546,8 +546,9 @@ def note_confirmed_payment(user_id, obj, *, payment_ref=None, lifetime=False):
     """
     if not lifetime:
         return False
-    amount, currency = _explicit_charge(obj)
-    if amount != PRICE_MINOR or currency != CURRENCY:
+    # The same tax-aware comparison the licence grant used, so a buyer in a
+    # taxed place who got the plan also gets the live paid record.
+    if not _billing.explicit_offer_charge(obj, PRICE_MINOR, CURRENCY):
         return False
     uid = str(user_id or "").strip()
     if not uid:

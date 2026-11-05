@@ -88,8 +88,16 @@ def deliver(event):
 
 
 def session(**over):
-    """A paid Checkout Session, the shape the provider actually sends."""
+    """A paid Checkout Session, the shape the provider actually sends.
+
+    Every purchase is a NEW payment, so it gets its own PaymentIntent id; the
+    reversal events built afterwards read the current `PI`. (A payment that
+    was refunded is remembered by its id, so reusing one id for a later
+    purchase would be a replay, which the handler now holds.)
+    """
+    global PI
     _n[0] += 1
+    PI = f"pi_3TestPaymentIntent{_n[0]:03d}"
     obj = {"id": f"cs_test_{_n[0]}", "object": "checkout_session",
            "payment_status": "paid", "payment_intent": PI,
            "amount_total": B.APPROVED_PRICE_MINOR,

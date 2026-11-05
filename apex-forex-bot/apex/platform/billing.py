@@ -429,6 +429,11 @@ def _payment_ref(obj):
     return ""
 
 
+def _k_refunded(ref):
+    """Payment id → that it was refunded or disputed (a tombstone)."""
+    return f"{_store._ns()}:{_store._P}:billing:refunded:{ref}"
+
+
 def _k_ref(ref):
     """Payment id → the platform user it granted to."""
     return f"{_store._ns()}:{_store._P}:billing:ref:{ref}"
@@ -481,6 +486,32 @@ def _amount_matches(obj, cfg):
     return True, ""
 
 
+def explicit_offer_charge(obj, want_minor=None, want_ccy=None):
+    """True only when the object itself states an amount AND a currency and they
+    meet the approved offer, tax-aware (the offer, or the offer plus declared
+    tax). Unlike `_amount_matches`, an object that states nothing is NOT a
+    match: this is the check for writing the live paid record.
+    """
+    if not isinstance(obj, dict):
+        return False
+    want_minor = APPROVED_PRICE_MINOR if want_minor is None else want_minor
+    want_ccy = APPROVED_CURRENCY if want_ccy is None else want_ccy
+    got = None
+    for k in ("amount_total", "amount_received", "amount_paid", "amount"):
+        v = obj.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            got = int(v)
+            break
+    ccy = str(obj.get("currency") or "").strip().lower()
+    if got is None or not ccy or ccy != want_ccy:
+        return False
+    details = obj.get("total_details")
+    tax = details.get("amount_tax") if isinstance(details, dict) else None
+    tax = int(tax) if (isinstance(tax, (int, float)) and not isinstance(tax, bool)
+                       and tax > 0) else 0
+    return got == want_minor or bool(tax and got - tax == want_minor)
+
+
 def _fully_refunded(obj):
     """Whether a Charge was refunded in FULL.
 
@@ -512,7 +543,7 @@ def _livemode_ok(event):
     Only asserted in production. Outside it both modes are legitimate and
     insisting would break every staging deployment.
     """
-    if (os.getenv("APP_ENV") or "").strip().lower() != "production":
+    if (os.getenv("APP_ENV") or "").strip().lower() not in ("production", "prod"):
         return True, ""
     if event.get("livemode") is False:
         return False, "a test-mode event reached the production endpoint"
@@ -580,7 +611,12 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         # is matched through that. The PaymentIntent id is the one id all
         # four shapes share.
         try:
-            _rec = _store._read(_k_ref(ref))
+            # STRICT: a store that did not answer must not look like "no such
+            # payment". The old non-strict read returned None on an outage,
+            # the event was marked done as "no platform user", and a refund
+            # never withdrew the licence. Strict raises, the handler answers
+            # 500 and the provider retries.
+            _rec = _store._read_strict(_k_ref(ref))
             user_id = str((_rec or {}).get("userId") or "") or None
         except Exception as e:                               # noqa: BLE001
             print(f"[Billing] could not resolve payment {ref} to a user: "
@@ -595,6 +631,19 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         # used to print nothing at all, from any branch.
         print(f"[Billing] {etype} {event_id} carries no platform user "
               f"(payment={ref or 'unknown'}) — nothing granted or revoked")
+        if etype in REVOKING:
+            # Money moved back and nobody was matched to it. A person has to
+            # look; quietly marking it done would leave the licence in place.
+            try:
+                _hold_for_review(event_id, etype, None, ref,
+                                 "a refund or dispute could not be matched to "
+                                 "a platform user")
+            except Exception as e:                           # noqa: BLE001
+                print(f"[Billing] could not record the held reversal "
+                      f"({type(e).__name__})")
+                _release(event_id)
+                return 500, {"ok": False, "error": {
+                    "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
         _mark_done(event_id, "no-user")
         return 200, {"ok": True, "handled": False, "reason": "no platform user on this payment"}
 
@@ -613,6 +662,17 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                 _mark_done(event_id, "manual-review")
                 return 200, {"ok": True, "handled": False,
                              "reason": "held for manual review"}
+            if ref:
+                # A grant that arrives AFTER the refund of the same payment
+                # (an out-of-order or retried delivery) would give the licence
+                # back. Strict read: unknown is a retry, not a grant.
+                if _store._read_strict(_k_refunded(ref)):
+                    _hold_for_review(event_id, etype, user_id, ref,
+                                     "this payment was already refunded or "
+                                     "disputed")
+                    _mark_done(event_id, "refunded-before-grant")
+                    return 200, {"ok": True, "handled": False,
+                                 "reason": "this payment was already refunded"}
             cfg = product_config()
             ok_live, why_live = _livemode_ok(event)
             if not ok_live:
@@ -674,6 +734,12 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                              "reason": "a partial refund does not withdraw "
                                        "the licence"}
             _lic.revoke(user_id)
+            if ref:
+                # Remembered strictly, so a failure retries the whole reversal
+                # (revoking again is harmless).
+                _store._write_strict(_k_refunded(ref), {
+                    "userId": str(user_id), "eventId": event_id,
+                    "type": etype, "at": time.time()})
             # The paid record has to go with the licence. Revoke does not
             # stop a loop that is already running; that is a separate gap.
             from apex.platform import live_gate as _live_gate
