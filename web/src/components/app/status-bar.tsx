@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import type { AutomationState, CtraderStatus, Me } from "@/lib/api";
 import type { ApiResult } from "@/lib/api";
-import { ShimmerText } from "@/components/ui/shimmer-text";
 
 type Tone = "long" | "short" | "accent" | "neutral";
 
@@ -101,7 +100,7 @@ export function StatusBar({
           tone={selected.mode === "live" ? "short" : "long"}
           live={selected.mode === "live"}
           icon={selected.mode === "live" ? Radio : FlaskConical}
-          label={selected.mode === "live" ? "LIVE" : "DEMO"}
+          label={selected.mode === "live" ? "Live account" : "Demo account"}
           value={<span className="mono">#{selected.ctid}</span>}
         />
       ) : (
@@ -127,10 +126,10 @@ export function StatusBar({
             : running.state === "paused" ? Pause
             : Square}
           label="Automation"
-          value={marketIdle ? "MARKET CLOSED"
-            : running.state === "blocked" ? "BLOCKED"
-            : running.state === "running" ? <ShimmerText>RUNNING</ShimmerText>
-            : running.state.toUpperCase()}
+          value={marketIdle ? "Market closed"
+            : running.state === "blocked" ? "Blocked"
+            : running.state === "running" ? "Running"
+            : running.state.charAt(0).toUpperCase() + running.state.slice(1)}
           title={marketIdle
             ? (running.marketMessage ?? "The market is closed, so the loop is idle.")
             : running.blockReason ?? running.levelBlurb ?? undefined}
@@ -172,7 +171,7 @@ export function StatusBar({
           icon={running.riskGuard.state === "holding" ? ShieldAlert
             : running.riskGuard.state === "ok" ? ShieldCheck
             : idleForWeekend ? Moon : Clock}
-          value={running.riskGuard.state === "holding" ? "HOLDING"
+          value={running.riskGuard.state === "holding" ? "Holding"
             : running.riskGuard.state === "ok" ? "Active"
               : idleForWeekend ? "Market closed" : "No report yet"}
           title={running.riskGuard.state === "holding"
@@ -209,7 +208,7 @@ export function StatusBar({
           trade live, and that is a property of the product, not a setting. */}
       <span className="stat-chip" title="Live trading is not enabled in this release">
         <Mark icon={FlaskConical} />
-        <span>Demo&nbsp;only</span>
+        <span>Live trading not enabled</span>
       </span>
     </div>
   );
