@@ -206,7 +206,7 @@ export function ForwardView() {
     <Head title="Forward testing" detail="Active-rule signals are recorded separately from hypothetical execution" />
     <p className="notice" role="note">Forward testing is hypothetical and does not place orders.</p>
     {rules.loading && !rules.result ? <Spinner label="Reading active rule" /> : null}
-    <Failure result={rules.result} retry={rules.reload} />
+    {rules.result && !rules.result.ok ? <p className="muted">The active rule could not be read.</p> : null}
     {!active && rules.result?.ok ? <p className="empty">No active rule is available for this read.</p> : null}
     {active ? <section className="card">
       <p className="muted">Using {active.name || "active rule"} on {symbol}.</p>
