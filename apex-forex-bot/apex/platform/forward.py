@@ -40,9 +40,8 @@ def record_for_user(user_id: str, *, rule: dict[str, Any] | None,
     symbol = str(rule.get("symbols", [""])[0] if isinstance(rule.get("symbols"), list)
                  and rule.get("symbols") else rule.get("symbol") or "")
     timeframe = str(rule.get("timeframe") or "1h")
-    from apex.platform.backtest import _rule_signal
-    signal = _rule_signal(rule, symbol, timeframe)
-    decision = signal(bars[-1]) or {}
+    from apex.platform.backtest import decision_at_end
+    decision = decision_at_end(rule, symbol, timeframe, bars) or {}
     side = decision.get("side") if isinstance(decision, dict) else None
     close = _number(bars[-1].get("close"))
     later = _number(executable_price)
@@ -120,12 +119,9 @@ def record_bar_close(user_id: str, *, rule: dict[str, Any] | None,
                     if isinstance(row, dict))
     new_event = None
     if not duplicate:
-        from apex.platform.backtest import _rule_signal
-        signal_fn = _rule_signal(dict(rule, state="active"), symbol, timeframe)
-        decision = None
-        for candle in bars:
-            if isinstance(candle, dict):
-                decision = signal_fn(candle)
+        from apex.platform.backtest import decision_at_end
+        decision = decision_at_end(dict(rule, state="active"), symbol,
+                                   timeframe, bars)
         side = (decision or {}).get("side") if isinstance(decision, dict) else None
         signal_price = _number(bars[-1].get("close"))
         new_event = {

@@ -588,10 +588,13 @@ def min_lot(user_id, *, symbol, timeframe, risk_percent, **kw):
 
 
 def _shape(rows):
-    """Only the five fields a snapshot needs, as plain numbers.
+    """Only the fields a snapshot needs, as plain numbers.
 
     Narrowed on purpose: whatever else the connector attaches to a bar is not
-    part of this contract, and passing it through would make it one.
+    part of this contract, and passing it through would make it one. The
+    volume is part of it: the ready-made strategies read it, and the live loop
+    gets it from the same connector, so a platform read without it made every
+    preset fail with KeyError('volume') in forward tests, backtests and replay.
     """
     out = []
     for r in rows or []:
@@ -601,5 +604,10 @@ def _shape(rows):
             continue
         if r.get("time") is not None:
             bar["time"] = r["time"]
+        try:
+            if r.get("volume") is not None:
+                bar["volume"] = float(r["volume"])
+        except (TypeError, ValueError):
+            pass            # an unreadable volume is left out, not made up
         out.append(bar)
     return out

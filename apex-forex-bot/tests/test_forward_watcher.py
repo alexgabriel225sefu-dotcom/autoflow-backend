@@ -100,4 +100,34 @@ try:
 finally:
     user_store._DIR, user_store._USE_REDIS = old_dir, old_redis
 
+# Regression: broker reads dropped volume, so every preset raised KeyError.
+import random
+from apex import strategy_api
+from apex.platform import backtest, broker_read, strategy_catalog
+strategy_api.load_builtins()
+random.seed(2); _p = 4100.0; _raw = []
+for _i in range(240):
+    _o = _p; _c = _o + random.uniform(-3, 3)
+    _raw.append({"time": 1_700_000_000 + _i * 900, "open": _o, "high": max(_o, _c) + 1,
+                 "low": min(_o, _c) - 1, "close": _c, "volume": 100 + _i})
+    _p = _c
+_bars = broker_read._shape(_raw)
+check("a platform read keeps the bar volume", all("volume" in b for b in _bars))
+_bad = []
+for _d in strategy_catalog.describe():
+    try:
+        backtest.decision_at_end({"strategy": _d["id"]}, "XAUUSD", "15m", _bars)
+    except Exception as e:
+        _bad.append(f"{_d['id']}: {e}")
+check("every ready-made strategy evaluates on broker-shaped bars", not _bad, str(_bad))
+check("too little history is no signal, not an error",
+      backtest.decision_at_end({"strategy": _d["id"]}, "XAUUSD", "15m", _bars[:5]) is None)
+try:
+    backtest.decision_at_end({"strategy": _d["id"]}, "XAUUSD", "15m",
+                             [{k: v for k, v in b.items() if k != "volume"} for b in _bars])
+    check("candles without volume are refused", False)
+except ValueError as e:
+    check("candles without volume are refused", "volume" in str(e))
+
 print("ALL OK")
+

@@ -135,6 +135,26 @@ def _metrics(trades: list[dict[str, Any]], *, initial_balance: float | None) -> 
             "longVsShort": direction}
 
 
+# Bars a ready-made strategy needs before it can judge anything. Below this a
+# strategy's indicators raise on an empty window, which is "too early", not an
+# error in the strategy. The live loop works on about 240 bars.
+PRESET_WARMUP_BARS = 60
+
+
+def decision_at_end(rule: dict[str, Any], symbol: str, timeframe: str,
+                    bars: list[dict[str, Any]]):
+    """The rule's or preset's decision on the LAST bar of `bars`, evaluated once
+    over the whole series (not once per prefix). Returns {"side", ...} or None.
+    Raises on a real fault; a series shorter than the warm-up returns None.
+    """
+    fn = _rule_signal(rule, symbol, timeframe)
+    decision = None
+    for candle in bars:
+        if isinstance(candle, dict):
+            decision = fn(candle)
+    return decision
+
+
 def _rule_signal(rule: dict[str, Any], symbol: str, timeframe: str):
     """Build a pure evaluator-backed signal function for a RuleDoc or preset.
 
@@ -153,7 +173,13 @@ def _rule_signal(rule: dict[str, Any], symbol: str, timeframe: str):
         history: list[dict[str, Any]] = []
         def preset_signal(candle):
             from apex.strategy_api import Market
+            if "volume" not in candle:
+                raise ValueError(
+                    "these candles carry no volume, which the ready-made "
+                    "strategies read; use candles that include it")
             history.append(candle)
+            if len(history) < PRESET_WARMUP_BARS:
+                return None     # not enough history yet: no signal, not a guess
             market = Market(history, symbol=symbol, timeframe=timeframe,
                             price=candle.get("close"))
             action = (strategy.signal(market) or {}).get("action")
