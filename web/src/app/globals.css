@@ -2515,3 +2515,10 @@ body {
   .ticker-d { animation: none; }
 }
 .ovb-tile.spot:hover, .trade .strat.spot:hover { transform: none; }
+
+/* Touch responsiveness: taps register at once, with no double-tap-zoom wait and
+   no grey tap flash. Invisible; changes no styling. */
+a, button, [role="button"], summary, label, select, input, .chip, .btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
