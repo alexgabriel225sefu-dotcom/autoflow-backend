@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { BrandLockup } from "@/components/brand/logo";
+import { StackedBrandLockup } from "@/components/brand/logo";
 import styles from "./perspective-tunnel-hero.module.css";
 
 type TunnelCardData = {
@@ -120,7 +120,7 @@ export function PerspectiveTunnelHero() {
             className={styles.mark}
             style={reducedMotion ? undefined : { opacity: markOpacity, scale: markScale }}
           >
-            <BrandLockup className={styles.markLogo} size={42} />
+            <StackedBrandLockup className={styles.markLogo} width={300} />
             <small>One control panel for your trading rules</small>
           </motion.div>
           <div className={styles.tunnel}>

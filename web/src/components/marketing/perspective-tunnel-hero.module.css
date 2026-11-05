@@ -73,12 +73,11 @@
   pointer-events: none;
 }
 
-.markLogo { display: block; }
-.markLogo :global(.brand-lockup-image) {
+.markLogo {
+  display: block;
   width: min(22rem, 42vw);
   max-width: 100%;
-  filter: none;
-  animation: none;
+  height: auto;
 }
 
 .mark small {

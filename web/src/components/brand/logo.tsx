@@ -87,3 +87,33 @@ export function BrandLockup({
     </span>
   );
 }
+
+/**
+ * The stacked lockup used by the public hero: the A4 mark sits above the
+ * original wordmark. Both pieces are cropped from the same approved asset so
+ * the lettering cannot drift from the brand artwork.
+ */
+export function StackedBrandLockup({
+  width = 300, className,
+}: { width?: number; className?: string }) {
+  const height = Math.round(width * 330 / 766);
+  return (
+    <svg
+      className={className}
+      width={width}
+      height={height}
+      viewBox="0 0 766 330"
+      role="img"
+      aria-label="Apex4Traders"
+      focusable="false"
+    >
+      <title>Apex4Traders</title>
+      <svg x="294" y="0" width="178" height="152" viewBox="0 0 178 152">
+        <image href="/apex4traders-logo-light.png" width="1116" height="152" />
+      </svg>
+      <svg x="0" y="178" width="766" height="152" viewBox="355 0 766 152">
+        <image href="/apex4traders-logo-light.png" width="1116" height="152" />
+      </svg>
+    </svg>
+  );
+}
