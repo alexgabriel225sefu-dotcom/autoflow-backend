@@ -691,8 +691,8 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 # Roadmap, Codex items
 
 Current branch: `claude/apex4traders-platform-v1`  
-Current commit: `d7574a2`  
-CI: green on all four Tests jobs (python, node, web, config-drift) for `d7574a2`.
+Current commit: `0d8c7f2`  
+CI: green on all four Tests jobs (python, node, web, config-drift) for `0d8c7f2`.
 
 Done in this slice:
 
@@ -705,6 +705,7 @@ Done in this slice:
 - Item 11, Incident Center — `ce390bc`: observed incidents persist per user with start time, affected scope, system action, trader action requirement and recovery field. They live in the owned user record and therefore follow account export/erasure.
 - Item 12, Automation health — `ce390bc`: health inputs now come from token expiry, rule validation, latest candle age and the real shared-store probe; unknown dependencies lower the score.
 - Item 16, Anti-overfitting — `43be736`: condition, trade and period counts are derived from the active rule, backtest/trade history and rule versions; changes after losses are flagged from stored timestamps.
+- Landing hero direction — `0d8c7f2`: the public landing page now opens with a 21st-inspired perspective tunnel. The Apex4Traders mark stays central while cTrader, MetaTrader 4 and MetaTrader 5 cards enter on scroll; the existing integration labels remain the source of truth for availability.
 
 Still partial:
 
