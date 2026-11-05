@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { BrandMark } from "@/components/brand/logo";
+import { BrandLockup } from "@/components/brand/logo";
 import styles from "./perspective-tunnel-hero.module.css";
 
 type TunnelCardData = {
@@ -91,8 +91,8 @@ export function PerspectiveTunnelHero() {
     target: sectionRef,
     offset: ["start start", "end end"],
   });
-  const markOpacity = useTransform(scrollYProgress, [0, 0.32, 0.72, 1], [1, 1, 0.4, 0.18]);
-  const markScale = useTransform(scrollYProgress, [0, 0.72], [1, 0.8]);
+  const markOpacity = useTransform(scrollYProgress, [0, 0.18, 0.38, 0.54], [1, 1, 0.35, 0]);
+  const markScale = useTransform(scrollYProgress, [0, 0.54], [1, 0.78]);
 
   return (
     <section ref={sectionRef} className={styles.section} id="product">
@@ -120,8 +120,7 @@ export function PerspectiveTunnelHero() {
             className={styles.mark}
             style={reducedMotion ? undefined : { opacity: markOpacity, scale: markScale }}
           >
-            <BrandMark size={74} title="Apex4Traders" />
-            <span>Apex4Traders</span>
+            <BrandLockup className={styles.markLogo} size={42} />
             <small>One control panel for your trading rules</small>
           </motion.div>
           <div className={styles.tunnel}>

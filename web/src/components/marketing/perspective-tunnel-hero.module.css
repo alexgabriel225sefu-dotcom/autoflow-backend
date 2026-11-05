@@ -73,10 +73,12 @@
   pointer-events: none;
 }
 
-.mark span {
-  font-size: clamp(1.2rem, 2.2vw, 1.7rem);
-  font-weight: 650;
-  letter-spacing: -.04em;
+.markLogo { display: block; }
+.markLogo :global(.brand-lockup-image) {
+  width: min(22rem, 42vw);
+  max-width: 100%;
+  filter: none;
+  animation: none;
 }
 
 .mark small {
@@ -131,8 +133,8 @@
 .logo {
   display: block;
   width: auto;
-  max-width: 10rem;
-  height: 2.5rem;
+  max-width: 12rem;
+  height: 3.1rem;
   object-fit: contain;
   object-position: left center;
 }
@@ -177,7 +179,7 @@
   .grid { inset: 8% -50% 0; }
   .mark { transform: scale(.86); }
   .card { padding: 1rem; min-height: 9.5rem; }
-  .logo { height: 2.1rem; max-width: 8rem; }
+  .logo { height: 2.35rem; max-width: 9rem; }
   .scrollHint { font-size: .66rem; }
 }
 
