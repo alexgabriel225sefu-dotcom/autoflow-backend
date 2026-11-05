@@ -326,7 +326,7 @@ def _k_review(event_id):
     return f"{_store._ns()}:{_store._P}:billing:review:{event_id}"
 
 
-def record_link_intent(user_id, email, *, now=None):
+def record_link_intent(user_id, email, *, now=None, acknowledged_at=None):
     """Note that THIS server sent `user_id` to the Payment Link.
 
     Called by `stripe_checkout.start_checkout` from an authenticated session.
@@ -338,9 +338,11 @@ def record_link_intent(user_id, email, *, now=None):
     uid = str(user_id or "").strip()
     if not uid:
         raise ValueError("a user id is required")
-    _store._write_strict(_k_intent(uid), {
-        "userId": uid, "email": str(email or "").strip().lower(),
-        "at": time.time() if now is None else now})
+    rec = {"userId": uid, "email": str(email or "").strip().lower(),
+           "at": time.time() if now is None else now}
+    if acknowledged_at is not None:
+        rec["acknowledgedTrialAt"] = acknowledged_at
+    _store._write_strict(_k_intent(uid), rec)
 
 
 def _session_email(obj):

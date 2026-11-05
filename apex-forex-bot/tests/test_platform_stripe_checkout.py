@@ -75,8 +75,11 @@ class _Principal:
 A._id.verify_token = lambda tok, **kw: _Principal()
 
 
-def call(body=None):
-    raw = json.dumps(body if body is not None else {}).encode()
+def call(body=None, acknowledged=True):
+    body = dict(body or {})
+    if acknowledged:
+        body.setdefault("acknowledgedTrial", True)
+    raw = json.dumps(body).encode()
     return A.handle("POST", "/api/v1/billing/checkout",
                     {"Authorization": "Bearer x"}, raw)
 
@@ -193,6 +196,19 @@ check("client_reference_id is the signed-in user",
       form.get("client_reference_id") == USER, str(form))
 check("metadata carries the same user",
       form.get(f"metadata[{B.USER_META_KEY}]") == USER, str(form))
+check("the session records when the buyer confirmed they had tried the demo",
+      form.get("metadata[acknowledgedTrialAt]", "").isdigit(), str(form))
+# The confirmation is required, and only a literal true counts.
+SC._transport = transport
+try:
+    _st, _out = call({"method": "session"}, acknowledged=False)
+    check("no confirmation is refused with its own code",
+          _st == 400 and _out["error"]["code"] == "ACKNOWLEDGEMENT_REQUIRED", str(_out)[:160])
+    for _bad in ("yes", 1, "true", None):
+        _st, _ = call({"method": "session", "acknowledgedTrial": _bad}, acknowledged=False)
+        check(f"{_bad!r} is not a confirmation", _st == 400, str(_st))
+finally:
+    SC._transport = None
 check("success and cancel come back to /license",
       form.get("success_url") == "https://app.example.test/license?checkout=success"
       and form.get("cancel_url") == "https://app.example.test/license?checkout=cancel",

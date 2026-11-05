@@ -46,9 +46,10 @@ describe("BuyButton", () => {
       },
     } satisfies ApiResult<{ url: string; kind: string }>);
     render(<BuyButton open navigate={navigate} />);
+    fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: /buy founder access/i }));
     await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
-    expect(api).toHaveBeenCalledWith("billing/checkout", { method: "POST", body: {} });
+    expect(api).toHaveBeenCalledWith("billing/checkout", { method: "POST", body: { acknowledgedTrial: true } });
     expect(navigate.mock.calls[0][0]).toContain("client_reference_id=user-1");
   });
 
@@ -60,8 +61,25 @@ describe("BuyButton", () => {
       data: { url: "https://evil.test/checkout", kind: "payment_link" },
     });
     render(<BuyButton open navigate={navigate} />);
+    fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: /buy founder access/i }));
     await waitFor(() => expect(screen.getByText(/not a Stripe page/i)).toBeTruthy());
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("cannot be bought until the buyer confirms they tried the demo", () => {
+    api.mockReset();
+    render(<BuyButton open navigate={vi.fn()} />);
+    const buy = screen.getByRole("button", { name: /buy founder access/i });
+    expect(buy).toHaveProperty("disabled", true);
+    fireEvent.click(buy);
+    expect(api).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(buy).toHaveProperty("disabled", false);
+  });
+
+  it("keeps the buyer's statutory rights in the wording", () => {
+    render(<BuyButton open navigate={vi.fn()} />);
+    expect(screen.getByText(/refund right the law gives me stays/i)).toBeTruthy();
   });
 });

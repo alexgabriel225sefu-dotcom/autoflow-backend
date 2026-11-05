@@ -24,6 +24,7 @@ the ``client_reference_id`` from the URL.
 import json
 import os
 import urllib.error
+import time
 import urllib.parse
 import urllib.request
 
@@ -201,7 +202,8 @@ def _session_url(raw):
     return url
 
 
-def create_checkout_session(user_id, *, email=None, transport=None):
+def create_checkout_session(user_id, *, email=None, transport=None,
+                            acknowledged_at=None):
     """Create one Checkout Session. Raises CheckoutError. Does not grant."""
     if not session_configured():
         raise CheckoutError(
@@ -220,6 +222,9 @@ def create_checkout_session(user_id, *, email=None, transport=None):
         "line_items[0][quantity]": "1",
         f"metadata[{billing.USER_META_KEY}]": uid,
     }
+    if acknowledged_at is not None:
+        # When the buyer confirmed they had tried the demo, kept on the payment.
+        form["metadata[acknowledgedTrialAt]"] = str(int(acknowledged_at))
     mail = str(email or "").strip()
     if mail:
         form["customer_email"] = mail
@@ -250,10 +255,21 @@ def start_checkout(principal, body=None, *, transport=None):
     if method not in ("", "auto", "payment_link", "session"):
         raise CheckoutError(
             "BAD_METHOD", "method must be payment_link or session", status=400)
+    # A buyer confirms they have tried the free demo and understand what they are
+    # paying for. Required only once a purchase could really start, so a
+    # deployment that is not on sale still answers "Not on sale yet".
+    acknowledged = isinstance(body, dict) and body.get("acknowledgedTrial") is True
+    if purchase_ready() and not acknowledged:
+        raise CheckoutError(
+            "ACKNOWLEDGEMENT_REQUIRED",
+            "confirm that you have tried the free demo and understand the "
+            "purchase before paying", status=400)
+    ack_at = time.time() if acknowledged else None
     uid = str(getattr(principal, "user_id", "") or "")
     email = getattr(principal, "email", None)
     if method == "session" or (method in ("", "auto") and not payment_link_base()):
-        url = create_checkout_session(uid, email=email, transport=transport)
+        url = create_checkout_session(uid, email=email, transport=transport,
+                                      acknowledged_at=ack_at)
         return {"url": url, "kind": "checkout_session"}
     url = payment_link_for(uid, email)
     if not url:
@@ -264,7 +280,7 @@ def start_checkout(principal, body=None, *, transport=None):
     # the e-mail Stripe collects matches theirs (billing._trusted_user_of).
     from apex.platform import billing as billing
     try:
-        billing.record_link_intent(uid, email)
+        billing.record_link_intent(uid, email, acknowledged_at=ack_at)
     except Exception as exc:                                 # noqa: BLE001
         raise CheckoutError(
             "CHECKOUT_FAILED",
