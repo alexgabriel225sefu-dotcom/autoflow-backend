@@ -31,7 +31,9 @@ function ReadStatus({ data, empty }: { data: CandlesRead | null; empty: string }
 function useCandleRead(symbol: string, timeframe: string, days: number) {
   const accounts = useRead<CtraderStatus>("accounts", 60_000);
   const ctid = accounts.result?.ok ? String(accounts.result.data.selected?.ctid ?? "") : "";
-  const to = useMemo(() => Math.floor(Date.now() / 1000) - days * 86400, [days]);
+  // Captured once when the screen opens; the window is measured back from then.
+  const [openedAt] = useState(() => Math.floor(Date.now() / 1000));
+  const to = openedAt - days * 86400;
   const path = ctid && symbol && timeframe
     ? `accounts/${encodeURIComponent(ctid)}/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=500&to=${to}`
     : null;
@@ -51,21 +53,28 @@ export function ReplayView() {
   const [symbol, setSymbol] = useState("EUR_USD");
   const [timeframe, setTimeframe] = useState("1h");
   const [days, setDays] = useState(7);
-  const [cursor, setCursor] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  // The position and the play state belong to one set of bars. When the bars
+  // change, both fall back to the end and to paused without an effect.
+  const [pos, setPos] = useState<{ n: number; len: number } | null>(null);
+  const [playingFor, setPlayingFor] = useState<number | null>(null);
   const { accounts, candles } = useCandleRead(symbol, timeframe, days);
   const data = candles.result?.ok ? candles.result.data : null;
   const bars = data?.status === "ok" ? (data.candles ?? []) : [];
+  const last = Math.max(0, bars.length - 1);
+  const cursor = pos && pos.len === bars.length ? pos.n : last;
+  const playing = playingFor === bars.length && bars.length > 0 && cursor < last;
+  const setCursor = (fn: (n: number) => number) => setPos({ n: fn(cursor), len: bars.length });
+  const setPlaying = (fn: (v: boolean) => boolean) => setPlayingFor(fn(playing) ? bars.length : null);
   const visible = bars.slice(0, Math.max(0, cursor + 1));
-  useEffect(() => { setCursor(Math.max(0, bars.length - 1)); setPlaying(false); }, [bars.length]);
   useEffect(() => {
     if (!playing) return;
-    const id = window.setInterval(() => setCursor((n) => {
-      if (n >= bars.length - 1) { setPlaying(false); return n; }
-      return n + 1;
+    const len = bars.length;
+    const id = window.setInterval(() => setPos((p) => {
+      const at = p && p.len === len ? p.n : last;
+      return { n: Math.min(at + 1, last), len };
     }), 650);
     return () => window.clearInterval(id);
-  }, [playing, bars.length]);
+  }, [playing, bars.length, last]);
   return <main>
     <Head title="Strategy replay" detail="Read-only candle-by-candle inspection" reload={candles.reload} loading={candles.loading} />
     <p className="notice" role="note">{DISCLAIMER}</p>
@@ -85,8 +94,8 @@ export function ReplayView() {
         <div className="card-head"><h2>Replay controls</h2><span className="muted">Bar {cursor + 1} of {bars.length}</span></div>
         <div style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
           <button className="btn btn-ghost" onClick={() => setPlaying((v) => !v)}>{playing ? <Pause className="ico" aria-hidden /> : <Play className="ico" aria-hidden />}{playing ? "Pause" : "Play"}</button>
-          <button className="btn btn-ghost" onClick={() => setCursor((n) => Math.min(n + 1, bars.length - 1))} disabled={cursor >= bars.length - 1}><SkipForward className="ico" aria-hidden /> Step</button>
-          <button className="btn btn-ghost" onClick={() => { setCursor(0); setPlaying(false); }}>Restart</button>
+          <button className="btn btn-ghost" onClick={() => setCursor((n) => Math.min(n + 1, last))} disabled={cursor >= last}><SkipForward className="ico" aria-hidden /> Step</button>
+          <button className="btn btn-ghost" onClick={() => { setCursor(() => 0); setPlaying(() => false); }}>Restart</button>
         </div>
         <p className="muted" role="status">{visible.length ? "Data available at this replay point." : "No candle is available at this replay point."}</p>
       </section>
@@ -103,18 +112,20 @@ type RuleLayerResult = { units: number; unitLabel: string; riskAmount: number };
 
 export function BacktestView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
-  const list = rules.result?.ok ? rules.result.data.rules : [];
-  const [ruleId, setRuleId] = useState("");
-  const [symbol, setSymbol] = useState("EUR_USD");
-  const [timeframe, setTimeframe] = useState("1h");
+  const list = useMemo(() => (rules.result?.ok ? rules.result.data.rules : []), [rules.result]);
+  const [chosenRule, setRuleId] = useState("");
+  const [symbolPick, setSymbol] = useState<string | null>(null);
+  const [timeframePick, setTimeframe] = useState<string | null>(null);
+  // Defaults come from the chosen rule; typing in a field overrides them.
+  const ruleId = chosenRule || list[0]?.ruleDocId || "";
+  const selected = list.find((r) => r.ruleDocId === ruleId);
+  const symbol = symbolPick ?? selected?.symbols?.[0] ?? "EUR_USD";
+  const timeframe = timeframePick ?? selected?.timeframe ?? "1h";
   const [spread, setSpread] = useState("1.5");
   const [slippage, setSlippage] = useState("0.5");
   const [commission, setCommission] = useState("0");
   const [result, setResult] = useState<ApiResult<BacktestResult> | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (!ruleId && list[0]) setRuleId(list[0].ruleDocId); }, [ruleId, list]);
-  const selected = list.find((r) => r.ruleDocId === ruleId);
-  useEffect(() => { if (selected?.symbols?.[0]) setSymbol(selected.symbols[0]); if (selected?.timeframe) setTimeframe(selected.timeframe); }, [selected]);
   const { accounts, candles } = useCandleRead(symbol, timeframe, 30);
   const rule = useRead<RuleRead>(ruleId ? `rules/${encodeURIComponent(ruleId)}` : null, 0);
   const candleData = candles.result?.ok ? candles.result.data : null;
@@ -135,7 +146,7 @@ export function BacktestView() {
     {rules.result?.ok && !list.length ? <p className="empty">No rule is available to backtest.</p> : null}
     {list.length ? <section className="card">
       <div className="grid grid-3">
-        <label>Rule<select className="input" value={ruleId} onChange={(e) => setRuleId(e.target.value)}>{list.map((r) => <option key={r.ruleDocId} value={r.ruleDocId}>{r.name}</option>)}</select></label>
+        <label>Rule<select className="input" value={ruleId} onChange={(e) => { setRuleId(e.target.value); setSymbol(null); setTimeframe(null); }}>{list.map((r) => <option key={r.ruleDocId} value={r.ruleDocId}>{r.name}</option>)}</select></label>
         <label>Spread (pips)<input className="input" inputMode="decimal" value={spread} onChange={(e) => setSpread(e.target.value)} /></label>
         <label>Slippage (pips)<input className="input" inputMode="decimal" value={slippage} onChange={(e) => setSlippage(e.target.value)} /></label>
       </div>
@@ -194,5 +205,5 @@ export function RiskGuardView() {
 export function RuleLayerView() {
   const [symbol, setSymbol] = useState("EUR_USD"); const [price, setPrice] = useState("1.1"); const [balance, setBalance] = useState(""); const [risk, setRisk] = useState("0.01"); const [stop, setStop] = useState(""); const [result, setResult] = useState<ApiResult<{ units: number; unitLabel: string; riskAmount: number }> | null>(null); const [busy, setBusy] = useState(false);
   async function calculate() { setBusy(true); const r = await api<RuleLayerResult>("rule-layer", { method: "POST", body: { symbol, price: Number(price), balance: balance === "" ? undefined : Number(balance), riskFraction: Number(risk), stopPips: stop === "" ? undefined : Number(stop) } }); setResult(r); setBusy(false); }
-  return <main><Head title="Broker-agnostic rule layer" detail="One read-only risk-unit calculation across instruments" /><section className="card"><div className="grid grid-3"><label>Symbol<input className="input" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} /></label><label>Price<input className="input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></label><label>Balance<input className="input" inputMode="decimal" placeholder="unknown" value={balance} onChange={(e) => setBalance(e.target.value)} /></label></div><div className="grid grid-3"><label>Risk fraction<input className="input" inputMode="decimal" value={risk} onChange={(e) => setRisk(e.target.value)} /></label><label>Stop distance (pips)<input className="input" inputMode="decimal" placeholder="unknown" value={stop} onChange={(e) => setStop(e.target.value)} /></label></div><button className="btn" onClick={() => void calculate()} disabled={busy}>{busy ? "Calculating…" : "Calculate"}</button></section><Failure result={result} />{busy ? <Spinner label="Calculating risk units" /> : result?.ok ? <section className="card"><div className="grid grid-3"><div className="stat"><span className="stat-k">Units</span><strong className="stat-v">{result.data.units}</strong></div><div className="stat"><span className="stat-k">Unit label</span><strong className="stat-v">{result.data.unitLabel}</strong></div><div className="stat"><span className="stat-k">Risk amount</span><strong className="stat-v">{result.data.riskAmount}</strong></div></div><p className="muted">This calculation is informational and does not submit an order.</p></section> : <p className="empty">No risk-unit calculation has been run yet.</p>}</main>;
+  return <main><Head title="Broker-agnostic rule layer" detail="One read-only risk-unit calculation across instruments" /><section className="card"><div className="grid grid-3"><label>Symbol<input className="input" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} /></label><label>Price<input className="input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></label><label>Balance<input className="input" inputMode="decimal" placeholder="unknown" value={balance} onChange={(e) => setBalance(e.target.value)} /></label></div><div className="grid grid-3"><label>Risk fraction<input className="input" inputMode="decimal" value={risk} onChange={(e) => setRisk(e.target.value)} /></label><label>Stop distance (pips)<input className="input" inputMode="decimal" placeholder="unknown" value={stop} onChange={(e) => setStop(e.target.value)} /></label></div><button className="btn" onClick={() => void calculate()} disabled={busy}>{busy ? "Calculating…" : "Calculate"}</button></section><Failure result={result} />{busy ? <Spinner label="Calculating risk units" /> : result?.ok ? <section className="card"><div className="grid grid-3"><div className="stat"><span className="stat-k">Units</span><strong className="stat-v">{result.data.units}</strong></div><div className="stat"><span className="stat-k">Unit label</span><strong className="stat-v">{result.data.unitLabel}</strong></div><div className="stat"><span className="stat-k">Risk amount</span><strong className="stat-v">{result.data.riskAmount}</strong></div></div><p className="muted">This calculation is informational and does not submit an order.</p></section> : <p className="empty">Nothing has been calculated yet.</p>}</main>;
 }

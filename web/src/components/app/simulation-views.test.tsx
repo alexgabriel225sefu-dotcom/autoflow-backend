@@ -44,7 +44,7 @@ describe("simulation screens", () => {
     await waitFor(() => expect(screen.getByText(/trade count is unknown/)).toBeTruthy());
     const body = calls[0]?.init as { body?: { tradeCount?: unknown } };
     expect(body.body?.tradeCount).toBeUndefined();
-    expect(screen.getByPlaceholderText("unknown")).toBeTruthy();
+    expect(screen.getAllByPlaceholderText("unknown").length).toBeGreaterThan(0);
   });
 
   it("does not present an unreadable risk guard as ready", async () => {
