@@ -213,7 +213,7 @@ export function ForwardView() {
       {accounts.loading && !accounts.result ? <Spinner label="Checking connected accounts" /> : null}
       {accounts.result && !accounts.result.ok ? <p className="muted">The connected account could not be read.</p> : null}
       {candles.loading && !candles.result ? <Spinner label="Reading the latest candle" /> : null}
-      <Failure result={candles.result} retry={candles.reload} />
+      {candles.result && !candles.result.ok ? <p className="muted">The latest candle could not be read.</p> : null}
       <ReadStatus data={candles.result?.ok ? candles.result.data : null} empty="The latest candle could not be read." />
       <button className="btn" onClick={() => void record()} disabled={busy || !latest.length}>
         {busy ? "Recording…" : "Record signal"}
