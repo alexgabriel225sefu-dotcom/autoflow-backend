@@ -17,15 +17,23 @@ import Landing from "./page";
 describe("landing page", () => {
   it("renders, with sign-up and log-in entry points", () => {
     render(<Landing />);
-    expect(screen.getAllByRole("link", { name: /get started|sign up|create/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /try free for 14 days|sign up|create/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /log in/i }).length).toBeGreaterThan(0);
   });
 
   it("states cTrader as available and the MetaTrader platforms as coming soon", () => {
     render(<Landing />);
-    // Each status appears in the hero cards and again in the partner row.
-    expect(screen.getAllByText("Available now")).toHaveLength(2);
-    expect(screen.getAllByText("Coming soon")).toHaveLength(4);
+    // Platform statuses are kept in the discreet Platforms section, below the hero.
+    expect(screen.getAllByText("Available now")).toHaveLength(1);
+    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+  });
+
+  it("shows a product preview, the three steps and plain-language FAQ", () => {
+    render(<Landing />);
+    expect(screen.getByLabelText("Product preview")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /a simple path from idea to demo/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /questions, answered plainly/i })).toBeInTheDocument();
+    expect(screen.queryByText("Read-only preview")).not.toBeInTheDocument();
   });
 
   it("says demo-only and makes no profit claim", () => {

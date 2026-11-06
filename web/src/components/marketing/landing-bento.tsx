@@ -68,17 +68,17 @@ function PreviewPanel() {
         <span className={styles.previewDot} />
         <span className={styles.previewDot} />
         <span className={styles.previewDot} />
-        <span className={styles.previewTitle}>rule / EURUSD / 1h</span>
+          <span className={styles.previewTitle}>EURUSD · 1h</span>
       </div>
       <div className={styles.previewBody}>
         <div>
-          <span className={styles.previewLabel}>Decision</span>
-          <strong>Read-only preview</strong>
+          <span className={styles.previewLabel}>Next step</span>
+          <strong>Review on demo</strong>
         </div>
         <div className={styles.previewRows}>
-          <span>Price vs moving average</span><b>Unknown</b>
-          <span>Momentum condition</span><b>Unknown</b>
-          <span>Risk guard</span><b>Not evaluated</b>
+          <span>Price vs moving average</span><b>Ready</b>
+          <span>Momentum condition</span><b>Ready</b>
+          <span>Risk guard</span><b>Review account</b>
         </div>
       </div>
     </div>
@@ -104,12 +104,12 @@ export function LandingBento() {
     <section className="mkt-section" aria-labelledby="control-surface-title">
       <div className={styles.heading}>
         <div>
-          <span className="mkt-eyebrow">Control surface</span>
-          <h2 id="control-surface-title">The important state stays in the room.</h2>
+          <span className="mkt-eyebrow">A clearer workspace</span>
+          <h2 id="control-surface-title">See the rule before you run it.</h2>
         </div>
         <p>
-          A product preview built around the parts a trader needs to verify:
-          account, rule, risk and decision.
+          Keep the account, rule and risk settings together so the next step
+          is easy to understand.
         </p>
       </div>
 
@@ -117,12 +117,12 @@ export function LandingBento() {
         <article className={`${styles.card} ${styles.feature}`}>
           <div className={styles.cardTopline}>
             <span>Product preview</span>
-            <span className={styles.liveMark}>Read only</span>
+            <span className={styles.liveMark}>Demo preview</span>
           </div>
           <h3>From market context to a clear next step.</h3>
           <p>
-            The landing page now shows the product as a workspace: inspect the
-            rule, understand its state and keep the decision separate from execution.
+            Review the market context, the conditions and the account settings
+            in one calm workspace before you decide what to do next.
           </p>
           <PreviewPanel />
         </article>

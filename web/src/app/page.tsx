@@ -12,50 +12,72 @@ import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { MagnifierCard } from "@/components/marketing/magnifier-card";
-import { RuleTerminal } from "@/components/marketing/rule-terminal";
 import { PerspectiveTunnelHero } from "@/components/marketing/perspective-tunnel-hero";
-import { LandingBento } from "@/components/marketing/landing-bento";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
-  title: "Apex4Traders: a control panel for your own trading rules",
+  title: "Apex4Traders: clear rules for your trading",
   description:
-    "Connect your cTrader account, write your own rules from named " +
-    "conditions, see what they would decide before anything runs, and keep " +
-    "risk limits and a stop button in one place. Demo accounts first.",
+    "Connect your cTrader account, choose a rule and test it on demo before you automate it.",
 };
 
-/**
- * The landing page.
- *
- * No win rate, return, testimonial or account-balance claim appears here.
- * The product is positioned as a control panel: the trader connects the
- * broker, writes the rules, tests on demo, and keeps risk controls visible.
- */
+const steps = [
+  ["01", "Connect your account", "Choose your cTrader account and see its state before you continue."],
+  ["02", "Choose a rule", "Start with a clear method or build conditions that match your plan."],
+  ["03", "Test on demo", "Review what the rule would do with demo data before automation."],
+] as const;
+
+const faqs = [
+  ["Do I need a broker account?", "Yes. You connect your own cTrader account so the platform can read the market and account context you choose."],
+  ["Does it place real orders?", "This release is for demo accounts. A preview and a test do not place an order."],
+  ["What happens if data is unavailable?", "The screen says when a read is unavailable and names the next step. It does not fill in a guess."],
+  ["Can I write my own rules?", "Yes. You can combine named conditions and read the rule back before testing it."],
+] as const;
+
 export default function Landing() {
   return (
     <main className="mkt">
       <div className="mkt-wrap">
         <nav className="mkt-nav">
           <BrandLockup size={24} />
-          {/* Product, features and resources are sections of this page.
-              Pricing is a route: /pricing used to 404, including for anyone
-              sent here by an advertisement or a shared link. */}
           <span className="mkt-nav-mid">
             <a href="#product">Product</a>
-            <a href="#features">Features</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#platforms">Platforms</a>
             <a href="/pricing">Pricing</a>
-            <a href="#resources">Resources</a>
+            <a href="#faq">FAQ</a>
           </span>
           <span className="mkt-nav-links">
             <a className="mkt-navlink" href="/login">Log in</a>
-            <a className="mkt-btn" href="/signup">Get started</a>
+            <a className="mkt-btn" href="/signup">Try free for 14 days</a>
           </span>
         </nav>
 
         <PerspectiveTunnelHero />
 
-        <section className="mkt-partners" id="partners" aria-label="Broker integrations">
+        <section id="how-it-works" className="mkt-section mkt-flow" aria-labelledby="how-title">
+          <div>
+            <span className="mkt-eyebrow">How it works</span>
+            <h2 id="how-title">A simple path from idea to demo.</h2>
+            <p>Each step shows you what is connected, what the rule checks and what happens next.</p>
+          </div>
+          <div className="mkt-flow-steps">
+            {steps.map(([number, title, body]) => (
+              <div className="mkt-flow-step" key={number}>
+                <span>{number}</span>
+                <strong>{title}</strong>
+                <p>{body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="platforms" className="mkt-partners" aria-labelledby="platforms-title">
+          <div className="mkt-section-heading">
+            <span className="mkt-eyebrow">Platforms</span>
+            <h2 id="platforms-title">Connect the platform you use.</h2>
+            <p>cTrader is available today. MetaTrader connections are on the roadmap.</p>
+          </div>
           <SpotlightGrid className="mkt-partner-grid">
             <div className="mkt-partner mkt-partner-live" data-spot>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -74,152 +96,80 @@ export default function Landing() {
               <span className="mkt-partner-status">Coming soon</span>
             </div>
           </SpotlightGrid>
-          <p className="mkt-partner-note">
-            No install path promised yet for MetaTrader. No signals, no profit
-            guarantees. Automation runs on demo accounts in this release.
-          </p>
         </section>
-
-        <LandingBento />
 
         <section id="features" className="mkt-section">
-          <h2>What it actually does</h2>
-          <p>
-            Six things, all of them checkable by using it. None of them is a
-            prediction.
-          </p>
-
+          <span className="mkt-eyebrow">What you can check</span>
+          <h2>Everything important stays visible.</h2>
+          <p>Use the same workspace to connect, review a rule and keep your boundaries in view.</p>
           <div className="mkt-lens-grid">
-            <MagnifierCard
-              icon={<Link2 size={14} aria-hidden />}
-              title="Connect your own account"
-              rows={[["You authorise", "cTrader", "Demo first"], ["Disconnect any time", "No broker password"], ["Token stays on the server", "Your own account"]]}
-            >
-              You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password, and the access token never reaches your browser.
+            <MagnifierCard icon={<Link2 size={14} aria-hidden />} title="Connect your own account" rows={[["You authorise", "cTrader", "Demo first"], ["Disconnect any time", "No broker password"], ["Token stays on the server", "Your own account"]]}>
+              You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password.
             </MagnifierCard>
-            <MagnifierCard
-              icon={<ListChecks size={14} aria-hidden />}
-              title="Write rules in named conditions"
-              rows={[["Moving averages", "RSI", "MACD"], ["ATR", "Bollinger Bands", "Stochastic"], ["Sessions", "Weekdays", "Spread", "Position limits"]]}
-            >
-              Moving averages, RSI, MACD, ATR, Bollinger Bands, Stochastic, sessions, weekdays, spread and position limits.
+            <MagnifierCard icon={<ListChecks size={14} aria-hidden />} title="Build named conditions" rows={[["Moving averages", "RSI", "MACD"], ["ATR", "Bollinger Bands", "Stochastic"], ["Sessions", "Weekdays", "Spread"]]}>
+              Combine familiar market conditions and read the rule back in plain language before you test it.
             </MagnifierCard>
-            <MagnifierCard
-              icon={<Eye size={14} aria-hidden />}
-              title="Preview before it runs"
-              rows={[["Condition passed", "Condition failed"], ["Rule would decide", "Nothing is placed"], ["Real candles", "Preview only"]]}
-            >
-              Read which conditions passed, which failed, and what the rule would decide. Nothing is placed by a preview.
+            <MagnifierCard icon={<Eye size={14} aria-hidden />} title="Review before it runs" rows={[["Condition passed", "Condition failed"], ["Rule decision", "Nothing placed"], ["Real candles", "Demo preview"]]}>
+              See which conditions passed, which failed and what the rule would decide. A preview does not place an order.
             </MagnifierCard>
-            <MagnifierCard
-              icon={<GaugeCircle size={14} aria-hidden />}
-              title="Risk limits you set"
-              rows={[["Risk per trade", "Stop distance"], ["Target", "Open position cap"], ["Enforced on the server", "Daily stop"]]}
-            >
-              Risk per trade, stop distance, target, and a cap on open positions are enforced on the server.
+            <MagnifierCard icon={<GaugeCircle size={14} aria-hidden />} title="Set your boundaries" rows={[["Risk per trade", "Stop distance"], ["Target", "Open position cap"], ["Server checks", "Daily stop"]]}>
+              Risk per trade, stop distance, target and open-position limits are shown beside the rule.
             </MagnifierCard>
-            <MagnifierCard
-              icon={<PlayCircle size={14} aria-hidden />}
-              title="Start, pause, stop"
-              rows={[["Start", "Pause", "Stop"], ["You press Start", "Recorded in the journal"], ["Unknown when unsure", "Never guessed"]]}
-            >
-              Automation runs only while you have started it. The panel says unknown rather than guessing when it cannot tell.
+            <MagnifierCard icon={<PlayCircle size={14} aria-hidden />} title="Start, pause or stop" rows={[["Start", "Pause", "Stop"], ["You press Start", "Journal records it"], ["Unavailable", "Shown clearly"]]}>
+              The panel shows the current state and says when a read is unavailable instead of guessing.
             </MagnifierCard>
-            <MagnifierCard
-              icon={<ShieldCheck size={14} aria-hidden />}
-              title="A journal of every decision"
-              rows={[["Acted", "Did not act"], ["Reason recorded", "Condition that stopped it"], ["Every evaluation", "Readable later"]]}
-            >
-              Each evaluation is recorded with the reason it acted or did not. When nothing happens, the journal tells you which condition stopped it.
+            <MagnifierCard icon={<ShieldCheck size={14} aria-hidden />} title="Keep a decision journal" rows={[["Acted", "Did not act"], ["Reason recorded", "Condition named"], ["Every evaluation", "Readable later"]]}>
+              Each evaluation records what the rule saw, decided and left unchanged.
             </MagnifierCard>
           </div>
         </section>
 
-        <section id="resources" className="mkt-section mkt-flow">
-          <div>
-            <span className="mkt-eyebrow">Launch flow</span>
-            <h2>From licence to controlled automation.</h2>
+        <section className="mkt-section" aria-labelledby="audience-title">
+          <span className="mkt-eyebrow">Who it is for</span>
+          <h2 id="audience-title">A calmer starting point for two kinds of trader.</h2>
+          <div className="mkt-audience-grid">
+            <article className="mkt-audience-card"><h3>Starting out</h3><p>Learn what each setting means, test a simple rule on demo and build confidence in the process.</p></article>
+            <article className="mkt-audience-card"><h3>Already trading</h3><p>Turn an existing plan into named conditions, review the edge cases and keep account context nearby.</p></article>
           </div>
-          <div className="mkt-flow-steps">
-            {[
-              ["01", "Get your licence", "One licence unlocks the platform for your account."],
-              ["02", "Connect cTrader", "Approve access in cTrader; the page shows which account is selected before any action."],
-              ["03", "Choose market, method, risk", "Named conditions and visible risk controls."],
-              ["04", "Preview decision", "Read the decision before starting automation."],
-              ["05", "Start, pause, stop", "Controls are explicit and recorded in the journal."],
-            ].map(([n, title, body]) => (
-              <div className="mkt-flow-step" key={n}>
-                <span>{n}</span>
-                <strong>{title}</strong>
-                <p>{body}</p>
-              </div>
+        </section>
+
+        <section id="faq" className="mkt-section mkt-faq" aria-labelledby="faq-title">
+          <span className="mkt-eyebrow">Questions</span>
+          <h2 id="faq-title">Questions, answered plainly.</h2>
+          <div className="mkt-faq-list">
+            {faqs.map(([question, answer]) => (
+              <details key={question}>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
             ))}
           </div>
         </section>
 
-        <section className="mkt-section">
-          <h2>A rule reads back to you</h2>
-          <p>
-            The builder writes a plain-language summary of whatever you
-            configured, so you can check it before it ever runs.
-          </p>
-          <RuleTerminal
-            rule={
-              "Buy or sell EURUSD on 1h when Price vs MA(ema, 50, above) AND " +
-              "RSI(14, above, 55); risk 1.0% per trade; stop 1.5\u00d7 ATR; " +
-              "target 2.0R; at most 1 open position."
-            }
-            reply={[
-              "Market: EURUSD, 1h",
-              "Entry: Price vs MA(ema, 50, above) AND RSI(14, above, 55)",
-              "Risk: 1.0% per trade; stop 1.5\u00d7 ATR; target 2.0R",
-              "Limit: at most 1 open position",
-              "Preview only. Nothing is placed.",
-            ]}
-          />
-          <p className="mkt-plain" style={{ marginTop: "1rem" }}>
-            An example of the summary the builder produces from your own
-            configuration. It is not a recommendation, and it is not a rule we
-            supply.
-          </p>
-        </section>
-
-        <section id="pricing" className="mkt-section">
-          <PricingSection />
-        </section>
+        <section id="pricing" className="mkt-section"><PricingSection /></section>
 
         <section className="mkt-section">
-          <h2>What this is not</h2>
+          <h2>Built for rules, not predictions.</h2>
           <p className="mkt-plain" style={{ marginTop: ".9rem" }}>
-            Apex4Traders is <strong>software that executes rules you
-            configure</strong>. It is not financial advice, it does not manage
-            money for you, it does not supply signals, and it makes no claim
-            about returns. We do not take custody of your funds: orders are
-            placed through a broker account that you connect and can disconnect
-            at any time.
+            Apex4Traders is software that executes rules you configure. It is
+            not financial advice, does not manage money for you and does not
+            supply signals. We do not take custody of your funds.
           </p>
           <div className="mkt-risk">
             <strong style={{ color: "var(--mkt-text)" }}>Risk warning.</strong>{" "}
-            Trading carries risk, including the loss of your capital. Automated
-            execution does not reduce that risk. It carries out your
-            instructions faster and without hesitating. You are responsible for
-            the rules you run and for the outcomes they produce.
+            Leveraged trading carries a high risk of loss. Past results do not
+            guarantee future results. You are responsible for the rules you run.
           </div>
           <div className="mkt-risk">
-            <strong style={{ color: "var(--mkt-text)" }}>
-              Live trading is not available in this release.
-            </strong>{" "}
-            Apex4Traders connects to demo accounts only right now. {PLAN_NOTICE}
+            <strong style={{ color: "var(--mkt-text)" }}>Demo accounts first.</strong>{" "}
+            Live trading is not available in this release. {PLAN_NOTICE}
           </div>
         </section>
 
         <footer className="mkt-foot">
           <span>© Apex4Traders</span>
-          <span>
-            <a href="/terms">Terms</a> · <a href="/refunds">Refunds</a> ·{" "}
-            <a href="/tax">Tax</a> · <a href="/privacy">Privacy</a> ·{" "}
-            <a href="/login">Sign in</a>
-          </span>
+          <span>Company details — to be added · Contact — to be added</span>
+          <span><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/login">Sign in</a></span>
         </footer>
       </div>
     </main>
