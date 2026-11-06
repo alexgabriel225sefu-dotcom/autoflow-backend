@@ -691,8 +691,8 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 # Roadmap, Codex items
 
 Current branch: `claude/apex4traders-platform-v1`  
-Current commit: `85b1c42`  
-CI: green on all four Tests jobs (python, node, web, config-drift) for `85b1c42`.
+Current commit: `a4bb3db`  
+CI: green on all four Tests jobs (python, node, web, config-drift) for `a4bb3db`.
 
 Done in this slice:
 
@@ -706,6 +706,7 @@ Done in this slice:
 - Item 12, Automation health — `ce390bc`: health inputs now come from token expiry, rule validation, latest candle age and the real shared-store probe; unknown dependencies lower the score.
 - Item 16, Anti-overfitting — `43be736`: condition, trade and period counts are derived from the active rule, backtest/trade history and rule versions; changes after losses are flagged from stored timestamps.
 - Landing hero direction — `85b1c42`: the public landing page now opens with a 21st-inspired perspective tunnel. The exact approved Apex4Traders artwork is cropped into a vertical A4-over-wordmark lockup, while cTrader, MetaTrader 4 and MetaTrader 5 cards enter on scroll; broker logos are enlarged and the central lockup fades before the cards settle.
+- Landing product surface — `a4bb3db`: added a responsive 21st-inspired bento section with hover treatment for account context, rule readability, risk guard, preview, journal and controls. The preview is explicitly read-only and keeps unavailable values as `Unknown` or `Not evaluated`.
 
 Still partial:
 
