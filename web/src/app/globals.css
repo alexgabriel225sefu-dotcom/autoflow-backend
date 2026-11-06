@@ -2553,3 +2553,19 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
 .mkt-feature-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; height: 2.2rem; margin-bottom: 1rem; border: 1px solid var(--mkt-line); border-radius: 10px; color: var(--a4t-link); }
 .mkt-feature h3 { margin: 0 0 .45rem; font-size: 1.02rem; font-weight: 600; letter-spacing: -.01em; color: var(--mkt-text); }
 .mkt-feature p { margin: 0; color: var(--mkt-muted); font-size: .92rem; line-height: 1.6; }
+
+/* Landing on a phone: the same content and look as on desktop, in less
+   scrolling. Cards are denser, the platforms sit in a grid, sections are tighter. */
+@media (max-width: 640px) {
+  .mkt-section { padding: 2rem 0; }
+  .mkt-feature-grid { gap: .7rem; margin-top: 1.4rem; }
+  .mkt-feature { display: grid; grid-template-columns: auto 1fr; column-gap: .8rem; row-gap: .3rem; padding: 1rem; border-radius: 14px; }
+  .mkt-feature-icon { grid-row: 1 / span 2; margin: 0; width: 2rem; height: 2rem; align-self: start; }
+  .mkt-feature h3 { margin: 0; font-size: .98rem; }
+  .mkt-feature p { font-size: .87rem; line-height: 1.5; }
+  .mkt-partner-grid { grid-template-columns: 1fr 1fr; }
+  .mkt-partner-live { grid-column: 1 / -1; }
+  .mkt-partner { padding: 1rem; gap: .6rem; }
+  .mkt-partner + .mkt-partner { border-top: 1px solid var(--mkt-line); }
+  .mkt-partner-soon + .mkt-partner-soon { border-left: 1px solid var(--mkt-line); }
+}
