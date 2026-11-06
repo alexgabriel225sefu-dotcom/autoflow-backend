@@ -690,8 +690,8 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 
 # Roadmap, Codex items
 
-Current branch: `claude/apex4traders-platform-v1`  
-Current commit: `a4bb3db`  
+Current branch: `claude/apex4traders-platform-v1`
+Current commit: `a4bb3db`
 CI: green on all four Tests jobs (python, node, web, config-drift) for `a4bb3db`.
 
 Done in this slice:
