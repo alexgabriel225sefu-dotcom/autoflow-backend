@@ -11,7 +11,6 @@ import {
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
-import { MagnifierCard } from "@/components/marketing/magnifier-card";
 import { PerspectiveTunnelHero } from "@/components/marketing/perspective-tunnel-hero";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
@@ -25,6 +24,15 @@ const steps = [
   ["01", "Connect your account", "Choose your cTrader account and see its state before you continue."],
   ["02", "Choose a rule", "Start with a clear method or build conditions that match your plan."],
   ["03", "Test on demo", "Review what the rule would do with demo data before automation."],
+] as const;
+
+const features = [
+  { icon: Link2, title: "Connect your own account", body: "You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password." },
+  { icon: ListChecks, title: "Build rules from conditions", body: "Combine moving averages, RSI, MACD, sessions and more, then read the rule back in plain language before you test it." },
+  { icon: Eye, title: "Review before it runs", body: "See which conditions passed, which failed and what the rule would decide. A preview never places an order." },
+  { icon: GaugeCircle, title: "Set your limits", body: "Risk per trade, stop distance, target and the number of open positions stay next to the rule you are testing." },
+  { icon: PlayCircle, title: "Start, pause or stop", body: "One panel shows the current state. If something cannot be read, it says so instead of guessing." },
+  { icon: ShieldCheck, title: "Keep a decision journal", body: "Every evaluation records what the rule saw, what it decided and why, so you can review it later." },
 ] as const;
 
 const faqs = [
@@ -100,28 +108,17 @@ export default function Landing() {
         </section>
 
         <section id="features" className="mkt-section">
-          <span className="mkt-eyebrow">What you can check</span>
-          <h2>Everything important stays visible.</h2>
-          <p>Use the same workspace to connect, review a rule and keep your boundaries in view.</p>
-          <div className="mkt-lens-grid">
-            <MagnifierCard icon={<Link2 size={14} aria-hidden />} title="Connect your own account" rows={[["You authorise", "cTrader", "Demo first"], ["Disconnect any time", "No broker password"], ["Token stays on the server", "Your own account"]]}>
-              You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password.
-            </MagnifierCard>
-            <MagnifierCard icon={<ListChecks size={14} aria-hidden />} title="Build named conditions" rows={[["Moving averages", "RSI", "MACD"], ["ATR", "Bollinger Bands", "Stochastic"], ["Sessions", "Weekdays", "Spread"]]}>
-              Combine familiar market conditions and read the rule back in plain language before you test it.
-            </MagnifierCard>
-            <MagnifierCard icon={<Eye size={14} aria-hidden />} title="Review before it runs" rows={[["Condition passed", "Condition failed"], ["Rule decision", "Nothing placed"], ["Real candles", "Demo preview"]]}>
-              See which conditions passed, which failed and what the rule would decide. A preview does not place an order.
-            </MagnifierCard>
-            <MagnifierCard icon={<GaugeCircle size={14} aria-hidden />} title="Set your boundaries" rows={[["Risk per trade", "Stop distance"], ["Target", "Open position cap"], ["Server checks", "Daily stop"]]}>
-              Risk per trade, stop distance, target and open-position limits are shown beside the rule.
-            </MagnifierCard>
-            <MagnifierCard icon={<PlayCircle size={14} aria-hidden />} title="Start, pause or stop" rows={[["Start", "Pause", "Stop"], ["You press Start", "Journal records it"], ["Unavailable", "Shown clearly"]]}>
-              The panel shows the current state and says when a read is unavailable instead of guessing.
-            </MagnifierCard>
-            <MagnifierCard icon={<ShieldCheck size={14} aria-hidden />} title="Keep a decision journal" rows={[["Acted", "Did not act"], ["Reason recorded", "Condition named"], ["Every evaluation", "Readable later"]]}>
-              Each evaluation records what the rule saw, decided and left unchanged.
-            </MagnifierCard>
+          <span className="mkt-eyebrow">Features</span>
+          <h2>Everything you need to test a rule.</h2>
+          <p>One workspace to connect your account, review the rule and keep your limits in view.</p>
+          <div className="mkt-feature-grid">
+            {features.map(({ icon: Icon, title, body }) => (
+              <article className="mkt-feature" key={title}>
+                <span className="mkt-feature-icon"><Icon size={18} aria-hidden /></span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -169,7 +166,6 @@ export default function Landing() {
 
         <footer className="mkt-foot">
           <span>© Apex4Traders</span>
-          <span>Company details — to be added · Contact — to be added</span>
           <span><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/login">Sign in</a></span>
         </footer>
       </div>
