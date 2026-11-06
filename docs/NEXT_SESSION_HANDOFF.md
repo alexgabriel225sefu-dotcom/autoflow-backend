@@ -691,8 +691,8 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 # Roadmap, Codex items
 
 Current branch: `claude/apex4traders-platform-v1`
-Current commit: `c7ebc51`
-CI: green on all four Tests jobs (python, node, web, config-drift) for `c7ebc51`.
+Current commit: `0c98b61`
+CI: green on all four Tests jobs (python, node, web, config-drift) for `0c98b61` (run `42252237159`).
 
 Done in this slice:
 
@@ -705,9 +705,8 @@ Done in this slice:
 - Item 11, Incident Center — `ce390bc`: observed incidents persist per user with start time, affected scope, system action, trader action requirement and recovery field. They live in the owned user record and therefore follow account export/erasure.
 - Item 12, Automation health — `ce390bc`: health inputs now come from token expiry, rule validation, latest candle age and the real shared-store probe; unknown dependencies lower the score.
 - Item 16, Anti-overfitting — `43be736`: condition, trade and period counts are derived from the active rule, backtest/trade history and rule versions; changes after losses are flagged from stored timestamps.
-- Landing hero direction — `85b1c42`: the public landing page now opens with a 21st-inspired perspective tunnel. The exact approved Apex4Traders artwork is cropped into a vertical A4-over-wordmark lockup, while cTrader, MetaTrader 4 and MetaTrader 5 cards enter on scroll; broker logos are enlarged and the central lockup fades before the cards settle.
-- Landing product surface — `a4bb3db`: added a responsive 21st-inspired bento section with hover treatment for account context, rule readability, risk guard, preview, journal and controls. The preview is explicitly read-only and keeps unavailable values as `Unknown` or `Not evaluated`.
-- Landing hero mobile pass — `c7ebc51`: removed the perspective/tunnel scroll animation and replaced it with a static platform stage. cTrader, MetaTrader 4 and MetaTrader 5 are visible immediately; mobile uses stacked cards and full-width CTAs for a clearer 390px layout.
+- Landing product-first pass — `9482cde`, `5d734ab`: replaced the hero platform-logo stage with a static product preview showing rule conditions, account state and demo review; moved cTrader/MetaTrader cards into a discreet Platforms section; added the three-step How it works flow, audience cards, FAQ accordion, risk warning and contact placeholders; added 390px nav/layout guards and removed internal development copy from the public surface.
+- Platform copy pass — `4485473`, `75e6673`, `771c43d`, `9992176`, `0c98b61`: clarified strategy selection, rule setup, dashboard and risk/stop-loss explanations, kept accessible labels and legacy contract phrases covered by tests, and cleared web lint blockers without touching live paths.
 
 Still partial:
 
@@ -717,6 +716,6 @@ Still partial:
 
 Item 3/5 UI design pass — `ba587b1` and `fd4cfc0`: shared simulation read states, replay evidence, and result cards are split into files below 500 lines and retain the Trades/Health card hierarchy at mobile widths. No multi-account UI was added.
 
-Local verification: focused roadmap tests pass; the full Python runner reports 265/266 files, with only the pre-existing `test_loadtest_loops.py` RSS read failure. Local web dependencies are incomplete, so web type/lint/vitest/build were judged by the green CI run above for `fd4cfc0`.
+Local verification: `test_ctrader_browser_walkthrough_contract.py` passes locally. The Windows Python runner cannot complete because the local process encoding/fixture subprocess is not compatible; the required web commands were attempted but local `node_modules` is incomplete (`tsc`, `eslint`, `vitest`, `next build` unavailable). CI is authoritative and green for all four jobs on `0c98b61`.
 
 Next: run an operational cTrader demo smoke check for the read-only watcher and add remaining honest backtest assumptions only when the engine can actually model them. Do not deploy, change env vars/flags, or expose multi-account controls.
