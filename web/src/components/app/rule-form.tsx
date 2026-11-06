@@ -427,7 +427,7 @@ export function RuleForm({
     <>
       <Section
         title="Risk and size"
-        note="How large a position this rule opens. Risk percent derives the size from the stop distance, so the stop and the size are one decision."
+        note="Risk per trade is the share of your account you are willing to put behind one setup. The stop distance and position size are calculated together."
       >
         <div className="field"><span>Sizing</span>
           <Seg value={d.sizingMode} options={["risk_percent", "fixed_volume"]}
@@ -438,7 +438,7 @@ export function RuleForm({
             <label className="field"><span>Risk per trade <span className="hint">% of balance</span></span>
               <input type="number" step="0.1" min="0.1" max="100" value={d.riskPercent}
                      onChange={(e) => set("riskPercent", e.target.value)} />
-              <span className="field-note">A live account is capped at 1% per trade; a rule above that will not start there.</span></label>
+              <span className="field-note">This setting is checked against the account before a demo run can start.</span></label>
           ) : (
             <label className="field"><span>Volume <span className="hint">lots</span></span>
               <input type="number" step="0.01" min="0.01" value={d.fixedVolume}
@@ -452,7 +452,7 @@ export function RuleForm({
     <>
       <Section
         title="Stop loss"
-        note="Not optional. Without a stop the position has no defined worst case and the size cannot be derived from risk."
+        note="A stop loss is the price level where the setup is closed if it moves against you. It defines the planned loss used for sizing."
       >
         <div className="field"><span>Stop</span>
           <Seg value={d.slMode} options={["atr", "pips"]} onChange={(v) => set("slMode", v)} />

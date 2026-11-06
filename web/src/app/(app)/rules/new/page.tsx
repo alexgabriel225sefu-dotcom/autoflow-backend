@@ -196,13 +196,13 @@ export default function NewRulePage() {
 
         <aside className="inspector">
           <section className="card">
-            <div className="card-head"><h2>What happens next</h2></div>
+            <div className="card-head"><h2>Your next steps</h2></div>
             <ol className="muted" style={{ fontSize: ".82rem", lineHeight: 1.7, paddingLeft: "1.1rem" }}>
-              <li>Save this as a draft.</li>
-              <li>Validate it — the server checks every field again.</li>
-              <li>Preview it against real bars from your account.</li>
-              <li>Activate it. The version is then frozen.</li>
-              <li>Start automation on a demo account.</li>
+              <li>Save the rule as a draft.</li>
+              <li>Check the settings and account context.</li>
+              <li>Preview it against demo market data.</li>
+              <li>Activate the version when it looks right.</li>
+              <li>Start on a demo account.</li>
             </ol>
           </section>
 

@@ -115,7 +115,7 @@ export default function PickStrategyPage() {
     return (
       <main>
         <h1>Choose a strategy</h1>
-        <Spinner label="Reading the engine's strategy registry" />
+        <Spinner label="Loading available strategies" />
       </main>
     );
   }
@@ -130,9 +130,8 @@ export default function PickStrategyPage() {
         <div>
           <h1>Choose a strategy</h1>
           <span className="sub">
-            One of the engine&apos;s own strategies decides the entries and
-            exits. You still set the instrument, the risk, the stop and the
-            limits — and nothing trades until you activate it.
+            Pick a ready-made method for your demo setup. You choose the
+            market and guardrails; the method explains what it checks.
           </span>
         </div>
         <span className="pill pill-demo">Demo only</span>
@@ -142,10 +141,8 @@ export default function PickStrategyPage() {
           is one click away, not in a different part of the product. */}
       <div className="notice notice-accent">
         <SlidersHorizontal className="ico" aria-hidden />{" "}
-        Want your own entry and exit conditions instead?{" "}
-        <Link href="/rules/new">Build a rule</Link>. A rule and a strategy are
-        the same document with one field different, so switching later is a
-        new version, not a new rule.
+        Want to use your own conditions instead?{" "}
+        <Link href="/rules/new">Build a rule</Link> and review it on demo.
       </div>
 
       {strategies.length === 0 ? (
@@ -188,6 +185,12 @@ export default function PickStrategyPage() {
                     <p style={{ fontSize: ".85rem", lineHeight: 1.6 }}>
                       {s.what}
                     </p>
+                    <div className="btn-row" style={{ alignItems: "center", gap: ".5rem" }}>
+                      <span className="pill pill-muted">Risk: review before running</span>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setChosen(s.id); setFailed(""); }}>
+                        Try on demo
+                      </button>
+                    </div>
 
                     {/* What it refuses is shown WITHOUT expanding, because it
                         is the half a client has to read and a detail nobody
@@ -195,7 +198,7 @@ export default function PickStrategyPage() {
                     <p className="muted"
                        style={{ fontSize: ".8rem", lineHeight: 1.6 }}>
                       <strong style={{ color: "var(--a4t-text)" }}>
-                        Will not trade:
+                        It skips:
                       </strong>{" "}
                       {s.refuses}
                     </p>
@@ -206,7 +209,7 @@ export default function PickStrategyPage() {
                       aria-expanded={isOpen}
                       onClick={() => setOpen(isOpen ? "" : s.id)}
                     >
-                      {isOpen ? "Hide how it decides" : "How it decides"}
+                      {isOpen ? "Hide how it works" : "How it works"}
                     </button>
 
                     {isOpen ? (
@@ -232,9 +235,9 @@ export default function PickStrategyPage() {
               absent: this strategy decides those. */}
           <section className="card">
             <div className="card-head">
-              <h2>Your terms</h2>
+              <h2>Set your guardrails</h2>
               <span className="dim" style={{ fontSize: ".75rem" }}>
-                The strategy decides when to trade. These decide how much.
+                The method decides when to act. These settings decide how much.
               </span>
             </div>
             {/* TWO FIELDS IN "Basics" DO NOTHING FOR A PRESET, AND SAYING SO
@@ -246,10 +249,8 @@ export default function PickStrategyPage() {
                 own polling cycle. Both are still recorded on the document,
                 and the rule page lists what the engine will not act on. */}
             <p className="muted" style={{ fontSize: ".78rem", lineHeight: 1.6 }}>
-              Sides and Evaluate are recorded on the rule and are not acted on
-              when a strategy decides: it picks its own direction, and the loop
-              checks on its polling cycle rather than at the instant a candle
-              closes. Everything else below reaches the engine.
+              These settings stay with the rule so you can review the risk,
+              stop distance and limits before a demo run.
             </p>
             {SHARED_STEPS.map((s) => (
               <div key={s.id} style={{ marginBottom: "var(--sp-3)" }}>
@@ -293,7 +294,7 @@ export default function PickStrategyPage() {
 
         <aside className="inspector">
           <section className="card">
-            <div className="card-head"><h2>What happens next</h2></div>
+            <div className="card-head"><h2>Your next steps</h2></div>
             <ol className="muted" style={{ fontSize: ".82rem", lineHeight: 1.7,
                                            paddingLeft: "1.1rem" }}>
               <li>Save this as a draft.</li>

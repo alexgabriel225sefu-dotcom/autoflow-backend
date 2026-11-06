@@ -188,7 +188,7 @@ export default function Dashboard() {
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>
-          <span className="sub">Last synced {whenSynced(lastSync)}</span>
+          <span className="sub">Your account, rule and current automation state in one place. Last synced {whenSynced(lastSync)}</span>
         </div>
         <span className="btn-row">
         <DashboardCustomise hidden={hidden} />

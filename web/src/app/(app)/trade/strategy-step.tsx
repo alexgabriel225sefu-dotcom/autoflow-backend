@@ -46,7 +46,7 @@ export function StrategyStep({
         </span>
       </div>
       {lib.result && !lib.result.ok ? <ErrorNotice error={lib.result as ApiError} onRetry={lib.reload} /> : null}
-      {!lib.result ? <Spinner label="Reading the engine's strategies" /> : null}
+      {!lib.result ? <Spinner label="Loading available strategies" /> : null}
       {lib.result && lib.result.ok && strategies.length === 0 ? (
         <div className="notice notice-warn" role="alert">
           The strategy list could not be read, so there is nothing to choose from.
@@ -59,11 +59,11 @@ export function StrategyStep({
         </button>
         <button type="button" role="tab" className="chip" aria-selected={tab === "mine"}
                 onClick={() => setTab("mine")}>
-          My methods{myMethods.length ? ` · ${myMethods.length}` : ""}
+          My rules{myMethods.length ? ` · ${myMethods.length}` : ""}
         </button>
       </div>
       {tab === "mine" ? (
-        <div role="tabpanel" aria-label="My methods">
+          <div role="tabpanel" aria-label="My rules">
           <p className="muted trade-note">
             A method of your own is a set of entry and exit conditions you built.
             The instrument, risk and account come from this setup.
@@ -72,7 +72,7 @@ export function StrategyStep({
             ? <ErrorNotice error={myRules.result as ApiError} onRetry={myRules.reload} /> : null}
           {myMethods.length === 0 && myRules.result && myRules.result.ok
             ? <p>You have not built a method yet.</p> : null}
-          <div className="strat-grid" role="radiogroup" aria-label="My methods">
+          <div className="strat-grid" role="radiogroup" aria-label="My rules">
             {myMethods.map((r) => (
               <div key={r.ruleDocId} className="strat spot" data-chosen={custom?.ruleDocId === r.ruleDocId}
                    onPointerMove={onSpot} onPointerDown={onSpot}>
@@ -92,13 +92,13 @@ export function StrategyStep({
                     Built on {r.symbols?.join(", ") || "no instrument"} · {r.timeframe}
                   </span>
                 </button>
-                <Link className="btn btn-ghost btn-sm" href={`/rules/${r.ruleDocId}`}>Open the method</Link>
+                <Link className="btn btn-ghost btn-sm" href={`/rules/${r.ruleDocId}`}>Review this rule</Link>
               </div>
             ))}
           </div>
           {methodErr ? <ErrorNotice error={methodErr} /> : null}
           <p className="trade-note">
-            <Link className="btn btn-ghost btn-sm" href="/rules/new">Build a new method</Link>
+            <Link className="btn btn-ghost btn-sm" href="/rules/new">Build a new rule</Link>
           </p>
         </div>
       ) : null}
@@ -127,20 +127,20 @@ export function StrategyStep({
                   {choice.strategy?.id === s.id ? <Check className="ico" aria-hidden /> : null}
                 </span>
                 <span className="strat-what">{s.what}</span>
-                <span className="strat-refuses"><strong>Will not trade:</strong> {s.refuses}</span>
+                <span className="strat-refuses"><strong>It skips:</strong> {s.refuses}</span>
                 <span className="strat-refuses">
                   <strong>Timeframe:</strong> {s.timeframeNote || "Runs on the timeframe you chose."}
                 </span>
                 <span className="strat-refuses">
                   {s.backtest
-                    ? `Stored backtest: ${s.backtest.trades} closed trades. ${s.backtest.note}`
-                    : "No stored backtest."}
+                    ? `Demo history: ${s.backtest.trades} closed trades. ${s.backtest.note}`
+                    : "No demo history is available yet."}
                 </span>
               </button>
               <button type="button" className="btn btn-ghost btn-sm"
                       aria-expanded={open === s.id}
                       onClick={() => setOpen(open === s.id ? "" : s.id)}>
-                {open === s.id ? "Hide how it decides" : "How it decides"}
+                {open === s.id ? "Hide how it works" : "How it works"}
               </button>
               {open === s.id ? <p className="strat-decides">{s.decides}</p> : null}
             </div>
@@ -154,7 +154,7 @@ export function StrategyStep({
         </div>
       ))}
       <p className="muted trade-note">
-        No stored backtest is published for these strategies.
+        No demo history is available for these strategies.
         {" "}{catalogue?.disclaimer ?? "Past performance does not guarantee future results."}
       </p>
     </section>
