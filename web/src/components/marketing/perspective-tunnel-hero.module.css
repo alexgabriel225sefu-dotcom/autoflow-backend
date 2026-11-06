@@ -31,3 +31,7 @@
 @media (max-width: 900px) { .layout { grid-template-columns: 1fr; min-height: auto; gap: 2.5rem; padding-block: 3rem 4rem; } .copy { max-width: 42rem; } }
 @media (max-width: 560px) { .section { padding-inline: 1rem; } .layout { gap: 2rem; padding-block: 2.3rem 3rem; } .copy h1 { font-size: clamp(2.75rem, 15vw, 4.2rem); } .copy .mkt-lede { font-size: .98rem; } .stage { padding: .85rem; border-radius: 18px; } .previewGrid { grid-template-columns: 1fr; } .statePanel { grid-template-columns: 1fr 1fr; align-items: center; } .statePanel > .panelEyebrow, .statePanel > strong { grid-column: 1 / -1; } .brandMark { margin-top: .35rem; } }
 @media (max-width: 420px) { .copy h1 { font-size: 2.8rem; } :global(.mkt-hero-cta) { flex-direction: column; align-items: stretch; } :global(.mkt-hero-cta .mkt-btn) { justify-content: center; width: 100%; } .conditionList div { grid-template-columns: auto 1fr; } .conditionList b { grid-column: 2; } }
+
+.controls { display: flex; gap: .4rem; margin-top: .9rem; }
+.controls span { flex: 1; padding: .45rem .3rem; border: 1px solid var(--mkt-line); border-radius: 999px; color: var(--mkt-text); font-size: .68rem; font-weight: 600; text-align: center; }
+.controls .stop { color: var(--a4t-short); border-color: color-mix(in srgb, var(--a4t-short) 40%, var(--mkt-line)); }

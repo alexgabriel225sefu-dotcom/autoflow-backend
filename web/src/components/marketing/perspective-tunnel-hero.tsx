@@ -1,5 +1,4 @@
 import { ArrowRight, Check, Circle } from "lucide-react";
-import { StackedBrandLockup } from "@/components/brand/logo";
 import styles from "./perspective-tunnel-hero.module.css";
 
 export function PerspectiveTunnelHero() {
@@ -28,7 +27,7 @@ export function PerspectiveTunnelHero() {
             <span className={styles.windowDots} aria-hidden>
               <i /> <i /> <i />
             </span>
-            <span>Rule review</span>
+            <span>Example rule</span>
             <span className={styles.stageStatus}>Demo workspace</span>
           </div>
           <div className={styles.previewGrid}>
@@ -51,12 +50,15 @@ export function PerspectiveTunnelHero() {
               <span className={styles.panelEyebrow}>Account state</span>
               <strong>Demo account</strong>
               <div className={styles.stateRow}><span>Connection</span><b>Connected</b></div>
-              <div className={styles.stateRow}><span>Risk settings</span><b>Set by you</b></div>
+              <div className={styles.stateRow}><span>Risk per trade</span><b>1%</b></div>
+              <div className={styles.stateRow}><span>Daily stop</span><b>On</b></div>
               <div className={styles.stateRow}><span>Next step</span><b>Test on demo</b></div>
-              <StackedBrandLockup className={styles.brandMark} width={126} />
+              <div className={styles.controls} aria-label="Controls shown in the platform">
+                <span>Start</span><span>Pause</span><span className={styles.stop}>Stop</span>
+              </div>
             </aside>
           </div>
-          <p className={styles.stageNote}>A clear place to review the rule before it runs.</p>
+          <p className={styles.stageNote}>Example screen with demo data.</p>
         </div>
       </div>
     </section>
