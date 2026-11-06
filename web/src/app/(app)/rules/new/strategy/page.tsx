@@ -206,6 +206,7 @@ export default function PickStrategyPage() {
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
+                      aria-label={isOpen ? "Hide how it decides" : "How it decides"}
                       aria-expanded={isOpen}
                       onClick={() => setOpen(isOpen ? "" : s.id)}
                     >
