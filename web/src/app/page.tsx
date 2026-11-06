@@ -96,6 +96,7 @@ export default function Landing() {
               <span className="mkt-partner-status">Coming soon</span>
             </div>
           </SpotlightGrid>
+          <p className="mkt-partner-note">No install path promised yet for MetaTrader.</p>
         </section>
 
         <section id="features" className="mkt-section">

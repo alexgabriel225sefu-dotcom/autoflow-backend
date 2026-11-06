@@ -23,7 +23,7 @@ export function PerspectiveTunnelHero() {
           </div>
         </div>
 
-        <div className={styles.stage} aria-label="Product preview">
+        <div className={styles.stage} role="region" aria-label="Product preview">
           <div className={styles.stageHeader}>
             <span className={styles.windowDots} aria-hidden>
               <i /> <i /> <i />

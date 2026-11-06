@@ -30,7 +30,7 @@ describe("landing page", () => {
 
   it("shows a product preview, the three steps and plain-language FAQ", () => {
     render(<Landing />);
-    expect(screen.getByLabelText("Product preview")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Product preview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /a simple path from idea to demo/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /questions, answered plainly/i })).toBeInTheDocument();
     expect(screen.queryByText("Read-only preview")).not.toBeInTheDocument();
