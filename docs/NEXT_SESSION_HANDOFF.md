@@ -691,8 +691,8 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 # Roadmap, Codex items
 
 Current branch: `claude/apex4traders-platform-v1`
-Current commit: `3f683e4`
-CI: green on all four Tests jobs (python, node, web, config-drift) for `3f683e4`.
+Current commit: `c7ebc51`
+CI: green on all four Tests jobs (python, node, web, config-drift) for `c7ebc51`.
 
 Done in this slice:
 
@@ -707,6 +707,7 @@ Done in this slice:
 - Item 16, Anti-overfitting — `43be736`: condition, trade and period counts are derived from the active rule, backtest/trade history and rule versions; changes after losses are flagged from stored timestamps.
 - Landing hero direction — `85b1c42`: the public landing page now opens with a 21st-inspired perspective tunnel. The exact approved Apex4Traders artwork is cropped into a vertical A4-over-wordmark lockup, while cTrader, MetaTrader 4 and MetaTrader 5 cards enter on scroll; broker logos are enlarged and the central lockup fades before the cards settle.
 - Landing product surface — `a4bb3db`: added a responsive 21st-inspired bento section with hover treatment for account context, rule readability, risk guard, preview, journal and controls. The preview is explicitly read-only and keeps unavailable values as `Unknown` or `Not evaluated`.
+- Landing hero mobile pass — `c7ebc51`: removed the perspective/tunnel scroll animation and replaced it with a static platform stage. cTrader, MetaTrader 4 and MetaTrader 5 are visible immediately; mobile uses stacked cards and full-width CTAs for a clearer 390px layout.
 
 Still partial:
 
