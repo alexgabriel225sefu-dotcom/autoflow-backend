@@ -32,7 +32,8 @@ function seed(cmd: string) {
       const line = buf.toString().trim().split("\n").pop() ?? "";
       if (line.includes('"ok"')) {
         proc.stdout.off("data", onLine);
-        JSON.parse(line).ok ? resolve() : reject(new Error(line));
+        if (JSON.parse(line).ok) resolve();
+        else reject(new Error(line));
       }
     };
     proc.stdout.on("data", onLine);

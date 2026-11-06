@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ApiResult, Candle, CtraderStatus, RuleSummary } from "@/lib/api";
+import type { ApiResult, CtraderStatus, RuleSummary } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";

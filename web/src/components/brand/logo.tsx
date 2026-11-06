@@ -76,6 +76,7 @@ export function BrandLockup({
   }
   return (
     <span className={className ? `brand-lockup ${className}` : "brand-lockup"}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="brand-lockup-image"
         src="/apex4traders-logo-light.png"

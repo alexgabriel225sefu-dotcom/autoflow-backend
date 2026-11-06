@@ -80,7 +80,9 @@ describe("the condition the rule builder opens with", () => {
 
     const missing: Record<string, ConditionSpec> = Object.fromEntries(
       Object.entries(LIBRARY).map(([id, s]) => {
-        const { impliesDirection: _drop, ...rest } = s;
+        const rest = Object.fromEntries(
+          Object.entries(s).filter(([key]) => key !== "impliesDirection"),
+        );
         return [id, rest as ConditionSpec];
       }),
     );
