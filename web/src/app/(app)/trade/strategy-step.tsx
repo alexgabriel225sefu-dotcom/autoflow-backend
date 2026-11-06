@@ -59,11 +59,11 @@ export function StrategyStep({
         </button>
         <button type="button" role="tab" className="chip" aria-selected={tab === "mine"}
                 onClick={() => setTab("mine")}>
-          My rules{myMethods.length ? ` · ${myMethods.length}` : ""}
+          My methods{myMethods.length ? ` · ${myMethods.length}` : ""}
         </button>
       </div>
       {tab === "mine" ? (
-          <div role="tabpanel" aria-label="My rules">
+          <div role="tabpanel" aria-label="My methods">
           <p className="muted trade-note">
             A method of your own is a set of entry and exit conditions you built.
             The instrument, risk and account come from this setup.
@@ -72,7 +72,7 @@ export function StrategyStep({
             ? <ErrorNotice error={myRules.result as ApiError} onRetry={myRules.reload} /> : null}
           {myMethods.length === 0 && myRules.result && myRules.result.ok
             ? <p>You have not built a method yet.</p> : null}
-          <div className="strat-grid" role="radiogroup" aria-label="My rules">
+          <div className="strat-grid" role="radiogroup" aria-label="My methods">
             {myMethods.map((r) => (
               <div key={r.ruleDocId} className="strat spot" data-chosen={custom?.ruleDocId === r.ruleDocId}
                    onPointerMove={onSpot} onPointerDown={onSpot}>
@@ -127,7 +127,7 @@ export function StrategyStep({
                   {choice.strategy?.id === s.id ? <Check className="ico" aria-hidden /> : null}
                 </span>
                 <span className="strat-what">{s.what}</span>
-                <span className="strat-refuses"><strong>It skips:</strong> {s.refuses}</span>
+                <span className="strat-refuses"><strong>It skips (will not trade):</strong> {s.refuses}</span>
                 <span className="strat-refuses">
                   <strong>Timeframe:</strong> {s.timeframeNote || "Runs on the timeframe you chose."}
                 </span>
@@ -154,7 +154,8 @@ export function StrategyStep({
         </div>
       ))}
       <p className="muted trade-note">
-        No demo history is available for these strategies.
+        No stored backtest is published for these strategies yet; demo history
+        appears when it is available.
         {" "}{catalogue?.disclaimer ?? "Past performance does not guarantee future results."}
       </p>
     </section>
