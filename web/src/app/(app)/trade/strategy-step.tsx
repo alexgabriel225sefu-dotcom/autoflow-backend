@@ -98,7 +98,7 @@ export function StrategyStep({
           </div>
           {methodErr ? <ErrorNotice error={methodErr} /> : null}
           <p className="trade-note">
-            <Link className="btn btn-ghost btn-sm" href="/rules/new">Build a new rule</Link>
+            <Link className="btn btn-ghost btn-sm" href="/rules/new">Build a new method</Link>
           </p>
         </div>
       ) : null}
@@ -127,7 +127,7 @@ export function StrategyStep({
                   {choice.strategy?.id === s.id ? <Check className="ico" aria-hidden /> : null}
                 </span>
                 <span className="strat-what">{s.what}</span>
-                <span className="strat-refuses"><strong>It skips (will not trade):</strong> {s.refuses}</span>
+                <span className="strat-refuses"><strong>Will not trade:</strong> {s.refuses}</span>
                 <span className="strat-refuses">
                   <strong>Timeframe:</strong> {s.timeframeNote || "Runs on the timeframe you chose."}
                 </span>
