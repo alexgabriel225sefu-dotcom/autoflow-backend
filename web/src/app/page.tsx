@@ -14,6 +14,7 @@ import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { MagnifierCard } from "@/components/marketing/magnifier-card";
 import { RuleTerminal } from "@/components/marketing/rule-terminal";
 import { PerspectiveTunnelHero } from "@/components/marketing/perspective-tunnel-hero";
+import { LandingBento } from "@/components/marketing/landing-bento";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -78,6 +79,8 @@ export default function Landing() {
             guarantees. Automation runs on demo accounts in this release.
           </p>
         </section>
+
+        <LandingBento />
 
         <section id="features" className="mkt-section">
           <h2>What it actually does</h2>
