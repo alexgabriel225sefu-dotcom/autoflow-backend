@@ -690,6 +690,56 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 
 # Roadmap, Codex items
 
+## Platform bug-fix scan — 2026-11-07
+
+Branch: `codex/platform-bugs-performance-reads`, based on
+`claude/apex4traders-platform-v1`. Commits: `6d4d31a9` (cTrader read
+authorization recovery) and `b14fe3bf` (broker-state UI). Not deployed and not
+merged. CI has not been run for these commits yet.
+
+Done in this slice:
+
+- cTrader connection pooling now keys sockets by a non-secret access-token
+  fingerprint as well as environment and account. Dropping an account closes
+  every token-bound socket, so a refreshed token or another user's token cannot
+  reuse an authenticated session. Plain-script isolation tests cover this.
+- Broker authorization failures, including `INVALID_REQUEST ... not
+  authorized`, persist one safe reconnect-needed state per user and return
+  `reauth_required` to performance, positions, orders and candle reads. Raw
+  broker errors are not stored or returned. Loop diagnostics use a state-change
+  logger with capped backoff instead of flooding logs.
+- `/me` now carries the server's operator decision. The app shell no longer
+  probes `live/queue` on every route, so ordinary users do not create repeated
+  403 responses; the review route remains protected.
+- Dashboard and account status surfaces show one actionable cTrader reconnect
+  step. Dependent market/positions/orders panels use compact account-selection
+  copy rather than repeating connection notices.
+- Health score marks broker-dependent checks as not applicable when no account
+  is connected and says `Connect a cTrader account to check data and session.`
+  without calling that state a failure. Web and Python regressions were added.
+
+Verification:
+
+- Targeted Python checks pass: connection-pool isolation, broker auth state,
+  roadmap modules, platform API, cTrader link flow and token refresh.
+- Required `python3 tests/run_all.py` could not start on this Windows host
+  (`python3` is not installed). `python tests/run_all.py` also hit the host's
+  cp1252 subprocess decoding before completion; no source or runner workaround
+  was made.
+- Required web checks were attempted but are blocked by the incomplete local
+  `web/node_modules`: TypeScript, ESLint, Vitest and Next build dependencies
+  are missing. CI must be treated as authoritative; these commits are not
+  “done” until all four jobs are green.
+
+Still partial / next:
+
+- No connected cTrader account was available for a read-only production-like
+  smoke walk of Performance, Trades, Positions, Orders and Risk. Run that only
+  with the owner's already-authorized demo account, never by bypassing auth.
+- Push this branch after the normal rebase, inspect all four CI jobs, and fix
+  forward if needed. Do not deploy, change environment variables/flags, or
+  expose multi-account controls.
+
 Current branch: `claude/apex4traders-platform-v1`
 Current commit: `abbf8b7`
 CI: green on all four Tests jobs (python, node, web, config-drift) for `abbf8b7` (run `42253243668`).
