@@ -159,6 +159,12 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   const pauseUntil = useRef(0);
   /** The request this mounted reader is waiting on, so unmount can drop it. */
   const held = useRef<Flight | null>(null);
+  /** The retry timer calls this, not `load` directly: the timer is scheduled
+   * from inside `load`, and the hook linter rejects that self-reference. */
+  const loadRef = useRef<(
+    force?: boolean,
+    kind?: "mount" | "poll" | "visible" | "online",
+  ) => Promise<ApiResult<T> | undefined>>(async () => undefined);
 
   const load = useCallback(async (force = false, kind: "mount" | "poll" | "visible" | "online" = "mount"): Promise<ApiResult<T> | undefined> => {
     if (!path) return undefined;
@@ -178,7 +184,7 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
         const wait = Math.max(0, sharedPause - Date.now());
         const id = window.setTimeout(() => {
           pauseRetry.delete(path);
-          void load(false, "poll");
+          void loadRef.current(false, "poll");
         }, wait);
         pauseRetry.set(path, id);
       }
@@ -224,6 +230,10 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     // screen to have caught up.
     return r;
   }, [path, intervalMs]);
+
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
 
   useEffect(() => {
     // Queued rather than called straight from the effect body. `load` sets
