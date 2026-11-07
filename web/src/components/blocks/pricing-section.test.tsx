@@ -117,6 +117,8 @@ describe("the call to action", () => {
     const signup = await screen.findByRole("link", { name: /create an account/i });
     expect(signup.getAttribute("href")).toBe("/signup");
     expect(screen.getByText("Free")).toBeTruthy();
+    expect(screen.getByText(/Free for 14 days/)).toBeTruthy();
+    expect(screen.queryByText(/no expiry/i)).toBeNull();
   });
 });
 

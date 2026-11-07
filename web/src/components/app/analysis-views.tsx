@@ -23,14 +23,23 @@ function Head({ title, sub, r }: { title: string; sub: string; r: { reload: () =
 }
 
 const CHECK_LABELS: Record<string, string> = {
-  broker: "Broker connected", data: "Price data fresh", session: "Session valid",
+  broker: "Broker connected", data: "Price data fresh", quotes: "Position quotes safe",
+  session: "Session valid",
   rule: "Rule valid", risk: "Risk guard ready", store: "Shared store available",
   incidents: "No critical incident",
 };
 
+function checkText(v: boolean | null | string): string {
+  if (v === true) return "yes";
+  if (v === false) return "no";
+  if (v === "not_applicable") return "not applicable";
+  if (v === "market_closed") return "market closed";
+  return "could not be read";
+}
+
 type Health = {
   score: number; status: "healthy" | "degraded" | "blocked" | "not_connected";
-  checks: Record<string, boolean | null | "not_applicable">; warnings: string[];
+  checks: Record<string, boolean | null | "not_applicable" | "market_closed">; warnings: string[];
 };
 
 export function HealthView() {
@@ -56,9 +65,9 @@ export function HealthView() {
             <div className="card-head"><h2>What was checked</h2></div>
             <ul className="plain-list">
               {Object.entries(d.checks).map(([k, v]) => (
-                <li key={k} data-check={v === true ? "ok" : v === false ? "fail" : v === "not_applicable" ? "not-applicable" : "unknown"}>
+                <li key={k} data-check={v === true ? "ok" : v === false ? "fail" : v === "not_applicable" ? "not-applicable" : v === "market_closed" ? "market-closed" : "unknown"}>
                   <strong>{CHECK_LABELS[k] ?? k}</strong>{" "}
-                  <span className="muted">{v === true ? "yes" : v === false ? "no" : v === "not_applicable" ? "not applicable" : "could not be read"}</span>
+                  <span className="muted">{checkText(v)}</span>
                 </li>
               ))}
             </ul>
@@ -75,8 +84,8 @@ export function HealthView() {
 }
 
 type Incidents = {
-  incidents: { severity: string; kind: string; status: string }[];
-  checked: string[]; notChecked: string[]; message: string;
+  incidents?: { severity?: string; kind?: string; status?: string }[];
+  checked?: string[]; notChecked?: string[]; message?: string;
 };
 
 export function IncidentsView() {
@@ -89,16 +98,16 @@ export function IncidentsView() {
       {r.result && !r.result.ok ? <ErrorNotice error={r.result} onRetry={r.reload} /> : null}
       {d ? (
         <section className="card">
-          <p style={{ fontWeight: 600 }}>{d.message}</p>
-          {d.incidents.length ? (
+          <p style={{ fontWeight: 600 }}>{d.message || "Nothing could be checked just now, so this is not an all-clear."}</p>
+          {Array.isArray(d.incidents) && d.incidents.length ? (
             <ul className="plain-list">
               {d.incidents.map((i, n) => (
-                <li key={n}><strong>{i.kind.replace("_", " ")}</strong>{" "}
-                  <span className="muted">{i.severity} · {i.status}</span></li>
+                <li key={n}><strong>{String(i.kind || "incident").replaceAll("_", " ")}</strong>{" "}
+                  <span className="muted">{i.severity || "unknown"} · {i.status || "unknown"}</span></li>
               ))}
             </ul>
           ) : null}
-          {d.notChecked.length ? (
+          {Array.isArray(d.notChecked) && d.notChecked.length ? (
             <p className="muted" style={{ fontSize: ".8rem" }}>
               Not checked yet: {d.notChecked.join(", ")}. Start and end times and recovery are not recorded yet.
             </p>

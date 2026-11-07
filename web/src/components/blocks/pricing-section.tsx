@@ -52,7 +52,7 @@ export function planFor(offer: PublicOffer): PricingPlan[] {
     {
       id: "demo",
       name: "Demo",
-      description: "Practice accounts, at no cost. No card, no expiry.",
+      description: "Practice accounts, at no cost. No card. Free for 14 days.",
       palette: "neutral",
       price: "Free",
       // The only plan anybody can act on today, so it carries the filled
@@ -63,7 +63,7 @@ export function planFor(offer: PublicOffer): PricingPlan[] {
       features: DEMO_FEATURES,
       footerNote: "No payment details required",
       footerDesc:
-        "Demo accounts stay free. Nothing on a practice account can move real money.",
+        "The free demo trial lasts 14 days, then demo automation pauses. Nothing on a practice account can move real money.",
     },
     {
       id: offer.sku,
