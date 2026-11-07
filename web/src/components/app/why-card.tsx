@@ -32,7 +32,7 @@ export function WhyCard() {
       </div>
       {why.result && !why.result.ok
         ? <ErrorNotice error={why.result} onRetry={why.reload} /> : null}
-      {!why.result ? <p className="muted">Reading the engine…</p> : null}
+      {!why.result ? <p className="muted">Reading the latest checks…</p> : null}
       {raw && !wellFormed ? (
         <p className="muted">The explanation came back in a form this page cannot read.</p>
       ) : null}
@@ -81,7 +81,7 @@ export function WhyCard() {
           {!w.skips.length && !w.recorded.length ? (
             <p className="muted" style={{ fontSize: ".8rem" }}>
               {w.recordedReadable
-                ? "No refusals recorded yet. That is not a verdict on the engine: a restart clears the live list, and the log fills as it checks."
+                ? "No refusals recorded yet. That is not a verdict on the platform: a restart clears the live list, and the log fills as it checks."
                 : "The decision log could not be read just now."}
             </p>
           ) : null}

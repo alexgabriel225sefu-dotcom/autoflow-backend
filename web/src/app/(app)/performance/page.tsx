@@ -139,8 +139,8 @@ export default function PerformancePage() {
                 {d.source.unattributed} of {d.summary.trades} trade{d.summary.trades === 1 ? "" : "s"} are
                 unlabelled
                 {d.source.journalReadable
-                  ? " — the engine did not open them, or they pre-date strategy labels."
-                  : " — the engine's journal could not be read just now, so strategies are missing."}
+                  ? " — the platform did not open them, or they pre-date strategy labels."
+                  : " — the journal could not be read just now, so strategies are missing."}
               </p>
             ) : null}
             {d.excluded.unknownMode > 0 || d.excluded.otherMode > 0 ? (

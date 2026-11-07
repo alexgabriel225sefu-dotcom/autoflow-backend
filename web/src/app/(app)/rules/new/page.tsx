@@ -199,9 +199,9 @@ export default function NewRulePage() {
             <div className="card-head"><h2>Your next steps</h2></div>
             <ol className="muted" style={{ fontSize: ".82rem", lineHeight: 1.7, paddingLeft: "1.1rem" }}>
               <li>Save the rule as a draft.</li>
-              <li>Validate it — the server checks every field again.</li>
+              <li>Check it: every field is verified once more before it can run.</li>
               <li>Preview it against real bars from your account (demo data).</li>
-              <li>Activate the version when it looks right.</li>
+              <li>Turn it on when it looks right.</li>
               <li>Start on a demo account.</li>
             </ol>
           </section>

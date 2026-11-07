@@ -244,7 +244,7 @@ describe("fields that would be refused at execution say so at the input", () => 
     const text = document.body.textContent ?? "";
     expect(text).toContain("account's own daily limit still applies");
     // Max exposure really is not enforced in this release, and still says so.
-    expect(text).toContain("Recorded on the rule; not enforced by the engine yet.");
+    expect(text).toContain("Recorded on the rule; not enforced yet.");
   });
 
   it("does not offer flatten as a choice", () => {

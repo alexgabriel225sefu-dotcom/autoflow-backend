@@ -299,7 +299,7 @@ export default function PickStrategyPage() {
             <ol className="muted" style={{ fontSize: ".82rem", lineHeight: 1.7,
                                            paddingLeft: "1.1rem" }}>
               <li>Save this as a draft.</li>
-              <li>Validate it — the server checks every field again.</li>
+              <li>Check it: every field is verified once more before it can run.</li>
               <li>Activate it. The version is then frozen.</li>
               <li>Start automation on a demo account.</li>
             </ol>
