@@ -13,50 +13,17 @@ is always selectable here too, never a stale subset.
 This is a *setup assistant*, not signal advice: the bot executes exactly what
 the user selected, and the user owns the outcome.
 
-Product-aware: the same module serves the crypto and forex builds. Forex uses
-pip-based stops + session filters; crypto uses ATR/%-based stops, wider bands,
-no session filter (runs whenever the broker feed is open).
+Forex only: pip-based stops, session filters and a news guard.
 """
 from apex import config as cfg
 from apex import ai
-
-
-def _is_crypto():
-    return getattr(cfg, "PRODUCT", "forex") == "crypto"
 
 
 # ─── Presets ───────────────────────────────────────────────
 # Each preset is a full patch of user_store fields. Values are deliberately
 # conservative-to-balanced; the client can fine-tune any of them afterwards.
 def presets():
-    """Return the presets relevant to THIS build's market."""
-    if _is_crypto():
-        return {
-            "crypto_scalp": {
-                "label": "⚡ Crypto-Scalp",
-                "desc": "1m, fast in/out, ATR stops, wide spread tolerance",
-                "patch": {
-                    "style": "scalping", "timeframe": "1m",
-                    "risk": 0.005, "min_confidence": 55, "atr_stops": True,
-                    "sl_pips": 200, "tp_pips": 300,
-                    "exit_mode": "fixed", "trailing": False, "breakeven_r": 0,
-                    "news_filter": False, "session_filter": [],
-                    "max_trades_day": 20, "max_dd_pct": 20, "max_daily_loss_pct": 4,
-                },
-            },
-            "crypto_swing": {
-                "label": "📈 Crypto-Swing",
-                "desc": "1h, trend-following, wider ATR stops, trailing + break-even",
-                "patch": {
-                    "style": "swing", "timeframe": "1h",
-                    "risk": 0.005, "min_confidence": 60, "atr_stops": True,
-                    "sl_pips": 400, "tp_pips": 900,
-                    "exit_mode": "trail", "trailing": True, "breakeven_r": 1.0,
-                    "news_filter": False, "session_filter": [],
-                    "max_trades_day": 5, "max_dd_pct": 25, "max_daily_loss_pct": 5,
-                },
-            },
-        }
+    """The preset strategy profiles a client can pick from."""
     return {
         "forex_scalp": {
             "label": "⚡ Forex-Scalping",
@@ -87,29 +54,25 @@ def presets():
 
 # ─── Custom wizard steps ───────────────────────────────────
 # Ordered list of (key, prompt, options). Each option carries a patch applied to
-# the in-progress draft. Forex-only steps are filtered out on the crypto build.
+# the in-progress draft.
 def _style_step():
-    if _is_crypto():
-        tf_note = "ATR-based stops scale with volatility"
-    else:
-        tf_note = "pip stops scale with the style"
     return {
         "key": "style",
         "title": "1️⃣ Trading style",
-        "sub": f"Sets the timeframe and stop scale — {tf_note}.",
+        "sub": "Sets the timeframe and stop scale — pip stops scale with the style.",
         "options": [
             {"label": "⚡ Scalping (1m)", "patch": {
                 "style": "scalping", "timeframe": "1m",
-                **({"atr_stops": True} if _is_crypto() else {"sl_pips": 15, "tp_pips": 30, "atr_stops": False})}},
+                "sl_pips": 15, "tp_pips": 30, "atr_stops": False}},
             {"label": "📅 Day trading (5m)", "patch": {
                 "style": "day", "timeframe": "5m",
-                **({"atr_stops": True} if _is_crypto() else {"sl_pips": 20, "tp_pips": 40, "atr_stops": True})}},
+                "sl_pips": 20, "tp_pips": 40, "atr_stops": True}},
             {"label": "📈 Swing (1h)", "patch": {
                 "style": "swing", "timeframe": "1h", "atr_stops": True,
-                **({"sl_pips": 400, "tp_pips": 900} if _is_crypto() else {"sl_pips": 25, "tp_pips": 60})}},
+                "sl_pips": 25, "tp_pips": 60}},
             {"label": "🎯 Position (4h)", "patch": {
                 "style": "position", "timeframe": "4h", "atr_stops": True,
-                **({"sl_pips": 800, "tp_pips": 2000} if _is_crypto() else {"sl_pips": 50, "tp_pips": 150})}},
+                "sl_pips": 50, "tp_pips": 150}},
         ],
     }
 
@@ -172,7 +135,7 @@ _EXIT_STEP = {
 _SESSION_STEP = {  # forex only
     "key": "session_filter",
     "title": "6️⃣ Trading sessions",
-    "sub": "When the bot is allowed to trade (forex reacts to session opens).",
+    "sub": "When execution is allowed (forex reacts to session opens).",
     "options": [
         {"label": "🌍 All sessions", "patch": {"session_filter": []}},
         {"label": "🇬🇧🇺🇸 London + New York", "patch": {"session_filter": ["London", "New York"]}},
@@ -182,11 +145,9 @@ _SESSION_STEP = {  # forex only
 
 
 def steps():
-    """Ordered wizard steps for this build."""
-    s = [_style_step(), _setup_step(), _CONFIRM_STEP, _RISK_STEP, _EXIT_STEP]
-    if not _is_crypto():
-        s.append(_SESSION_STEP)
-    return s
+    """Ordered wizard steps."""
+    return [_style_step(), _setup_step(), _CONFIRM_STEP, _RISK_STEP,
+            _EXIT_STEP, _SESSION_STEP]
 
 
 # ─── Summary ───────────────────────────────────────────────
@@ -196,28 +157,49 @@ _CONFIRM_LABEL = {"price": "Price action", "indicator": "Indicators",
                   "volume": "Volume + volatility", "mtf": "Multi-timeframe"}
 
 
+def _strategy_label(key):
+    """Display name for any strategy, V1 or later.
+
+    STRATEGY_MODES only describes the ten methods with an engine in ai.py, and
+    `.get(key, STRATEGY_MODES['auto'])` therefore reported *Auto* for every
+    method added after V1 — so a client who had just picked Momentum read back
+    a summary saying the bot would choose for them. Same class of bug as the
+    one /status had. Ask the registry, which knows all of them.
+    """
+    k = (key or "auto").lower()
+    m = ai.STRATEGY_MODES.get(k)
+    if m:
+        return m["label"]
+    try:
+        from apex import strategy_api
+        cls = strategy_api._REGISTRY.get(k)
+        if cls:
+            return getattr(cls, "label", k)
+    except Exception:
+        pass
+    return k
+
+
 def summary(d):
     """Human-readable recap of a composed strategy (dict of fields)."""
-    market = "Crypto" if _is_crypto() else "Forex"
     risk_pct = float(d.get("risk", 0.01)) * 100
     sess = d.get("session_filter") or []
     sess_txt = "All sessions" if not sess else " + ".join(sess)
     lines = [
-        f"📋 <b>Your strategy — {market}</b>",
+        "📋 <b>Your strategy — Forex</b>",
         "━━━━━━━━━━━━━━━━━━━━",
         f"• Style: <b>{(d.get('style') or 'swing').title()}</b> · {d.get('timeframe', '5m')}",
-        f"• Entry setup: <b>{ai.STRATEGY_MODES.get((d.get('strategy') or 'auto').lower(), ai.STRATEGY_MODES['auto'])['label']}</b>",
+        f"• Entry setup: <b>{_strategy_label(d.get('strategy'))}</b>",
         f"• Confirmation: <b>{_CONFIRM_LABEL.get(d.get('confirm', 'indicator'), 'Indicators')}</b>",
         f"• Risk: <b>{risk_pct:g}%</b> per trade",
         f"• Exit: <b>{_EXIT_LABEL.get(d.get('exit_mode', 'fixed'), 'Fixed TP/SL')}</b>",
     ]
-    if not _is_crypto():
-        lines.append(f"• Sessions: <b>{sess_txt}</b>")
-        lines.append(f"• News guard: <b>{'ON' if d.get('news_filter', True) else 'OFF'}</b>")
+    lines.append(f"• Sessions: <b>{sess_txt}</b>")
+    lines.append(f"• News guard: <b>{'ON' if d.get('news_filter', True) else 'OFF'}</b>")
     lines += [
         f"• Max trades/day: <b>{d.get('max_trades_day', 10)}</b>",
         f"• Daily loss stop: <b>{d.get('max_daily_loss_pct', 4):g}%</b> · Max drawdown: <b>{d.get('max_dd_pct', 20):g}%</b>",
         "━━━━━━━━━━━━━━━━━━━━",
-        "<i>The bot executes exactly this — you stay in control and own the results.</i>",
+        "<i>The platform executes exactly this — you stay in control and own the results.</i>",
     ]
     return "\n".join(lines)

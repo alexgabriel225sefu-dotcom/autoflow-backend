@@ -1,0 +1,446 @@
+"""Rate limits for the platform API. Transport-free, like the rest of it.
+
+WHY THIS EXISTS
+
+Every route under /api/v1/ was unmetered. Two of them matter more than the
+rest:
+
+  candles  consumes the broker's historical budget, which cTrader enforces at
+           5 requests per second PER CONNECTION, shared across every client on
+           that connection. One client in a loop degrades the platform for
+           everyone, and the limit that protects them is here, not at cTrader.
+
+  preview  runs the evaluator over up to 300 bars on every call.
+
+The rest are metered because an unmetered authenticated endpoint is a way to
+enumerate, and because a burst of automation start/stop is not a thing a human
+does.
+
+KEYED BY USER FIRST, THEN BY ADDRESS
+
+An authenticated request is limited per user. A shared office or a carrier NAT
+would otherwise let one client's loop lock out everybody behind the same
+address. Unauthenticated routes — the OAuth callback and the payment webhook —
+have no user, so they fall back to the address.
+
+The token is never used as a key directly; only a SHA-256 prefix of it is, so
+a bearer token cannot be read back out of a limiter's key set.
+
+WHERE THE COUNTER LIVES
+
+A fixed window held in one process is wrong the moment there are two: each
+holds its own window, so the effective limit becomes the configured one times
+the instance count. During a Render deploy two instances serve the same users
+at once — that has been observed, not assumed.
+
+So the counter is `user_store.incr`, a Redis/Upstash INCR with a TTL, which is
+the primitive a rate limit actually needs. Read-modify-write on a blob loses
+increments whenever two of anything race.
+
+The in-memory limiter remains, for development and tests only. When there is
+no shared backend the limiter still counts in memory — refusing to limit at
+all would be worse — but `store_mode()` reports `memory`, and `/readyz`
+refuses readiness in production on exactly that. A deployment that cannot
+share a counter should be told, not quietly served.
+"""
+
+import hashlib
+import os
+import math
+import re
+import time
+
+from apex import user_store
+from apex.http_security import RateLimiter
+
+# Route class → (requests, window seconds). Every one is overridable by an
+# environment variable so a deployment can tune without a code change.
+_BUCKETS = {
+    # Starting an OAuth flow or completing one. Tight: both are rare, and
+    # both are the interesting ones to guess at.
+    "oauth": ("RL_A4T_OAUTH_PER_MIN", 10, 60),
+    # Broker reads that cost the shared historical budget.
+    "candles": ("RL_A4T_CANDLES_PER_MIN", 30, 60),
+    # Evaluator runs.
+    "preview": ("RL_A4T_PREVIEW_PER_MIN", 20, 60),
+    # Anything that changes whether money can move.
+    # Controls are authenticated, fresh-session actions. Keep a bounded
+    # per-user budget, but leave room for a mobile client retrying after a
+    # slow response: a safety Stop must not be stranded behind a handful of
+    # ordinary control retries. The address floor and the fresh auth check
+    # remain in force.
+    "control": ("RL_A4T_CONTROL_PER_MIN", 120, 60),
+    # The client's own panic button, on a bucket nothing else spends. It shared
+    # "control" with single closes, so a client who had closed twenty positions
+    # by hand got 429 on Emergency. Generous: pressing it again is the right
+    # reaction to a slow answer, and the work it does is bounded elsewhere.
+    "emergency": ("RL_A4T_EMERGENCY_PER_MIN", 30, 60),
+    # The same panic button, counted per PERSON after the session is verified.
+    # The per-token bucket above is per session, so a user with several tabs or
+    # devices multiplied it; one press can hold a worker for minutes, so the
+    # person is bounded as well.
+    "emergency_user": ("RL_A4T_EMERGENCY_USER_PER_MIN", 30, 60),
+    # Freezing a version.
+    "activate": ("RL_A4T_ACTIVATE_PER_MIN", 10, 60),
+    # The payment provider. Generous: it retries, and being throttled off a
+    # legitimate retry is how a paying client ends up unprovisioned.
+    "webhook": ("RL_A4T_WEBHOOK_PER_MIN", 120, 60),
+    # The one unauthenticated form on the site. Tight on purpose: it is the
+    # only route a stranger can write through, and the cost of being wrong is
+    # a list full of addresses nobody typed. Five a minute is generous for a
+    # human correcting a typo and useless for a script.
+    "waitlist": ("RL_A4T_WAITLIST_PER_MIN", 5, 60),
+    # Everything else: reads the dashboard polls.
+    "default": ("RL_A4T_DEFAULT_PER_MIN", 240, 60),
+    # PER NETWORK ADDRESS, before the token is known to be real. The buckets
+    # above are keyed on a hash of whatever bearer string arrives, and a string
+    # nobody has verified is free to invent: every junk token got a fresh
+    # bucket, so an anonymous caller could send unlimited control requests, each
+    # forcing a Supabase lookup, until that service throttled the platform's key
+    # and every client — including the Emergency button — saw AUTH_UNAVAILABLE.
+    # Generous, because several people can share one address.
+    "addr": ("RL_A4T_ADDR_PER_MIN", 600, 60),
+    # The same, for the routes that move money or change what can.
+    "addr_control": ("RL_A4T_ADDR_CONTROL_PER_MIN", 120, 60),
+    # PER NETWORK ADDRESS, counted only when a bearer token has to be checked
+    # with Supabase (a cache miss). The address floors above still let one
+    # address spend 600 Supabase lookups a minute with invented tokens; this
+    # is the budget for the lookups themselves. See api._authenticate.
+    "addr_verify": ("RL_A4T_ADDR_VERIFY_PER_MIN", 120, 60),
+    # Erasing an account. Strict: it is rare, irreversible, and expensive (it
+    # scans the store for every key the account owns).
+    "account_delete": ("RL_A4T_ACCOUNT_DELETE_PER_HOUR", 5, 3600),
+    # Exporting an account. Reads everything the account owns in one go.
+    "account_export": ("RL_A4T_ACCOUNT_EXPORT_PER_HOUR", 10, 3600),
+}
+
+# The bucket name a refusal carries when the limiter itself failed on a route
+# that fails closed. Not a configured bucket: nothing is counted under it.
+UNAVAILABLE = "unavailable"
+
+
+def _mk(name):
+    env, limit, window = _BUCKETS[name]
+    try:
+        limit = int(os.getenv(env) or limit)
+    except (TypeError, ValueError):
+        pass
+    return RateLimiter(limit, window, f"a4t-{name}")
+
+
+LIMITERS = {name: _mk(name) for name in _BUCKETS}
+
+_CANDLES_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/candles$")
+_PREVIEW_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/preview$")
+_CLOSE_RE = re.compile(r"^accounts/[A-Za-z0-9_-]{1,64}/positions/[A-Za-z0-9_-]{1,64}/close$")
+_ACTIVATE_RE = re.compile(r"^rules/[A-Za-z0-9_-]{1,64}/activate$")
+
+
+def classify(method, route):
+    """Which bucket a route belongs to. `route` has the /api/v1/ prefix off."""
+    route = (route or "").split("?", 1)[0].strip("/")
+    if route == "billing/webhook":
+        return "webhook"
+    if route == "waitlist":
+        return "waitlist"
+    if route.startswith("ctrader/"):
+        # A GET of the link status is a poll — the shell and the accounts
+        # page both refresh it every 60 seconds, and two open tabs would
+        # exhaust a tight bucket in minutes. Sharing that budget with
+        # connect, complete and disconnect meant a client who had left a tab
+        # open could not disconnect their own account. The existing HTTP
+        # suite caught exactly that.
+        if method == "GET":
+            return "default"
+        # ONLY the two that actually go through cTrader's OAuth.
+        #
+        # Everything else under ctrader/ used to land here too, and `select`
+        # is the one that made it visible: it is a client choosing which of
+        # THEIR OWN already-listed accounts to use, a local store write with
+        # nothing to guess at — the ctids were handed to them by this same
+        # API and ownership is checked on the way in. Metering it against the
+        # oauth bucket meant that a client who had just spent that budget
+        # connecting could not then pick the account they had connected.
+        #
+        # Observed in production on 2026-10-04: POST ctrader/select answered
+        # 429 with retryAfterSec=42, so the owner's phone showed
+        # "No account selected" on every screen while the account sat linked
+        # and unselectable. The bucket's own docstring says it is for flows
+        # that are "rare, and the interesting ones to guess at". Select is
+        # neither.
+        if route in ("ctrader/connect", "ctrader/complete"):
+            return "oauth"
+        # select and disconnect: they change which account automation would
+        # act on, which is exactly what the control bucket is for.
+        return "control"
+    if _CANDLES_RE.match(route) or route in ("symbols", "trade/min-lot", "trades"):
+        # Both are market-data reads that go to cTrader, whose limits are
+        # shared across every client on a connection, so they share a budget.
+        return "candles"
+    if route == "admin" or (route or "").startswith("admin/"):
+        # The operator audit reads the same broker, including deal history.
+        return "candles"
+    if _PREVIEW_RE.match(route):
+        return "preview"
+    if _ACTIVATE_RE.match(route):
+        return "activate"
+    if route.startswith("emergency/"):
+        return "emergency"
+    if route == "approvals/approve":
+        # Approving IS placing an order, and it sat in "default" (240 a
+        # minute) next to the journal poll, twelve times looser than a Stop.
+        # Only approve: declining is saying no, and a client must always be
+        # able to say no, so reject and the pending-list poll stay where they
+        # were. The claim and the clear inside `approvals.approve` are what
+        # stop a double tap opening two positions; this is the second layer.
+        return "control"
+    if _CLOSE_RE.match(route):
+        # Closing a position moves money. It sat in "default" (240 a minute),
+        # twelve times looser than a Stop.
+        return "control"
+    if route.startswith("automation"):
+        # A GET of the automation state is a poll, not a control action.
+        return "control" if method != "GET" else "default"
+    if route == "account" and method == "DELETE":
+        return "account_delete"
+    if route == "account/export":
+        return "account_export"
+    return "default"
+
+
+def key_for(client_key, auth_header):
+    """The limiting key: the caller's identity if there is one, else address.
+
+    Only a prefix of the token's digest is used. A limiter's key set is not a
+    place a bearer token should be recoverable from, even in a core dump.
+    """
+    token = ""
+    if auth_header:
+        parts = str(auth_header).split(None, 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1].strip()
+    if token:
+        return "u:" + hashlib.sha256(token.encode()).hexdigest()[:24]
+    return "a:" + str(client_key or "unknown")
+
+
+# The buckets whose routes change whether, or how, money moves.
+# "emergency" is NOT in this tuple, on purpose. The stricter per-address floor is
+# counted before the token is verified, so anyone behind the same address (a
+# carrier NAT, an office, a VPN) could spend it with invented tokens and leave a
+# real client's panic button answering 429. The emergency route is still under
+# the generic address floor and its own per-token bucket; what it gives up is
+# the tighter per-address ceiling the other money routes carry.
+_MONEY_BUCKETS = ("control", "oauth", "activate", "account_delete")
+
+# Mutating routes that still FAIL OPEN when the limiter itself breaks.
+#   emergency  the client's panic button. Refusing a safety stop because the
+#              limiter threw is worse than the hole failing closed would close.
+#   webhook    the payment provider. Unauthenticated and signature-checked;
+#              refusing it leaves a paying client unprovisioned.
+_FAIL_OPEN_WRITES = ("emergency", "webhook")
+
+
+def _fails_closed(method, bucket):
+    """Whether a limiter FAILURE refuses this request.
+
+    Reads stay lenient: a limiter bug must not become an outage of the
+    dashboard. Writes that change what can happen to money do not: a limiter
+    that answers "allowed" whenever it throws is no ceiling at all on exactly
+    the routes a flood aims at.
+    """
+    if (method or "GET").upper() in ("GET", "HEAD", "OPTIONS"):
+        return False
+    return bucket not in _FAIL_OPEN_WRITES
+
+
+def check(method, route, *, client_key=None, auth_header=None):
+    """(allowed, bucket, retry_after_seconds).
+
+    When the limiter itself fails, a read is allowed (a limiter bug must not
+    become an outage) and a mutating route is refused with the bucket
+    `UNAVAILABLE`, except the emergency stop and the payment webhook — see
+    `_FAIL_OPEN_WRITES`.
+    """
+    bucket = classify(method, route)
+    limiter = LIMITERS.get(bucket) or LIMITERS["default"]
+    key = key_for(client_key, auth_header)
+    try:
+        # The address floor comes first and does not depend on the token.
+        if client_key:
+            floors = ["addr"] + (["addr_control"] if bucket in _MONEY_BUCKETS else [])
+            for name in floors:
+                lim = LIMITERS[name]
+                akey = f"ip:{name}:{client_key}"
+                aok = None
+                if _MODE != "memory":
+                    aok = _shared_check(akey, lim.limit, lim.window_s)
+                if aok is None:
+                    aok = lim.check(akey)
+                if not aok:
+                    return False, name, _seconds_until_reset(lim.window_s)
+        ok = None
+        if _MODE != "memory":
+            ok = _shared_check(key, limiter.limit, limiter.window_s)
+        if ok is None:
+            # No shared backend, or it could not answer. Counting in one
+            # process is weaker than counting across all of them, and it is
+            # far better than not counting. /readyz reports the degradation.
+            ok = limiter.check(key)
+    except Exception:
+        if _fails_closed(method, bucket):
+            return False, UNAVAILABLE, 5
+        # A bug in the limiter must not become an outage of the platform.
+        return True, bucket, 0
+    return bool(ok), bucket, (0 if ok else _seconds_until_reset(limiter.window_s))
+
+
+def _seconds_until_reset(window_s):
+    """How long the caller must ACTUALLY wait, not how long a window lasts.
+
+    The window is a floor of the clock, so it rolls at the top of the next
+    one: fifty-nine seconds in, the wait is one second. This used to report
+    the window length flat, so a client was told to wait a minute when the
+    budget was about to come back — and a number that can be wrong by a whole
+    window is worse than none, because a countdown is what a person acts on.
+
+    Never zero: a wait of zero invites an instant retry that fails again.
+    """
+    remaining = window_s - (time.time() % window_s)
+    return max(1, min(int(window_s), math.ceil(remaining)))
+
+
+def refusal(bucket, retry_after):
+    """The platform API's own error shape, so the UI branches on a code.
+
+    The seconds go in the MESSAGE as well as the field, because the field is
+    only as useful as the clients that read it, and the message is what every
+    surface already displays.
+
+    A limiter that FAILED on a fail-closed route answers 503 with its own
+    code: the client did nothing wrong, and a 429 would tell them they had.
+    """
+    if bucket == UNAVAILABLE:
+        return 503, {"ok": False, "error": {
+            "code": "RATE_LIMIT_UNAVAILABLE",
+            "message": "this action is briefly unavailable — try again in a "
+                       "few seconds",
+            "retryAfterSec": retry_after,
+        }}
+    wait =(f"wait {int(retry_after)}s and try again" if retry_after
+            else "try again shortly")
+    return 429, {"ok": False, "error": {
+        "code": "RATE_LIMITED",
+        "message": f"too many requests — {wait}",
+        "bucket": bucket,
+        "retryAfterSec": retry_after,
+    }}
+
+
+# ── where the counter lives ─────────────────────────────────────────────────
+
+# "auto" uses the shared backend when there is one. "memory" forces the
+# in-process limiter, which is a development choice and is reported as such.
+_MODE = (os.getenv("RATE_LIMIT_STORE") or "auto").strip().lower()
+
+
+def _shared_available():
+    """Whether a cross-process counter can be reached.
+
+    `user_store.incr` returns None both when there is no backend and when the
+    command failed, and those are the same answer for this question: we cannot
+    count across instances right now.
+    """
+    if _MODE == "memory":
+        return False
+    return user_store.incr(f"{_store_ns()}:rl:probe", ttl_s=60) is not None
+
+
+def _store_ns():
+    # Namespaced like every other key, so two products on one Redis do not
+    # share a rate-limit window.
+    return f"{os.getenv('PRODUCT', '').strip().lower() or 'forex'}:a4t"
+
+
+def store_mode():
+    """`shared`, `memory`, or `memory-forced`. Reported by /readyz."""
+    if _MODE == "memory":
+        return "memory-forced"
+    return "shared" if _shared_available() else "memory"
+
+
+def _shared_check(key, limit, window_s):
+    """True/False from the shared counter, or None when it cannot answer.
+
+    The window is a floor of the clock, so every instance agrees on which
+    bucket a request belongs to without any coordination between them.
+    """
+    slot = int(time.time() // window_s)
+    n = user_store.incr(f"{_store_ns()}:rl:{key}:{slot}", ttl_s=window_s * 2)
+    if n is None:
+        return None
+    return n <= limit
+
+
+def check_user(bucket, user_id, *, fail_closed=False):
+    """(allowed, retry_after_seconds) for a VERIFIED user id.
+
+    Called by a route after authentication, for the few routes where the work
+    done per request is large enough that a per-session limit can be multiplied
+    by opening more sessions. A failure of the limiter itself allows unless
+    `fail_closed`: the emergency stop must not be refused by a limiter bug,
+    while erasing an account can wait a few seconds.
+    """
+    lim = LIMITERS.get(bucket)
+    if lim is None or not user_id:
+        return True, 0
+    key = f"user:{bucket}:{user_id}"
+    try:
+        ok = None
+        if _MODE != "memory":
+            ok = _shared_check(key, lim.limit, lim.window_s)
+        if ok is None:
+            ok = lim.check(key)
+    except Exception:
+        return (False, 5) if fail_closed else (True, 0)
+    return bool(ok), (0 if ok else _seconds_until_reset(lim.window_s))
+
+
+class Limited(Exception):
+    """Raised from inside a request when a budget refuses it mid-way."""
+
+    def __init__(self, bucket, retry_after):
+        self.bucket, self.retry_after = bucket, retry_after
+        super().__init__(f"rate limited: {bucket}")
+
+
+def check_verify(client_key):
+    """Spend one unit of the address's Supabase-lookup budget, or raise.
+
+    Called only when a token has to be checked with Supabase (a cache miss),
+    so a real client whose session is cached never spends it. No address
+    means the transport did not supply one; the address floors in `check`
+    have the same gap and it is not widened here. A limiter failure allows:
+    the address floor has already been passed, and refusing every cache miss
+    would sign out the platform.
+    """
+    if not client_key:
+        return
+    lim = LIMITERS["addr_verify"]
+    key = f"ip:addr_verify:{client_key}"
+    try:
+        ok = None
+        if _MODE != "memory":
+            ok = _shared_check(key, lim.limit, lim.window_s)
+        if ok is None:
+            ok = lim.check(key)
+    except Exception:
+        return
+    if not ok:
+        raise Limited("addr_verify", _seconds_until_reset(lim.window_s))
+
+
+def reset_all():
+    """For tests. Production has no reason to clear a window."""
+    for lim in LIMITERS.values():
+        lim.reset()

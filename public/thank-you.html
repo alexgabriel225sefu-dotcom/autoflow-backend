@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Order Confirmed — Apex Trading Suite</title>
+<title>Order Confirmed — Apex4Traders</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
@@ -75,7 +75,7 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
 <div class="aurora-bg"></div>
 
 <div class="wrap">
-  <p class="eyebrow">Apex Trading Suite &nbsp;&bull;&nbsp; Order Confirmation</p>
+  <p class="eyebrow">Apex4Traders &nbsp;&bull;&nbsp; Order Confirmation</p>
   <div class="card-shell">
     <div class="card-inner">
       <div class="accent-line"></div>
@@ -105,12 +105,12 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
         </div>
 
         <div class="state" id="stateError">
-          <span class="chip" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--gold)">&#9888; Almost there</span>
-          <h1>Your order is being processed.</h1>
-          <p class="err">Payment was received &mdash; your license key and setup email will arrive in your inbox within 1-2 minutes. If you don't see it, check your spam folder.</p>
+          <span class="chip">&#10003; Payment confirmed</span>
+          <h1>Your license is on its way.</h1>
+          <p class="err">We've received your payment and your license is being finalized on our end. You'll get an email at the address you used at checkout with your license key and Telegram activation link &mdash; usually within a couple of minutes, occasionally a little longer at peak times.</p>
           <button class="retry" onclick="location.reload()">&#x21bb; Check again</button>
           <div class="support-box">
-            <p>Didn't receive it? Contact us and we'll sort it out right away:</p>
+            <p>Nothing after 10 minutes? We'll sort it out right away &mdash; just reach out:</p>
             <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
           </div>
         </div>
@@ -118,7 +118,7 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
       </div>
     </div>
   </div>
-  <a class="back-link" href="/">&larr; Back to Apex Trading Suite</a>
+  <a class="back-link" href="/">&larr; Back to Apex4Traders</a>
 </div>
 
 <script>
@@ -165,7 +165,10 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
           progressTextEl.textContent = 'Done!';
           var botUsername = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
           var tgLink = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(d.licenseKey);
-          document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your Crypto bot is ready.';
+          // Forex is the only product. The crypto branch named a bot that can no
+          // longer be bought or deployed, so a buyer reaching it saw a promise
+          // nothing behind the page could keep.
+          document.getElementById('readyTitle').textContent = 'Your Forex bot is ready.';
           document.getElementById('readySub').textContent = 'Tap the button below — Telegram opens and your ' + (isForex ? 'Forex' : 'Crypto') + ' bot activates automatically. No setup required.';
           document.getElementById('tgBtn').href = tgLink;
           setTimeout(function(){ show('stateReady'); }, 400);

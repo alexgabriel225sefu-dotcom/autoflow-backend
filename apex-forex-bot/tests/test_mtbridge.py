@@ -9,11 +9,21 @@ import time
 
 os.environ["PAPER_TRADING"] = "false"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Tests are a development environment and say so explicitly: user_store now
+# REFUSES to start without TOKEN_ENCRYPTION_KEY rather than falling back to
+# plaintext, and that refusal is the behaviour under test elsewhere.
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
+os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 
 from apex import config as cfg  # noqa: E402
 from apex.brokers import mtbridge  # noqa: E402
 
-cfg.MT_BRIDGE_SECRET = "test-secret-123"
+# The bridge secret moved out of apex/config.py and into the module that reads
+# it: its broker cannot run in this build, so a credential in the production
+# config read like a live product setting. Same value, same assertions.
+from apex.brokers import mtbridge as _mtb  # noqa: E402
+_mtb.BRIDGE_SECRET = "test-secret-123"
 cfg.PAPER_TRADING = False
 
 

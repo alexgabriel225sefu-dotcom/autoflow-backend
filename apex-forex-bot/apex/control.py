@@ -18,6 +18,8 @@ Safety:
   • Handlers are injected by bot.py, so this module stays dependency-free and
     can't import the bot in a cycle.
 """
+import hashlib
+import hmac
 import json
 import os
 import threading
@@ -61,9 +63,243 @@ _RESULT    = lambda cid: f"{_NS}:cmdresult:{cid}"
 WRITE_ACTIONS = {"restart_loop", "bot_on", "bot_off", "refresh_token",
                  "set_setting", "send_message", "force_close", "force_trade"}
 
+# ─── Capability levels ────────────────────────────────────
+# An operations assistant reads state; it does not move money. Before this,
+# `force_trade` and `force_close` rode the SAME switch as `restart_loop`, so
+# turning on remote restarts also handed out order placement and position
+# closing. Levels split them, and each level has its own gate.
+#
+#   1 READ ONLY            always available
+#   2 CONTROLLED OPS       MCP_CONTROL_ENABLED, and the caller must confirm
+#   3 FINANCIAL            MCP_FINANCIAL_ENABLED, off by default, separately
+#
+# Anything not listed is treated as level 3. An action nobody classified is an
+# action nobody thought about, and the safe reading of that is "the dangerous
+# kind" — a new handler cannot become remotely callable by being forgotten.
+LEVEL_1_READ = {
+    "status", "user_detail", "events", "ctrader_account", "audit_log",
+    "recent_commands", "recent_events",
+    # The closed-trade journal. A read like the rest of this set: it loads the
+    # stored rows, filters them through an allowlist and returns them. It
+    # reaches no broker and changes nothing. Unlisted actions default to level
+    # 3 and are refused, which is why this line has to exist at all.
+    "trade_journal",
+    "bot_alive", "bot_status",
+    # The ops API (see apex/ops_api.py). All read-only by construction.
+    "ops_system_health", "ops_user_health", "ops_user_license",
+    "ops_user_broker_status", "ops_user_risk", "ops_user_positions",
+    "ops_user_orders", "ops_user_worker_status", "ops_user_ownership",
+    "ops_user_incidents", "ops_recent_errors", "ops_reconcile_status",
+    "ops_investigate", "ops_degraded_users", "ops_unprotected_positions",
+    "ops_broker_reconcile",
+}
+LEVEL_2_CONTROLLED = {
+    "restart_loop", "bot_on", "bot_off", "refresh_token", "set_setting",
+    "send_message", "client_message",
+}
+LEVEL_3_FINANCIAL = {"force_close", "force_trade"}
+
+# Level-2 actions that change what the bot DOES rather than merely restarting
+# it still need MCP_CONTROL_ENABLED; confirmation is enforced per-call.
+CONFIRM_REQUIRED = LEVEL_2_CONTROLLED
+
+
+def level_of(action) -> int:
+    if action in LEVEL_1_READ:
+        return 1
+    if action in LEVEL_2_CONTROLLED:
+        return 2
+    return 3                     # unlisted == financial == denied by default
+
 
 def actions_enabled() -> bool:
     return (os.getenv("MCP_CONTROL_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def financial_enabled() -> bool:
+    """Level 3 needs its OWN switch, deliberately separate from level 2.
+
+    An operator who turns on remote restarts has not thereby agreed to let a
+    chat assistant place orders. Financial capability is never a side effect of
+    enabling operations.
+    """
+    return (os.getenv("MCP_FINANCIAL_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _allowed_operators():
+    """Operators permitted to run level 2/3 commands.
+
+    MCP_OPERATORS is a comma-separated allowlist. Empty means nobody, which is
+    why levels 2 and 3 are unreachable until it is set — an env flag alone says
+    the capability exists, not who may use it.
+    """
+    raw = os.getenv("MCP_OPERATORS") or ""
+    return {p.strip() for p in raw.split(",") if p.strip()}
+
+
+def operator_ok(operator) -> bool:
+    """Is this operator on the allowlist?
+
+    The identity must be established by the TRANSPORT — whoever can write to
+    the Redis command queue is already trusted to name themselves, and this
+    allowlist is the second factor, not the first. A string in the payload is
+    never treated as proof on its own: it is checked against a list only the
+    deployment's environment can change, so a caller cannot promote itself by
+    inventing a name.
+    """
+    allowed = _allowed_operators()
+    if not allowed:
+        return False
+    return str(operator or "").strip() in allowed
+
+
+def _signing_secret():
+    return (os.getenv("MCP_SIGNING_SECRET") or "").strip()
+
+
+# A signed command stays valid forever unless something bounds its age. Replay
+# protection claims the command id for 24h, but the claim EXPIRES — so a
+# captured envelope replayed after that window has a signature that still
+# verifies and an id nobody remembers refusing. The id is inside the signed
+# payload, so an attacker cannot mint a fresh one; bounding the age closes the
+# remaining window permanently instead of for a day.
+_MAX_COMMAND_AGE_S = int(os.getenv("MCP_MAX_COMMAND_AGE_S") or 300)
+# Two hosts, two clocks. A small negative skew is normal, a large one is a
+# forged or misconfigured sender.
+_MAX_CLOCK_SKEW_S = 60
+
+
+def unsigned_allowed() -> bool:
+    """Whether an unsigned level-2/3 command may run at all.
+
+    Only outside production, and "outside production" is decided by
+    user_store._is_production(), which is deliberately inverted: anything
+    unrecognised counts AS production. Re-deriving that here would give the
+    deployment two answers to one question, and the day they disagree is the
+    day the financial control plane accepts unsigned commands on a live box.
+
+    Imported lazily so this module keeps its no-import-cycle property.
+    """
+    try:
+        from apex import user_store
+        return not user_store._is_production()
+    except Exception:
+        return False        # cannot tell => treat as production
+
+
+def verify_envelope(cmd):
+    """Is the operator name in this command actually proven? (ok, reason).
+
+    A name in a JSON payload is not identity — anyone who can write to the
+    command queue can type one. When MCP_SIGNING_SECRET is configured the
+    sender signs the canonical envelope and this checks it, so the name cannot
+    be forged without the secret.
+
+    IN PRODUCTION THE SECRET IS MANDATORY for levels 2 and 3.
+
+    It used to return "unsigned" when no secret was configured, on the argument
+    that the surrounding layers already gated the queue: Upstash credentials to
+    reach it, MCP_CONTROL_ENABLED for level 2, a separate switch for level 3.
+    Those layers are real and they all remain. But every one of them answers
+    "is this capability enabled", and none answers "who sent this". Anyone able
+    to write to the command queue could put operator="alex" in a payload and be
+    treated as that operator — the allowlist would agree, because an allowlist
+    can only authorize an identity that something else established.
+
+    The original reason for the fallback was operational and was true at the
+    time: enforcing operator identity before the sender could supply one locked
+    the operator out of their own bot. The sender signs now, and the secret is
+    deployed on both services, so the fallback is protecting nothing and
+    costing the one property that matters here.
+
+    Outside production, unsigned still works — but that requires APP_ENV to say
+    dev/development/local/test explicitly. An unset or unfamiliar environment
+    counts as production and gets the strict path.
+    """
+    secret = _signing_secret()
+    if not secret:
+        if unsigned_allowed():
+            return True, "UNSIGNED_DEV_ENVIRONMENT"
+        return False, ("SIGNING_NOT_CONFIGURED — set MCP_SIGNING_SECRET on this "
+                       "service and on the MCP sender; level 2/3 commands "
+                       "cannot be authenticated without it")
+    sig = str((cmd or {}).get("sig") or "")
+    if not sig:
+        return False, "SIGNATURE_MISSING"
+    try:
+        payload = json.dumps(
+            {k: cmd.get(k) for k in ("id", "action", "args", "ts", "operator")},
+            sort_keys=True, separators=(",", ":"))
+        expect = hmac.new(secret.encode(), payload.encode(),
+                          hashlib.sha256).hexdigest()
+    except Exception as e:
+        return False, f"SIGNATURE_UNVERIFIABLE ({type(e).__name__})"
+    if not hmac.compare_digest(expect, sig):
+        return False, "SIGNATURE_INVALID"
+    # Freshness is checked only now, because `ts` is only trustworthy once the
+    # signature over it has verified.
+    try:
+        age = time.time() - float(cmd.get("ts"))
+    except (TypeError, ValueError):
+        return False, "TIMESTAMP_MISSING"
+    if age > _MAX_COMMAND_AGE_S:
+        return False, f"COMMAND_EXPIRED ({int(age)}s old)"
+    if age < -_MAX_CLOCK_SKEW_S:
+        return False, "TIMESTAMP_IN_FUTURE"
+    return True, "SIGNATURE_OK"
+
+
+def authorize(action, args=None, operator=None):
+    """(ok, reason) for one command. The single place authorization is decided."""
+    lvl = level_of(action)
+    if lvl == 1:
+        return True, "LEVEL_1_READ"
+    # Anything that changes state needs a named, allowlisted operator. Env
+    # flags say what the deployment permits; this says who is asking.
+    if not operator_ok(operator):
+        if not _allowed_operators():
+            return False, ("NO_OPERATORS_CONFIGURED — set MCP_OPERATORS to the "
+                           "identities allowed to run level 2/3 commands")
+        return False, "OPERATOR_NOT_AUTHORIZED"
+    if lvl == 2:
+        if not actions_enabled():
+            return False, "LEVEL_2_DISABLED (set MCP_CONTROL_ENABLED=true)"
+        if action in CONFIRM_REQUIRED and not (args or {}).get("confirm"):
+            return False, "CONFIRMATION_REQUIRED (resend with confirm=true)"
+        return True, "LEVEL_2_CONFIRMED"
+    if not financial_enabled():
+        return False, ("LEVEL_3_FINANCIAL_DISABLED — financial actions are not "
+                       "available to the operations interface")
+    if not (args or {}).get("confirm"):
+        return False, "CONFIRMATION_REQUIRED (resend with confirm=true)"
+    return True, "LEVEL_3_CONFIRMED"
+
+
+# ─── Replay protection ────────────────────────────────────
+# The queue carries a command id and nothing stopped the same id being popped
+# and executed twice — a retry after a timeout, a redelivery, or an operator
+# tapping again because the first reply was slow. For force_trade that is a
+# second position; for force_close, closing a position that was reopened in
+# between. The id is claimed before dispatch and the stored result is replayed
+# on a repeat, so the caller gets the ORIGINAL outcome rather than a refusal
+# they might respond to by trying once more.
+_REPLAY_TTL = 24 * 3600
+
+
+def _replay_key(cid):
+    return f"{_NS}:cmdseen:{cid}"
+
+
+def _claim_command(cid):
+    """True when this id is new. False means it has already been executed."""
+    if not _ENABLED_STORE or not cid:
+        return True
+    res = _cmd("SET", _replay_key(cid), "1", "NX", "EX", _REPLAY_TTL)
+    if res is None:
+        # Cannot tell. Allowing an unverifiable retry is the lesser risk for
+        # level 1/2; the financial path refuses separately below.
+        return None
+    return str(res).upper() == "OK"
 
 
 # ─── Redis commands (standard or Upstash REST) ────────────
@@ -107,6 +343,7 @@ def _cmd(*parts):
 _LEVEL_FOR = {
     "AI_ERROR": "error", "DATA_ERROR": "error", "BROKER_HEALTH": "warn",
     "STOP": "warn", "NEWS_WARN": "info", "FLASH_WARN": "warn",
+    "NEWS_AHEAD": "info", "NEWS_CLEAR": "info",
     "STOP_MOVED": "info", "CLOSE": "trade", "BROKER_CLOSE": "trade",
     "BROKER_CLOSE_MULTI": "trade", "BUY": "trade", "SELL": "trade",
 }
@@ -141,10 +378,41 @@ def event_from_alert(user_id, result):
 
 
 # ─── Command consumer ─────────────────────────────────────
-def _record_result(cid, ok, data):
+def _record_result(cid, ok, data, ttl=180):
+    """Store a command's outcome for the caller to poll.
+
+    `ttl` is 180s for a read — long enough for the MCP server to collect it.
+    A state-changing command keeps its result for the whole replay window
+    instead: replaying an id is supposed to return the ORIGINAL outcome, and
+    a result that expired first would turn a harmless duplicate into "already
+    executed, outcome unknown" — which is exactly the answer that invites the
+    operator to try again.
+    """
     payload = json.dumps({"id": cid, "ok": ok, "data": data, "ts": int(time.time())})
     _cmd("SET", _RESULT(cid), payload)
-    _cmd("EXPIRE", _RESULT(cid), 180)
+    _cmd("EXPIRE", _RESULT(cid), int(ttl))
+
+
+# Argument names that must never reach the audit log. The log is read by an
+# assistant and echoed into chat, so a token landing here leaves the process
+# entirely. Matching is on the KEY, and by substring, so `ctrader_access_token`
+# and a future `access_token_v2` are both caught.
+_SECRET_ARG_HINTS = ("token", "secret", "key", "password", "passwd", "credential",
+                     "auth", "cookie", "session", "private")
+
+
+def _safe_args(args):
+    """Arguments with anything credential-shaped replaced by a marker."""
+    out = {}
+    for k, v in (args or {}).items():
+        lk = str(k).lower()
+        if any(h in lk for h in _SECRET_ARG_HINTS):
+            out[k] = "[REDACTED]"
+        elif isinstance(v, str) and len(v) > 120:
+            out[k] = v[:120] + "…"
+        else:
+            out[k] = v
+    return out
 
 
 def _audit(entry):
@@ -183,23 +451,86 @@ def start_consumer(handlers, poll=10.0, heartbeat_interval=60.0):
                 cid = cmd.get("id") or str(int(time.time() * 1000))
                 action = cmd.get("action", "")
                 args = cmd.get("args") or {}
-                if action in WRITE_ACTIONS and not actions_enabled():
-                    _record_result(cid, False, "write actions disabled "
-                                   "(set MCP_CONTROL_ENABLED=true to allow)")
+                lvl = level_of(action)
+                operator = str(cmd.get("operator") or "unknown")[:64]
+                # Authorization is decided in ONE place and recorded whether it
+                # passed or failed. A refusal nobody can see is indistinguishable
+                # from a request nobody made.
+                # Prove the operator NAME before trusting it. Reads are
+                # unaffected — they carry no identity claim worth forging.
+                if lvl > 1:
+                    _sig_ok, _sig_why = verify_envelope(cmd)
+                    if not _sig_ok:
+                        _record_result(cid, False, _sig_why)
+                        _audit({"ts": int(time.time()), "cid": cid,
+                                "action": action, "level": lvl,
+                                "operator": operator, "authorized": False,
+                                "args": _safe_args(args), "ok": False,
+                                "err": _sig_why})
+                        continue
+                allowed, why = authorize(action, args, operator=operator)
+                if not allowed:
+                    _record_result(cid, False, why)
+                    _audit({"ts": int(time.time()), "cid": cid, "action": action,
+                            "level": lvl, "operator": operator,
+                            "user": str(args.get("user_id") or ""),
+                            "args": _safe_args(args), "authorized": False,
+                            "confirmed": bool(args.get("confirm")),
+                            "ok": False, "err": why})
                     continue
                 fn = handlers.get(action)
                 if not fn:
                     _record_result(cid, False, f"unknown action: {action}")
                     continue
+                # Replay check AFTER authorization, so a refused command does
+                # not burn its id and block a corrected retry.
+                seen = _claim_command(cid)
+                if seen is False:
+                    prior = _cmd("GET", _RESULT(cid))
+                    print(f"[Control] replay of {cid} ({action}) — returning the "
+                          f"original result without executing again")
+                    if prior is None:
+                        _record_result(cid, False,
+                                       "duplicate command id; the original result "
+                                       "has expired")
+                    _audit({"ts": int(time.time()), "cid": cid, "action": action,
+                            "level": lvl, "operator": operator,
+                            "user": str(args.get("user_id") or ""),
+                            "args": _safe_args(args), "authorized": True,
+                            "confirmed": bool(args.get("confirm")),
+                            "ok": True, "replay": True})
+                    continue
+                if seen is None and lvl == 3:
+                    # Cannot prove this is not a replay, and the action moves
+                    # money. Refuse rather than risk a second position.
+                    _record_result(cid, False, "REPLAY_CHECK_UNAVAILABLE — "
+                                   "refusing a financial action that cannot be "
+                                   "verified as new")
+                    continue
+                base = {"ts": int(time.time()), "cid": cid, "action": action,
+                        "level": lvl, "operator": operator,
+                        "user": str(args.get("user_id") or ""),
+                        "args": _safe_args(args), "authorized": True,
+                        # HOW the operator was established, not merely that it
+                        # was. The audit recorded the reason only on refusal,
+                        # so a signed command and an unsigned one that happened
+                        # to be permitted were indistinguishable after the
+                        # fact — which is the one question an audit of a
+                        # financial control plane has to be able to answer.
+                        "identity": _sig_why if lvl > 1 else "LEVEL_1_READ",
+                        "confirmed": bool(args.get("confirm"))}
+                # A state-changing result outlives the poll, so a replay can
+                # return it rather than a bare "already executed".
+                _ttl = _REPLAY_TTL if lvl > 1 else 180
                 try:
                     data = fn(args)
-                    _record_result(cid, True, data)
-                    _audit({"ts": int(time.time()), "action": action,
-                            "args": args, "ok": True})
+                    _record_result(cid, True, data, ttl=_ttl)
+                    _audit({**base, "ok": True})
                 except Exception as e:
-                    _record_result(cid, False, str(e)[:300])
-                    _audit({"ts": int(time.time()), "action": action,
-                            "args": args, "ok": False, "err": str(e)[:200]})
+                    # The message only. A traceback can carry file paths, config
+                    # values and occasionally the argument that failed to parse.
+                    _record_result(cid, False, str(e)[:300], ttl=_ttl)
+                    _audit({**base, "ok": False, "err": str(e)[:200]})
             except Exception as e:
                 print(f"[Control] consumer loop error: {e}")
                 time.sleep(poll)
