@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ClipboardList, LogOut, MoreHorizontal, OctagonAlert, User, X } from "lucide-react";
 import { BrandLockup, BrandMark } from "@/components/brand/logo";
 import { createClient } from "@/lib/supabase/client";
-import { api, type AutomationState, type CtraderStatus, type Me, type NotificationPage } from "@/lib/api";
+import { type AutomationState, type CtraderStatus, type Me, type NotificationPage } from "@/lib/api";
 import { useRead } from "@/lib/use-api";
 import { isActive, NAV, PRIMARY, titleFor } from "./nav";
 import { StatusBar } from "./status-bar";
@@ -28,22 +28,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [drawer, setDrawer] = useState(false);
   const [menu, setMenu] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
-  // The audit list reads the broker, so it is the wrong request to make on
-  // every screen just to decide whether a link is shown. live/queue is the
-  // existing operator check and it does not open a cTrader session. A refusal
-  // leaves the page reachable by its URL and absent from the menu.
-  const [showAudit, setShowAudit] = useState(false);
-  useEffect(() => {
-    let live = true;
-    api<{ requests?: unknown[] }>("live/queue").then((result) => {
-      if (live && result.ok) setShowAudit(true);
-    });
-    return () => { live = false; };
-  }, []);
-
   // One fetch of each, shared with the status strip, rather than every page
   // asking again for the same three facts.
   const me = useRead<Me>("me", 120_000);
+  // /me already carries the identity-level operator decision. Do not probe a
+  // protected queue endpoint from every ordinary page just to hide one link.
+  const showAudit = me.result?.ok === true && me.result.data.operator === true;
   // The same path the dashboard and the trade page read, so the three do not
   // each spend a request on one account record. `accounts` is the same
   // payload and stays in the invalidation list.

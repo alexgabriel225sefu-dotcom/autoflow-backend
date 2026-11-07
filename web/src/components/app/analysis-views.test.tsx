@@ -21,6 +21,16 @@ describe("analysis views", () => {
     expect(screen.queryByText("could not be read")).not.toBeNull();
     expect(document.querySelector('[data-check="unknown"]')).not.toBeNull();
   });
+  it("health says what is needed when no cTrader account is connected", async () => {
+    answer = okv({ score: 100, status: "not_connected", checks: {
+      broker: "not_applicable", data: "not_applicable", session: "not_applicable",
+      rule: true, risk: "not_applicable", store: true, incidents: true,
+    }, warnings: ["Connect a cTrader account to check data and session."] });
+    render(<HealthView />);
+    await waitFor(() => expect(screen.queryByText(/Connect a cTrader account/)).not.toBeNull());
+    expect(screen.queryByText("could not be read")).toBeNull();
+    expect(document.querySelector('[data-check="not-applicable"]')).not.toBeNull();
+  });
   it("incidents say what was not checked", async () => {
     answer = okv({ incidents: [], checked: ["brokerStatus"], notChecked: ["riskBlocked"],
                    message: "Nothing wrong in what was checked (brokerStatus). Not checked: riskBlocked." });

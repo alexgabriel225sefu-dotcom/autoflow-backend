@@ -101,6 +101,16 @@ def test_health_and_incident_outputs_are_conservative():
     assert result["score"] < 100
     assert result["warnings"]
     assert incidents.derive({"brokerStatus": "unavailable"})["incidents"]
+    disconnected = health_score.score({"brokerConnected": False,
+                                       "ruleValid": True,
+                                       "storeAvailable": True,
+                                       "criticalIncidents": False})
+    assert disconnected["status"] == "not_connected"
+    assert disconnected["checks"]["data"] == "not_applicable"
+    assert disconnected["checks"]["session"] == "not_applicable"
+    assert any("Connect a cTrader account to check data and session." in w
+               for w in disconnected["warnings"])
+    assert not any("failed" in w for w in disconnected["warnings"])
 
 
 def test_backtest_replay_forward_are_read_only():

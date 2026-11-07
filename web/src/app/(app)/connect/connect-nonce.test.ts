@@ -302,7 +302,7 @@ describe("a finished connection does not still invite step 1", () => {
     // The heading is chosen from the connection state before `pending`.
     // `pending` is a local recovery aid; when it beat the server state, a
     // stale tab could put "Step 2" over an already-linked account.
-    expect(src).toMatch(/<h2>\{isConnected \? "Account connected"\s*: pending \? "Step 2 — finish here"/);
+    expect(src).toMatch(/<h2>\{needsReconnect \? "Reconnect cTrader"\s*: isConnected \? "Account connected"\s*: pending \? "Step 2 — finish here"/);
     expect(src).toContain("Account connected");
   });
 

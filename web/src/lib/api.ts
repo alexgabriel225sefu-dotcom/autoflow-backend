@@ -352,11 +352,14 @@ export type Me = {
   user: { userId: string; email: string | null; emailVerified: boolean };
   licence: Licence;
   execution: Execution;
+  operator?: boolean;
 };
 
 export type CtAccount = { ctid: number | string; mode: "demo" | "live"; label?: string };
 export type CtraderStatus = {
   connected: boolean;
+  needsReconnect?: boolean;
+  reconnectReason?: string | null;
   accounts: CtAccount[];
   selected: { ctid: number | string; mode: "demo" | "live" } | null;
   liveAllowed: boolean;

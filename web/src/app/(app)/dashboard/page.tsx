@@ -48,9 +48,14 @@ import type {
 } from "@/lib/api";
 
 /** A read that failed, said plainly, with the action that fixes it. */
-function Unavailable({ status, reason }: { status: string; reason?: string }) {
+function Unavailable({ status, reason, compact = false }: {
+  status: string; reason?: string; compact?: boolean;
+}) {
   const p = plainRead(status, reason);
   if (!p) return null;
+  if (compact && status === "not_connected") {
+    return <p className="empty">Choose an account to view this data.</p>;
+  }
   return (
     <div className={p.tone === "short" ? "notice notice-warn" : "notice"} role="status">
       <p style={{ fontWeight: 600 }}>{p.label}</p>
@@ -296,6 +301,13 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
+                  {account.needsReconnect ? (
+                    <div className="notice notice-warn" role="alert">
+                      <p style={{ fontWeight: 600 }}>Reconnect cTrader</p>
+                      <p className="muted">The broker rejected the saved authorisation. Reconnect before reading account data.</p>
+                      <Link className="btn btn-sm" href="/connect">Reconnect cTrader</Link>
+                    </div>
+                  ) : null}
                   <label className="field">
                     <span>Account</span>
                     <select
@@ -597,7 +609,8 @@ export default function Dashboard() {
                   ]}
                 />
               ) : (
-                <Unavailable status={pos.result.data.status} reason={pos.result.data.reason} />
+                <Unavailable status={pos.result.data.status} reason={pos.result.data.reason}
+                             compact={pos.result.data.status === "not_connected"} />
               )
             ) : <Spinner />}
           </section>
@@ -616,7 +629,8 @@ export default function Dashboard() {
                   <p>{(ord.result.data.orders ?? []).length} waiting at the broker.</p>
                 ) : <p className="empty">No pending orders.</p>
               ) : (
-                <Unavailable status={ord.result.data.status} reason={ord.result.data.reason} />
+                <Unavailable status={ord.result.data.status} reason={ord.result.data.reason}
+                             compact={ord.result.data.status === "not_connected"} />
               )
             ) : <Spinner />}
           </section>

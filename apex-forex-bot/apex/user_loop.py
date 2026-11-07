@@ -203,6 +203,41 @@ CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
 # the wrong number without failing.
 _LEV_CACHE = {}
 _LEV_STATIC_FX = 30.0
+_LEV_FAILURE_STATE = {}
+_LEV_FAILURE_LOCK = threading.Lock()
+
+
+def _report_leverage_failure(key, symbol, static, exc):
+    """Report a leverage read failure on a capped, state-change cadence."""
+    now = time.monotonic()
+    message = f"{type(exc).__name__}: {exc}"
+    with _LEV_FAILURE_LOCK:
+        state = _LEV_FAILURE_STATE.setdefault(key, {
+            "message": None, "nextLog": 0.0, "backoff": 30.0})
+        changed = message != state["message"]
+        if not changed and now < state["nextLog"]:
+            return False
+        state["message"] = message
+        state["nextLog"] = now + state["backoff"]
+        state["backoff"] = min(900.0, state["backoff"] * 2.0)
+    print(f"[UserLoop] leverage_for({symbol}) failed, using {static}x: {message}")
+    return True
+
+
+def _report_capped_failure(key, message):
+    """Print one loop failure per state change, then at a capped backoff."""
+    now = time.monotonic()
+    with _LEV_FAILURE_LOCK:
+        state = _LEV_FAILURE_STATE.setdefault(key, {
+            "message": None, "nextLog": 0.0, "backoff": 30.0})
+        changed = message != state["message"]
+        if not changed and now < state["nextLog"]:
+            return False
+        state["message"] = message
+        state["nextLog"] = now + state["backoff"]
+        state["backoff"] = min(900.0, state["backoff"] * 2.0)
+    print(message)
+    return True
 
 
 def leverage_for_symbol(broker, cfg, symbol):
@@ -236,7 +271,7 @@ def leverage_for_symbol(broker, cfg, symbol):
         # Best-effort refinement, never a hard dependency — but the fallback
         # is now the right ORDER OF MAGNITUDE for the instrument, which is the
         # part that was wrong.
-        print(f"[UserLoop] leverage_for({symbol}) failed, using {static}x: {e}")
+        _report_leverage_failure(("symbol", sym), symbol, static, e)
     _LEV_CACHE[sym] = lev
     return lev
 
@@ -1316,7 +1351,21 @@ def _make_broker(user, user_id=None, ctid=None):
         try:
             fake_cfg.LEVERAGE = broker.leverage_for(fake_cfg.SYMBOL)
         except Exception as e:
-            print(f"[UserLoop] leverage_for failed, keeping default {fake_cfg.LEVERAGE}: {e}")
+            try:
+                # The narrow matcher, not _looks_like_auth_error: that one is
+                # tuned to decide when a refresh might help ("access",
+                # "route", bare INVALID_REQUEST), and persisting "reconnect
+                # required" on such a match would lock a client out over a
+                # data hiccup.
+                from apex.platform import broker_read as _br
+                if user_id and _br._is_auth_failure(e):
+                    from apex.platform import ctrader_link as _link
+                    _link.mark_reconnect_required(user_id)
+            except Exception:
+                pass
+            _report_leverage_failure(
+                ("account", str(user_id), str(ct_account)),
+                fake_cfg.SYMBOL, fake_cfg.LEVERAGE, e)
     return broker, fake_cfg
 
 
@@ -1360,8 +1409,10 @@ def _refresh_platform_token(user_id, cfg) -> bool:
         # LinkError here means the connection exists and could not be made
         # usable — an expired token whose refresh failed. The client has to
         # reconnect, and the platform's own screens already say so.
-        print(f"[UserLoop:{user_id}] platform token refresh failed: "
-              f"{type(e).__name__}: {e}")
+        _report_capped_failure(
+            ("refresh", str(user_id)),
+            f"[UserLoop:{user_id}] platform token refresh failed: "
+            f"{type(e).__name__}: {e}")
         return False
     if not conn or not conn.get("accessToken"):
         return False

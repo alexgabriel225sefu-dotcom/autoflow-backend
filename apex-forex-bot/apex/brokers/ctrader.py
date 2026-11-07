@@ -30,6 +30,7 @@ against a real cTrader demo account before being used with real money. Paper mod
 uses cTrader for DATA only and simulates fills locally, so it is safe to run now.
 """
 import collections
+import hashlib
 import os
 import select
 import ssl
@@ -560,9 +561,18 @@ class _Conn:
         self._sock = None
 
 
-# Connection pool keyed by (env, ctid) — one persistent socket per account.
+# Connection pool keyed by (env, ctid, access-token fingerprint).  A socket is
+# authenticated for one token, not merely for an account id.  Reusing a socket
+# after a refresh (or between two users who happen to share a ctid) makes the
+# broker answer ``INVALID_REQUEST ... not authorized`` even though the current
+# token is valid.
 _conns: dict = {}
 _pool_lock = threading.Lock()
+
+
+def _token_key(access_token):
+    """Return a non-secret, stable pool key for an access token."""
+    return hashlib.sha256(str(access_token or "").encode()).hexdigest()
 
 
 def account_id(value, *, allow_zero=False):
@@ -593,7 +603,8 @@ def account_id(value, *, allow_zero=False):
 
 
 def _conn_for(env, access_token, ctid) -> _Conn:
-    key = (str(env).lower(), account_id(ctid, allow_zero=True))
+    key = (str(env).lower(), account_id(ctid, allow_zero=True),
+           _token_key(access_token))
     with _pool_lock:
         c = _conns.get(key)
         if c and c._sock is not None:
@@ -604,11 +615,14 @@ def _conn_for(env, access_token, ctid) -> _Conn:
 
 
 def _drop_conn(env, ctid):
-    key = (str(env).lower(), account_id(ctid, allow_zero=True))
+    env_key = str(env).lower()
+    account = account_id(ctid, allow_zero=True)
     with _pool_lock:
-        c = _conns.pop(key, None)
-    if c:
-        c.close()
+        keys = [key for key in _conns
+                if key[0] == env_key and key[1] == account]
+        conns = [_conns.pop(key) for key in keys]
+    for conn in conns:
+        conn.close()
 
 
 # ── Per-user broker class ────────────────────────────────────────────────────

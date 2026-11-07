@@ -94,6 +94,11 @@ export function StatusBar({
           <Mark icon={Plug} />
           <span>Account</span><strong>Not connected</strong>
         </a>
+      ) : account.needsReconnect ? (
+        <a className="stat-chip" href="/connect" data-tone="short">
+          <Mark icon={Plug} />
+          <span>cTrader</span><strong>Reconnect</strong>
+        </a>
       ) : selected ? (
         <Chip
           href="/accounts"
