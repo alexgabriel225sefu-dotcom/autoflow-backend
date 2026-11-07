@@ -100,7 +100,8 @@ export default function ConnectPage() {
   // Whether a broker account is already linked. Drives the heading below,
   // which must never invite step 1 at somebody who has finished step 2.
   const linked = status.result?.ok ? status.result.data : null;
-  const isConnected = Boolean(linked?.connected);
+  const needsReconnect = Boolean(linked?.needsReconnect);
+  const isConnected = Boolean(linked?.connected && !needsReconnect);
 
   /**
    * Step 1 is offered ONLY once the server has said they are not connected.
@@ -121,7 +122,8 @@ export default function ConnectPage() {
    * reading as "not connected", which is the same mistake with a different
    * cause. An answer we do not have is not an answer of no.
    */
-  const canOfferStep1 = status.result?.ok === true && !linked?.connected;
+  const canOfferStep1 = status.result?.ok === true
+    && (!linked?.connected || needsReconnect);
 
   // Resume after the visitor comes back from cTrader. Two ways in, because on
   // a phone only the second one is reliable:
@@ -255,7 +257,15 @@ export default function ConnectPage() {
         {status.result && !status.result.ok
           ? <ErrorNotice error={status.result} onRetry={status.reload} /> : null}
         {status.result?.ok ? (
-          status.result.data.connected ? (
+          status.result.data.needsReconnect ? (
+            <>
+              <p><span className="pill pill-warn">Reconnect needed</span>{" "}The broker rejected the saved authorisation.</p>
+              <button className="btn btn-sm" style={{ marginTop: ".6rem" }}
+                      onClick={() => void begin()} disabled={busy}>
+                {busy ? "Opening cTrader…" : "Reconnect cTrader"}
+              </button>
+            </>
+          ) : status.result.data.connected ? (
             <>
               <p><span className="pill pill-ok">Connected</span>{" "}{status.result.data.accounts.length} account(s) available</p>
               <a className="btn btn-ghost btn-sm" style={{ marginTop: ".6rem" }} href="/accounts">Choose which one to trade</a>
@@ -276,7 +286,8 @@ export default function ConnectPage() {
             stale local pending nonce: sessionStorage is a recovery aid, not
             the source of truth. */}
         <div className="card-head">
-          <h2>{isConnected ? "Account connected"
+          <h2>{needsReconnect ? "Reconnect cTrader"
+               : isConnected ? "Account connected"
                : pending ? "Step 2 — finish here"
                : canOfferStep1 ? "Step 1 — authorise"
                : "Checking your link…"}</h2>
@@ -285,7 +296,14 @@ export default function ConnectPage() {
              : canOfferStep1 ? "1 of 2" : "…"}
           </span>
         </div>
-        {isConnected ? (
+        {needsReconnect ? (
+          <>
+            <p>The broker rejected the saved authorisation. Start a new cTrader connection to read this account again.</p>
+            <button className="btn" onClick={() => void begin()} disabled={busy}>
+              {busy ? "Opening cTrader…" : "Reconnect cTrader"}
+            </button>
+          </>
+        ) : isConnected ? (
           <>
             <p>
               cTrader is linked. Nothing is being traded yet — choose which
