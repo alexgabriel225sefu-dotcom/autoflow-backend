@@ -210,15 +210,6 @@ export default function Dashboard() {
 
       <JourneyStrip auto={auto.result} rules={rules.result} mode={selected?.mode ?? null} />
 
-      <AccountsDuo
-        accounts={account?.accounts ?? null} selected={selected}
-        execution={execution} running={running}
-      />
-
-      <FirstRunChecklist
-        me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}
-      />
-
       <PipelineFlow
         account={selected ? `#${selected.ctid} · ${selected.mode === "demo" ? "Demo" : "Live"}` : null}
         accountReady={!!selected}
@@ -226,6 +217,15 @@ export default function Dashboard() {
         ruleReady={!!activeRule}
         running={running?.state === "running" && !running.marketClosed}
         decisions={jr.result?.ok && jr.result.data.status === "ok" ? jr.result.data.entries.length : null}
+      />
+
+      <AccountsDuo
+        accounts={account?.accounts ?? null} selected={selected}
+        execution={execution} running={running}
+      />
+
+      <FirstRunChecklist
+        me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}
       />
 
       <OverviewBand tiles={overview} />
