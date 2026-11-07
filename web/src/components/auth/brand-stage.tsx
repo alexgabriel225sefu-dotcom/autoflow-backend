@@ -24,6 +24,12 @@ function reduced() {
   return !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 }
 
+/** Web Animations where the browser has them; nothing where it does not (jsdom, old browsers). */
+function play(el: Element | null | undefined, frames: Keyframe[], opts: KeyframeAnimationOptions) {
+  if (!el || typeof (el as HTMLElement).animate !== "function") return null;
+  return el.animate(frames, opts);
+}
+
 export function BrandStage() {
   const root = useRef<HTMLDivElement>(null);
   const tilt = useRef<HTMLDivElement>(null);
@@ -50,7 +56,7 @@ export function BrandStage() {
       if (!input || input.tagName !== "INPUT") return;
       const ie = e as InputEvent;
       const typed = ie.data;
-      kick.current?.animate(
+      play(kick.current,
         [
           { transform: "scale(1) rotateZ(0deg)" },
           { transform: `scale(1.14) rotateZ(${(Math.random() * 8 - 4).toFixed(1)}deg)`, offset: 0.35 },
@@ -60,7 +66,7 @@ export function BrandStage() {
       );
       const field = input.closest("label.field") as HTMLElement | null;
       if (!field) return;
-      input.animate(
+      play(input,
         [{ boxShadow: "0 0 0 0 rgba(255,148,132,.0)" }, { boxShadow: "0 0 26px 0 rgba(255,148,132,.35)", offset: 0.3 }, { boxShadow: "0 0 0 0 rgba(255,148,132,0)" }],
         { duration: 420, easing: "ease-out" },
       );
@@ -81,10 +87,11 @@ export function BrandStage() {
         color: "#ff9484", textShadow: "0 0 14px rgba(255,148,132,.7)",
       });
       field.appendChild(pop);
-      pop.animate(
+      const anim = play(pop,
         [{ transform: "translate3d(0,0,0) scale(.6)", opacity: 0 }, { transform: "translate3d(0,-14px,0) scale(1.25)", opacity: 1, offset: 0.25 }, { transform: `translate3d(${(Math.random() * 16 - 8).toFixed(0)}px,-46px,0) scale(.9)`, opacity: 0 }],
         { duration: 780, easing: "cubic-bezier(.2,.7,.2,1)" },
-      ).onfinish = () => pop.remove();
+      );
+      if (anim) anim.onfinish = () => pop.remove(); else pop.remove();
     }
 
     // 3. Turn on the spot while the form is signing in.
