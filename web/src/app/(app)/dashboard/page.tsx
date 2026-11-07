@@ -38,6 +38,7 @@ import { OverviewBand, type Tile } from "@/components/app/overview-band";
 import { FirstRunChecklist } from "@/components/app/first-run";
 import { JourneyStrip } from "@/components/app/journey-strip";
 import { AccountsDuo } from "@/components/app/accounts-duo";
+import { WelcomeColour } from "@/components/app/welcome-colour";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -186,7 +187,9 @@ export default function Dashboard() {
   }
 
   return (
-    <main>
+    <main className="dash">
+      <div className="dash-orb" aria-hidden="true" />
+      <WelcomeColour />
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>

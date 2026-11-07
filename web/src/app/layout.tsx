@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Familjen_Grotesk } from "next/font/google";
 import "./globals.css";
 import { NO_FLASH_SCRIPT } from "@/lib/appearance";
 import { RippleListener } from "@/components/ui/ripple-listener";
+import { PressGlowListener } from "@/components/ui/press-glow-listener";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,6 +56,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <RippleListener />
+        <PressGlowListener />
       </body>
     </html>
   );
