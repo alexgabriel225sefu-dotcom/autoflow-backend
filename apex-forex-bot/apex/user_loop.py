@@ -192,23 +192,29 @@ CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
 
 
 # Leverage is a property of the INSTRUMENT and of the account, not of a
-# build-time constant. The broker's own per-symbol answer is preferred; this
-# static is only the fallback when it cannot be read.
+# build-time constant. The broker's own per-symbol answer is preferred.
 #
-# This mattered more than it looks. `calc_units` uses leverage only for the
-# margin cap — so an assumed 30x on a 5x instrument does not merely overstate
-# capacity, it makes the cap check a different question than the one the
-# broker will ask. The position that "uses 8.7% of the account" at 30x needs
-# 52% of it at 5x, and the guard that exists to prevent exactly that reports
-# the wrong number without failing.
+# An unknown read is not 30x. `calc_units` uses leverage only for the margin
+# cap, so an assumed 30x on a 5x instrument makes that cap the wrong question:
+# the position that "uses 8.7% of the account" at 30x needs 52% of it at 5x.
+# When the broker cannot be asked, the order is not sized.
+#
+# The cache key is the account, the environment and a fingerprint of the
+# access token, plus the symbol. A successful read for one account must not
+# become the margin assumption for another, and a refreshed token must not
+# keep the previous session's number. Failures are remembered only briefly,
+# as unknown, so the next tick does not hammer the broker and does not size.
 _LEV_CACHE = {}
-_LEV_STATIC_FX = 30.0
+_LEV_UNKNOWN_TTL_S = 60.0
 _LEV_FAILURE_STATE = {}
 _LEV_FAILURE_LOCK = threading.Lock()
 
 
-def _report_leverage_failure(key, symbol, static, exc):
-    """Report a leverage read failure on a capped, state-change cadence."""
+def _report_leverage_failure(key, symbol, exc):
+    """Report a leverage read failure on a capped, state-change cadence.
+
+    The log does not name a substitute leverage. There isn't one.
+    """
     now = time.monotonic()
     message = f"{type(exc).__name__}: {exc}"
     with _LEV_FAILURE_LOCK:
@@ -220,8 +226,18 @@ def _report_leverage_failure(key, symbol, static, exc):
         state["message"] = message
         state["nextLog"] = now + state["backoff"]
         state["backoff"] = min(900.0, state["backoff"] * 2.0)
-    print(f"[UserLoop] leverage_for({symbol}) failed, using {static}x: {message}")
+    print(f"[UserLoop] leverage_for({symbol}) could not be read; "
+          f"no order will be sized from an assumed leverage: {message}")
     return True
+
+
+def _leverage_cache_key(cfg, symbol):
+    import hashlib
+    account = str(getattr(cfg, "CTRADER_ACCOUNT_ID", "") or "")
+    env = str(getattr(cfg, "CTRADER_ENV", "") or "").lower()
+    token = str(getattr(cfg, "CTRADER_ACCESS_TOKEN", "") or "")
+    fingerprint = hashlib.sha256(token.encode()).hexdigest()[:16] if token else ""
+    return (account, env, fingerprint, _nrm(symbol))
 
 
 def _report_capped_failure(key, message):
@@ -240,13 +256,17 @@ def _report_capped_failure(key, message):
     return True
 
 
-def leverage_for_symbol(broker, cfg, symbol):
-    """The broker's real leverage for `symbol`, cached, with a per-INSTRUMENT
-    fallback rather than a per-build one.
+def leverage_for_symbol(broker, cfg, symbol, *, user_id=None):
+    """The broker's leverage for this account and `symbol`, or None.
 
-    An explicit client setting always wins — `cfg.LEVERAGE` is already the
-    resolved value when the user set one, and second-guessing it here would
-    silently override a deliberate choice.
+    None means the margin cap cannot be computed. Callers must not size an
+    order. An explicit client setting still wins — that number is the
+    client's, not a substitute for a failed read.
+
+    A successful read is cached for this account, environment and token
+    fingerprint. A failure is cached as unknown for a short time so a tight
+    loop does not ask again on every tick, and so another account does not
+    inherit it.
     """
     sym = _nrm(symbol)
     # An explicit client setting wins for every symbol. This used to be
@@ -257,23 +277,38 @@ def leverage_for_symbol(broker, cfg, symbol):
         if explicit > 0:
             return explicit
     if not sym:
-        return float(getattr(cfg, "LEVERAGE", _LEV_STATIC_FX))
-    if sym in _LEV_CACHE:
-        return _LEV_CACHE[sym]
-    static = _LEV_STATIC_FX
-    lev = static
+        return None
+    key = _leverage_cache_key(cfg, sym)
+    now = time.monotonic()
+    cached = _LEV_CACHE.get(key)
+    if cached is not None:
+        expires, value = cached
+        if expires is None or now < expires:
+            return value
+    err = None
+    lev = None
     try:
         if broker is not None and hasattr(broker, "leverage_for"):
             got = float(broker.leverage_for(symbol) or 0)
             if got > 0:
                 lev = got
     except Exception as e:
-        # Best-effort refinement, never a hard dependency — but the fallback
-        # is now the right ORDER OF MAGNITUDE for the instrument, which is the
-        # part that was wrong.
-        _report_leverage_failure(("symbol", sym), symbol, static, e)
-    _LEV_CACHE[sym] = lev
-    return lev
+        err = e
+    if lev is not None:
+        _LEV_CACHE[key] = (None, lev)
+        return lev
+    _LEV_CACHE[key] = (now + _LEV_UNKNOWN_TTL_S, None)
+    if err is not None:
+        _report_leverage_failure(key, symbol, err)
+        if user_id:
+            try:
+                from apex.platform import broker_read as _br
+                if _br._is_auth_failure(err):
+                    from apex.platform import ctrader_link as _link
+                    _link.mark_reconnect_required(user_id)
+            except Exception:
+                pass
+    return None
 
 
 def broker_min_units(broker, symbol, fallback=0.0):
@@ -1348,24 +1383,13 @@ def _make_broker(user, user_id=None, ctid=None):
     # CtraderBroker.leverage_for) — but only when the client didn't set one
     # explicitly and we're actually margining real money against it.
     if not paper and ct_token and ct_account and "leverage" not in user:
-        try:
-            fake_cfg.LEVERAGE = broker.leverage_for(fake_cfg.SYMBOL)
-        except Exception as e:
-            try:
-                # The narrow matcher, not _looks_like_auth_error: that one is
-                # tuned to decide when a refresh might help ("access",
-                # "route", bare INVALID_REQUEST), and persisting "reconnect
-                # required" on such a match would lock a client out over a
-                # data hiccup.
-                from apex.platform import broker_read as _br
-                if user_id and _br._is_auth_failure(e):
-                    from apex.platform import ctrader_link as _link
-                    _link.mark_reconnect_required(user_id)
-            except Exception:
-                pass
-            _report_leverage_failure(
-                ("account", str(user_id), str(ct_account)),
-                fake_cfg.SYMBOL, fake_cfg.LEVERAGE, e)
+        # Only a broker reading is written onto the config. A failure leaves
+        # the default untouched and does not become the margin assumption;
+        # `leverage_for_symbol` returns None and the entry is refused.
+        got = leverage_for_symbol(
+            broker, fake_cfg, fake_cfg.SYMBOL, user_id=user_id)
+        if got is not None:
+            fake_cfg.LEVERAGE = got
     return broker, fake_cfg
 
 
@@ -4639,12 +4663,19 @@ def _loop(user_id, alert_fn, gen=None):
                 # volatile-regime reductions (risk_mult below) still shrink it
                 # when conditions call for it — that's a safety cut, not drift.
                 sizing_balance = dash.get("startBalance") or paper_balance
-                _lev = leverage_for_symbol(broker, cfg, symbol)
-                units = forex.calc_units(sizing_balance, per_trade_risk,
-                                         stop_pips_eff, symbol, price,
-                                         leverage=_lev, mult=risk_mult)
-                floor = forex.safe_min_units(symbol, paper_balance, price,
-                                             _lev, cfg.MARGIN_CAP)
+                _lev = leverage_for_symbol(broker, cfg, symbol, user_id=user_id)
+                if not _lev:
+                    _skip("leverage for this account could not be read, so "
+                          "this order was not sized")
+                    entry_ok = False
+                    units = 0
+                    floor = 0
+                else:
+                    units = forex.calc_units(sizing_balance, per_trade_risk,
+                                             stop_pips_eff, symbol, price,
+                                             leverage=_lev, mult=risk_mult)
+                    floor = forex.safe_min_units(symbol, paper_balance, price,
+                                                 _lev, cfg.MARGIN_CAP)
                 # The BROKER's own minimum, when it will tell us. place_order
                 # raises anything below it up to that minimum — correct for the
                 # wire, but it happens after sizing, so without asking here the
@@ -4653,7 +4684,9 @@ def _loop(user_id, alert_fn, gen=None):
                 # minimum is 1 oz, and the account has been trading gold at
                 # ~1.5% risk with nothing reporting it.
                 floor = max(floor, broker_min_units(broker, symbol, floor))
-                if floor == 0:
+                if not _lev:
+                    pass
+                elif floor == 0:
                     _skip("account too small for minimum lot on this instrument")
                     entry_ok = False
                 else:
@@ -5905,11 +5938,16 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
         units = forex.lots_to_units(lots, sym)
     else:
         # Same per-instrument leverage as the automatic path.
+        _lev = leverage_for_symbol(broker, cfg, sym, user_id=user_id)
+        if not _lev:
+            return {"ok": False, "side": side, "symbol": sym,
+                    "error": "leverage for this account could not be read, "
+                             "so the order was not sized"}
         units = forex.calc_units(sizing_balance,
                                  (risk_override if risk_override is not None
                                   else cfg.RISK_PER_TRADE),
                                  stop_pips_eff, sym, price,
-                                 leverage=leverage_for_symbol(broker, cfg, sym))
+                                 leverage=_lev)
     units = forex.round_units(max(units, forex.min_units(sym)), sym)
     # Same unbounded-floor defect the automatic path had: when the risk-correct
     # size lands below the minimum lot, taking the lot anyway spends more than

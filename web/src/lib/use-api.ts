@@ -34,6 +34,25 @@ const flights = new Map<string, Flight>();
 export const MIN_POLL_GAP_MS = 8_000;
 const lastAttempt = new Map<string, number>();
 const pathPauseUntil = new Map<string, number>();
+const pauseRetry = new Map<string, number>();
+
+/**
+ * Paths that spend the server's historical-data bucket (30/min). The limit
+ * itself is not raised. A refusal on any of them pauses the rest, so a chart
+ * poll that has used the budget does not immediately spend `/trades` as well.
+ */
+const HISTORICAL_BUDGET = "historical";
+
+export function historicalRead(path: string): boolean {
+  const bare = path.split("?")[0];
+  return bare === "trades" || bare === "symbols"
+    || bare.startsWith("trade/min-lot")
+    || /\/candles$/.test(bare);
+}
+
+function pauseKey(path: string): string {
+  return historicalRead(path) ? HISTORICAL_BUDGET : path;
+}
 
 function pollGap(intervalMs: number): number {
   if (!intervalMs) return MIN_POLL_GAP_MS;
@@ -127,6 +146,8 @@ export function invalidateBrokerViews() {
 export function resetReadSchedule() {
   lastAttempt.clear();
   pathPauseUntil.clear();
+  for (const id of pauseRetry.values()) window.clearTimeout(id);
+  pauseRetry.clear();
 }
 
 export function useRead<T>(path: string | null, intervalMs = 0) {
@@ -138,14 +159,37 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   const pauseUntil = useRef(0);
   /** The request this mounted reader is waiting on, so unmount can drop it. */
   const held = useRef<Flight | null>(null);
+  /** The retry timer calls this, not `load` directly: the timer is scheduled
+   * from inside `load`, and the hook linter rejects that self-reference. */
+  const loadRef = useRef<(
+    force?: boolean,
+    kind?: "mount" | "poll" | "visible" | "online",
+  ) => Promise<ApiResult<T> | undefined>>(async () => undefined);
 
   const load = useCallback(async (force = false, kind: "mount" | "poll" | "visible" | "online" = "mount"): Promise<ApiResult<T> | undefined> => {
     if (!path) return undefined;
     // The server said how long to wait. Polling again before that spends the
     // budget the refusal just told us is empty. The pause is per path, so a
     // second reader of the same endpoint waits out the same refusal.
-    const sharedPause = pathPauseUntil.get(path) ?? 0;
-    if (!force && (Date.now() < pauseUntil.current || Date.now() < sharedPause)) return undefined;
+    const sharedPause = Math.max(
+      pathPauseUntil.get(path) ?? 0,
+      pathPauseUntil.get(pauseKey(path)) ?? 0,
+      pauseUntil.current,
+    );
+    if (!force && Date.now() < sharedPause) {
+      // One retry when the shared budget reopens. A page that mounted during
+      // the pause would otherwise sit on its spinner until its own interval,
+      // which for closed trades is a minute.
+      if (!pauseRetry.has(path)) {
+        const wait = Math.max(0, sharedPause - Date.now());
+        const id = window.setTimeout(() => {
+          pauseRetry.delete(path);
+          void loadRef.current(false, "poll");
+        }, wait);
+        pauseRetry.set(path, id);
+      }
+      return undefined;
+    }
     if (!force && (kind === "poll" || kind === "visible")) {
       const last = lastAttempt.get(path) ?? 0;
       const gap = kind === "visible" ? Math.max(pollGap(intervalMs), 12_000) : pollGap(intervalMs);
@@ -172,8 +216,9 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
         && typeof r.retryAfterSec === "number" && r.retryAfterSec > 0) {
       const until = Date.now() + r.retryAfterSec * 1000;
       pauseUntil.current = until;
-      const prev = pathPauseUntil.get(path) ?? 0;
-      pathPauseUntil.set(path, Math.max(prev, until));
+      const bucket = pauseKey(path);
+      const prev = pathPauseUntil.get(bucket) ?? 0;
+      pathPauseUntil.set(bucket, Math.max(prev, until));
     } else if (r.ok) {
       pauseUntil.current = 0;
     }
@@ -185,6 +230,10 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     // screen to have caught up.
     return r;
   }, [path, intervalMs]);
+
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
 
   useEffect(() => {
     // Queued rather than called straight from the effect body. `load` sets

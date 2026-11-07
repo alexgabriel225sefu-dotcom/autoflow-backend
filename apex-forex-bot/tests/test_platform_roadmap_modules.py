@@ -273,6 +273,21 @@ def test_incidents_do_not_reassure_about_what_was_not_checked():
     assert "Not checked" in some["message"] and "brokerStatus" in some["checked"]
 
 
+def test_incidents_record_keeps_the_empty_contract():
+    import apex.user_store as us
+    old_dir, old_redis = us._DIR, us._USE_REDIS
+    us._DIR, us._USE_REDIS = tempfile.mkdtemp(prefix="a4t-incidents-empty-"), False
+    try:
+        out = incidents.record("healthy-user", {"brokerStatus": "ok", "storeAvailable": True})
+        assert out["incidents"] == []
+        assert "notChecked" in out and isinstance(out["notChecked"], list)
+        assert "riskBlocked" in out["notChecked"]
+        assert "checked" in out and "brokerStatus" in out["checked"]
+        assert isinstance(out.get("message"), str) and out["message"]
+    finally:
+        us._DIR, us._USE_REDIS = old_dir, old_redis
+
+
 if __name__ == "__main__":
     failed = []
     for name, fn in sorted((n, f) for n, f in globals().items()

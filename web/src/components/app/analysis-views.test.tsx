@@ -31,6 +31,21 @@ describe("analysis views", () => {
     expect(screen.queryByText("could not be read")).toBeNull();
     expect(document.querySelector('[data-check="not-applicable"]')).not.toBeNull();
   });
+  it("a closed market is not shown as a failed price feed", async () => {
+    answer = okv({ score: 80, status: "degraded", checks: {
+      broker: true, data: "market_closed", quotes: "market_closed", risk: false,
+    }, warnings: ["The market is closed, so candle age and quote age are not treated as a feed failure."] });
+    render(<HealthView />);
+    await waitFor(() => expect(screen.getAllByText("market closed").length).toBe(2));
+    expect(screen.queryByText("Price data fresh")).not.toBeNull();
+    expect(document.querySelector('[data-check="market-closed"]')).not.toBeNull();
+  });
+  it("incidents render when the healthy payload omits notChecked", async () => {
+    answer = okv({ status: "ok", incidents: [] });
+    render(<IncidentsView />);
+    await waitFor(() => expect(screen.queryByText(/not an all-clear/i)).not.toBeNull());
+    expect(screen.queryByText("Something went wrong")).toBeNull();
+  });
   it("incidents say what was not checked", async () => {
     answer = okv({ incidents: [], checked: ["brokerStatus"], notChecked: ["riskBlocked"],
                    message: "Nothing wrong in what was checked (brokerStatus). Not checked: riskBlocked." });

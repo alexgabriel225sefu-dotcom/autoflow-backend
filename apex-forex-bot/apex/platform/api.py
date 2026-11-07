@@ -609,7 +609,9 @@ def _dispatch(method, route, headers, body, query=None):
 
     if route == "health-score" and method == "GET":
         p = _authenticate(headers)
+        from apex import forex as _fx
         from apex.platform import health_score as _health_score
+        from apex.platform import risk_guard as _risk_guard
         accounts = _link.public_status(p.user_id)
         selected = (accounts or {}).get("selected") or {}
         rule = _selected_rule(p.user_id)
@@ -626,17 +628,6 @@ def _dispatch(method, route, headers, body, query=None):
                 session_valid = float(token_exp) > time.time()
             except (TypeError, ValueError):
                 session_valid = None
-        data_fresh = None
-        if rule and selected.get("ctid") and rule.get("symbols"):
-            got = _read.candles(p.user_id, symbol=rule["symbols"][0],
-                                timeframe=rule.get("timeframe") or "1h", limit=2,
-                                ctid=selected.get("ctid"))
-            if got.get("status") == _read.OK and got.get("candles"):
-                stamp = got["candles"][-1].get("time", got["candles"][-1].get("timestamp"))
-                try:
-                    data_fresh = time.time() - float(stamp) <= 120
-                except (TypeError, ValueError):
-                    data_fresh = None
         try:
             store_health = _ustore.redis_health()
             store_available = store_health.get("reachable") if store_health.get("configured") else None
@@ -647,14 +638,53 @@ def _dispatch(method, route, headers, body, query=None):
             "brokerStatus": "ok" if accounts.get("connected") else None,
             "storeAvailable": store_available,
             "riskBlocked": None})
-        return _ok(_health_score.score({
-            "brokerConnected": accounts.get("connected"),
-            "sessionValid": session_valid, "storeAvailable": store_available,
-            "ruleValid": rule_valid, "riskGuardReady": None,
-            "dataFresh": data_fresh,
-            "criticalIncidents": any(i.get("severity") == "critical"
-                                      for i in incident_view.get("incidents", [])),
-        }))
+        connected = accounts.get("connected") is True
+        market_open = _fx.is_market_open()
+        now = time.time()
+        timeframe = (rule or {}).get("timeframe") or "1h"
+        candle_status, candle_stamp = "skipped", None
+        positions_status, position_rows = "skipped", None
+        guard = None
+        # A closed market is not asked for a new bar or a live quote. The
+        # risk guard still is: it reads closed trades, and an unread guard
+        # is not reported as ready.
+        if connected and market_open and rule and selected.get("ctid") and rule.get("symbols"):
+            got = _read.candles(p.user_id, symbol=rule["symbols"][0],
+                                timeframe=timeframe, limit=2,
+                                ctid=selected.get("ctid"))
+            candle_status = got.get("status")
+            if candle_status == _read.OK and got.get("candles"):
+                last = got["candles"][-1]
+                candle_stamp = last.get("time", last.get("timestamp"))
+        if connected and market_open and selected.get("ctid"):
+            got_pos = _read.positions(p.user_id, ctid=selected.get("ctid"))
+            positions_status = got_pos.get("status")
+            position_rows = got_pos.get("positions")
+        if connected:
+            try:
+                trades = _tradesread.read(
+                    p.user_id, days=7,
+                    mode=selected.get("mode") or "demo",
+                    ctid=selected.get("ctid") or None)
+                account = _read.account(
+                    p.user_id, ctid=selected.get("ctid") or None)
+                balance = ({"balance": account.get("balance")}
+                           if account.get("status") == _read.OK else {})
+                guard = _risk_guard.evaluate(
+                    _risk_guard.state_from_trades(trades, balance, now=now))
+            except Exception:
+                guard = None
+        return _ok(_health_score.assemble(
+            connected=connected, market_open=market_open,
+            session_valid=session_valid, rule_valid=rule_valid,
+            store_available=store_available,
+            critical_incidents=any(
+                i.get("severity") == "critical"
+                for i in incident_view.get("incidents", [])),
+            timeframe=timeframe, now=now,
+            candle_status=candle_status, candle_stamp=candle_stamp,
+            positions_status=positions_status, positions=position_rows,
+            guard=guard))
 
     if route == "incidents" and method == "GET":
         p = _authenticate(headers)

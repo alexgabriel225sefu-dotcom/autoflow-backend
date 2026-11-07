@@ -177,6 +177,14 @@ check("and the licence is withdrawn",
       LIC.status_for(USER)["state"] == LIC.REVOKED,
       str(LIC.status_for(USER)))
 
+print("\n[4b] the same dispute delivered again stays revoked and is not a second revoke race")
+st, payload = deliver(dispute)
+check("the redelivery is a duplicate", st == 200 and (payload or {}).get("duplicate") is True,
+      f"{st} {payload}")
+check("the licence is still withdrawn",
+      LIC.status_for(USER)["state"] == LIC.REVOKED,
+      str(LIC.status_for(USER)))
+
 print("\n[5] a PARTIAL refund does not take the whole licence away")
 # `charge.refunded` fires on partial refunds too, and revoking everything
 # for one takes away access the client has still paid for.

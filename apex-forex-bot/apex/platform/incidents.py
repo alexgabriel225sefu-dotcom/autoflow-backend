@@ -29,18 +29,23 @@ def derive(facts: dict[str, Any]) -> dict[str, Any]:
 
 
 def record(user_id: str, facts: dict[str, Any], *, now: float | None = None) -> dict[str, Any]:
-    """Persist only incidents derived from current observable facts."""
+    """Persist only incidents derived from current observable facts.
+
+    The empty case used to drop `checked`, `notChecked` and `message`. The
+    incidents page reads `notChecked.length`, so a healthy account — the
+    common case — threw in the browser and the error boundary replaced the
+    page. Every answer now carries the same contract `derive` already builds.
+    """
     current = derive(facts)
-    if not current["incidents"]:
-        return {"status": "ok", "incidents": [], "history": _history(user_id)}
     history = _history(user_id)
-    for incident in current["incidents"]:
-        if not any(row.get("kind") == incident.get("kind")
-                   and row.get("status") == incident.get("status")
-                   and row.get("recoveredAt") is None for row in history):
-            history.append(incident)
-    history = history[-200:]
-    user_store.update(user_id, {"incidents": history})
+    if current["incidents"]:
+        for incident in current["incidents"]:
+            if not any(row.get("kind") == incident.get("kind")
+                       and row.get("status") == incident.get("status")
+                       and row.get("recoveredAt") is None for row in history):
+                history.append(incident)
+        history = history[-200:]
+        user_store.update(user_id, {"incidents": history})
     return {**current, "history": history}
 
 

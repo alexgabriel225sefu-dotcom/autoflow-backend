@@ -394,6 +394,38 @@ describe("invalidate reaches every reader of a path", () => {
     }
   });
 
+  it("a historical refusal pauses the other reads that share that budget", async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: string[] = [];
+      vi.spyOn(apiModule, "api").mockImplementation(async (path) => {
+        calls.push(String(path));
+        if (String(path).includes("candles")) {
+          return {
+            ok: false, status: 429, code: "RATE_LIMITED",
+            message: "too many requests — wait 30s and try again",
+            retryAfterSec: 30,
+          } as never;
+        }
+        return { ok: true, data: { trades: [] } } as never;
+      });
+      renderHook(() => useRead("accounts/9/candles?symbol=EURUSD", 60_000));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls).toEqual(["accounts/9/candles?symbol=EURUSD"]);
+
+      renderHook(() => useRead("trades?days=30&mode=demo", 60_000));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls, "trades spent the budget the candle read was just refused").toEqual([
+        "accounts/9/candles?symbol=EURUSD",
+      ]);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+      expect(calls).toContain("trades?days=30&mode=demo");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("stops listening once the reader unmounts", async () => {
     const spy = vi.spyOn(apiModule, "api")
       .mockResolvedValue({ ok: true, data: {} } as never);
