@@ -11,7 +11,7 @@ import {
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
-import { PerspectiveTunnelHero } from "@/components/marketing/perspective-tunnel-hero";
+import { RuleSentenceHero } from "@/components/marketing/rule-sentence-hero";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -61,7 +61,7 @@ export default function Landing() {
           </span>
         </nav>
 
-        <PerspectiveTunnelHero />
+        <RuleSentenceHero />
 
         <section id="how-it-works" className="mkt-section mkt-flow" aria-labelledby="how-title">
           <div>
