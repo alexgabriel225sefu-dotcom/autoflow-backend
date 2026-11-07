@@ -91,13 +91,20 @@ def _scrub(text, *secrets):
 
 
 def _is_auth_failure(exc):
-    """Recognise cTrader auth refusals without exposing the raw message."""
+    """Recognise cTrader auth refusals without exposing the raw message.
+
+    NARROW ON PURPOSE. A match here persists "reconnect required" on the
+    client's link, which blocks every read and the automation until they go
+    through the connection flow again. `INVALID_REQUEST` alone is cTrader's
+    generic refusal (a bad symbol, a bad volume, a closed market), so it must
+    not match by itself; only the phrases that say the credential or the
+    account authorisation is the problem do.
+    """
     text = str(exc or "").lower()
     return any(marker in text for marker in (
         "not authorized", "not_authorized", "not authenticated",
         "not_authenticated", "account auth failed", "token expired",
-        "token invalid", "access token", "unauthorised", "unauthorized",
-        "invalid_request",
+        "token invalid", "invalid token", "unauthorised", "unauthorized",
     ))
 
 

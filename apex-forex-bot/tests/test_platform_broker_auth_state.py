@@ -64,6 +64,23 @@ check("the first refusal changes state", first is True)
 check("the repeated refusal is quiet", second is False)
 check("only one persistence write occurs", len(writes) == 1, str(writes))
 
+# ── which errors count as a lost authorisation ─────────────────────────────
+# A match persists "reconnect required", which locks the client out until they
+# reconnect. The error seen in production must match; cTrader's generic
+# refusals (bad symbol, bad volume, market closed) must NOT.
+check("the production refusal is an auth failure",
+      BR._is_auth_failure(Exception(
+          "cTrader error: INVALID_REQUEST Trading account is not authorized")))
+check("an expired token is an auth failure",
+      BR._is_auth_failure(Exception("token expired")))
+check("a bare INVALID_REQUEST is NOT an auth failure",
+      not BR._is_auth_failure(Exception("cTrader error: INVALID_REQUEST bad symbol id")))
+check("a volume refusal is NOT an auth failure",
+      not BR._is_auth_failure(Exception("INVALID_REQUEST volume below minimum")))
+check("a closed market is NOT an auth failure",
+      not BR._is_auth_failure(Exception("MARKET_CLOSED the market is closed")))
+
+
 print()
 if _fails:
     print(f"FAILED ({len(_fails)}):")

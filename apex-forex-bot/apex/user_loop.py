@@ -1352,7 +1352,13 @@ def _make_broker(user, user_id=None, ctid=None):
             fake_cfg.LEVERAGE = broker.leverage_for(fake_cfg.SYMBOL)
         except Exception as e:
             try:
-                if user_id and _looks_like_auth_error(str(e)):
+                # The narrow matcher, not _looks_like_auth_error: that one is
+                # tuned to decide when a refresh might help ("access",
+                # "route", bare INVALID_REQUEST), and persisting "reconnect
+                # required" on such a match would lock a client out over a
+                # data hiccup.
+                from apex.platform import broker_read as _br
+                if user_id and _br._is_auth_failure(e):
                     from apex.platform import ctrader_link as _link
                     _link.mark_reconnect_required(user_id)
             except Exception:
