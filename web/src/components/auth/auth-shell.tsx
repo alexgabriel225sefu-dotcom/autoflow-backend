@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BookOpen, PlayCircle, ShieldCheck } from "lucide-react";
-import { BrandLockup, StackedBrandLockup } from "@/components/brand/logo";
+import { BrandLockup } from "@/components/brand/logo";
+import { BrandStage } from "./brand-stage";
 import styles from "./auth-shell.module.css";
 
 /**
@@ -39,7 +40,7 @@ export function AuthShell({
       <aside className={styles.brand} aria-label="About Apex4Traders">
         <div className={styles.brandGlow} aria-hidden="true" />
         <div className={styles.brandInner}>
-          <StackedBrandLockup width={300} className={styles.brandLogo} />
+          <BrandStage />
           <h2>Trade by rules you can read.</h2>
           <p>
             Write your plan in plain words, test it on a demo account for 14
