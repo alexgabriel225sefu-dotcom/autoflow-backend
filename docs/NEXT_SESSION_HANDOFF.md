@@ -694,8 +694,9 @@ is explained or left "unknown", never guessed; a failed read is shown as failed.
 
 Branch: `codex/platform-bugs-performance-reads`, based on
 `claude/apex4traders-platform-v1`. Commits: `6d4d31a9` (cTrader read
-authorization recovery) and `b14fe3bf` (broker-state UI). Not deployed and not
-merged. CI has not been run for these commits yet.
+authorization recovery), `b14fe3bf` (broker-state UI), and `cce27c2d`
+(actionable reconnect flow). Not deployed and not merged. CI has not been run
+for these commits yet.
 
 Done in this slice:
 
