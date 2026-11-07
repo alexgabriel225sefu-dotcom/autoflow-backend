@@ -37,6 +37,7 @@ import { collapseRepeated, plainAutomation, plainDecision, plainLicence, plainRe
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
 import { FirstRunChecklist } from "@/components/app/first-run";
 import { JourneyStrip } from "@/components/app/journey-strip";
+import { AccountsDuo } from "@/components/app/accounts-duo";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -204,6 +205,11 @@ export default function Dashboard() {
       </div>
 
       <JourneyStrip auto={auto.result} rules={rules.result} mode={selected?.mode ?? null} />
+
+      <AccountsDuo
+        accounts={account?.accounts ?? null} selected={selected}
+        execution={execution} running={running}
+      />
 
       <FirstRunChecklist
         me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}

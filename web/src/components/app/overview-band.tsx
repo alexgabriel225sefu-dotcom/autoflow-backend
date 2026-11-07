@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { onSpot } from "./spotlight";
+import { NumberTicker } from "@/components/ui/number-ticker";
 
 /**
  * The dashboard's first glance: four facts, large, read-only.
@@ -42,7 +43,9 @@ export function OverviewBand({ tiles }: { tiles: Tile[] }) {
             data-empty={t.value == null || t.value === "" ? "true" : undefined}
           >
             {t.tone === "long" ? <i className="ovb-live" aria-hidden="true" /> : null}
-            {t.value ?? "—"}
+            {typeof t.value === "string" && /^\d{1,6}$/.test(t.value)
+              ? <NumberTicker value={Number(t.value)} />
+              : (t.value ?? "—")}
           </span>
           {t.note ? <span className="ovb-note">{t.note}</span> : <span className="ovb-note">&nbsp;</span>}
         </div>

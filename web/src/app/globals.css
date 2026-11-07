@@ -2620,3 +2620,18 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
   .ovb-value:not([data-empty="true"]) { animation: ovb-pop .45s cubic-bezier(.2, .8, .3, 1.2); }
   @keyframes ovb-pop { from { transform: scale(.92); opacity: .4; } to { transform: none; opacity: 1; } }
 }
+
+/* ── demo and live, side by side ───────────────────────────────────── */
+.duo { display: grid; gap: .75rem; margin-bottom: var(--sp-3); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.duo-card { position: relative; display: flex; flex-direction: column; gap: .4rem; min-width: 0; padding: 1.1rem 1.25rem; border-radius: 20px; border: 1px solid var(--a4t-line-soft); background: radial-gradient(120% 90% at 0% 0%, rgba(247, 246, 242, .05), transparent 55%), var(--a4t-surface); overflow: hidden; }
+.duo-card[data-active="true"] { border-color: transparent; }
+.duo-card header { display: flex; align-items: center; gap: .5rem; font-size: .72rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--a4t-dim); }
+.duo-card header em { margin-left: auto; font-style: normal; letter-spacing: .02em; text-transform: none; font-size: .74rem; padding: .18rem .6rem; border-radius: 999px; border: 1px solid var(--a4t-line); color: var(--a4t-muted); }
+.duo-card header em[data-tone="on"] { color: var(--a4t-long); border-color: color-mix(in srgb, var(--a4t-long) 50%, transparent); background: color-mix(in srgb, var(--a4t-long) 12%, transparent); }
+.duo-card header em[data-tone="ready"] { color: var(--a4t-text); }
+.duo-card > strong { font-size: clamp(1.2rem, 2vw, 1.6rem); letter-spacing: -.03em; }
+.duo-card > p { margin: 0; color: var(--a4t-muted); font-size: .86rem; line-height: 1.5; min-height: 2.6em; }
+.duo-card > a { margin-top: .3rem; align-self: flex-start; color: var(--a4t-text); font-size: .86rem; font-weight: 600; text-decoration: underline; text-decoration-color: var(--a4t-line); text-underline-offset: 4px; }
+.duo-card > a:hover { text-decoration-color: var(--a4t-text); }
+@media (prefers-reduced-motion: no-preference) { .duo-card { animation: jrn-rise .6s cubic-bezier(.2, .7, .2, 1) both; } .duo-card[data-kind="live"] { animation-delay: 80ms; } }
