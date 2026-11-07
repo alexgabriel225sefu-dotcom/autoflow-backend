@@ -34,11 +34,13 @@ export function LivingBackdrop() {
     let w = 0, h = 0, raf = 0, last = 0, frame = 0;
     const blocks: Block[] = [];
     const CELL = 34;
+    const Q = 0.5;                            // draw at half resolution; the lines are soft anyway
 
     function size() {
       if (!canvas) return;
       w = canvas.clientWidth; h = canvas.clientHeight;
-      canvas.width = w; canvas.height = h;
+      canvas.width = Math.round(w * Q); canvas.height = Math.round(h * Q);
+      ctx?.setTransform(Q, 0, 0, Q, 0, 0);
     }
 
     function draw(t: number) {
@@ -64,7 +66,7 @@ export function LivingBackdrop() {
           if (xi === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
         }
         ctx.strokeStyle = `rgba(${r},${g},${b},${(strokeA * (0.25 + z * 0.75)).toFixed(3)})`;
-        ctx.lineWidth = 0.6 + z * 0.9;
+        ctx.lineWidth = (0.6 + z * 0.9) * 1.8;
         ctx.stroke();
       }
 
@@ -80,15 +82,15 @@ export function LivingBackdrop() {
         if (age >= 1) { blocks.splice(i, 1); continue; }
         const a = Math.sin(age * Math.PI);
         ctx.fillStyle = k.hot
-          ? `rgba(${dark ? 255 : 20},${dark ? 255 : 20},${dark ? 255 : 20},${(a * 0.5).toFixed(3)})`
-          : `rgba(${r},${g},${b},${(a * 0.38).toFixed(3)})`;
+          ? `rgba(${dark ? 255 : 20},${dark ? 255 : 20},${dark ? 255 : 20},${(a * 0.16).toFixed(3)})`
+          : `rgba(${r},${g},${b},${(a * 0.14).toFixed(3)})`;
         ctx.fillRect(k.cx * CELL + 2, k.cy * CELL + 2, CELL - 4, CELL - 4);
       }
     }
 
     function loop(t: number) {
       raf = requestAnimationFrame(loop);
-      if (t - last < 33) return;              // about 30 frames a second
+      if (t - last < 42) return;              // about 24 frames a second
       last = t;
       if (++frame % 90 === 0) rgb = accent(document.documentElement);
       draw(t);

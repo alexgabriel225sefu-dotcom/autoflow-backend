@@ -2669,7 +2669,7 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
 .dash { position: relative; isolation: isolate; }
 .dash-orb { position: absolute; z-index: -1; top: -2.5rem; right: 4%; width: clamp(9rem, 22vw, 15rem); aspect-ratio: 1; border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle at 32% 28%, #fff 0, var(--a4t-accent-strong, #fff) 12%, var(--a4t-accent) 38%, color-mix(in srgb, var(--a4t-accent) 30%, #000) 72%, transparent 74%);
-  opacity: .5; filter: blur(.5px) drop-shadow(0 30px 60px color-mix(in srgb, var(--a4t-accent) 45%, transparent)); }
+  opacity: .5; box-shadow: 0 30px 60px -10px color-mix(in srgb, var(--a4t-accent) 45%, transparent); will-change: translate, scale; }
 :root[data-theme="light"] .dash-orb { opacity: .32; }
 @media (prefers-reduced-motion: no-preference) {
   .dash-orb { animation: orb-float 9s ease-in-out infinite; }
@@ -2728,8 +2728,8 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
 @media (prefers-reduced-motion: reduce) { .pfl-node { animation: none; } .pfl-link[data-on="true"] .pfl-dot { animation: none; left: 30%; top: 30%; } }
 
 /* ── the living background behind the dashboard ─────────────────────── */
-.dash-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-.dash-aurora i { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .34; will-change: transform; }
+.dash-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; contain: strict; }
+.dash-aurora i { position: absolute; border-radius: 50%; opacity: .34; will-change: transform; }
 .dash-aurora i:nth-child(1) { width: 46vmax; height: 46vmax; left: 18vw; top: -10vmax; background: radial-gradient(circle, var(--a4t-accent), transparent 66%); }
 .dash-aurora i:nth-child(2) { width: 40vmax; height: 40vmax; right: -6vmax; top: 24vh; background: radial-gradient(circle, color-mix(in srgb, var(--a4t-accent) 35%, #7b61ff), transparent 66%); opacity: .3; }
 .dash-aurora i:nth-child(3) { width: 36vmax; height: 36vmax; left: 30vw; bottom: -10vmax; background: radial-gradient(circle, color-mix(in srgb, var(--a4t-accent) 40%, #ff8f7a), transparent 66%); opacity: .26; }
@@ -2743,13 +2743,13 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
   @keyframes aur-c { from { transform: translate3d(0, 0, 0) scale(.95); } to { transform: translate3d(-12vmax, -12vmax, 0) scale(1.2); } }
 }
 
-.dash-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; mix-blend-mode: screen; }
-:root[data-theme="light"] .dash-canvas { mix-blend-mode: multiply; }
+.dash-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 @media (min-width: 1024px) { .dash-aurora { left: 232px; } }
 /* Glass: the surfaces on the dashboard let the living background show through. */
 .dash .card, .dash .pfl, .dash .duo-card, .dash .ovb-tile, .dash .jrn-step {
-  background: linear-gradient(180deg, rgba(247, 246, 242, .05), rgba(247, 246, 242, .015)), color-mix(in srgb, var(--a4t-surface) 66%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.25); backdrop-filter: blur(14px) saturate(1.25);
+  background: linear-gradient(180deg, rgba(247, 246, 242, .05), rgba(247, 246, 242, .015)), color-mix(in srgb, var(--a4t-surface) 78%, transparent);
 }
 :root[data-theme="light"] .dash .card, :root[data-theme="light"] .dash .pfl, :root[data-theme="light"] .dash .duo-card,
 :root[data-theme="light"] .dash .ovb-tile, :root[data-theme="light"] .dash .jrn-step { background: color-mix(in srgb, var(--a4t-surface) 78%, transparent); }
+
+@media (max-width: 1023px) { .dash-aurora { display: none; } }
