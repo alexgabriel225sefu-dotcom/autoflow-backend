@@ -12,6 +12,8 @@ import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { RuleSentenceHero } from "@/components/marketing/rule-sentence-hero";
+import { HeroProduct } from "@/components/marketing/hero-product";
+import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -62,6 +64,17 @@ export default function Landing() {
         </nav>
 
         <RuleSentenceHero />
+
+        <section className="mkt-section" aria-label="The platform in use" style={{ paddingTop: 0 }}>
+          <HeroProduct />
+        </section>
+
+        <section id="tour" className="mkt-section" aria-labelledby="tour-title">
+          <span className="mkt-eyebrow">The platform</span>
+          <h2 id="tour-title">See it before you sign up.</h2>
+          <p>Real screens from a demo account, from the first setup step to the journal of every decision.</p>
+          <ProductShowcase />
+        </section>
 
         <section id="how-it-works" className="mkt-section mkt-flow" aria-labelledby="how-title">
           <div>
