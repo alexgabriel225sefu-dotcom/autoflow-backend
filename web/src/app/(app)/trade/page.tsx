@@ -1,4 +1,5 @@
 "use client";
+import { InstrumentArt, InstrumentCard } from "@/components/app/instrument-art";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -213,7 +214,7 @@ export default function TradePage() {
                       aria-checked={c.symbol === r.id}
                       aria-disabled={!r.tradeable} disabled={!r.tradeable}
                       title={r.reason ?? undefined}
-                      onClick={() => set("symbol", r.id)}>{r.id}</button>
+                      onClick={() => set("symbol", r.id)}><InstrumentArt symbol={r.id} />{r.id}</button>
             ))}
           </div>
           {view.rows.length === 0 && broker.result ? (
@@ -239,6 +240,7 @@ export default function TradePage() {
               ? `Your broker lists ${view.total} instruments. ${view.total - view.unsupported} can be traded now; the rest are shown with the reason, not hidden.`
               : "Your broker's list could not be read, so this shows what the platform supports: forex with a USD leg, plus gold and silver."}
           </p>
+          {c.symbol ? <InstrumentCard symbol={c.symbol} /> : null}
           {c.symbol ? (
             <div className="field">
               <span>Also record <span className="hint">not traded in this release</span></span>

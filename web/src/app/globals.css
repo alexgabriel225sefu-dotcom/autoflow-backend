@@ -2635,3 +2635,25 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
 .duo-card > a { margin-top: .3rem; align-self: flex-start; color: var(--a4t-text); font-size: .86rem; font-weight: 600; text-decoration: underline; text-decoration-color: var(--a4t-line); text-underline-offset: 4px; }
 .duo-card > a:hover { text-decoration-color: var(--a4t-text); }
 @media (prefers-reduced-motion: no-preference) { .duo-card { animation: jrn-rise .6s cubic-bezier(.2, .7, .2, 1) both; } .duo-card[data-kind="live"] { animation-delay: 80ms; } }
+
+/* ── instrument pictures ───────────────────────────────────────────── */
+.ins { display: inline-flex; align-items: center; flex: none; vertical-align: middle; }
+.ins-disc { display: block; border-radius: 50%; box-shadow: 0 0 0 2px var(--a4t-surface); }
+.ins[data-size="sm"] { margin-right: .45rem; }
+.ins[data-size="sm"] .ins-disc { width: 1.1rem; height: 1.1rem; }
+.ins[data-size="sm"] .ins-disc + .ins-disc { margin-left: -.35rem; }
+.ins[data-size="sm"] .ins-bars { width: 1.5rem; height: 1.05rem; }
+.ins[data-size="lg"] .ins-disc { width: 3.4rem; height: 3.4rem; }
+.ins[data-size="lg"] .ins-disc + .ins-disc { margin-left: -1.1rem; }
+.ins[data-size="lg"] .ins-bars { width: 4.4rem; height: 3.1rem; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .45)); }
+.chips-symbols .chip { display: inline-flex; align-items: center; }
+.ins-card { display: flex; align-items: center; gap: 1rem; margin: .9rem 0 .2rem; padding: .9rem 1.1rem; border: 1px solid var(--a4t-line-soft); border-radius: 18px; background: radial-gradient(120% 120% at 0% 0%, rgba(247, 246, 242, .06), transparent 60%), var(--a4t-surface); }
+.ins-card strong { display: block; font-size: 1.3rem; letter-spacing: -.02em; }
+.ins-card span:not(.ins) { display: block; color: var(--a4t-muted); font-size: .86rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .ins-card { animation: ins-in .5s cubic-bezier(.2, .8, .3, 1.15); }
+  .ins-card .ins-disc, .ins-card .ins-bars { animation: ins-float 4.5s ease-in-out infinite; }
+  .ins-card .ins-disc + .ins-disc { animation-delay: -1.2s; }
+  @keyframes ins-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes ins-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
+}
