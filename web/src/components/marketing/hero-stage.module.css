@@ -1,6 +1,10 @@
 .section { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(2rem, 5vw, 3.5rem); padding-block: clamp(2.5rem, 7vw, 5rem) clamp(2rem, 5vw, 4rem); isolation: isolate; }
-.glow { position: absolute; z-index: -1; inset: -10% -20% 0; background: radial-gradient(50% 55% at 78% 40%, rgba(255, 148, 132, .16), transparent 70%), radial-gradient(40% 50% at 12% 20%, rgba(120, 140, 255, .10), transparent 70%); animation: drift 14s ease-in-out infinite alternate; pointer-events: none; }
+.glow { position: absolute; z-index: -1; inset: -10% -20% 0; mask-image: linear-gradient(180deg, #000 70%, transparent); background: radial-gradient(50% 55% at 78% 40%, rgba(255, 148, 132, .16), transparent 70%), radial-gradient(40% 50% at 12% 20%, rgba(120, 140, 255, .10), transparent 70%), conic-gradient(from 210deg at 70% 45%, transparent 0deg, rgba(255, 148, 132, .10) 60deg, rgba(95, 70, 160, .14) 120deg, transparent 200deg); animation: drift 14s ease-in-out infinite alternate; pointer-events: none; }
 .copy { max-width: 40rem; }
+.pill { display: inline-flex; align-items: center; gap: .55rem; margin: 0 0 1.1rem; padding: .45rem .9rem; border: 1px solid var(--mkt-line); border-radius: 999px; background: rgba(247, 246, 242, .05); backdrop-filter: blur(8px); color: var(--mkt-text); font-size: .78rem; font-weight: 600; }
+.pulse { position: relative; width: .45rem; height: .45rem; border-radius: 50%; background: #3ddc97; }
+.pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1px solid #3ddc97; animation: ping 2.2s ease-out infinite; }
+@keyframes ping { from { transform: scale(.6); opacity: .9; } to { transform: scale(1.9); opacity: 0; } }
 .copy h1 { margin: 0; font-size: clamp(2.8rem, 7.2vw, 5.4rem); line-height: .96; letter-spacing: -.05em; font-weight: 650; text-wrap: balance; }
 .copy .mkt-lede { max-width: 42ch; margin-top: 1.4rem; }
 .fine { margin: 1rem 0 0; color: var(--mkt-dim); font-size: .82rem; }
@@ -12,4 +16,4 @@
 @keyframes drift { from { transform: translate3d(-2%, 0, 0) scale(1); } to { transform: translate3d(3%, 4%, 0) scale(1.06); } }
 @media (max-width: 420px) { :global(.mkt-hero-cta) { flex-direction: column; align-items: stretch; } :global(.mkt-hero-cta .mkt-btn) { justify-content: center; width: 100%; } }
 @media (min-width: 1000px) { .section { grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr); align-items: center; gap: clamp(2rem, 4vw, 4rem); } .copy h1 { font-size: clamp(3rem, 5.2vw, 4.8rem); } }
-@media (prefers-reduced-motion: reduce) { .rise { opacity: 1; transform: none; animation: none; } .glow, .shine { animation: none; } .shine { color: inherit; background: none; } }
+@media (prefers-reduced-motion: reduce) { .rise { opacity: 1; transform: none; animation: none; } .glow, .shine, .pulse::after { animation: none; } .shine { color: inherit; background: none; } }

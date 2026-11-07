@@ -29,12 +29,12 @@ const steps = [
 ] as const;
 
 const features = [
-  { icon: Link2, title: "Connect your own account", body: "You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password." },
-  { icon: ListChecks, title: "Build rules from conditions", body: "Combine moving averages, RSI, MACD, sessions and more, then read the rule back in plain language before you test it." },
-  { icon: Eye, title: "Review before it runs", body: "See which conditions passed, which failed and what the rule would decide. A preview never places an order." },
+  { icon: ShieldCheck, title: "Keep a decision journal", body: "Every evaluation records what the rule saw, what it decided and why, including the times it decided to wait. Review it whenever you like.", wide: true, shot: true },
   { icon: GaugeCircle, title: "Set your limits", body: "Risk per trade, stop distance, target and the number of open positions stay next to the rule you are testing." },
-  { icon: PlayCircle, title: "Start, pause or stop", body: "One panel shows the current state. If something cannot be read, it says so instead of guessing." },
-  { icon: ShieldCheck, title: "Keep a decision journal", body: "Every evaluation records what the rule saw, what it decided and why, so you can review it later." },
+  { icon: Link2, title: "Connect your own account", body: "You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password." },
+  { icon: ListChecks, title: "Build rules from conditions", body: "Combine moving averages, RSI, MACD, sessions and more, then read the rule back in plain language before you test it.", wide: true },
+  { icon: Eye, title: "Review before it runs", body: "See which conditions passed, which failed and what the rule would decide. A preview never places an order." },
+  { icon: PlayCircle, title: "Start, pause or stop", body: "One panel shows the current state. If something cannot be read, it says so instead of guessing.", wide: true },
 ] as const;
 
 const faqs = [
@@ -128,13 +128,22 @@ export default function Landing() {
           <h2>Everything you need to test a rule.</h2>
           <p>One workspace to connect your account, review the rule and keep your limits in view.</p>
           <div className="mkt-feature-grid">
-            {features.map(({ icon: Icon, title, body }) => (
-              <article className="mkt-feature" key={title}>
-                <span className="mkt-feature-icon"><Icon size={18} aria-hidden /></span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            ))}
+            {features.map((f) => {
+              const { icon: Icon, title, body } = f;
+              const wide = "wide" in f && f.wide;
+              const shot = "shot" in f && f.shot;
+              return (
+                <article className={wide ? "mkt-feature mkt-feature-wide" : "mkt-feature"} key={title}>
+                  <span className="mkt-feature-icon"><Icon size={18} aria-hidden /></span>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                  {shot ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="mkt-feature-shot" src="/product/journal.webp" alt="The journal: a buy decision and two hold decisions, each with its reason." width={1280} height={768} loading="lazy" decoding="async" />
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </section>
 

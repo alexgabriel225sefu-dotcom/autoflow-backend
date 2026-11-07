@@ -13,7 +13,11 @@ export function HeroStage() {
     <section className={styles.section} id="product">
       <div className={styles.glow} aria-hidden="true" />
       <div className={styles.copy}>
-        <p className={`mkt-kicker ${styles.rise}`} style={{ ["--d" as string]: "0ms" }}>RULES YOU CAN READ</p>
+        <p className={`${styles.pill} ${styles.rise}`} style={{ ["--d" as string]: "0ms" }}>
+          <i className={styles.pulse} aria-hidden="true" />
+          cTrader works today. More platforms are on the roadmap.
+        </p>
+        <p className={`mkt-kicker ${styles.rise}`} style={{ ["--d" as string]: "40ms" }}>RULES YOU CAN READ</p>
         <h1 className={styles.rise} style={{ ["--d" as string]: "90ms" }}>
           Trade by rules <span className={styles.shine}>you can read.</span>
         </h1>
