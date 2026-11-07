@@ -40,6 +40,7 @@ import { JourneyStrip } from "@/components/app/journey-strip";
 import { AccountsDuo } from "@/components/app/accounts-duo";
 import { WelcomeColour } from "@/components/app/welcome-colour";
 import { PipelineFlow } from "@/components/app/pipeline-flow";
+import { LivingBackdrop } from "@/components/app/living-backdrop";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -190,7 +191,7 @@ export default function Dashboard() {
   return (
     <main className="dash">
       <div className="dash-orb" aria-hidden="true" />
-      <div className="dash-aurora" aria-hidden="true"><i /><i /><i /><b /></div>
+      <div className="dash-aurora" aria-hidden="true"><i /><i /><i /><LivingBackdrop /></div>
       <WelcomeColour />
       <div className="page-head">
         <div>
