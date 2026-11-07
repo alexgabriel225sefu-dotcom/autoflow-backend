@@ -1,79 +1,104 @@
 # `licenses` and `bot_configs`: row security
 
-`sql/003_rls_server_tables.sql` is the production fix. This file does not
-apply it. Nothing here connects to a database. The owner runs it, on the
-project the site already uses for sign-in, after reading it.
+Production is already locked. This file records what was applied and what
+must not be repeated. It does not connect to a database, and this
+repository does not run it.
 
-The browser ships that project's anon key. With row security off and
-`anon` allowed to select, insert, update and delete, anyone who has the
-key can read and write `public.licenses` and `public.bot_configs` through
-the REST API. The platform app does not query those tables. The key being
-public is enough.
+## Applied
 
-`service_role` bypasses row security. `server.js` uses
-`SUPABASE_SERVICE_KEY`, which is that role. The script keeps a
-`service_role` policy and does not revoke that role, so the legacy server
-can keep using the tables. Do not put the service key in the browser.
+**When:** 22:28:52 Europe/Amsterdam, 7 November 2026.
 
-## Apply
+**Where:** Supabase project `ibvuibfzljhrgtsbvzsg`, tables
+`public.licenses` and `public.bot_configs` only.
 
-From a machine that already has the database URL. Do not print the URL
-and do not select rows.
-
-```bash
-psql "$DATABASE_URL" -f sql/003_rls_server_tables.sql
-```
-
-The script is idempotent. It skips a table that is not there. It enables
-row security, revokes `anon` and `authenticated`, and adds one
-`service_role` policy per table. Affiliate tables in the same file are
-included when they exist. Sequences for those affiliate tables are revoked
-from `anon` and `authenticated` too.
-
-## Check, without reading customer data
+**Statement that was run:**
 
 ```sql
-SELECT c.relname, c.relrowsecurity
-FROM pg_class c
-JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = 'public'
-  AND c.relname IN ('licenses', 'bot_configs');
-
-SELECT table_name, grantee, privilege_type
-FROM information_schema.role_table_grants
-WHERE table_schema = 'public'
-  AND table_name IN ('licenses', 'bot_configs')
-  AND grantee IN ('anon', 'authenticated', 'service_role')
-ORDER BY table_name, grantee, privilege_type;
-
-SELECT tablename, policyname, roles
-FROM pg_policies
-WHERE schemaname = 'public'
-  AND tablename IN ('licenses', 'bot_configs');
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '15s';
+ALTER TABLE public.licenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bot_configs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.licenses, public.bot_configs
+  FROM anon, authenticated, PUBLIC;
+COMMIT;
 ```
 
-Do not SELECT from `licenses` or `bot_configs`. Expected after a successful
-apply: `relrowsecurity` true, no privileges for `anon` or `authenticated`,
-and a `service_role` policy still present. `service_role` may not appear in
-`role_table_grants` as a separate grant; it bypasses row security either way.
+That is the whole change. Do not run `sql/003_rls_server_tables.sql` against
+this project as a follow-up. That file also alters affiliate tables and
+their sequences, and it creates `service_role` policies. None of that was
+part of this apply, and it is not required for the state below.
 
-## Rollback — EMERGENCY
+## What was verified
 
-Only if the legacy server can no longer read the tables and the cause is
-this script. This puts the tables back to the unsafe state. It does not
-drop `service_role` and it does not delete rows.
+Catalog and privilege checks only. Do not SELECT customer rows from
+`licenses` or `bot_configs`.
+
+- Row security is on for both tables.
+- `anon` and `authenticated` have no effective SELECT, INSERT, UPDATE, or
+  DELETE on either table. `PUBLIC` was included in the revoke.
+- `pg_policies` has no policy on either table. That is intentional. The
+  server roles do not need a policy. Supabase advisors: the two errors are
+  resolved; two info findings of "no policy" are expected.
+- Explicit table grants for `postgres` and `service_role` are still
+  `arwdDxtm` (INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES,
+  TRIGGER, MAINTAIN). Both roles also have `BYPASSRLS`.
+- A read-only `SELECT 1 ... LIMIT 0` as `service_role` succeeded on both
+  tables. No row was returned and no row was read.
+- Both platform health endpoints answered 200. The deployed API commit was
+  still `d979ab73c3763b48752b960c95f94bc7ee458443`. This documentation
+  change does not redeploy it.
+- A full HTTP check that one tenant cannot read or write another tenant's
+  business data has not been run.
+
+## `BYPASSRLS` is not a table privilege
+
+`BYPASSRLS` is a role attribute. It means row-security policies are not
+applied to that role. It does not grant SELECT, INSERT, UPDATE, DELETE, or
+any other table privilege.
+
+`service_role` can read these tables because both of these are true: it
+bypasses row security, and it still holds the explicit `arwdDxtm` grants.
+Revoking those grants would lock the server out even though `BYPASSRLS`
+remained. Keep the grants. Do not put the service key in the browser.
+
+`anon` and `authenticated` do not bypass row security. With row security
+on, no policy, and no table privileges, they cannot use the tables. The
+missing policy is not a hole for those roles.
+
+## `sql/003_rls_server_tables.sql`
+
+The script in the repository is a broader template: it enables row
+security, revokes `anon` and `authenticated`, and adds a `service_role`
+policy, and it does that for affiliate tables and their sequences when
+those objects exist. It was not the statement applied above. Do not apply
+the whole file automatically to `ibvuibfzljhrgtsbvzsg`.
+
+A policy for `service_role` is optional here. The role already bypasses
+row security. Adding one later is a separate decision, not a repair of
+this apply.
+
+## Rollback — EMERGENCY, owner approval
+
+Rollback is not a deploy step. Re-granting `anon`, `authenticated`, or
+`PUBLIC`, or turning row security off, reopens the exposure that was
+closed: the anon key shipped in the browser could read and write these
+tables again. Do it only with an explicit owner decision that the legacy
+server cannot run any other way.
+
+This does not drop `service_role`, does not remove `BYPASSRLS`, and does
+not delete rows. It also must not revoke the `postgres` or `service_role`
+table grants.
 
 ```sql
+-- EMERGENCY only, after the owner approves. Reopens the known exposure.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.licenses TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.bot_configs TO anon, authenticated;
 ALTER TABLE public.licenses DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bot_configs DISABLE ROW LEVEL SECURITY;
 ```
 
-Leave the `service_role` policies in place. They do no harm while row
-security is off, and they are what you want if you enable it again.
-
 ## What this repository will not do
 
-It will not run the script against production, and it will not fill in
-legal, tax or company text. Those stay owner decisions.
+It will not run either statement against production, and it will not fill
+in legal, tax, or company text.
