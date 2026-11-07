@@ -2569,3 +2569,91 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
   .mkt-partner + .mkt-partner { border-top: 1px solid var(--mkt-line); }
   .mkt-partner-soon + .mkt-partner-soon { border-left: 1px solid var(--mkt-line); }
 }
+
+/* Landing motion. Sections ease in as they scroll into view (browsers without
+   scroll-driven animations simply show them), cards lift on hover, and all of
+   it stops for anyone who asked their system for less motion. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .mkt-section, .mkt-partners, .mkt-feature, .mkt-audience-card, .mkt-flow-step {
+      animation: mkt-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 38%;
+    }
+    @keyframes mkt-reveal { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mkt-feature, .mkt-audience-card, .mkt-flow-step, .mkt-partner { transition: transform .25s cubic-bezier(.2, .7, .2, 1), border-color .25s, background .25s; }
+  .mkt-feature:hover, .mkt-audience-card:hover, .mkt-flow-step:hover { transform: translateY(-4px); border-color: #3a3a44; }
+  .mkt-btn:not(.mkt-btn-outline) { box-shadow: 0 0 0 0 rgba(255, 148, 132, 0); animation: mkt-halo 3.4s ease-out 2s infinite; }
+  @keyframes mkt-halo { 0% { box-shadow: 0 0 0 0 rgba(255, 148, 132, .35); } 70%, 100% { box-shadow: 0 0 0 16px rgba(255, 148, 132, 0); } }
+}
+
+/* ── the three-step strip and the live tiles ───────────────────────── */
+.jrn { display: grid; gap: .6rem; margin-bottom: var(--sp-3); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { .jrn { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.jrn-step {
+  position: relative; display: flex; align-items: center; gap: .85rem; min-width: 0;
+  padding: .85rem 1rem; border-radius: 16px; text-decoration: none; color: var(--a4t-text);
+  border: 1px solid var(--a4t-line-soft); background: var(--a4t-surface);
+  transition: border-color .2s, transform .2s, background .2s;
+}
+.jrn-step:hover { transform: translateY(-2px); border-color: var(--a4t-line); }
+.jrn-mark { flex: none; display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 50%; border: 1px solid var(--a4t-line); color: var(--a4t-muted); }
+.jrn-text { display: grid; gap: .15rem; min-width: 0; }
+.jrn-text strong { font-size: .95rem; letter-spacing: -.01em; }
+.jrn-text span { font-size: .8rem; color: var(--a4t-muted); line-height: 1.4; }
+.jrn-step[data-state="done"] .jrn-mark { background: color-mix(in srgb, var(--a4t-long) 18%, transparent); border-color: color-mix(in srgb, var(--a4t-long) 50%, transparent); color: var(--a4t-long); }
+.jrn-step[data-state="done"] .jrn-text strong { color: var(--a4t-muted); }
+.jrn-step[data-state="current"] { border-color: color-mix(in srgb, var(--a4t-accent) 55%, var(--a4t-line)); background: linear-gradient(135deg, color-mix(in srgb, var(--a4t-accent) 10%, var(--a4t-surface)), var(--a4t-surface)); }
+.jrn-step[data-state="current"] .jrn-mark { background: var(--a4t-accent); border-color: var(--a4t-accent); color: var(--a4t-on-accent); }
+.jrn-step[data-state="unknown"] { opacity: .6; }
+.ovb-live { display: inline-block; width: .5rem; height: .5rem; margin-right: .5rem; border-radius: 50%; background: var(--a4t-long); vertical-align: middle; box-shadow: 0 0 0 0 color-mix(in srgb, var(--a4t-long) 60%, transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  .jrn-step, .ovb-tile { animation: jrn-rise .6s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+  @keyframes jrn-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .jrn-step[data-state="current"] .jrn-mark { animation: jrn-pulse 2.2s ease-out infinite; }
+  @keyframes jrn-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--a4t-accent) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 10px transparent; } }
+  .ovb-live { animation: ovb-ping 2s ease-out infinite; }
+  @keyframes ovb-ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--a4t-long) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
+  .ovb-value:not([data-empty="true"]) { animation: ovb-pop .45s cubic-bezier(.2, .8, .3, 1.2); }
+  @keyframes ovb-pop { from { transform: scale(.92); opacity: .4; } to { transform: none; opacity: 1; } }
+}
+
+/* ── demo and live, side by side ───────────────────────────────────── */
+.duo { display: grid; gap: .75rem; margin-bottom: var(--sp-3); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { .duo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.duo-card { position: relative; display: flex; flex-direction: column; gap: .4rem; min-width: 0; padding: 1.1rem 1.25rem; border-radius: 20px; border: 1px solid var(--a4t-line-soft); background: radial-gradient(120% 90% at 0% 0%, rgba(247, 246, 242, .05), transparent 55%), var(--a4t-surface); overflow: hidden; }
+.duo-card[data-active="true"] { border-color: transparent; }
+.duo-card header { display: flex; align-items: center; gap: .5rem; font-size: .72rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--a4t-dim); }
+.duo-card header em { margin-left: auto; font-style: normal; letter-spacing: .02em; text-transform: none; font-size: .74rem; padding: .18rem .6rem; border-radius: 999px; border: 1px solid var(--a4t-line); color: var(--a4t-muted); }
+.duo-card header em[data-tone="on"] { color: var(--a4t-long); border-color: color-mix(in srgb, var(--a4t-long) 50%, transparent); background: color-mix(in srgb, var(--a4t-long) 12%, transparent); }
+.duo-card header em[data-tone="ready"] { color: var(--a4t-text); }
+.duo-card > strong { font-size: clamp(1.2rem, 2vw, 1.6rem); letter-spacing: -.03em; }
+.duo-card > p { margin: 0; color: var(--a4t-muted); font-size: .86rem; line-height: 1.5; min-height: 2.6em; }
+.duo-card > a { margin-top: .3rem; align-self: flex-start; color: var(--a4t-text); font-size: .86rem; font-weight: 600; text-decoration: underline; text-decoration-color: var(--a4t-line); text-underline-offset: 4px; }
+.duo-card > a:hover { text-decoration-color: var(--a4t-text); }
+@media (prefers-reduced-motion: no-preference) { .duo-card { animation: jrn-rise .6s cubic-bezier(.2, .7, .2, 1) both; } .duo-card[data-kind="live"] { animation-delay: 80ms; } }
+
+/* ── instrument pictures ───────────────────────────────────────────── */
+.ins { display: inline-flex; align-items: center; flex: none; vertical-align: middle; }
+.ins-disc { display: block; border-radius: 50%; box-shadow: 0 0 0 2px var(--a4t-surface); }
+.ins[data-size="sm"] { margin-right: .45rem; }
+.ins[data-size="sm"] .ins-disc { width: 1.1rem; height: 1.1rem; }
+.ins[data-size="sm"] .ins-disc + .ins-disc { margin-left: -.35rem; }
+.ins[data-size="sm"] .ins-bars { width: 1.5rem; height: 1.05rem; }
+.ins[data-size="lg"] .ins-disc { width: 3.4rem; height: 3.4rem; }
+.ins[data-size="lg"] .ins-disc + .ins-disc { margin-left: -1.1rem; }
+.ins[data-size="lg"] .ins-bars { width: 4.4rem; height: 3.1rem; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .45)); }
+.chips-symbols .chip { display: inline-flex; align-items: center; }
+.ins-card { display: flex; align-items: center; gap: 1rem; margin: .9rem 0 .2rem; padding: .9rem 1.1rem; border: 1px solid var(--a4t-line-soft); border-radius: 18px; background: radial-gradient(120% 120% at 0% 0%, rgba(247, 246, 242, .06), transparent 60%), var(--a4t-surface); }
+.ins-card strong { display: block; font-size: 1.3rem; letter-spacing: -.02em; }
+.ins-card span:not(.ins) { display: block; color: var(--a4t-muted); font-size: .86rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .ins-card { animation: ins-in .5s cubic-bezier(.2, .8, .3, 1.15); }
+  .ins-card .ins-disc, .ins-card .ins-bars { animation: ins-float 4.5s ease-in-out infinite; }
+  .ins-card .ins-disc + .ins-disc { animation-delay: -1.2s; }
+  @keyframes ins-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes ins-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
+}

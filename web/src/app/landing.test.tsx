@@ -30,7 +30,7 @@ describe("landing page", () => {
 
   it("shows a product preview, the three steps and plain-language FAQ", () => {
     render(<Landing />);
-    expect(screen.getByRole("region", { name: "Product preview" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /on a laptop and on a phone/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /a simple path from idea to demo/i })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /questions, answered plainly/i })).toBeTruthy();
     expect(screen.queryByText("Read-only preview")).toBeNull();

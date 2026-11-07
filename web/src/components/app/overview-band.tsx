@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { onSpot } from "./spotlight";
+import { NumberTicker } from "@/components/ui/number-ticker";
 
 /**
  * The dashboard's first glance: four facts, large, read-only.
@@ -25,17 +26,26 @@ export type Tile = {
 export function OverviewBand({ tiles }: { tiles: Tile[] }) {
   return (
     <section className="ovb" aria-label="Overview">
-      {tiles.map((t) => (
+      {tiles.map((t, i) => (
         <div
           className="ovb-tile spot"
           key={t.label}
+          style={{ ["--i" as string]: i } as React.CSSProperties}
           data-tone={t.tone ?? "neutral"}
           onPointerMove={onSpot}
           onPointerDown={onSpot}
         >
           <span className="ovb-label">{t.label}</span>
-          <span className="ovb-value" data-empty={t.value == null || t.value === "" ? "true" : undefined}>
-            {t.value ?? "—"}
+          {/* Keyed on the value so a change replays the small "pop". */}
+          <span
+            className="ovb-value"
+            key={typeof t.value === "string" || typeof t.value === "number" ? String(t.value) : "v"}
+            data-empty={t.value == null || t.value === "" ? "true" : undefined}
+          >
+            {t.tone === "long" ? <i className="ovb-live" aria-hidden="true" /> : null}
+            {typeof t.value === "string" && /^\d{1,6}$/.test(t.value)
+              ? <NumberTicker value={Number(t.value)} />
+              : (t.value ?? "—")}
           </span>
           {t.note ? <span className="ovb-note">{t.note}</span> : <span className="ovb-note">&nbsp;</span>}
         </div>
