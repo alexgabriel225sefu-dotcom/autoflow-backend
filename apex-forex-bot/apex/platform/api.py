@@ -1046,7 +1046,12 @@ def _dispatch(method, route, headers, body, query=None):
         # second implementation of this decision.
         return _ok({"user": p.as_dict(),
                     "licence": _lic.status_for(p.user_id),
-                    "execution": _ent.capability(p.user_id)})
+                    "execution": _ent.capability(p.user_id),
+                    # Menu visibility is identity metadata, not a broker
+                    # request. Keeping it on /me avoids probing live/queue on
+                    # every page for ordinary users (which correctly returns
+                    # 403 to non-operators).
+                    "operator": bool(_live_gate.is_operator(p.user_id))})
 
     # The strategy picker renders its list from this, so the UI can never
     # offer a strategy the engine does not register — the same contract

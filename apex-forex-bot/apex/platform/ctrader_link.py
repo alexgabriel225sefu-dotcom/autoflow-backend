@@ -47,6 +47,7 @@ import hmac
 import json
 import os
 import secrets
+import threading
 import time
 
 from apex import user_store
@@ -65,6 +66,8 @@ LIVE = "live"
 # one spelling of "the broker would not confirm it" in the product.
 UNKNOWN = "unknown"
 MODES = (DEMO, LIVE, UNKNOWN)
+RECONNECT_REASON = "cTrader authorisation was rejected — reconnect the account"
+_reconnect_lock = threading.Lock()
 
 
 class LinkError(RuntimeError):
@@ -714,6 +717,9 @@ def public_status(user_id):
         "connected": True,
         "connectedAt": rec.get("connectedAt"),
         "expiresAt": rec.get("expiresAt"),
+        "needsReconnect": bool(rec.get("needsReconnect")),
+        "reconnectReason": (RECONNECT_REASON
+                             if rec.get("needsReconnect") else None),
         "accounts": rec.get("accounts") or [],
         "selected": ({"ctid": rec.get("selectedCtid"),
                       "mode": rec.get("selectedMode")}
@@ -721,6 +727,24 @@ def public_status(user_id):
         "liveAllowed": live_allowed(),
         "accountPlan": _account_plan(user_id, rec.get("tradedCtids") or []),
     }
+
+
+def mark_reconnect_required(user_id, *, reason=None):
+    """Persist one safe reconnect state transition for a broker auth failure.
+
+    The broker's raw error is deliberately not stored: connector messages can
+    contain routing details or credential-shaped text.  Repeated dashboard
+    reads observe the same state and do not rewrite or re-log it.
+    """
+    with _reconnect_lock:
+        rec = _read_conn(str(user_id))
+        if rec.get("needsReconnect"):
+            return False
+        rec["needsReconnect"] = True
+        rec["reconnectAt"] = int(time.time())
+        _save_link(_k_conn(str(user_id)), rec)
+    _log.event("connection.reconnect_required", user=_log.user_ref(user_id))
+    return True
 
 
 def _account_plan(user_id, traded):
@@ -988,6 +1012,8 @@ def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None):
         if want_ctid is None or want_ctid == "":
             want_ctid = ctid
         want_mode = match.get("mode")
+    if rec.get("needsReconnect"):
+        raise LinkError("REAUTH_REQUIRED", RECONNECT_REASON)
     if want_mode == LIVE and not live_allowed():
         # Read-only or not, opening a live account means a live broker
         # session. The environment gate is the same one select_account uses;

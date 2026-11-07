@@ -90,6 +90,30 @@ def _scrub(text, *secrets):
     return _safe.message(masked, fallback="the broker did not answer", limit=300)
 
 
+def _is_auth_failure(exc):
+    """Recognise cTrader auth refusals without exposing the raw message."""
+    text = str(exc or "").lower()
+    return any(marker in text for marker in (
+        "not authorized", "not_authorized", "not authenticated",
+        "not_authenticated", "account auth failed", "token expired",
+        "token invalid", "access token", "unauthorised", "unauthorized",
+        "invalid_request",
+    ))
+
+
+def _reauth(user_id, reason=None):
+    try:
+        _link.mark_reconnect_required(user_id)
+    except Exception:
+        # A failed marker write must not turn a known broker refusal into a
+        # plausible empty read. The response still tells the client to retry
+        # the connection flow, and the next successful write can persist it.
+        pass
+    return {"connected": True, "status": REAUTH_REQUIRED,
+            "reason": "the cTrader authorisation was rejected — reconnect "
+                      "the account"}
+
+
 def _disconnected(reason="no cTrader account is connected"):
     return {"connected": False, "status": NOT_CONNECTED, "reason": reason}
 
@@ -122,9 +146,10 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
             # The link exists; the credential behind it is dead. This is the
             # one case that must NOT read as "not connected", because the
             # remedy is different: reconnect, not connect.
-            return None, {"connected": True, "status": REAUTH_REQUIRED,
-                          "reason": "the cTrader authorisation has expired — "
-                                    "reconnect the account"}
+            return None, _reauth(user_id, "the cTrader authorisation has "
+                                "expired — reconnect the account")
+        if e.code == "REAUTH_REQUIRED":
+            return None, _reauth(user_id, e.detail)
         return None, _disconnected(e.detail)
     if not conn:
         return None, _disconnected(
@@ -160,6 +185,8 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         # The account is known — the connection was read before the broker
         # was built. Omitting it here made the orders page say "No account
         # selected" beside a status strip that showed the demo account.
+        if _is_auth_failure(e):
+            return None, _reauth(user_id, e)
         return None, {"connected": True, "status": UNAVAILABLE,
                       "accountId": conn.get("ctid"), "mode": conn.get("mode"),
                       "reason": _human_broker_fault(e, conn.get("accessToken"))}
@@ -194,6 +221,8 @@ def _read(user_id, key, call, *, ctid=None, connection_fn=None,
     except Exception as e:  # noqa: BLE001
         # Deliberately not an empty list. "We could not ask" and "there is
         # nothing" look identical to a dashboard and mean opposite things.
+        if _is_auth_failure(e):
+            return _reauth(user_id, e)
         return {"connected": True, "status": UNAVAILABLE,
                 "accountId": conn.get("ctid"), "mode": conn.get("mode"),
                 "reason": _human_broker_fault(e, conn.get("accessToken"))}
