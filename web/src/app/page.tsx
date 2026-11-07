@@ -13,6 +13,7 @@ import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { HeroStage } from "@/components/marketing/hero-stage";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
+import { ProductGuide } from "@/components/marketing/product-guide";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -69,6 +70,13 @@ export default function Landing() {
           <h2 id="tour-title">See it before you sign up.</h2>
           <p>Real screens from a demo account, from the first setup step to the journal of every decision.</p>
           <ProductShowcase />
+        </section>
+
+        <section id="guide" className="mkt-section" aria-labelledby="guide-title">
+          <span className="mkt-eyebrow">How it works</span>
+          <h2 id="guide-title">Three steps. Everything explained on screen.</h2>
+          <p>Real screens from the platform. The highlights show where to look.</p>
+          <ProductGuide />
         </section>
 
         <section id="how-it-works" className="mkt-section mkt-flow" aria-labelledby="how-title">
