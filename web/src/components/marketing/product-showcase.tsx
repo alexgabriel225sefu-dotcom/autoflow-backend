@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProductWindow } from "./product-window";
 import styles from "./product.module.css";
 
@@ -44,7 +44,19 @@ const tabs = [
 
 export function ProductShowcase() {
   const [active, setActive] = useState<(typeof tabs)[number]["id"]>("setup");
+  // Moves through the tabs on its own until the visitor picks one.
+  const [auto, setAuto] = useState(true);
   const tab = tabs.find((t) => t.id === active) ?? tabs[0];
+
+  useEffect(() => {
+    if (!auto) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    const timer = window.setTimeout(() => {
+      const i = tabs.findIndex((t) => t.id === active);
+      setActive(tabs[(i + 1) % tabs.length].id);
+    }, 5500);
+    return () => window.clearTimeout(timer);
+  }, [active, auto]);
   return (
     <div>
       <div className={styles.tabs} role="tablist" aria-label="Parts of the platform">
@@ -52,7 +64,7 @@ export function ProductShowcase() {
           <button
             key={t.id} type="button" role="tab" id={`tab-${t.id}`}
             aria-selected={t.id === active} aria-controls="showcase-panel"
-            className={styles.tab} onClick={() => setActive(t.id)}
+            className={styles.tab} data-auto={auto && t.id === active ? "true" : undefined} onClick={() => { setAuto(false); setActive(t.id); }}
           >
             {t.label}
           </button>

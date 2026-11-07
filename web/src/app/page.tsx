@@ -11,8 +11,7 @@ import {
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
-import { RuleSentenceHero } from "@/components/marketing/rule-sentence-hero";
-import { HeroProduct } from "@/components/marketing/hero-product";
+import { HeroStage } from "@/components/marketing/hero-stage";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
@@ -63,11 +62,7 @@ export default function Landing() {
           </span>
         </nav>
 
-        <RuleSentenceHero />
-
-        <section className="mkt-section" aria-label="The platform in use" style={{ paddingTop: 0 }}>
-          <HeroProduct />
-        </section>
+        <HeroStage />
 
         <section id="tour" className="mkt-section" aria-labelledby="tour-title">
           <span className="mkt-eyebrow">The platform</span>

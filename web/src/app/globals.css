@@ -2569,3 +2569,23 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
   .mkt-partner + .mkt-partner { border-top: 1px solid var(--mkt-line); }
   .mkt-partner-soon + .mkt-partner-soon { border-left: 1px solid var(--mkt-line); }
 }
+
+/* Landing motion. Sections ease in as they scroll into view (browsers without
+   scroll-driven animations simply show them), cards lift on hover, and all of
+   it stops for anyone who asked their system for less motion. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .mkt-section, .mkt-partners, .mkt-feature, .mkt-audience-card, .mkt-flow-step {
+      animation: mkt-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 38%;
+    }
+    @keyframes mkt-reveal { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mkt-feature, .mkt-audience-card, .mkt-flow-step, .mkt-partner { transition: transform .25s cubic-bezier(.2, .7, .2, 1), border-color .25s, background .25s; }
+  .mkt-feature:hover, .mkt-audience-card:hover, .mkt-flow-step:hover { transform: translateY(-4px); border-color: #3a3a44; }
+  .mkt-btn:not(.mkt-btn-outline) { box-shadow: 0 0 0 0 rgba(255, 148, 132, 0); animation: mkt-halo 3.4s ease-out 2s infinite; }
+  @keyframes mkt-halo { 0% { box-shadow: 0 0 0 0 rgba(255, 148, 132, .35); } 70%, 100% { box-shadow: 0 0 0 16px rgba(255, 148, 132, 0); } }
+}
