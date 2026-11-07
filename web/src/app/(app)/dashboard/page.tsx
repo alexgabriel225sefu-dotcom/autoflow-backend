@@ -190,6 +190,7 @@ export default function Dashboard() {
   return (
     <main className="dash">
       <div className="dash-orb" aria-hidden="true" />
+      <div className="dash-aurora" aria-hidden="true"><i /><i /><i /><b /></div>
       <WelcomeColour />
       <div className="page-head">
         <div>
