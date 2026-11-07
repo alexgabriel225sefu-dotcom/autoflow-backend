@@ -15,7 +15,7 @@ export function HeroStage() {
       <div className={styles.copy}>
         <p className={`${styles.pill} ${styles.rise}`} style={{ ["--d" as string]: "0ms" }}>
           <i className={styles.pulse} aria-hidden="true" />
-          cTrader works today. MT4 and MT5 are on the roadmap.
+          cTrader works today. More platforms are on the roadmap.
         </p>
         <p className={`mkt-kicker ${styles.rise}`} style={{ ["--d" as string]: "40ms" }}>RULES YOU CAN READ</p>
         <h1 className={styles.rise} style={{ ["--d" as string]: "90ms" }}>
