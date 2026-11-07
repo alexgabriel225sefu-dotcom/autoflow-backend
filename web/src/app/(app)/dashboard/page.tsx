@@ -36,6 +36,7 @@ import { runAutomationControl, type ControlAction, type ControlResult } from "@/
 import { collapseRepeated, plainAutomation, plainDecision, plainLicence, plainRead, toneClass, tonePill } from "@/components/app/plain";
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
 import { FirstRunChecklist } from "@/components/app/first-run";
+import { JourneyStrip } from "@/components/app/journey-strip";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -201,6 +202,8 @@ export default function Dashboard() {
         </button>
         </span>
       </div>
+
+      <JourneyStrip auto={auto.result} rules={rules.result} />
 
       <FirstRunChecklist
         me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}
