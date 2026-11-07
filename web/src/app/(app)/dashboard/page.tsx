@@ -39,6 +39,7 @@ import { FirstRunChecklist } from "@/components/app/first-run";
 import { JourneyStrip } from "@/components/app/journey-strip";
 import { AccountsDuo } from "@/components/app/accounts-duo";
 import { WelcomeColour } from "@/components/app/welcome-colour";
+import { PipelineFlow } from "@/components/app/pipeline-flow";
 import { MarketPanel } from "@/components/chart/market-panel";
 import type {
   AutomationState, CtraderStatus, JournalPage, Me, OrdersRead,
@@ -216,6 +217,15 @@ export default function Dashboard() {
 
       <FirstRunChecklist
         me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}
+      />
+
+      <PipelineFlow
+        account={selected ? `#${selected.ctid} · ${selected.mode === "demo" ? "Demo" : "Live"}` : null}
+        accountReady={!!selected}
+        rule={activeRule ? (activeRule.name || "(untitled)") : null}
+        ruleReady={!!activeRule}
+        running={running?.state === "running" && !running.marketClosed}
+        decisions={jr.result?.ok && jr.result.data.status === "ok" ? jr.result.data.entries.length : null}
       />
 
       <OverviewBand tiles={overview} />
