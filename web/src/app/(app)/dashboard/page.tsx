@@ -203,7 +203,7 @@ export default function Dashboard() {
         </span>
       </div>
 
-      <JourneyStrip auto={auto.result} rules={rules.result} />
+      <JourneyStrip auto={auto.result} rules={rules.result} mode={selected?.mode ?? null} />
 
       <FirstRunChecklist
         me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}

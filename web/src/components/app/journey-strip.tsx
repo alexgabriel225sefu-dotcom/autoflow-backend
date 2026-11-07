@@ -23,9 +23,11 @@ export type JourneyStep = {
 type Reads = {
   auto: ApiResult<AutomationState> | null | undefined;
   rules: ApiResult<{ rules: RuleSummary[] }> | null | undefined;
+  /** The selected account's type. Null when none is selected or it is not known yet. */
+  mode?: "demo" | "live" | null;
 };
 
-export function journeySteps({ auto, rules }: Reads): JourneyStep[] {
+export function journeySteps({ auto, rules, mode = null }: Reads): JourneyStep[] {
   const autoOk = auto?.ok ? auto.data : null;
   const rulesOk = rules?.ok ? rules.data.rules : null;
 
@@ -35,7 +37,11 @@ export function journeySteps({ auto, rules }: Reads): JourneyStep[] {
 
   const raw: Array<[JourneyStep["id"], string, string, string, boolean | null]> = [
     ["choose", "Choose a strategy", "Pick an instrument and a ready-made strategy.", "/trade", hasRule],
-    ["start", "Start on demo", "One tap. No real money in this release.", "/trade", started],
+    mode === "live"
+      ? ["start", "Start on your live account", "Runs only when your account is cleared for live.", "/trade", started]
+      : mode === "demo"
+        ? ["start", "Start on demo", "One tap. No real money at risk.", "/trade", started]
+        : ["start", "Start automation", "Pick an account first, then one tap.", "/trade", started],
     ["watch", "Watch it work", running ? "Running. Every decision is in your journal." : "Every decision lands in your journal.", "/journal", null],
   ];
 

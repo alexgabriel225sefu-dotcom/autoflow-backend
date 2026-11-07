@@ -24,6 +24,13 @@ describe("journeySteps", () => {
   it("says unknown, never done, while a read has not answered", () => {
     expect(states({ auto: null, rules: null })).toEqual(["unknown", "unknown", "unknown"]);
   });
+  it("names the account type that is selected, not always demo", () => {
+    const title = (mode: "demo" | "live" | null) =>
+      journeySteps({ auto: auto("stopped"), rules: rules([rule("active")]), mode })[1].title;
+    expect(title("demo")).toBe("Start on demo");
+    expect(title("live")).toBe("Start on your live account");
+    expect(title(null)).toBe("Start automation");
+  });
   it("renders three links and marks the current step", () => {
     render(<JourneyStrip auto={auto("stopped")} rules={rules([])} />);
     expect(screen.getAllByRole("link")).toHaveLength(3);
