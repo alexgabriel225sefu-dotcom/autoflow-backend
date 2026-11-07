@@ -2550,6 +2550,8 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
 @media (min-width: 640px) { .mkt-feature-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1000px) { .mkt-feature-grid { grid-template-columns: repeat(3, 1fr); gap: 1.1rem; } }
 .mkt-feature { padding: 1.4rem; border: 1px solid var(--mkt-line); border-radius: 16px; background: color-mix(in srgb, var(--mkt-surface) 90%, transparent); }
+.mkt-feature-shot { display: block; width: 100%; height: auto; margin-top: 1.2rem; border: 1px solid var(--mkt-line); border-radius: 12px; }
+@media (min-width: 1000px) { .mkt-feature-wide { grid-column: span 2; } }
 .mkt-feature-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.2rem; height: 2.2rem; margin-bottom: 1rem; border: 1px solid var(--mkt-line); border-radius: 10px; color: var(--a4t-link); }
 .mkt-feature h3 { margin: 0 0 .45rem; font-size: 1.02rem; font-weight: 600; letter-spacing: -.01em; color: var(--mkt-text); }
 .mkt-feature p { margin: 0; color: var(--mkt-muted); font-size: .92rem; line-height: 1.6; }
