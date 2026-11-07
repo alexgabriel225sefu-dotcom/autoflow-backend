@@ -551,7 +551,7 @@ export function RuleForm({
           <label className="field"><span>Max exposure <span className="hint">% of balance</span></span>
             <input type="number" step="1" min="1" placeholder="no cap" value={d.maxExposurePercent}
                    onChange={(e) => set("maxExposurePercent", e.target.value)} />
-            <span className="field-note">Recorded on the rule; not enforced by the engine yet. A rule with this set will not start on a live account.</span></label>
+            <span className="field-note">Recorded on the rule; not enforced yet. A rule with this set will not start on a live account.</span></label>
         </div>
         <div className="field"><span>When a limit is hit</span>
           {d.onLimit === "flatten" ? (

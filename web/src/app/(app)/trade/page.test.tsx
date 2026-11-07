@@ -210,7 +210,7 @@ describe("the broker's own instruments", () => {
 
   it("shows the unsupported ones disabled, with the reason, when asked", async () => {
     await loaded();
-    fireEvent.click(screen.getByLabelText(/Also list the 2 the engine cannot trade yet/));
+    fireEvent.click(screen.getByLabelText(/Also list the 2 the platform cannot trade yet/));
     const us30 = screen.getByRole("radio", { name: "US30" }) as HTMLButtonElement;
     expect(us30.disabled).toBe(true);
     expect(us30.getAttribute("title")).toMatch(/exchange trading calendars/);

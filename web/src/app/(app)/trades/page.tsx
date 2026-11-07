@@ -77,7 +77,7 @@ function Detail({ t }: { t: TradeRow }) {
     ["Target at entry", t.tpPrice == null ? "—" : String(t.tpPrice)],
     ["Exit", t.exit == null ? "—" : String(t.exit)],
     ["Gross", money(t.gross)], ["Swap", money(t.swap)], ["Commission", money(t.commission)],
-    ["Net", money(t.net)], ["Strategy", t.strategy ?? "not opened by the engine"],
+    ["Net", money(t.net)], ["Strategy", t.strategy ?? "not opened by the platform"],
   ];
   return (
     <dl className="grid grid-3" data-testid="trade-detail">

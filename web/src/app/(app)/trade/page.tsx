@@ -226,7 +226,7 @@ export default function TradePage() {
             <label className="field-inline" style={{ marginTop: ".4rem" }}>
               <input type="checkbox" checked={showAll}
                      onChange={(e) => setShowAll(e.target.checked)} />
-              <span>Also list the {view.unsupported} the engine cannot trade yet</span>
+              <span>Also list the {view.unsupported} the platform cannot trade yet</span>
             </label>
           ) : null}
           {shownReasons.length ? (
@@ -237,7 +237,7 @@ export default function TradePage() {
           <p className="muted trade-note">
             {view.source === "broker"
               ? `Your broker lists ${view.total} instruments. ${view.total - view.unsupported} can be traded now; the rest are shown with the reason, not hidden.`
-              : "Your broker's list could not be read, so this shows what the engine supports: forex with a USD leg, plus gold and silver."}
+              : "Your broker's list could not be read, so this shows what the platform supports: forex with a USD leg, plus gold and silver."}
           </p>
           {c.symbol ? (
             <div className="field">
@@ -337,7 +337,7 @@ export default function TradePage() {
               <input type="number" min="1" max="2000" step="1" aria-label="Take profit pips"
                      value={c.takeProfitPips}
                      onChange={(e) => set("takeProfitPips", e.target.value)} />
-              <span className="field-note">Pips are the stop and target the engine uses exactly.</span>
+              <span className="field-note">These pip values are used exactly for the stop and target.</span>
             </label>
           </div>
           {lotNotice ? (
