@@ -62,8 +62,8 @@ export default function SignUpPage() {
           </p>
         ) : null}
         <p className="auth-lead">
-          The email comes from Supabase Auth, the service that handles our
-          sign-in. Nothing arrived? Check your spam folder, then ask for another link.
+          It comes from no-reply@apex4traders.com. Nothing arrived? Check your
+          spam folder, then ask for another link.
         </p>
         <ResendConfirmation email={email} />
       </AuthShell>

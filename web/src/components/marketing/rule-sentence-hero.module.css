@@ -18,4 +18,4 @@
 @media (max-width: 640px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .controls span { flex: 1; text-align: center; padding-inline: .4rem; } }
 @media (max-width: 420px) { :global(.mkt-hero-cta) { flex-direction: column; align-items: stretch; } :global(.mkt-hero-cta .mkt-btn) { justify-content: center; width: 100%; } }
 
-@media (min-width: 1000px) { .section { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); align-items: center; gap: clamp(2.5rem, 5vw, 5rem); min-height: min(720px, calc(100svh - 5rem)); } .copy h1 { font-size: clamp(3rem, 5.4vw, 4.9rem); } .card { max-width: none; } }
+@media (min-width: 1000px) { .section { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); align-items: center; gap: clamp(2.5rem, 5vw, 5rem); min-height: min(560px, calc(100svh - 7rem)); } .copy h1 { font-size: clamp(3rem, 5.4vw, 4.9rem); } .card { max-width: none; } }
