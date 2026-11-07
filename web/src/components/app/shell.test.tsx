@@ -52,6 +52,7 @@ vi.mock("@/lib/api", async (orig) => {
         return { ok: true, data: {
           user: { userId: "u1", email: "trader@example.test", emailVerified: shellState.emailVerified },
           licence: { state: "active", expiresAt: null, plan: "demo" },
+          operator: shellState.operator,
         } };
       }
       if (path === "ctrader/status" || path === "accounts") {
@@ -62,10 +63,6 @@ vi.mock("@/lib/api", async (orig) => {
       }
       if (path === "automation") {
         return { ok: true, data: { state: "running", ruleDocId: "r1", mode: "demo", startedAt: 0 } };
-      }
-      if (path === "live/queue") {
-        if (shellState.operator) return { ok: true, data: { requests: [] } };
-        return { ok: false, status: 403, code: "NOT_OPERATOR", message: "this action is limited to an operator" };
       }
       return { ok: false, status: 404, code: "NOT_FOUND", message: "no stub" };
     }),

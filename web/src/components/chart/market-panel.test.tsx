@@ -122,11 +122,11 @@ describe("market panel — what it asks the hook for", () => {
   it("asks for nothing without an account, and says no account is SELECTED", () => {
     mount({ ctid: null });
     for (const [path] of h.useRead.mock.calls) expect(path).toBeNull();
-    expect(screen.getByText(/No account selected/)).toBeDefined();
+    expect(screen.getByText(/Choose an account above to view the market/)).toBeDefined();
     // This panel knows only that none is selected, not whether cTrader is
     // linked; saying "not connected" sent an owner round OAuth a second time.
     expect(screen.queryByText(/not connected/i)).toBeNull();
-    expect(screen.getByRole("link", { name: /choose an account/i })).toHaveProperty("href", expect.stringContaining("/accounts"));
+    expect(screen.queryByRole("link", { name: /choose an account/i })).toBeNull();
     expect(chartDrawn()).toBe(false);
   });
 
@@ -160,7 +160,7 @@ describe("market panel — states that must not look like a quiet market", () =>
   });
 
   it.each([
-    ["not_connected", /No account selected/],
+    ["not_connected", /Choose an account above to view the market/],
     ["reauth_required", /cTrader needs reconnecting/],
     ["unavailable", /Market data unavailable/],
   ])("read status %s is shown as itself, with no chart", (status, expected) => {

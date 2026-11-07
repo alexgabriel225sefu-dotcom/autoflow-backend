@@ -29,8 +29,8 @@ const CHECK_LABELS: Record<string, string> = {
 };
 
 type Health = {
-  score: number; status: "healthy" | "degraded" | "blocked";
-  checks: Record<string, boolean | null>; warnings: string[];
+  score: number; status: "healthy" | "degraded" | "blocked" | "not_connected";
+  checks: Record<string, boolean | null | "not_applicable">; warnings: string[];
 };
 
 export function HealthView() {
@@ -56,9 +56,9 @@ export function HealthView() {
             <div className="card-head"><h2>What was checked</h2></div>
             <ul className="plain-list">
               {Object.entries(d.checks).map(([k, v]) => (
-                <li key={k} data-check={v === true ? "ok" : v === false ? "fail" : "unknown"}>
+                <li key={k} data-check={v === true ? "ok" : v === false ? "fail" : v === "not_applicable" ? "not-applicable" : "unknown"}>
                   <strong>{CHECK_LABELS[k] ?? k}</strong>{" "}
-                  <span className="muted">{v === true ? "yes" : v === false ? "no" : "could not be read"}</span>
+                  <span className="muted">{v === true ? "yes" : v === false ? "no" : v === "not_applicable" ? "not applicable" : "could not be read"}</span>
                 </li>
               ))}
             </ul>

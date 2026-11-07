@@ -59,6 +59,14 @@ export default function AccountsPage() {
 
       {limit ? <AccountLimitNotice error={limit} /> : null}
 
+      {data?.connected && data.needsReconnect ? (
+        <div className="notice notice-warn" role="alert">
+          <p style={{ fontWeight: 600 }}>Reconnect cTrader</p>
+          <p className="muted">The broker rejected the saved authorisation. Reconnect before reading account data.</p>
+          <a className="btn btn-sm" href="/connect">Reconnect cTrader</a>
+        </div>
+      ) : null}
+
       {data ? (
         data.connected ? (
           <>

@@ -173,14 +173,7 @@ export function MarketPanel({
            /accounts rather than /connect because it is right either way: it
            lists the accounts to choose from when there is a link, and says
            there is none and offers to connect when there is not. */
-        <div className="notice">
-          <p style={{ fontWeight: 600 }}>No account selected</p>
-          <p className="muted" style={{ fontSize: ".82rem" }}>
-            The chart shows bars read from the cTrader account you choose.
-            Pick one to see the market this rule watches.
-          </p>
-          <Link className="btn btn-ghost btn-sm" href="/accounts">Choose an account</Link>
-        </div>
+        <p className="empty">Choose an account above to view the market this rule watches.</p>
       ) : (
         <>
           <div className="grid grid-3">
