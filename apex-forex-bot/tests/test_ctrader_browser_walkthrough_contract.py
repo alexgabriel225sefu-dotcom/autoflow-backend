@@ -114,7 +114,7 @@ def test_connected_ctrader_ui_exposes_the_manual_walkthrough_states():
     )
     assert_all(
         rule_new,
-        ["New rule", "Validate it", "Preview it against real bars"],
+        ["New rule", "Check it: every field is verified once more", "Preview it against real bars"],
         WEB / "app" / "(app)" / "rules" / "new" / "page.tsx",
     )
     assert_all(
