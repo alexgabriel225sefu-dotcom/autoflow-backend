@@ -43,10 +43,14 @@ from apex.platform import store as _store
 # so a captured body cannot be replayed later.
 SIG_TOLERANCE_SEC = 300
 
-# Events that grant. Both shapes are accepted because which one arrives
-# depends on whether checkout is a Session or a PaymentIntent, and that is a
-# decision the owner has not made yet.
-GRANTING = ("checkout.session.completed", "payment_intent.succeeded",
+# Events that grant. The approved platform endpoint subscribes to
+# checkout.session.completed and checkout.session.async_payment_succeeded.
+# A card is paid on completed. A delayed method completes unpaid, then
+# async_payment_succeeded carries payment_status paid. The other two names
+# are older branches. They are not part of that endpoint.
+GRANTING = ("checkout.session.completed",
+            "checkout.session.async_payment_succeeded",
+            "payment_intent.succeeded",
             "invoice.payment_succeeded")
 # Events that take the entitlement away.
 REVOKING = ("charge.refunded", "charge.dispute.created",
@@ -305,7 +309,8 @@ def _foreign_product(obj):
     `metadata.product` to a legacy catalogue key such as `apex-forex` and
     do not set `a4tUserId`. Pointing a second endpoint at this handler
     delivers those events even while platform checkout is off. A present
-    product that is not the approved sku is not granted and does not revoke.
+    product that is not the approved sku is not granted and does not revoke,
+    including when the object also names a platform user.
 
     This platform's own Checkout Session does not set `metadata.product`,
     so a missing product is not treated as foreign.
@@ -465,8 +470,15 @@ def _user_id_of(obj):
 
 
 def _paid(obj, event_type):
-    """Whether this object represents money actually taken."""
-    if event_type == "checkout.session.completed":
+    """Whether this object represents money actually taken.
+
+    `checkout.session.completed` is not enough. A delayed method fires it
+    with `payment_status` unpaid, and the money arrives later as
+    `checkout.session.async_payment_succeeded`. Both grant only when the
+    session says paid. An unpaid async event does not grant either.
+    """
+    if event_type in ("checkout.session.completed",
+                      "checkout.session.async_payment_succeeded"):
         return obj.get("payment_status") == "paid"
     if event_type == "payment_intent.succeeded":
         return obj.get("status") == "succeeded"
@@ -500,6 +512,61 @@ def _k_refunded(ref):
 def _k_ref(ref):
     """Payment id → the platform user it granted to."""
     return f"{_store._ns()}:{_store._P}:billing:ref:{ref}"
+
+
+def _k_once(ref):
+    """Payment id → a grant for it has been started or finished.
+
+    `completed` and `async_payment_succeeded` are different event ids for
+    one payment. The event claim does not collapse them.
+    """
+    return f"{_store._ns()}:{_store._P}:billing:once:{ref}"
+
+
+_once_inflight = set()
+
+
+def _claim_payment(ref):
+    """'go' when this caller may grant `ref`. 'done' when it already did.
+    `BUSY` when a grant for `ref` is in flight and the shared claim could
+    not be asked.
+    """
+    if not ref:
+        return "go"
+    got = user_store.claim(_k_once(ref), ttl_s=86400)
+    if got is True:
+        return "go"
+    if got is False:
+        return "done"
+    with _fallback_lock:
+        if ref in _once_inflight:
+            return BUSY
+        if _store._read(_k_once(ref)):
+            return "done"
+        _once_inflight.add(ref)
+        return "go"
+
+
+def _finish_payment(ref):
+    if not ref:
+        return
+    try:
+        _store._write(_k_once(ref), {"at": time.time(), "outcome": "granted"})
+    except Exception:
+        pass
+    with _fallback_lock:
+        _once_inflight.discard(ref)
+
+
+def _release_payment(ref):
+    if not ref:
+        return
+    try:
+        user_store.set_blob(_k_once(ref), "", ttl_s=1)
+    except Exception:
+        pass
+    with _fallback_lock:
+        _once_inflight.discard(ref)
 
 
 def _amount_matches(obj, cfg):
@@ -663,31 +730,39 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         # A duplicate is a success: the provider retried, the work is done.
         return 200, {"ok": True, "duplicate": True, "type": etype}
 
-    if etype in GRANTING and _foreign_product(obj):
-        # A legacy checkout on the same Stripe account. Do not grant, and
-        # do not treat it as a platform refund later: there is no licence
-        # here to withdraw.
+    if _foreign_product(obj):
+        # A legacy payment on the same Stripe account. Do not grant it, and
+        # do not revoke from it. The object may still carry metadata.a4tUserId;
+        # that name does not make the payment one this platform sold.
         _mark_done(event_id, "foreign-product")
         return 200, {"ok": True, "handled": False,
                      "reason": "this payment is not the Apex4Traders offer"}
 
     ref = _payment_ref(obj)
-    user_id = _user_id_of(obj)
-    if not user_id and ref:
-        # A REFUND OR CHARGEBACK ARRIVES ON AN OBJECT THAT CARRIES NEITHER
-        # THE METADATA NOR THE REFERENCE WE WROTE AT CHECKOUT.
-        #
-        # `charge.refunded` is a Charge and `charge.dispute.created` is a
-        # Dispute. Neither has `client_reference_id`, and a Dispute carries
-        # no metadata of ours at all. So every reversal resolved to "no
-        # platform user", was marked done, and the client kept the licence
-        # they had been refunded for. The billing tests did not catch it
-        # because they built those events as a metadata dict, which the
-        # provider never sends.
-        #
-        # So the grant writes down which payment it was for, and a reversal
-        # is matched through that. The PaymentIntent id is the one id all
-        # four shapes share.
+    claimed = _user_id_of(obj)
+    user_id = claimed
+    # A Charge and a Dispute belong to a payment, not to whoever is named in
+    # metadata. metadata.a4tUserId is trusted for a Checkout Session this
+    # server created. On a reversal it used to skip the payment index and
+    # revoke that named account even when the payment was a different one.
+    if etype in ("charge.refunded", "charge.dispute.created"):
+        owner = None
+        if ref:
+            try:
+                _rec = _store._read_strict(_k_ref(ref))
+                owner = str((_rec or {}).get("userId") or "") or None
+            except Exception as e:                           # noqa: BLE001
+                print(f"[Billing] could not resolve payment {ref} to a user: "
+                      f"{type(e).__name__}")
+                _release(event_id)
+                return 500, {"ok": False, "error": {
+                    "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
+        user_id = owner
+    elif not user_id and ref:
+        # A reversal other than a Charge or Dispute (a deleted subscription,
+        # a failed invoice) may not carry the account. The grant wrote the
+        # payment id for this lookup. A Charge or Dispute never reaches
+        # here: those two revoke only the account stored for that payment.
         try:
             # STRICT: a store that did not answer must not look like "no such
             # payment". The old non-strict read returned None on an outage,
@@ -726,6 +801,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         return 200, {"ok": True, "handled": False, "reason": "no platform user on this payment"}
 
     notice = None
+    payment_claimed = False
     try:
         if etype in GRANTING:
             if not _paid(obj, etype):
@@ -771,6 +847,17 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             expires = None
             if cfg["periodDays"]:
                 expires = (time.time() if now is None else now) + cfg["periodDays"] * 86400
+            gate = _claim_payment(ref)
+            if gate == BUSY:
+                _release(event_id)
+                return 500, {"ok": False, "error": {
+                    "code": "BILLING_FAILED",
+                    "message": "this payment is already being granted"}}
+            if gate == "done":
+                _mark_done(event_id, "already-granted")
+                return 200, {"ok": True, "duplicate": True, "type": etype,
+                             "reason": "this payment was already granted"}
+            payment_claimed = bool(ref)
             _lic.grant(user_id, plan=cfg["plan"], expires_at=expires,
                        masked_key=None, now=now, payment_ref=ref)
             # The founder plan and the live paid record are different facts.
@@ -784,6 +871,8 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             _live_gate.note_confirmed_payment(
                 user_id, obj, payment_ref=ref, lifetime=lifetime)
             if ref:
+                _finish_payment(ref)
+                payment_claimed = False
                 # Best effort, and deliberately NOT strict: the licence is
                 # written and the buyer is provisioned. Failing the delivery
                 # here would make the provider retry a grant that already
@@ -831,6 +920,8 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         # refused as a duplicate and the buyer is never provisioned.
         print(f"[Billing] {etype} {event_id} FAILED for {user_id}: "
               f"{type(e).__name__}: {e}")
+        if payment_claimed:
+            _release_payment(ref)
         _release(event_id)
         return 500, {"ok": False, "error": {
             "code": "BILLING_FAILED", "message": f"{type(e).__name__}"}}

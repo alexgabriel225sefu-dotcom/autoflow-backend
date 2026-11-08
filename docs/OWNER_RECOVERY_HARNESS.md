@@ -23,10 +23,12 @@ directory as the local store:
 - A rule written for one user is not returned for another user id.
 - A revoked licence is not active.
 
-That store is one process's files. It does not prove that two deployed
-instances share a claim. Production order idempotency still depends on
-the shared store the service was given. This harness does not identify
-which provider that is.
+That store is the same process and the same local files. The harness
+does not start a subprocess, Postgres, Redis, or a load test. It does
+not prove that two deployed instances share a claim. Production order
+idempotency still depends on the shared store the service was given.
+This harness does not identify which provider that is, and it is not a
+backup or a provider recovery result.
 
 `apex-forex-bot/tests/test_platform_tenant_http.py` is the HTTP form of
 the tenant check: two synthetic users, the real platform server on

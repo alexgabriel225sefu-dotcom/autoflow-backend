@@ -30,12 +30,18 @@ to the login page, so this was not a homepage redirect. It was still not
 the billing handler. Stripe must not be pointed at a 404.
 
 That site route now forwards one POST to
-`{NEXT_PUBLIC_API_BASE_URL}/api/v1/billing/webhook`. It copies the raw
+`{NEXT_PUBLIC_API_BASE_URL}/api/v1/billing/webhook`. The path is that
+fixed path. The request does not choose the host. It copies the raw
 body and the `Stripe-Signature` header and does not follow a redirect.
-It forwards no cookie and no Authorization header. If
-`NEXT_PUBLIC_API_BASE_URL` is unset, or is the website's own origin, the
-route answers JSON 503 and does not call itself. Other `/api/*` paths
-on the website stay 404. This route does not turn checkout on.
+It forwards no cookie and no Authorization header. A missing signature
+is refused with JSON 400 before the body is forwarded. A body or an
+upstream response over 1 MiB is refused. The upstream call has a 10
+second deadline. The configured origin must be a public https host when
+`NODE_ENV` is `production`. A loopback, private, or link-local host is
+refused in every environment, as is a URL with a username or password.
+If `NEXT_PUBLIC_API_BASE_URL` is unset, or is the website's own origin,
+the route answers JSON 503 and does not call itself. Other `/api/*`
+paths on the website stay 404. This route does not turn checkout on.
 
 The supported public URL, once that variable is the API origin, is:
 
@@ -50,23 +56,34 @@ from `apex.platform.api` when the route is `billing/webhook`. No session
 cookie. The body is accepted only when the `Stripe-Signature` header
 matches.
 
-Events that can grant a platform licence:
+The approved endpoint, which has not been created from this repository,
+lists exactly these events:
 
-- `checkout.session.completed` with `payment_status` `paid`
-- `payment_intent.succeeded` with `status` `succeeded`
-- `invoice.payment_succeeded`
-
-Events that can withdraw one:
-
-- `charge.refunded` when the charge is fully refunded (a partial refund
-  does not withdraw)
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `charge.refunded`
 - `charge.dispute.created`
-- `customer.subscription.deleted`
-- `invoice.payment_failed`
 
-A repeated event id is a duplicate and does not grant or revoke again.
-Two threads in one process, when the shared claim cannot be asked, do not
-both grant: the second is told to retry.
+It does not list `payment_intent.*`, `invoice.*`,
+`customer.subscription.*`, `checkout.session.async_payment_failed`, or a
+wildcard. A card payment arrives as `checkout.session.completed` with
+`payment_status` `paid` and grants. A delayed method arrives first as
+`checkout.session.completed` with `payment_status` `unpaid`, which does
+not grant, and later as `checkout.session.async_payment_succeeded`. That
+second event grants only when `payment_status` is `paid`. The two event
+ids share one payment id, so only one grant is written. A second delivery
+while that grant is in flight is told to retry. `async_payment_failed`
+is not subscribed. Because the unpaid session never granted, there is no
+licence for that failure to withdraw.
+
+The handler still contains older branches for `payment_intent.succeeded`,
+`invoice.payment_succeeded`, `customer.subscription.deleted`, and
+`invoice.payment_failed`. Those branches are not the approved
+subscription. Do not add them to the endpoint.
+
+A full `charge.refunded`, and `charge.dispute.created`, withdraw the
+licence that was indexed for that payment. A partial refund does not.
+A repeated event id is a duplicate.
 
 ## Same Stripe account, legacy checkouts
 
@@ -78,9 +95,13 @@ site sets `metadata.product` (for example `apex-forex`). This platform's
 own Checkout Session does not set `metadata.product`; it sets
 `metadata.a4tUserId`.
 
-A legacy refund is not matched to a platform licence unless this handler
-previously indexed that payment. It does not withdraw a licence it did not
-grant.
+A `charge.refunded` or `charge.dispute.created` withdraws a licence only
+when this handler indexed that payment at grant time, and only for the
+account stored against that payment. `metadata.a4tUserId` on the charge
+or the dispute does not choose the account. A named product or sku other
+than `founder_lifetime` does not grant and does not revoke, even when
+the object also carries `a4tUserId` and even when the payment id matches
+one this handler granted. A repeated event id is a duplicate.
 
 ## Environment names
 
@@ -88,9 +109,15 @@ Values are not written here. The process reads:
 
 | Name | Role |
 |---|---|
-| `A4T_STRIPE_WEBHOOK_SECRET` | Preferred signing secret for this handler |
-| `STRIPE_WEBHOOK_SECRET` | Accepted if the preferred name is unset |
-| `NEXT_PUBLIC_API_BASE_URL` | API origin the website uses when it forwards the public webhook. Not a secret |
+| `A4T_STRIPE_WEBHOOK_SECRET` | The only secret to set on the platform API. It is the signing secret of the new endpoint |
+| `STRIPE_WEBHOOK_SECRET` | Legacy process name. Leave it unset on the platform API. The handler reads it only when the platform name is unset. Do not copy it from the Telegram service |
+| `NEXT_PUBLIC_API_BASE_URL` | API origin the website uses when it forwards the public webhook. Not a secret. The path is fixed |
+| `A4T_CHECKOUT_ENABLED` | Must be on before a buyer can be sent to pay. Off leaves checkout at 503 |
+| `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | Second gate, also required |
+| `STRIPE_SECRET_KEY` | Only to create a Checkout Session. Not required to verify a webhook |
+| `A4T_STRIPE_PRICE_ID` | Price used when creating a session |
+| `A4T_STRIPE_PAYMENT_LINK` | Alternative to creating a session |
+| `A4T_PUBLIC_WEB_ORIGIN` | Where the buyer returns |
 
 ## Do not edit the existing live endpoint
 
@@ -108,12 +135,14 @@ fulfillment consumes. The platform handler is a different verifier and a
 different licence store. Pointing the existing endpoint at it would break
 the legacy consumer and would not prove signatures verify.
 
-A separate endpoint is required. Its signing secret has to be set on the
-API as `A4T_STRIPE_WEBHOOK_SECRET` (or `STRIPE_WEBHOOK_SECRET` if that
-name is the one already used). That configuration step is indispensable:
-without a secret the handler answers 503 and verifies nothing, and there
-is no API operation here that copies the legacy secret. Do not rotate the
-secret on `we_1TzH8rGpBbs5xtI5S0glUEVE`.
+Create a separate endpoint. Do not edit `we_1TzH8rGpBbs5xtI5S0glUEVE`.
+On the platform API, set one key, `A4T_STRIPE_WEBHOOK_SECRET`, to the
+signing secret of that new endpoint. Do not set `STRIPE_WEBHOOK_SECRET`
+on the platform API, and do not rotate or replace the secret the
+Telegram service already uses. The handler answers 503 until
+`A4T_STRIPE_WEBHOOK_SECRET` is set. If that name is unset, the handler
+will read `STRIPE_WEBHOOK_SECRET`; leaving the legacy name unset on this
+API is what keeps the two verifiers apart. No value is recorded here.
 
 GET on both the website and the API returns 404. That was observed on
 8 November 2026 at 07:12 Europe/Amsterdam: the website body is JSON
@@ -125,12 +154,6 @@ in this change, and only when `NEXT_PUBLIC_API_BASE_URL` is the API
 origin. Until that forwarder is deployed, the website POST is still the
 catch-all JSON 404. Do not send Stripe there before that deploy and
 before the new endpoint's secret is set on the API.
-| `A4T_CHECKOUT_ENABLED` | Must be on before a buyer can be sent to pay. Off leaves checkout at 503 |
-| `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | Second gate, also required |
-| `STRIPE_SECRET_KEY` | Only to create a Checkout Session. Not required to verify a webhook |
-| `A4T_STRIPE_PRICE_ID` | Price used when creating a session |
-| `A4T_STRIPE_PAYMENT_LINK` | Alternative to creating a session |
-| `A4T_PUBLIC_WEB_ORIGIN` | Where the buyer returns |
 
 Checkout flags do not have to be on for the webhook to verify a delivery.
 They must stay off until the owner has finished the sandbox check below.

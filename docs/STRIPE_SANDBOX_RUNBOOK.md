@@ -134,12 +134,16 @@ reveal and copy the signing secret.
 11. **Livemode guard.** Only if the sandbox runs with `APP_ENV=production`:
     a test-mode event must be acknowledged but not grant.
 
-### B4. Known gap to decide before live mode
-`billing.GRANTING` handles `checkout.session.completed`,
-`payment_intent.succeeded` and `invoice.payment_succeeded`. It does **not**
-handle `checkout.session.async_payment_succeeded`. Cards are unaffected;
-a delayed bank-debit method would pay and never grant. Either keep Checkout to
-card payments (default) or ask engineering to add the event.
+### B4. Delayed payment methods
+`checkout.session.async_payment_succeeded` grants only when
+`payment_status` is `paid`, and only once for that payment. A card does
+not emit it. A delayed method emits `checkout.session.completed` first,
+with `payment_status` unpaid, and that delivery must not grant. No
+provider-signed delayed payment has been delivered to this handler. The
+approved endpoint lists `checkout.session.completed`,
+`checkout.session.async_payment_succeeded`, `charge.refunded`, and
+`charge.dispute.created`. It does not list invoice, subscription, or
+payment-intent events.
 
 ### B5. Exit
 Delete the sandbox webhook endpoint, rotate/discard the test keys if they were

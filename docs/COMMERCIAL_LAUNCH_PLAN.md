@@ -38,12 +38,14 @@ authenticated platform user id into provider metadata. The browser receives
 only the hosted checkout URL.
 
 Fulfilment remains webhook-driven. The server verifies the raw signature,
-requires `payment_status == "paid"`, and keeps event processing idempotent. A success-page redirect never grants a
-licence. In code the webhook accepts `checkout.session.completed` (which must
-be `paid`), `payment_intent.succeeded` and `invoice.payment_succeeded`;
-`checkout.session.async_payment_succeeded` is NOT handled by `billing.py`
-today, so a delayed-payment method would be acknowledged and ignored. Card
-payments arrive as `completed` + `paid` and are unaffected.
+requires `payment_status == "paid"`, and keeps one grant per payment. A
+success-page redirect never grants a licence. `checkout.session.completed`
+grants when it is already paid. `checkout.session.async_payment_succeeded`
+grants when that later session is paid, and does not grant a second time
+for the same payment. An unpaid `completed` session does not grant, so a
+delayed method is not fulfilled until the async event says paid. No
+provider-signed delivery of that pair has been run. The approved endpoint
+does not subscribe to invoice, subscription, or payment-intent events.
 
 The sandbox checklist is complete only after a real test-mode payment, webhook
 delivery, duplicate delivery, unpaid session, wrong-user metadata, refund and

@@ -33,6 +33,7 @@ os.environ.pop("STRIPE_WEBHOOK_SECRET", None)
 from apex.platform import api as API                                 # noqa: E402
 from apex.platform import billing as B                               # noqa: E402
 from apex.platform import licence as LIC                             # noqa: E402
+from apex.platform import store as ST                                # noqa: E402
 from apex import user_store                                          # noqa: E402
 
 _fails = []
@@ -109,27 +110,120 @@ st, out = deliver(refund)
 check("legacy refund is not a platform revoke",
       LIC.status_for(USER)["state"] == LIC.ACTIVE, str(LIC.status_for(USER)))
 
-print("\n[5] two threads without a shared claim cannot both grant")
+print("\n[4b] a foreign refund or dispute that names this user does not revoke")
+# Reproduced on 988b8b1: _foreign_product ran only for GRANTING, then
+# _user_id_of trusted metadata.a4tUserId and never consulted the payment
+# index. The signed object below is a different payment.
+for etype, eid in (("charge.refunded", "evt_foreign_refund_user"),
+                   ("charge.dispute.created", "evt_foreign_dispute_user")):
+    obj = {
+        "object": "charge" if etype == "charge.refunded" else "dispute",
+        "payment_intent": "pi_not_this_licence",
+        "amount": 29700, "amount_refunded": 29700,
+        "metadata": {"product": "apex-forex", B.USER_META_KEY: USER},
+    }
+    st, out = deliver({"id": eid, "type": etype, "livemode": True,
+                       "data": {"object": obj}})
+    check(f"{etype} is not a revoke",
+          st == 200 and out.get("outcome") != "revoked", str(out))
+    check(f"{etype} leaves the platform licence",
+          LIC.status_for(USER)["state"] == LIC.ACTIVE, str(LIC.status_for(USER)))
+    st, out = deliver({"id": eid, "type": etype, "livemode": True,
+                       "data": {"object": obj}})
+    check(f"{etype} again is a duplicate", out.get("duplicate") is True, str(out))
+
+print("\n[4c] the same, even when the foreign object reuses this payment id")
+for etype, eid in (("charge.refunded", "evt_foreign_refund_same_pi"),
+                   ("charge.dispute.created", "evt_foreign_dispute_same_pi")):
+    obj = {
+        "object": "charge" if etype == "charge.refunded" else "dispute",
+        "payment_intent": "pi_ours_1",
+        "amount": B.APPROVED_PRICE_MINOR,
+        "amount_refunded": B.APPROVED_PRICE_MINOR,
+        "metadata": {"product": "apex-forex", B.USER_META_KEY: USER},
+    }
+    st, out = deliver({"id": eid, "type": etype, "livemode": True,
+                       "data": {"object": obj}})
+    check(f"foreign {etype} on our payment id does not revoke",
+          out.get("outcome") != "revoked"
+          and LIC.status_for(USER)["state"] == LIC.ACTIVE, str(out))
+
+print("\n[4d] a platform user id with a payment we did not grant does not revoke")
+mismatch = {"id": "evt_mismatch_refund", "type": "charge.refunded",
+            "livemode": True, "data": {"object": {
+                "object": "charge", "payment_intent": "pi_never_granted",
+                "amount": B.APPROVED_PRICE_MINOR,
+                "amount_refunded": B.APPROVED_PRICE_MINOR,
+                "metadata": {B.USER_META_KEY: USER}}}}
+st, out = deliver(mismatch)
+check("mismatched payment is not a revoke",
+      out.get("outcome") != "revoked"
+      and LIC.status_for(USER)["state"] == LIC.ACTIVE, str(out))
+
+print("\n[4e] the payment this handler granted still revokes, once")
+own = {"id": "evt_own_refund", "type": "charge.refunded", "livemode": True,
+       "data": {"object": {
+           "object": "charge", "payment_intent": "pi_ours_1",
+           "amount": B.APPROVED_PRICE_MINOR,
+           "amount_refunded": B.APPROVED_PRICE_MINOR, "metadata": {}}}}
+st, out = deliver(own)
+check("own payment revokes", st == 200 and out.get("outcome") == "revoked", str(out))
+check("licence withdrawn", LIC.status_for(USER)["state"] == LIC.REVOKED)
+st, out = deliver(own)
+check("own refund again is a duplicate", out.get("duplicate") is True, str(out))
+check("still withdrawn", LIC.status_for(USER)["state"] == LIC.REVOKED)
+LIC.grant(USER, plan=B.APPROVED_PLAN, payment_ref="pi_ours_dispute")
+ST._write(B._k_ref("pi_ours_dispute"), {"userId": USER, "at": time.time()})
+dispute = {"id": "evt_own_dispute", "type": "charge.dispute.created",
+           "livemode": True, "data": {"object": {
+               "object": "dispute", "payment_intent": "pi_ours_dispute"}}}
+st, out = deliver(dispute)
+check("own dispute revokes", out.get("outcome") == "revoked", str(out))
+st, out = deliver(dispute)
+check("own dispute again is a duplicate", out.get("duplicate") is True, str(out))
+
+print("\n[5] a second delivery is refused while the first is still in flight")
 user_store.claim = lambda *a, **k: None
-barrier = threading.Barrier(2)
+first_inside = threading.Event()
+release_first = threading.Event()
+real_already = B._already_done
+
+def held_already(event_id):
+    result = real_already(event_id)
+    if result is False:
+        first_inside.set()
+        release_first.wait(5)
+    return result
+
+B._already_done = held_already
 results = []
 
 def hit():
-    barrier.wait()
     results.append(deliver(session(
         "evt_race_1", metadata={B.USER_META_KEY: USER},
         payment_intent="pi_race_1")))
 
 LIC.revoke(USER)
-threads = [threading.Thread(target=hit), threading.Thread(target=hit)]
-for t in threads:
-    t.start()
-for t in threads:
-    t.join()
-codes = sorted(st for st, _out in results)
-check("one delivery is refused as in flight", 500 in codes, str(results))
-check("the other applies", any(out.get("outcome") == "granted" for _st, out in results),
-      str(results))
+first = threading.Thread(target=hit)
+second = threading.Thread(target=hit)
+try:
+    first.start()
+    entered = first_inside.wait(5)
+    check("the first delivery is held in flight", entered)
+    second.start()
+    second.join(5)
+    check("the second is refused while the first is in flight",
+          len(results) == 1 and results[0][0] == 500
+          and results[0][1].get("error", {}).get("code") == "BILLING_FAILED",
+          str(results))
+    check("the held delivery has not granted yet",
+          LIC.status_for(USER)["state"] != LIC.ACTIVE)
+finally:
+    release_first.set()
+    first.join(5)
+    B._already_done = real_already
+check("the held delivery then grants",
+      any(out.get("outcome") == "granted" for _st, out in results), str(results))
 st, out = deliver(session("evt_race_1", metadata={B.USER_META_KEY: USER},
                           payment_intent="pi_race_1"))
 check("the retry is a duplicate", out.get("duplicate") is True, str(out))
