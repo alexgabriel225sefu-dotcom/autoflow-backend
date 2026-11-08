@@ -33,6 +33,7 @@ import os
 import re
 import threading
 import time
+import uuid
 
 from apex import user_store
 from apex.platform import licence as _lic
@@ -324,11 +325,46 @@ def _foreign_product(obj):
     return named not in (APPROVED_SKU, APPROVED_PLAN)
 
 
-# A shared SET NX value is an in-flight lease, not a finished grant. It has
-# to expire so a process that dies between the claim and the durable record
-# does not leave the payment acknowledged forever. Sixty seconds covers the
-# grant itself. Stripe retries for much longer than that.
+# The lease is how long a dead worker blocks a replacement. It is not the
+# proof that the grant happened. Ownership is a random token. Releasing and
+# publishing compare that token, so an expired worker cannot delete the
+# replacement's lease. Sixty seconds is only the recovery bound.
 _LEASE_S = 60
+_tls = threading.local()
+
+
+class _LostLease(RuntimeError):
+    """This worker no longer owns the lease it was going to publish."""
+
+
+def _push_token(kind, key, token):
+    box = getattr(_tls, kind, None)
+    if box is None:
+        box = {}
+        setattr(_tls, kind, box)
+    box.setdefault(key, []).append(token)
+
+
+def _take_token(kind, key):
+    box = getattr(_tls, kind, None) or {}
+    stack = box.get(key) or []
+    if not stack:
+        return None
+    return stack.pop()
+
+
+_event_local_owner = {}
+
+
+def _refund_state(ref):
+    """'yes' when this payment was refunded or disputed, 'no' when not,
+    'unknown' when the store could not say.
+    """
+    try:
+        rec = _store._read_strict(_k_refunded(ref))
+    except Exception:
+        return "unknown"
+    return "yes" if rec else "no"
 
 
 def _outcome_of(key):
@@ -346,25 +382,31 @@ def _outcome_of(key):
     return "open"
 
 
-def _already_done(event_id):
-    """True when this event has a durable outcome. `BUSY` when a lease for
-    it is held. `'unknown'` when the store could not say.
+def _event_lease(event_id):
+    return _event_key(event_id) + ":lease"
 
-    `user_store.claim` is SET NX EX. False means the key exists. That is an
-    in-flight lease until a durable outcome is written over it, not proof
-    the handler finished. None means the shared store could not be asked,
-    which is also not proof.
+
+def _already_done(event_id):
+    """True when this event has a durable outcome. False when THIS call owns
+    the lease and the caller must continue. `BUSY` when another owner holds
+    it. `'unknown'` when the store could not say.
+
+    The lease value is this call's token, not ``1``. After the lease is
+    acquired the outcome is read again. A worker that saw "open" before
+    another worker finished must not continue once the record exists.
     """
     key = _event_key(event_id)
-    state = _outcome_of(key)
-    if state == "unknown":
-        return "unknown"
-    if state == "done":
-        return True
+    lease = _event_lease(event_id)
     if user_store._USE_REDIS:
-        got = user_store.claim(key, ttl_s=_LEASE_S)
-        if got is True:
-            return False
+        state = _outcome_of(key)
+        if state == "unknown":
+            return "unknown"
+        if state == "done":
+            return True
+        token = uuid.uuid4().hex
+        got = user_store.claim_value(lease, token, ttl_s=_LEASE_S)
+        if got is None:
+            return "unknown"
         if got is False:
             again = _outcome_of(key)
             if again == "done":
@@ -372,35 +414,66 @@ def _already_done(event_id):
             if again == "unknown":
                 return "unknown"
             return BUSY
-        return "unknown"
+        again = _outcome_of(key)
+        if again == "done":
+            user_store.release_claim(lease, token)
+            return True
+        if again == "unknown":
+            user_store.release_claim(lease, token)
+            return "unknown"
+        _push_token("event", event_id, token)
+        return False
     with _fallback_lock:
         if event_id in _fallback_inflight:
             return BUSY
-        if _outcome_of(key) == "done":
+        state = _outcome_of(key)
+        if state == "done":
             return True
+        if state == "unknown":
+            return "unknown"
+        token = uuid.uuid4().hex
         _fallback_inflight.add(event_id)
+        _event_local_owner[event_id] = token
+        _push_token("event", event_id, token)
         return False
 
 
-def _mark_done(event_id, outcome):
-    _store._write(_event_key(event_id), {"at": time.time(), "outcome": outcome})
+def _mark_done(event_id, outcome, token):
+    """Publish the outcome only while `token` still owns the event lease."""
+    payload = {"at": time.time(), "outcome": outcome}
+    if not token:
+        raise _LostLease("this delivery does not own the event lease")
+    if user_store._USE_REDIS:
+        ok = user_store.publish_if_owner(
+            _event_lease(event_id), token, _event_key(event_id),
+            json.dumps(payload, separators=(",", ":")))
+        if ok is None:
+            raise user_store.StoreUnavailable("the event outcome was not stored")
+        if ok is False:
+            raise _LostLease("the event lease was no longer ours")
+        return
     with _fallback_lock:
+        if _event_local_owner.get(event_id) != token:
+            raise _LostLease("the event lease was no longer ours")
+        _store._write(_event_key(event_id), payload)
+        _event_local_owner.pop(event_id, None)
         _fallback_inflight.discard(event_id)
 
 
-def _release(event_id):
-    """Give the claim back after a delivery that did not complete.
-
-    Without this the two defences deadlock: the claim says "handled" while no
-    licence was written, so every retry is answered "duplicate" and a buyer who
-    has paid is never provisioned.
-    """
-    try:
-        user_store.del_blob(_event_key(event_id))
-    except Exception:
-        pass
+def _release(event_id, token):
+    """Give this worker's event lease back. Does not delete another owner's."""
+    if not token:
+        return
+    if user_store._USE_REDIS:
+        try:
+            user_store.release_claim(_event_lease(event_id), token)
+        except Exception:
+            pass
+        return
     with _fallback_lock:
-        _fallback_inflight.discard(event_id)
+        if _event_local_owner.get(event_id) == token:
+            _event_local_owner.pop(event_id, None)
+            _fallback_inflight.discard(event_id)
 
 
 def _k_intent(user_id):
@@ -557,75 +630,124 @@ def _k_once(ref):
 
 
 def _k_once_lease(ref):
-    """Payment id → someone is currently granting it.
+    """Payment id → the token of the worker currently granting it.
 
-    SET NX EX stores ``1`` here. That value means the lease is held. It
-    does not mean a licence was written.
+    The value is that worker's token. It is not a completed grant, and it
+    is not a shared ``1`` that any worker may delete.
     """
     return f"{_store._ns()}:{_store._P}:billing:once-lease:{ref}"
 
 
-_once_inflight = set()
+_once_owner = {}
+
+
+def _release_owned(lease_key, token, local_key=None):
+    """Drop this token's lease. A token that lost the lease deletes nothing."""
+    if not token:
+        return
+    if user_store._USE_REDIS:
+        try:
+            user_store.release_claim(lease_key, token)
+        except Exception:
+            pass
+        return
+    with _fallback_lock:
+        if local_key is not None and _once_owner.get(local_key) == token:
+            _once_owner.pop(local_key, None)
 
 
 def _claim_payment(ref):
     """'go' when this caller may grant `ref`. 'done' when a durable grant
-    record exists. `BUSY` when a lease is held. `'unknown'` when the store
+    record exists. 'refunded' when the payment was already reversed.
+    `BUSY` when another token holds the lease. `'unknown'` when the store
     could not be asked.
 
-    A shared claim returning False is the lease, not the completed grant.
-    The caller must retry, not tell the provider the payment was granted.
+    The done record is read again after this caller acquires the lease.
+    Seeing "open" and then acquiring is not enough: another worker can
+    finish in between those two steps.
     """
     if not ref:
         return "go"
-    state = _outcome_of(_k_once(ref))
-    if state == "unknown":
-        return "unknown"
-    if state == "done":
-        return "done"
+    record = _k_once(ref)
+    lease = _k_once_lease(ref)
     if user_store._USE_REDIS:
-        got = user_store.claim(_k_once_lease(ref), ttl_s=_LEASE_S)
-        if got is True:
-            return "go"
+        state = _outcome_of(record)
+        if state == "unknown":
+            return "unknown"
+        if state == "done":
+            return "done"
+        token = uuid.uuid4().hex
+        got = user_store.claim_value(lease, token, ttl_s=_LEASE_S)
+        if got is None:
+            return "unknown"
         if got is False:
-            again = _outcome_of(_k_once(ref))
+            again = _outcome_of(record)
             if again == "done":
                 return "done"
             if again == "unknown":
                 return "unknown"
             return BUSY
-        return "unknown"
+        again = _outcome_of(record)
+        refunded = _refund_state(ref)
+        if again == "done" or refunded == "yes":
+            _release_owned(lease, token)
+            return "done" if again == "done" else "refunded"
+        if again == "unknown" or refunded == "unknown":
+            _release_owned(lease, token)
+            return "unknown"
+        _push_token("payment", ref, token)
+        return "go"
     with _fallback_lock:
-        if ref in _once_inflight:
+        if ref in _once_owner:
             return BUSY
-        _once_inflight.add(ref)
+        state = _outcome_of(record)
+        if state == "done":
+            return "done"
+        if state == "unknown":
+            return "unknown"
+        refunded = _refund_state(ref)
+        if refunded == "yes":
+            return "refunded"
+        if refunded == "unknown":
+            return "unknown"
+        token = uuid.uuid4().hex
+        _once_owner[ref] = token
+        _push_token("payment", ref, token)
         return "go"
 
 
-def _finish_payment(ref):
-    """Record the grant, then drop the lease. A failed record raises.
+def _finish_payment(ref, token):
+    """Publish the grant only if `token` still owns the lease.
 
-    The licence write has already returned. Raising here makes the
-    delivery a retry instead of a 200 with no durable record. The lease
-    stays until the record lands, or until the caller releases it because
-    this write failed.
+    The licence write has already returned. Losing the lease here does not
+    delete the replacement's lease and does not count as a finished grant.
+    A later delivery can grant again only when no refund tombstone exists;
+    that second write is the same active licence, not a revival of a
+    revoked one.
     """
     if not ref:
         return
-    _store._write_strict(_k_once(ref), {"at": time.time(), "outcome": "granted"})
-    _release_payment(ref)
+    payload = json.dumps({"at": time.time(), "outcome": "granted"},
+                         separators=(",", ":"))
+    if user_store._USE_REDIS:
+        ok = user_store.publish_if_owner(_k_once_lease(ref), token, _k_once(ref), payload)
+        if ok is None:
+            raise user_store.StoreUnavailable("the payment grant was not stored")
+        if ok is False:
+            raise _LostLease("the payment lease was no longer ours")
+        return
+    with _fallback_lock:
+        if _once_owner.get(ref) != token:
+            raise _LostLease("the payment lease was no longer ours")
+        _store._write(_k_once(ref), {"at": time.time(), "outcome": "granted"})
+        _once_owner.pop(ref, None)
 
 
-def _release_payment(ref):
-    """Drop the in-flight lease. Does not remove a durable grant record."""
+def _release_payment(ref, token):
+    """Drop this token's payment lease. Does not remove a durable grant."""
     if not ref:
         return
-    try:
-        user_store.del_blob(_k_once_lease(ref))
-    except Exception:
-        pass
-    with _fallback_lock:
-        _once_inflight.discard(ref)
+    _release_owned(_k_once_lease(ref), token, ref)
 
 
 def _amount_matches(obj, cfg):
@@ -779,6 +901,10 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         return 200, {"ok": True, "handled": False, "type": etype}
 
     done = _already_done(event_id)
+    event_token = _take_token("event", event_id) if done is False else None
+    if done is False and not event_token:
+        return 500, {"ok": False, "error": {
+            "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
     if done == "unknown":
         return 500, {"ok": False, "error": {
             "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
@@ -796,7 +922,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         # A legacy payment on the same Stripe account. Do not grant it, and
         # do not revoke from it. The object may still carry metadata.a4tUserId;
         # that name does not make the payment one this platform sold.
-        _mark_done(event_id, "foreign-product")
+        _mark_done(event_id, "foreign-product", event_token)
         return 200, {"ok": True, "handled": False,
                      "reason": "this payment is not the Apex4Traders offer"}
 
@@ -816,7 +942,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             except Exception as e:                           # noqa: BLE001
                 print(f"[Billing] could not resolve payment {ref} to a user: "
                       f"{type(e).__name__}")
-                _release(event_id)
+                _release(event_id, event_token)
                 return 500, {"ok": False, "error": {
                     "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
         user_id = owner
@@ -836,7 +962,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         except Exception as e:                               # noqa: BLE001
             print(f"[Billing] could not resolve payment {ref} to a user: "
                   f"{type(e).__name__}")
-            _release(event_id)
+            _release(event_id, event_token)
             return 500, {"ok": False, "error": {
                 "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
 
@@ -856,18 +982,19 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             except Exception as e:                           # noqa: BLE001
                 print(f"[Billing] could not record the held reversal "
                       f"({type(e).__name__})")
-                _release(event_id)
+                _release(event_id, event_token)
                 return 500, {"ok": False, "error": {
                     "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
-        _mark_done(event_id, "no-user")
+        _mark_done(event_id, "no-user", event_token)
         return 200, {"ok": True, "handled": False, "reason": "no platform user on this payment"}
 
     notice = None
     payment_claimed = False
+    pay_token = None
     try:
         if etype in GRANTING:
             if not _paid(obj, etype):
-                _mark_done(event_id, "not-paid")
+                _mark_done(event_id, "not-paid", event_token)
                 return 200, {"ok": True, "handled": False, "reason": "payment not completed"}
             trusted, why_untrusted = _trusted_user_of(obj)
             if why_untrusted or trusted != user_id:
@@ -875,7 +1002,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                 # and a person has to decide whose it is.
                 _hold_for_review(event_id, etype, user_id, ref,
                                  why_untrusted or "user id mismatch")
-                _mark_done(event_id, "manual-review")
+                _mark_done(event_id, "manual-review", event_token)
                 return 200, {"ok": True, "handled": False,
                              "reason": "held for manual review"}
             if ref:
@@ -886,14 +1013,14 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                     _hold_for_review(event_id, etype, user_id, ref,
                                      "this payment was already refunded or "
                                      "disputed")
-                    _mark_done(event_id, "refunded-before-grant")
+                    _mark_done(event_id, "refunded-before-grant", event_token)
                     return 200, {"ok": True, "handled": False,
                                  "reason": "this payment was already refunded"}
             cfg = product_config()
             ok_live, why_live = _livemode_ok(event)
             if not ok_live:
                 print(f"[Billing] REFUSED {event_id}: {why_live}")
-                _mark_done(event_id, "livemode-mismatch")
+                _mark_done(event_id, "livemode-mismatch", event_token)
                 return 200, {"ok": True, "handled": False,
                              "reason": "this payment is not for this environment"}
             ok_amt, why_amt = _amount_matches(obj, cfg)
@@ -902,7 +1029,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                 # something other than the approved offer. Granting the full
                 # plan for it would be the product giving itself away.
                 print(f"[Billing] REFUSED {event_id} for {user_id}: {why_amt}")
-                _mark_done(event_id, "amount-mismatch")
+                _mark_done(event_id, "amount-mismatch", event_token)
                 return 200, {"ok": True, "handled": False,
                              "reason": "this payment does not match the "
                                        "approved offer"}
@@ -910,19 +1037,27 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             if cfg["periodDays"]:
                 expires = (time.time() if now is None else now) + cfg["periodDays"] * 86400
             gate = _claim_payment(ref)
-            if gate == "unknown":
-                _release(event_id)
+            pay_token = _take_token("payment", ref) if gate == "go" else None
+            if gate == "unknown" or (gate == "go" and ref and not pay_token):
+                _release(event_id, event_token)
                 return 500, {"ok": False, "error": {
                     "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
             if gate == BUSY:
-                _release(event_id)
+                _release(event_id, event_token)
                 return 500, {"ok": False, "error": {
                     "code": "BILLING_FAILED",
                     "message": "this payment is already being granted"}}
             if gate == "done":
-                _mark_done(event_id, "already-granted")
+                _mark_done(event_id, "already-granted", event_token)
                 return 200, {"ok": True, "duplicate": True, "type": etype,
                              "reason": "this payment was already granted"}
+            if gate == "refunded":
+                _hold_for_review(event_id, etype, user_id, ref,
+                                 "this payment was already refunded or "
+                                 "disputed")
+                _mark_done(event_id, "refunded-before-grant", event_token)
+                return 200, {"ok": True, "handled": False,
+                             "reason": "this payment was already refunded"}
             payment_claimed = bool(ref)
             _lic.grant(user_id, plan=cfg["plan"], expires_at=expires,
                        masked_key=None, now=now, payment_ref=ref)
@@ -937,7 +1072,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             _live_gate.note_confirmed_payment(
                 user_id, obj, payment_ref=ref, lifetime=lifetime)
             if ref:
-                _finish_payment(ref)
+                _finish_payment(ref, pay_token)
                 payment_claimed = False
                 # Best effort, and deliberately NOT strict: the licence is
                 # written and the buyer is provisioned. Failing the delivery
@@ -962,7 +1097,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                 # the client has still paid for.
                 print(f"[Billing] {event_id}: partial refund on {ref} for "
                       f"{user_id} — licence left in place")
-                _mark_done(event_id, "partial-refund")
+                _mark_done(event_id, "partial-refund", event_token)
                 return 200, {"ok": True, "handled": False,
                              "reason": "a partial refund does not withdraw "
                                        "the licence"}
@@ -987,8 +1122,8 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         print(f"[Billing] {etype} {event_id} FAILED for {user_id}: "
               f"{type(e).__name__}: {e}")
         if payment_claimed:
-            _release_payment(ref)
-        _release(event_id)
+            _release_payment(ref, pay_token)
+        _release(event_id, event_token)
         return 500, {"ok": False, "error": {
             "code": "BILLING_FAILED", "message": f"{type(e).__name__}"}}
 
@@ -1001,7 +1136,7 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
     # worked, and a provider that keeps getting 500s disables the endpoint.
     # The buyer has their licence either way; what they would lose is the
     # message saying so.
-    _mark_done(event_id, outcome)
+    _mark_done(event_id, outcome, event_token)
     if notice:
         try:
             _notify.notify(user_id, type="system", title=notice[0],

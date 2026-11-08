@@ -75,12 +75,19 @@ wildcard. A card payment arrives as `checkout.session.completed` with
 `checkout.session.completed` with `payment_status` `unpaid`, which does
 not grant, and later as `checkout.session.async_payment_succeeded`. That
 second event grants only when `payment_status` is `paid`. The two event
-ids share one payment id, so only one grant is written. The shared claim
-is an in-flight lease of 60 seconds. It is not a completed grant. The
-durable record is written only after the licence write returns. A second
-delivery while the lease is held is told to retry. If the first process
-dies before that record exists, the lease expires and a later delivery
-can grant. A store that cannot be read answers 500. `async_payment_failed`
+ids share one payment id. The worker that may grant holds a lease whose
+value is its own token. After it acquires the lease it reads the durable
+record again, and it reads whether that payment was already refunded.
+Another worker can finish between the first look and the acquire. The
+lease lasts 60 seconds so a dead worker does not block a replacement
+forever. That duration is not what prevents a second grant. Publishing
+the durable record and deleting the lease happen in one compare against
+the token, so an expired worker cannot delete the replacement's lease.
+A crash after the licence write and before that record can make the
+replacement write the same active licence again. It does not grant if
+the refund tombstone is already stored, so a revoked licence is not
+turned back on. This is bounded recovery, not a promise that the licence
+function runs only once. A store that cannot be read answers 500. `async_payment_failed`
 is not subscribed. Because the unpaid session never granted, there is no
 licence for that failure to withdraw.
 

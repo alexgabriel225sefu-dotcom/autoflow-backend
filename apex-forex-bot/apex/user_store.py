@@ -659,6 +659,44 @@ def release_claim(key, value):
     return int(res) == 1
 
 
+# Write the durable record and drop the lease in one step, and only if this
+# token still owns the lease. A worker whose TTL expired must not publish
+# and must not delete the replacement's lease.
+_LUA_PUBLISH = ("if redis.call('GET', KEYS[1]) == ARGV[1] then "
+                "redis.call('SET', KEYS[2], ARGV[2]) "
+                "redis.call('DEL', KEYS[1]) "
+                "return 1 else return 0 end")
+
+
+def publish_if_owner(lease_key, token, record_key, record_value):
+    """Write `record_key` and delete the lease, only if `token` still owns it.
+
+    True when this caller published. False when the lease belongs to someone
+    else or is gone. None when the store could not be asked.
+
+    One server-side step: a check, a separate SET, and a DEL can be split by
+    another worker taking the lease in between.
+    """
+    if not _USE_REDIS:
+        return None
+    # A test double replaces get/set/release and leaves no Redis client.
+    # The Lua path is the one that is atomic. This branch is single-threaded
+    # stand-in storage, not a second distributed protocol.
+    if _BACKEND == "redis" and _r is None:
+        current = get_blob(lease_key)
+        if current is None or str(current) != str(token):
+            return False
+        if not set_blob(record_key, record_value):
+            return None
+        release_claim(lease_key, token)
+        return True
+    res = _eval(_LUA_PUBLISH, [lease_key, record_key],
+                [str(token), str(record_value)])
+    if res is None:
+        return None
+    return int(res) == 1
+
+
 def incr(key, ttl_s=60):
     """Atomically bump a counter, giving it a TTL the first time it appears.
 
