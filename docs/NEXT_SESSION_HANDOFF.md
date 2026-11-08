@@ -779,6 +779,8 @@ Commits:
 
 - `7c3e3247` — canonical confirmation/reset redirects and readable auth errors;
 - `949836f5` — updated resend-error contract test;
+- `eb184b87` — merged the base resend component and its canonical redirect/error
+  behavior;
 - `5ff388fe` — this handoff update.
 
 Files changed include the Supabase redirect/error helpers, auth screens and
@@ -802,14 +804,16 @@ Checks:
 
 - Python targeted auth/platform scripts from the base branch were not changed
   in this slice; the new auth behavior is covered by the web contracts below.
-- Web targeted Vitest: 5 files / 23 tests passed; Accounts and Settings
-  contracts: 2 files / 6 tests passed.
-- Full web Vitest: 62 files passed, 854 tests passed, 24 skipped; the existing
-  `src/test/e2e.test.ts` failed because Windows resolved `python` to the
-  Microsoft Store alias (exit 9009), before the API test could start.
-- Web ESLint: 0 errors, 5 existing warnings. `npx tsc --noEmit` and
-  `next build` completed successfully (the build also completed its TypeScript
-  check and generated 29 routes).
+- Web targeted Vitest: 6 files / 27 tests passed, including the login,
+  signup, callback, settings-resend, canonical-redirect and error-message
+  contracts.
+- Full web Vitest: 104 files passed, 1,087 tests passed, 25 skipped; the
+  existing `src/test/e2e.test.ts` is the only remaining failure because Windows
+  resolved `python` to the Microsoft Store alias (exit 9009), before the API
+  test could start.
+- Web ESLint: 0 errors, 2 existing warnings. `npx tsc --noEmit` and
+  `npx next build` completed successfully; the build completed its TypeScript
+  check and generated 43 routes.
 - `python tests/run_all.py` could not complete on this Windows runner: its
   subprocess text decoder hit a cp1252 byte and then the runner dereferenced a
   missing stderr value. This is a runner/encoding failure, not a failing
