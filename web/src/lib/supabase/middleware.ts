@@ -17,7 +17,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export const PUBLIC_PATHS = [
   "/", "/login", "/signup", "/auth/confirm", "/auth/reset",
   "/auth/callback", "/terms", "/refunds", "/tax", "/privacy", "/pricing",
-  "/configurator",
+  "/configurator", "/faq", "/guide/test-a-rule-on-demo",
 ];
 
 /**
