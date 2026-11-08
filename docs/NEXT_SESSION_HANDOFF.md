@@ -847,7 +847,7 @@ was not raised and no environment variable or flag was changed. A one-second
 server rate-limit window is not safe to promise: the server's retry value is
 authoritative, and retrying earlier would increase the refusals.
 
-Implementation commit: `79c7bf22` (subject to the required rebase before push).
+Implementation commit: `360dad8b` (rebased onto the current base).
 
 Verification for this follow-up: the targeted `use-api` suite passed (21/21),
 TypeScript, ESLint (0 errors; the two existing connect-page warnings remain),
