@@ -83,6 +83,31 @@ check("explicit",
       user_loop.leverage_for_symbol(None, Cfg("111", "t", leverage=7, explicit=True),
                                     "EURUSD") == 7.0)
 
+print("\n[5] a successful reading expires, and a failed refresh is not the old number")
+user_loop._LEV_CACHE.clear()
+cfg = Cfg("333", "token-c")
+high = Broker(value=30)
+check("first read",
+      user_loop.leverage_for_symbol(high, cfg, "EURUSD", now=1000) == 30.0)
+lower = Broker(value=5)
+check("inside the freshness window the broker is not asked again",
+      user_loop.leverage_for_symbol(lower, cfg, "EURUSD", now=1000 + 30) == 30.0
+      and lower.calls == 0)
+check("after the window the new broker value replaces it",
+      user_loop.leverage_for_symbol(
+          lower, cfg, "EURUSD",
+          now=1000 + user_loop._LEV_SUCCESS_TTL_S) == 5.0)
+dead = Broker(error=RuntimeError("account not authorized"))
+check("a refresh that fails does not keep the previous leverage",
+      user_loop.leverage_for_symbol(
+          dead, cfg, "EURUSD",
+          now=1000 + 2 * user_loop._LEV_SUCCESS_TTL_S) is None)
+forever = ("333", "demo", __import__("hashlib").sha256(b"token-c").hexdigest()[:16],
+           "EURUSD")
+user_loop._LEV_CACHE[forever] = (None, 30.0)
+check("an entry with no expiry is not treated as still true",
+      user_loop.leverage_for_symbol(Broker(value=8), cfg, "EURUSD", now=5000) == 8.0)
+
 if _fails:
     print(f"\nFAILED ({len(_fails)}):")
     for item in _fails:

@@ -175,12 +175,22 @@ print("\n[7] a refund, a dispute or a failed renewal suspends the licence")
 for etype in ["charge.refunded", "charge.dispute.created",
               "customer.subscription.deleted", "invoice.payment_failed"]:
     reset(USER)
-    grant_body = event("checkout.session.completed", paid_session())
+    pi = "pi_sec7_" + etype.replace(".", "_")
+    grant_body = event("checkout.session.completed",
+                       paid_session(payment_intent=pi))
     B.handle_event(grant_body, sign(grant_body), secret=SECRET)
     check(f"active before {etype}", state(USER) == "active", state(USER))
-    body = event(etype, {"metadata": {B.USER_META_KEY: USER}})
+    if etype in ("charge.refunded", "charge.dispute.created"):
+        # The provider's Charge and Dispute name the payment, not the
+        # account. The account is the one this grant indexed.
+        obj = {"payment_intent": pi, "amount": 49700, "amount_refunded": 49700}
+    else:
+        obj = {"metadata": {B.USER_META_KEY: USER}}
+    body = event(etype, obj)
     st, out = B.handle_event(body, sign(body), secret=SECRET)
     check(f"{etype} revokes", state(USER) == "revoked", state(USER))
+    st, out = B.handle_event(body, sign(body), secret=SECRET)
+    check(f"{etype} again is a duplicate", out.get("duplicate") is True, json.dumps(out))
 
 # ── 8. an unconfigured webhook refuses rather than accepting ────────────────
 print("\n[8] with no secret configured, nothing is accepted")

@@ -206,6 +206,10 @@ CONFIRMED_CLOSED = "CONFIRMED_CLOSED"   # broker answered, definitively flat
 # as unknown, so the next tick does not hammer the broker and does not size.
 _LEV_CACHE = {}
 _LEV_UNKNOWN_TTL_S = 60.0
+# A successful reading is fresh only for this long. After that the broker
+# must confirm it again. Using the old number once it has expired would size
+# a later order against leverage the account may no longer have.
+_LEV_SUCCESS_TTL_S = 60.0
 _LEV_FAILURE_STATE = {}
 _LEV_FAILURE_LOCK = threading.Lock()
 
@@ -256,7 +260,7 @@ def _report_capped_failure(key, message):
     return True
 
 
-def leverage_for_symbol(broker, cfg, symbol, *, user_id=None):
+def leverage_for_symbol(broker, cfg, symbol, *, user_id=None, now=None):
     """The broker's leverage for this account and `symbol`, or None.
 
     None means the margin cap cannot be computed. Callers must not size an
@@ -264,9 +268,10 @@ def leverage_for_symbol(broker, cfg, symbol, *, user_id=None):
     client's, not a substitute for a failed read.
 
     A successful read is cached for this account, environment and token
-    fingerprint. A failure is cached as unknown for a short time so a tight
-    loop does not ask again on every tick, and so another account does not
-    inherit it.
+    fingerprint, and only until `_LEV_SUCCESS_TTL_S`. A failure, or a refresh
+    that fails after that, is unknown: the previous number is not reused.
+    Unknown is cached briefly so a tight loop does not ask on every tick,
+    and so another account does not inherit it.
     """
     sym = _nrm(symbol)
     # An explicit client setting wins for every symbol. This used to be
@@ -279,11 +284,13 @@ def leverage_for_symbol(broker, cfg, symbol, *, user_id=None):
     if not sym:
         return None
     key = _leverage_cache_key(cfg, sym)
-    now = time.monotonic()
+    now = time.monotonic() if now is None else float(now)
     cached = _LEV_CACHE.get(key)
     if cached is not None:
         expires, value = cached
-        if expires is None or now < expires:
+        # An entry with no expiry is the old unbounded cache. It is not
+        # trusted: the broker has to answer again.
+        if expires is not None and now < expires:
             return value
     err = None
     lev = None
@@ -295,7 +302,7 @@ def leverage_for_symbol(broker, cfg, symbol, *, user_id=None):
     except Exception as e:
         err = e
     if lev is not None:
-        _LEV_CACHE[key] = (None, lev)
+        _LEV_CACHE[key] = (now + _LEV_SUCCESS_TTL_S, lev)
         return lev
     _LEV_CACHE[key] = (now + _LEV_UNKNOWN_TTL_S, None)
     if err is not None:

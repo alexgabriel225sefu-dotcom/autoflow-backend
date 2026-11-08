@@ -5,6 +5,11 @@ export type ApiErrorCode =
   | "CHECKOUT_DISABLED"
   | "NOT_FOUND"
   | "METHOD_NOT_ALLOWED"
+  | "WEBHOOK_UNAVAILABLE"
+  | "BAD_SIGNATURE"
+  | "PAYLOAD_TOO_LARGE"
+  | "UPSTREAM_TIMEOUT"
+  | "BODY_TIMEOUT"
   | "INTERNAL_ERROR";
 
 export function apiError(status: number, code: ApiErrorCode, message: string) {
