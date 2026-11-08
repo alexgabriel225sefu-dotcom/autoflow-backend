@@ -777,11 +777,12 @@ Branch: `codex/new-client-flow-signup-demo`, based on
 
 Commits:
 
-- `7c3e3247` — canonical confirmation/reset redirects and readable auth errors;
-- `949836f5` — updated resend-error contract test;
-- `eb184b87` — merged the base resend component and its canonical redirect/error
+- `4c035317` — canonical confirmation/reset redirects and readable auth errors;
+- `2eadbd3f` — updated resend-error contract test;
+- `cbcaed85` — merged the base resend component and its canonical redirect/error
   behavior;
-- `5ff388fe` — this handoff update.
+- `839a9113` — handoff update;
+- `adac861e` — final verification/test contract update.
 
 Files changed include the Supabase redirect/error helpers, auth screens and
 resend component under `web/src/`, plus `docs/SUPABASE_OAUTH_SETUP.md`.
