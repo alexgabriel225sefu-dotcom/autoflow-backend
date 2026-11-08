@@ -46,6 +46,50 @@ async function submit() {
   await userEvent.click(screen.getByRole("button", { name: /create account/i }));
 }
 
+describe("sign up redirect", () => {
+  function atOrigin(origin: string) {
+    const real = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...real, origin, href: origin + "/signup" },
+    });
+    return () => Object.defineProperty(window, "location", { configurable: true, value: real });
+  }
+
+  it("keeps the confirmation link on the host the sign-up started on", async () => {
+    const restore = atOrigin("https://apex4traders-web.onrender.com");
+    signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
+    await submit();
+    await waitFor(() => expect(signUp).toHaveBeenCalled());
+    expect(signUp.mock.calls[0][0].options.emailRedirectTo)
+      .toBe("https://apex4traders-web.onrender.com/auth/callback");
+    restore();
+  });
+
+  it("sends an unknown preview host back to the public origin", async () => {
+    const restore = atOrigin("https://preview.example.test");
+    signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
+    await submit();
+    await waitFor(() => expect(signUp).toHaveBeenCalled());
+    expect(signUp.mock.calls[0][0].options.emailRedirectTo)
+      .toBe("https://www.apex4traders.com/auth/callback");
+    restore();
+  });
+
+  it("ignores a second press while the first is in flight", async () => {
+    let release: (v: unknown) => void = () => {};
+    signUp.mockReturnValue(new Promise((r) => { release = r; }));
+    render(<SignUpPage />);
+    await userEvent.type(screen.getByLabelText(/email/i), "ada@example.test");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "long-enough");
+    const button = screen.getByRole("button", { name: /create account/i });
+    await userEvent.click(button);
+    await userEvent.click(button);
+    expect(signUp).toHaveBeenCalledTimes(1);
+    release({ data: { session: null, user: {} }, error: null });
+  });
+});
+
 describe("sign up", () => {
   it("opens the dashboard when sign-up already returned a session", async () => {
     signUp.mockResolvedValue({ data: { session: { access_token: "t" }, user: {} }, error: null });

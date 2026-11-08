@@ -57,7 +57,7 @@ export default function SignUpPage() {
   }
 
   if (sent) {
-    const inbox = inboxLink(email);
+    const inbox = inboxLink(email.trim());
     return (
       <AuthShell
         title="Check your email."
@@ -82,7 +82,7 @@ export default function SignUpPage() {
           It comes from no-reply@apex4traders.com. Nothing arrived? Check your
           spam folder, then ask for another link.
         </p>
-        <ResendConfirmation email={email} />
+        <ResendConfirmation email={email.trim()} />
       </AuthShell>
     );
   }
