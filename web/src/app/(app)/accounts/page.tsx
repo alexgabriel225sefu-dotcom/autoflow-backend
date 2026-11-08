@@ -124,6 +124,26 @@ export default function AccountsPage() {
 
             <MoreAccountsSection plan={data.accountPlan} />
 
+            {/* The list above is whatever cTrader's own authorisation covers.
+                An account that was not ticked on cTrader's screen is not in
+                it, and nothing here can add it: only a new authorisation can.
+                So the way to bring a missing demo or live account in is
+                offered here, in the place where its absence is noticed. */}
+            <section className="card" aria-labelledby="refresh-accounts">
+              <div className="card-head"><h2 id="refresh-accounts">Switch or add accounts</h2></div>
+              <p className="muted" style={{ fontSize: ".85rem" }}>
+                {data.accounts.filter((a) => a.mode === "demo").length} demo
+                {" · "}
+                {data.accounts.filter((a) => a.mode === "live").length} live.
+                {" "}These come from your cTrader authorisation. If a demo or
+                live account is missing, sign in to cTrader again and tick
+                every account you want here.
+              </p>
+              <a className="btn" style={{ marginTop: ".7rem" }} href="/connect">
+                <Plug className="ico" aria-hidden /> Refresh accounts with cTrader
+              </a>
+            </section>
+
             <section className="card">
               <div className="card-head"><h2>Disconnect</h2></div>
               <p className="muted" style={{ fontSize: ".85rem" }}>

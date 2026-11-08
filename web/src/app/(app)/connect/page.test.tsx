@@ -105,7 +105,7 @@ describe("when the server answers", () => {
     expect(connectButton()).toBeNull();
     expect(screen.queryByText(/step 1/i)).toBeNull();
     // Adding a SECOND account stays reachable — demoted, not removed.
-    expect(screen.getByRole("button", { name: /connect another account/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /refresh accounts with ctrader/i })).toBeTruthy();
   });
 
   it("names which account is linked, since that is the question", async () => {

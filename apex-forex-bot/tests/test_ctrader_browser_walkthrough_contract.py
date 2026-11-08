@@ -58,7 +58,7 @@ def test_connected_ctrader_ui_exposes_the_manual_walkthrough_states():
             "diagnosticId",
             "Reference:",
             "Choose which one to trade",
-            "Connect another account",
+            "Refresh accounts with cTrader",
         ],
         WEB / "app" / "(app)" / "connect" / "page.tsx",
     )

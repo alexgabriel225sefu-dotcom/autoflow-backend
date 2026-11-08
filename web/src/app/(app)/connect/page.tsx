@@ -348,7 +348,7 @@ export default function ConnectPage() {
               {/* Demoted, not removed: somebody with a second broker account
                   still needs a way to add it. */}
               <button className="btn btn-ghost" onClick={begin} disabled={busy}>
-                {busy ? "Preparing…" : "Connect another account"}
+                {busy ? "Preparing…" : "Refresh accounts with cTrader"}
               </button>
             </div>
           </>
