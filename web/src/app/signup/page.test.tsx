@@ -36,6 +36,7 @@ beforeEach(() => {
   refresh.mockReset();
   signUp.mockReset();
   resend.mockReset();
+  resend.mockResolvedValue({ error: null });
 });
 
 async function submit() {
@@ -44,6 +45,50 @@ async function submit() {
   await userEvent.type(screen.getByLabelText(/^password$/i), "long-enough");
   await userEvent.click(screen.getByRole("button", { name: /create account/i }));
 }
+
+describe("sign up redirect", () => {
+  function atOrigin(origin: string) {
+    const real = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...real, origin, href: origin + "/signup" },
+    });
+    return () => Object.defineProperty(window, "location", { configurable: true, value: real });
+  }
+
+  it("keeps the confirmation link on the host the sign-up started on", async () => {
+    const restore = atOrigin("https://apex4traders-web.onrender.com");
+    signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
+    await submit();
+    await waitFor(() => expect(signUp).toHaveBeenCalled());
+    expect(signUp.mock.calls[0][0].options.emailRedirectTo)
+      .toBe("https://apex4traders-web.onrender.com/auth/callback");
+    restore();
+  });
+
+  it("sends an unknown preview host back to the public origin", async () => {
+    const restore = atOrigin("https://preview.example.test");
+    signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
+    await submit();
+    await waitFor(() => expect(signUp).toHaveBeenCalled());
+    expect(signUp.mock.calls[0][0].options.emailRedirectTo)
+      .toBe("https://www.apex4traders.com/auth/callback");
+    restore();
+  });
+
+  it("ignores a second press while the first is in flight", async () => {
+    let release: (v: unknown) => void = () => {};
+    signUp.mockReturnValue(new Promise((r) => { release = r; }));
+    render(<SignUpPage />);
+    await userEvent.type(screen.getByLabelText(/email/i), "ada@example.test");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "long-enough");
+    const button = screen.getByRole("button", { name: /create account/i });
+    await userEvent.click(button);
+    await userEvent.click(button);
+    expect(signUp).toHaveBeenCalledTimes(1);
+    release({ data: { session: null, user: {} }, error: null });
+  });
+});
 
 describe("sign up", () => {
   it("opens the dashboard when sign-up already returned a session", async () => {
@@ -79,11 +124,21 @@ describe("sign up", () => {
 
   it("shows a failure and allows trying again", async () => {
     signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
-    resend.mockResolvedValue({ error: { message: "email rate limit exceeded" } });
+    resend.mockResolvedValue({ error: { message: "Please try again after 12 seconds" } });
     await submit();
     await userEvent.click(await screen.findByRole("button", { name: /resend the link/i }));
-    expect((await screen.findByRole("alert")).textContent).toContain("email rate limit exceeded");
+    expect((await screen.findByRole("alert")).textContent).toContain("Please wait 12 seconds");
     const btn = screen.getByRole("button", { name: /resend the link/i }) as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
+
+  it("shows local validation without calling Supabase", async () => {
+    render(<SignUpPage />);
+    await userEvent.type(screen.getByLabelText(/email/i), "not-an-email");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "short");
+    await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/valid email/i);
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
 });

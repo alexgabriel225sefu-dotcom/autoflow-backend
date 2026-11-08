@@ -119,6 +119,15 @@ describe("auth callback", () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it("offers a way to request a fresh confirmation link after an expired link", async () => {
+    params = new URLSearchParams("code=expired");
+    exchangeCodeForSession.mockResolvedValue({ error: { message: "code expired" } });
+    render(<CallbackPage />);
+    await screen.findByRole("alert");
+    expect(screen.getByRole("link", { name: /request a new confirmation link/i })
+      .getAttribute("href")).toBe("/signup");
+  });
+
   it("saves a new password only after the recovery session exists", async () => {
     params = new URLSearchParams("mode=recovery&code=reset-ok");
     window.history.replaceState(null, "", "/auth/callback?mode=recovery&code=reset-ok");

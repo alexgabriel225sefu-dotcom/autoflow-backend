@@ -770,3 +770,61 @@ Item 3/5 UI design pass — `ba587b1` and `fd4cfc0`: shared simulation read stat
 Local verification: `test_ctrader_browser_walkthrough_contract.py` passes locally. The Windows Python runner cannot complete because the local process encoding/fixture subprocess is not compatible; the required web commands were attempted but local `node_modules` is incomplete (`tsc`, `eslint`, `vitest`, `next build` unavailable). CI is authoritative and green for all four jobs on `0c98b61`.
 
 Next: run an operational cTrader demo smoke check for the read-only watcher and add remaining honest backtest assumptions only when the engine can actually model them. Do not deploy, change env vars/flags, or expose multi-account controls.
+## Roadmap, Codex items — new-client flow (2026-11-08)
+
+Branch: `codex/new-client-flow-signup-demo`, based on
+`claude/apex4traders-platform-v1`.
+
+Commits:
+
+- `4c035317` — canonical confirmation/reset redirects and readable auth errors;
+- `2eadbd3f` — updated resend-error contract test;
+- `cbcaed85` — merged the base resend component and its canonical redirect/error
+  behavior;
+- `839a9113` — handoff update;
+- `adac861e` — final verification/test contract update.
+
+Files changed include the Supabase redirect/error helpers, auth screens and
+resend component under `web/src/`, plus `docs/SUPABASE_OAUTH_SETUP.md`.
+The base branch already contains the cTrader account refresh entry point from
+PR #151; this branch does not duplicate that backend path.
+
+What is covered:
+
+- Signup rejects malformed email/short passwords locally, prevents duplicate
+  submit, keeps the check-email state, and offers resend with a human wait
+  message for rate limits.
+- Confirmation, password-reset, settings resend and social auth callbacks use
+  the canonical production origin (`https://www.apex4traders.com`) while
+  preserving localhost for local development. Expired callback errors link to
+  a new confirmation request and sign-in.
+- The existing Accounts “Refresh accounts with cTrader” path remains on the
+  base branch and was not replaced or bypassed.
+
+Checks:
+
+- Python targeted auth/platform scripts from the base branch were not changed
+  in this slice; the new auth behavior is covered by the web contracts below.
+- Web targeted Vitest: 6 files / 27 tests passed, including the login,
+  signup, callback, settings-resend, canonical-redirect and error-message
+  contracts.
+- Full web Vitest: 104 files passed, 1,087 tests passed, 25 skipped; the
+  existing `src/test/e2e.test.ts` is the only remaining failure because Windows
+  resolved `python` to the Microsoft Store alias (exit 9009), before the API
+  test could start.
+- Web ESLint: 0 errors, 2 existing warnings. `npx tsc --noEmit` and
+  `npx next build` completed successfully; the build completed its TypeScript
+  check and generated 43 routes.
+- `python tests/run_all.py` could not complete on this Windows runner: its
+  subprocess text decoder hit a cp1252 byte and then the runner dereferenced a
+  missing stderr value. This is a runner/encoding failure, not a failing
+  assertion from the changed tests.
+
+Not verified here: real Supabase/Brevo inbox delivery, a real confirmation link
+in a second browser, a real cTrader OAuth login/account selection, provider
+dashboard redirect allowlists, or deployment CI. No provider dashboard,
+environment variable, secret, live account, or order was read or changed. The
+owner must set/confirm Supabase Site URL and redirect allowlist entries from
+`docs/SUPABASE_OAUTH_SETUP.md`, verify the Brevo sender/domain, and run the
+throwaway-mail and demo-account browser walkthrough before calling the journey
+complete. CI on the pushed branch is still pending.

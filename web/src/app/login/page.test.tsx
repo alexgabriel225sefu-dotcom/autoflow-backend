@@ -69,7 +69,7 @@ describe("login", () => {
   it("shows the provider's error and does not navigate", async () => {
     signIn.mockResolvedValue({ error: { message: "Invalid login credentials" } });
     await submit();
-    expect((await screen.findByRole("alert")).textContent).toContain("Invalid login credentials");
+    expect((await screen.findByRole("alert")).textContent).toContain("Email or password is incorrect");
     expect(push).not.toHaveBeenCalled();
   });
 });

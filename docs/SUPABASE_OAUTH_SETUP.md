@@ -9,7 +9,15 @@ Supabase project configuration.
 Add these URLs to the Supabase Auth URL configuration:
 
 - `http://localhost:3000/auth/callback`
-- `https://apex4traders-web.onrender.com/auth/callback`
+- `https://www.apex4traders.com/auth/callback` (canonical production origin)
+- `https://apex4traders-web.onrender.com/auth/callback` (hosted smoke-test origin)
+
+The web client intentionally sends hosted sign-up, confirmation, password
+reset and social-auth callbacks to `https://www.apex4traders.com`. This keeps a
+confirmation link from landing on a preview or service hostname. The Render
+URL remains allowlisted for operational smoke tests and direct navigation, but
+the Supabase **Site URL** should be the canonical production URL. This change
+must be made by the owner in Supabase Auth; it is not part of a code deploy.
 
 The callback accepts a safe `next` query parameter and never redirects to an
 external origin.

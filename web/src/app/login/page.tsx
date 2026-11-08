@@ -6,6 +6,7 @@ import { safeNext } from "@/lib/supabase/middleware";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/auth/password-field";
 import { AuthSubmit } from "@/components/auth/auth-submit";
+import { authErrorMessage } from "@/lib/supabase/auth-error";
 import { GoogleButton } from "@/components/auth/google-button";
 
 function LoginPageInner() {
@@ -26,7 +27,7 @@ function LoginPageInner() {
     // confirmed" and "Invalid credentials" need different actions from the
     // person reading them, and collapsing both into "Sign-in failed" hides
     // which one it was.
-    if (error) return setError(error.message);
+    if (error) return setError(authErrorMessage(error.message, "signin"));
     // Validated, never used raw: this value comes from the address bar and
     // this line navigates to it, which is an open redirect waiting to be
     // pointed at a phishing page.

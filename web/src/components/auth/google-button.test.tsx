@@ -23,7 +23,7 @@ describe("GoogleButton", () => {
     const arg = signInWithOAuth.mock.calls[0][0];
     expect(arg.provider).toBe("google");
     expect(arg.options.redirectTo).toBe(
-      `${window.location.origin}/auth/callback?next=${encodeURIComponent("/rules")}`);
+      `${window.location.origin}/auth/callback?next=%2Frules`);
   });
 
   it.each(["https://evil.example/x", "//evil.example", "/\\evil.example"])(
