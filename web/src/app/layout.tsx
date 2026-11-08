@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Familjen_Grotesk } from "next/font/google";
 import "./globals.css";
 import { NO_FLASH_SCRIPT } from "@/lib/appearance";
+import { SITE_URL } from "@/lib/site";
 import { RippleListener } from "@/components/ui/ripple-listener";
 import { PressGlowListener } from "@/components/ui/press-glow-listener";
 
@@ -35,6 +36,20 @@ export const metadata: Metadata = {
   description:
     "Build trading rules from named, testable conditions, preview what they " +
     "would decide, and run them on a cTrader account you connect yourself.",
+  // One public origin for search engines. Without it the same page is
+  // reachable at the onrender.com address too, and the two compete.
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: "/" },
+  applicationName: "Apex4Traders",
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "Apex4Traders",
+    title: "Apex4Traders — rule-based trading automation",
+    description:
+      "Connect your cTrader account, choose a rule and test it on demo " +
+      "before you automate it.",
+  },
 };
 
 export default function RootLayout({
