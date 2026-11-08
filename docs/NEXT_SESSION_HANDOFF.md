@@ -828,3 +828,31 @@ owner must set/confirm Supabase Site URL and redirect allowlist entries from
 `docs/SUPABASE_OAUTH_SETUP.md`, verify the Brevo sender/domain, and run the
 throwaway-mail and demo-account browser walkthrough before calling the journey
 complete. CI on the pushed branch is still pending.
+
+## Rate-limit follow-up — 2026-11-08
+
+Branch: `codex/new-client-flow-signup-demo`.
+
+The web client previously throttled each historical endpoint independently. A
+dashboard, chart and journal could therefore spend the shared candles budget
+in one burst even though every individual path respected its own interval.
+`web/src/lib/use-api.ts` now applies a shared 2.2-second cadence to candles,
+trades, symbols and minimum-lot reads, including manual reloads. Failed reads
+remain failures; a server-provided retry window is still respected. A completed
+request is no longer reused as an in-flight flight during a forced refresh.
+
+`web/src/lib/use-api.test.ts` proves that separate historical paths and a
+forced reload queue behind the shared budget. The server-side 30/minute limit
+was not raised and no environment variable or flag was changed. A one-second
+server rate-limit window is not safe to promise: the server's retry value is
+authoritative, and retrying earlier would increase the refusals.
+
+Implementation commit: `79c7bf22` (subject to the required rebase before push).
+
+Verification for this follow-up: the targeted `use-api` suite passed (21/21),
+TypeScript, ESLint (0 errors; the two existing connect-page warnings remain),
+and `next build` passed locally. Full Vitest: 105 files passed, 1,093 tests
+passed, 25 skipped; the existing `src/test/e2e.test.ts` remains the only
+failure because Windows resolved `python` to the Microsoft Store alias (exit
+9009), before the API test could start. CI must be treated as authoritative.
+No deployment was made.
