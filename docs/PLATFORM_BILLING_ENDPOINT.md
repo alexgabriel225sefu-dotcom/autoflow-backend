@@ -35,10 +35,14 @@ fixed path. The request does not choose the host. It copies the raw
 body and the `Stripe-Signature` header and does not follow a redirect.
 It forwards no cookie and no Authorization header. A missing signature
 is refused with JSON 400 before the body is forwarded. A body or an
-upstream response over 1 MiB is refused. The upstream call has a 10
-second deadline. The configured origin must be a public https host when
-`NODE_ENV` is `production`. A loopback, private, or link-local host is
-refused in every environment, as is a URL with a username or password.
+upstream response over 1 MiB is refused. The inbound body must finish
+within 10 seconds, and the upstream call has its own 10 second deadline.
+The configured origin must be a public https host when `NODE_ENV` is
+`production`. A literal loopback, private, or link-local host is refused
+in every environment, as is a URL with a username or password. Those
+checks do not resolve DNS. A public hostname that points at a private
+address is not detected. This is not a general SSRF guard. The host is
+the operator's configured origin, and the path is fixed.
 If `NEXT_PUBLIC_API_BASE_URL` is unset, or is the website's own origin,
 the route answers JSON 503 and does not call itself. Other `/api/*`
 paths on the website stay 404. This route does not turn checkout on.
@@ -71,8 +75,12 @@ wildcard. A card payment arrives as `checkout.session.completed` with
 `checkout.session.completed` with `payment_status` `unpaid`, which does
 not grant, and later as `checkout.session.async_payment_succeeded`. That
 second event grants only when `payment_status` is `paid`. The two event
-ids share one payment id, so only one grant is written. A second delivery
-while that grant is in flight is told to retry. `async_payment_failed`
+ids share one payment id, so only one grant is written. The shared claim
+is an in-flight lease of 60 seconds. It is not a completed grant. The
+durable record is written only after the licence write returns. A second
+delivery while the lease is held is told to retry. If the first process
+dies before that record exists, the lease expires and a later delivery
+can grant. A store that cannot be read answers 500. `async_payment_failed`
 is not subscribed. Because the unpaid session never granted, there is no
 licence for that failure to withdraw.
 

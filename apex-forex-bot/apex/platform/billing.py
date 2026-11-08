@@ -324,26 +324,59 @@ def _foreign_product(obj):
     return named not in (APPROVED_SKU, APPROVED_PLAN)
 
 
-def _already_done(event_id):
-    """True when this event has been processed. `BUSY` when this process
-    is already handling it and the shared claim could not be asked.
+# A shared SET NX value is an in-flight lease, not a finished grant. It has
+# to expire so a process that dies between the claim and the durable record
+# does not leave the payment acknowledged forever. Sixty seconds covers the
+# grant itself. Stripe retries for much longer than that.
+_LEASE_S = 60
 
-    `user_store.claim` is a cross-process SET NX and is the only one that
-    is correct when more than one instance is running. It returns None when
-    there is no shared backend or the backend errored. The in-process set
-    covers that gap for two threads here. It does not replace Redis across
-    instances.
+
+def _outcome_of(key):
+    """'done' when a durable outcome is stored, 'open' when it is not,
+    'unknown' when the store could not be asked or the record is unreadable.
+
+    A lease written by SET NX is the string ``1``. That is not an outcome.
     """
-    got = user_store.claim(_event_key(event_id), ttl_s=86400)
-    if got is True:
-        return False
-    if got is False:
+    try:
+        rec = _store._read_strict(key)
+    except Exception:
+        return "unknown"
+    if isinstance(rec, dict) and rec.get("outcome"):
+        return "done"
+    return "open"
+
+
+def _already_done(event_id):
+    """True when this event has a durable outcome. `BUSY` when a lease for
+    it is held. `'unknown'` when the store could not say.
+
+    `user_store.claim` is SET NX EX. False means the key exists. That is an
+    in-flight lease until a durable outcome is written over it, not proof
+    the handler finished. None means the shared store could not be asked,
+    which is also not proof.
+    """
+    key = _event_key(event_id)
+    state = _outcome_of(key)
+    if state == "unknown":
+        return "unknown"
+    if state == "done":
         return True
+    if user_store._USE_REDIS:
+        got = user_store.claim(key, ttl_s=_LEASE_S)
+        if got is True:
+            return False
+        if got is False:
+            again = _outcome_of(key)
+            if again == "done":
+                return True
+            if again == "unknown":
+                return "unknown"
+            return BUSY
+        return "unknown"
     with _fallback_lock:
         if event_id in _fallback_inflight:
             return BUSY
-        rec = _store._read(_event_key(event_id))
-        if rec:
+        if _outcome_of(key) == "done":
             return True
         _fallback_inflight.add(event_id)
         return False
@@ -363,7 +396,7 @@ def _release(event_id):
     has paid is never provisioned.
     """
     try:
-        user_store.set_blob(_event_key(event_id), "", ttl_s=1)
+        user_store.del_blob(_event_key(event_id))
     except Exception:
         pass
     with _fallback_lock:
@@ -515,54 +548,80 @@ def _k_ref(ref):
 
 
 def _k_once(ref):
-    """Payment id → a grant for it has been started or finished.
+    """Payment id → the durable fact that a grant for it finished.
 
-    `completed` and `async_payment_succeeded` are different event ids for
-    one payment. The event claim does not collapse them.
+    This key is written only after the licence write returns. It is not
+    the in-flight lease.
     """
     return f"{_store._ns()}:{_store._P}:billing:once:{ref}"
+
+
+def _k_once_lease(ref):
+    """Payment id → someone is currently granting it.
+
+    SET NX EX stores ``1`` here. That value means the lease is held. It
+    does not mean a licence was written.
+    """
+    return f"{_store._ns()}:{_store._P}:billing:once-lease:{ref}"
 
 
 _once_inflight = set()
 
 
 def _claim_payment(ref):
-    """'go' when this caller may grant `ref`. 'done' when it already did.
-    `BUSY` when a grant for `ref` is in flight and the shared claim could
-    not be asked.
+    """'go' when this caller may grant `ref`. 'done' when a durable grant
+    record exists. `BUSY` when a lease is held. `'unknown'` when the store
+    could not be asked.
+
+    A shared claim returning False is the lease, not the completed grant.
+    The caller must retry, not tell the provider the payment was granted.
     """
     if not ref:
         return "go"
-    got = user_store.claim(_k_once(ref), ttl_s=86400)
-    if got is True:
-        return "go"
-    if got is False:
+    state = _outcome_of(_k_once(ref))
+    if state == "unknown":
+        return "unknown"
+    if state == "done":
         return "done"
+    if user_store._USE_REDIS:
+        got = user_store.claim(_k_once_lease(ref), ttl_s=_LEASE_S)
+        if got is True:
+            return "go"
+        if got is False:
+            again = _outcome_of(_k_once(ref))
+            if again == "done":
+                return "done"
+            if again == "unknown":
+                return "unknown"
+            return BUSY
+        return "unknown"
     with _fallback_lock:
         if ref in _once_inflight:
             return BUSY
-        if _store._read(_k_once(ref)):
-            return "done"
         _once_inflight.add(ref)
         return "go"
 
 
 def _finish_payment(ref):
+    """Record the grant, then drop the lease. A failed record raises.
+
+    The licence write has already returned. Raising here makes the
+    delivery a retry instead of a 200 with no durable record. The lease
+    stays until the record lands, or until the caller releases it because
+    this write failed.
+    """
     if not ref:
         return
-    try:
-        _store._write(_k_once(ref), {"at": time.time(), "outcome": "granted"})
-    except Exception:
-        pass
-    with _fallback_lock:
-        _once_inflight.discard(ref)
+    _store._write_strict(_k_once(ref), {"at": time.time(), "outcome": "granted"})
+    _release_payment(ref)
 
 
 def _release_payment(ref):
+    """Drop the in-flight lease. Does not remove a durable grant record."""
     if not ref:
         return
     try:
-        user_store.set_blob(_k_once(ref), "", ttl_s=1)
+        user_store.del_blob(_k_once_lease(ref))
     except Exception:
         pass
     with _fallback_lock:
@@ -720,6 +779,9 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         return 200, {"ok": True, "handled": False, "type": etype}
 
     done = _already_done(event_id)
+    if done == "unknown":
+        return 500, {"ok": False, "error": {
+            "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
     if done == BUSY:
         # Not marked done. The provider retries after the in-flight delivery
         # finishes, instead of being told this event was already applied.
@@ -848,6 +910,10 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
             if cfg["periodDays"]:
                 expires = (time.time() if now is None else now) + cfg["periodDays"] * 86400
             gate = _claim_payment(ref)
+            if gate == "unknown":
+                _release(event_id)
+                return 500, {"ok": False, "error": {
+                    "code": "BILLING_FAILED", "message": "StoreUnavailable"}}
             if gate == BUSY:
                 _release(event_id)
                 return 500, {"ok": False, "error": {

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { POST, GET, MAX_WEBHOOK_BYTES, platformApiOrigin, readBounded } from "./route";
+import { POST, GET } from "./route";
+import { MAX_WEBHOOK_BYTES, platformApiOrigin, readBounded } from "./forward";
+import * as routeExports from "./route";
 
 const RAW = new TextEncoder().encode('{"id":"evt_test","type":"checkout.session.completed"}');
 
@@ -183,6 +185,26 @@ describe("public billing webhook route", () => {
     const body = await response.json();
     expect(body.error.code).toBe("INTERNAL_ERROR");
     expect(JSON.stringify(body).length).toBeLessThan(500);
+  });
+
+  it("stops reading a body that does not finish", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start() {
+        /* deliberately never enqueues or closes */
+      },
+    });
+    await expect(readBounded(stream, 100, AbortSignal.timeout(40))).rejects.toMatchObject({
+      name: "TimeoutError",
+    });
+  });
+
+  it("exports only route handlers and route config", () => {
+    const allowed = new Set([
+      "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "dynamic",
+    ]);
+    for (const name of Object.keys(routeExports)) {
+      expect(allowed.has(name)).toBe(true);
+    }
   });
 
   it("GET is JSON 405, not the homepage", async () => {

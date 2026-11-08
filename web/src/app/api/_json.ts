@@ -9,6 +9,7 @@ export type ApiErrorCode =
   | "BAD_SIGNATURE"
   | "PAYLOAD_TOO_LARGE"
   | "UPSTREAM_TIMEOUT"
+  | "BODY_TIMEOUT"
   | "INTERNAL_ERROR";
 
 export function apiError(status: number, code: ApiErrorCode, message: string) {
