@@ -21,7 +21,14 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { invalidate, invalidateBrokerViews, resetReadSchedule, useRead, whenSynced } from "./use-api";
+import {
+  HISTORICAL_MIN_GAP_MS,
+  invalidate,
+  invalidateBrokerViews,
+  resetReadSchedule,
+  useRead,
+  whenSynced,
+} from "./use-api";
 import * as apiModule from "./api";
 
 /** A pending call whose result the test decides, later. */
@@ -359,6 +366,66 @@ describe("invalidate reaches every reader of a path", () => {
         await Promise.resolve();
       });
       expect(result.current.result).toEqual({ ok: true, data: { v: 1 } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("spaces different historical reads under one shared budget, including forced reloads", async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: string[] = [];
+      vi.spyOn(apiModule, "api").mockImplementation(async (path) => {
+        calls.push(String(path));
+        return { ok: true, data: {} } as never;
+      });
+
+      const candles = renderHook(() => useRead("accounts/9/candles?symbol=EURUSD"));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls).toEqual(["accounts/9/candles?symbol=EURUSD"]);
+
+      // A second historical endpoint cannot spend the same server budget in
+      // the same tick, even though its path has its own poll timer.
+      const trades = renderHook(() => useRead("trades?days=30&mode=demo"));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls).toHaveLength(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(HISTORICAL_MIN_GAP_MS - 1); });
+      expect(calls).toHaveLength(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(calls).toHaveLength(2);
+
+      // Manual reloads are queued behind the same budget rather than creating
+      // a burst that immediately triggers RATE_LIMITED.
+      await act(async () => { void candles.result.current.reload(); await Promise.resolve(); });
+      expect(calls).toHaveLength(2);
+      await act(async () => { await vi.advanceTimersByTimeAsync(HISTORICAL_MIN_GAP_MS); });
+      expect(calls).toHaveLength(3);
+
+      candles.unmount();
+      trades.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts immediately after the previous screen's historical readers leave", async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: string[] = [];
+      vi.spyOn(apiModule, "api").mockImplementation(async (path) => {
+        calls.push(String(path));
+        return { ok: true, data: {} } as never;
+      });
+
+      const oldScreen = renderHook(() => useRead("symbols"));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls).toEqual(["symbols"]);
+      oldScreen.unmount();
+
+      const newScreen = renderHook(() => useRead("trades?days=30&mode=demo"));
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls).toEqual(["symbols", "trades?days=30&mode=demo"]);
+      newScreen.unmount();
     } finally {
       vi.useRealTimers();
     }
