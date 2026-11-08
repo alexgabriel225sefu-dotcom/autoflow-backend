@@ -16,6 +16,7 @@ type Flight = {
   force: boolean;
   controller: AbortController;
   promise: Promise<ApiResult<unknown>>;
+  settled: boolean;
   /** Mounted readers currently bound to this request. */
   readers: number;
 };
@@ -42,6 +43,15 @@ const pauseRetry = new Map<string, number>();
  * poll that has used the budget does not immediately spend `/trades` as well.
  */
 const HISTORICAL_BUDGET = "historical";
+/**
+ * The server allows 30 historical reads per minute for a user.  Keeping each
+ * path on its own timer still lets a dashboard, chart and journal spend that
+ * budget together in a burst.  A small shared gap keeps the normal client
+ * cadence below the server limit without hiding a failed read.
+ */
+export const HISTORICAL_MIN_GAP_MS = 2_200;
+let historicalLastAttempt: number | null = null;
+let activeHistoricalReaders = 0;
 
 export function historicalRead(path: string): boolean {
   const bare = path.split("?")[0];
@@ -64,7 +74,7 @@ function beginRead(path: string, force: boolean): Flight {
   // Join only a request somebody is still waiting on. A flight left behind
   // by an unmounted reader is a different question's answer — the next
   // screen has to ask again, or it sits on "loading" forever.
-  if (current && !current.controller.signal.aborted && current.readers > 0) {
+  if (current && !current.settled && !current.controller.signal.aborted && current.readers > 0) {
     if (!force || current.force) return current;
     current.controller.abort();
   }
@@ -73,7 +83,9 @@ function beginRead(path: string, force: boolean): Flight {
     force,
     controller,
     readers: 0,
+    settled: false,
     promise: api(path, { signal: controller.signal }).finally(() => {
+      flight.settled = true;
       if (flights.get(path)?.controller === controller) flights.delete(path);
     }),
   };
@@ -148,6 +160,8 @@ export function resetReadSchedule() {
   pathPauseUntil.clear();
   for (const id of pauseRetry.values()) window.clearTimeout(id);
   pauseRetry.clear();
+  historicalLastAttempt = null;
+  activeHistoricalReaders = 0;
 }
 
 export function useRead<T>(path: string | null, intervalMs = 0) {
@@ -195,6 +209,32 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
       const gap = kind === "visible" ? Math.max(pollGap(intervalMs), 12_000) : pollGap(intervalMs);
       if (Date.now() - last < gap) return undefined;
     }
+    const current = flights.get(path);
+    const canJoinCurrent = Boolean(
+      current
+      && !current.settled
+      && !current.controller.signal.aborted
+      && current.readers > 0
+      && (!force || current.force),
+    );
+    if (historicalRead(path) && !canJoinCurrent) {
+      const now = Date.now();
+      const nextAllowed = (historicalLastAttempt ?? now) + HISTORICAL_MIN_GAP_MS;
+      if (historicalLastAttempt !== null && now < nextAllowed) {
+        if (!pauseRetry.has(path)) {
+          const id = window.setTimeout(() => {
+            pauseRetry.delete(path);
+            // The shared historical timer already waited out the budget. Do
+            // not make the path's ordinary poll gap add another, unrelated
+            // delay to this queued read.
+            void loadRef.current(false, "online");
+          }, nextAllowed - now);
+          pauseRetry.set(path, id);
+        }
+        return undefined;
+      }
+      historicalLastAttempt = now;
+    }
     lastAttempt.set(path, Date.now());
     const mine = ++seq.current;
     setLoading(true);
@@ -234,6 +274,26 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   useEffect(() => {
     loadRef.current = load;
   }, [load]);
+
+  useEffect(() => {
+    if (!path || !historicalRead(path)) return;
+    activeHistoricalReaders += 1;
+    return () => {
+      activeHistoricalReaders = Math.max(0, activeHistoricalReaders - 1);
+      // A new screen should not inherit the previous screen's historical
+      // cadence. The shared gap is for concurrent readers, not a penalty for
+      // navigating to a different page after the old readers are gone.
+      if (activeHistoricalReaders === 0) {
+        historicalLastAttempt = null;
+        for (const [retryPath, id] of pauseRetry) {
+          if (historicalRead(retryPath)) {
+            window.clearTimeout(id);
+            pauseRetry.delete(retryPath);
+          }
+        }
+      }
+    };
+  }, [path]);
 
   useEffect(() => {
     // Queued rather than called straight from the effect body. `load` sets
