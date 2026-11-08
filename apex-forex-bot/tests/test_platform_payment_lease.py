@@ -157,21 +157,20 @@ try:
           st == 200 and out.get("duplicate") is True, str(out))
     check("still one active licence", LIC.status_for(USER)["state"] == LIC.ACTIVE)
 
-    print("\n[3] a grant that raises releases the lease, and the retry grants")
+    print("\n[3] a failure before the fenced write releases the lease")
     LIC.revoke(USER)
     PI2 = "pi_lease_crash"
 
-    def boom(*_a, **_k):
-        raise RuntimeError("worker died after the claim")
+    def boom(_ref, _token):
+        raise RuntimeError("worker died before the write")
 
-    real_grant = B._lic.grant
-    B._lic.grant = boom
+    B._before_fenced_grant = boom
     try:
         st, out = deliver(session("evt_crash", PI2))
         check("the failed grant is a retry", st == 500 and out.get("duplicate") is not True,
               str(out))
     finally:
-        B._lic.grant = real_grant
+        B._before_fenced_grant = None
     check("the lease was released", user_store.get_blob(B._k_once_lease(PI2)) in (None, ""))
     check("no durable record from the crash",
           user_store.get_blob(B._k_once(PI2)) in (None, ""))
@@ -294,6 +293,89 @@ print("HELD", user_store.get_blob(lease))
           out.get("outcome") != "granted", str(out))
     check("the revoked licence stays revoked",
           LIC.status_for(USER)["state"] == LIC.REVOKED, str(LIC.status_for(USER)))
+
+    print("\n[8] a stalled grant cannot restore what a real refund withdrew")
+    from apex.platform import live_gate as LG
+    PI8 = "pi_lease_stale_resume"
+    LIC.revoke(USER)
+    stalled = {"n": 0, "token": None}
+
+    def stall(ref, token):
+        if ref != PI8 or stalled["n"]:
+            return
+        stalled["n"] = 1
+        stalled["token"] = token
+        client.delete(B._k_once_lease(ref))
+        granted = deliver(session("evt_replace_grant", PI8))
+        check("the replacement grant is the real handler",
+              granted[1].get("outcome") == "granted", str(granted[1]))
+        refund = {"id": "evt_real_refund", "type": "charge.refunded",
+                  "livemode": True, "data": {"object": {
+                      "object": "charge", "payment_intent": PI8,
+                      "amount": B.APPROVED_PRICE_MINOR,
+                      "amount_refunded": B.APPROVED_PRICE_MINOR,
+                      "metadata": {}}}}
+        revoked = deliver(refund)
+        check("the refund is the real handler",
+              revoked[1].get("outcome") == "revoked", str(revoked[1]))
+
+    B._before_fenced_grant = stall
+    try:
+        stale = deliver(session("evt_stale_resume", PI8))
+    finally:
+        B._before_fenced_grant = None
+    check("the stalled worker does not grant",
+          stale[1].get("outcome") != "granted", str(stale[1]))
+    check("the licence stays withdrawn",
+          LIC.status_for(USER)["state"] == LIC.REVOKED,
+          str(LIC.status_for(USER)))
+    paid = ST._read(LG._key(f"paid:{USER}"))
+    check("the paid record stays withdrawn", not paid, str(paid))
+    published = user_store.publish_if_owner(
+        B._k_once_lease(PI8), stalled["token"], B._k_once(PI8),
+        '{"outcome":"stale"}')
+    check("the stalled token cannot publish", published is False, str(published))
+    durable = user_store.get_blob(B._k_once(PI8))
+    check("the replacement grant record remains",
+          isinstance(durable, str) and "granted" in durable, repr(durable))
+
+    print("\n[9] the local store refuses the same stalled grant")
+    flags = (user_store._r, user_store._BACKEND, user_store._USE_REDIS)
+    user_store._USE_REDIS = False
+    user_store._BACKEND = "none"
+    PI9 = "pi_local_stale_resume"
+    local_stall = {"n": 0}
+    try:
+        LIC.revoke(USER)
+
+        def stall_local(ref, token):
+            if ref != PI9 or local_stall["n"]:
+                return
+            local_stall["n"] = 1
+            B._once_owner.pop(ref, None)
+            check("the local replacement grants",
+                  deliver(session("evt_local_b", PI9))[1].get("outcome") == "granted")
+            refund = {"id": "evt_local_refund", "type": "charge.refunded",
+                      "livemode": True, "data": {"object": {
+                          "object": "charge", "payment_intent": PI9,
+                          "amount": B.APPROVED_PRICE_MINOR,
+                          "amount_refunded": B.APPROVED_PRICE_MINOR,
+                          "metadata": {}}}}
+            check("the local refund withdraws",
+                  deliver(refund)[1].get("outcome") == "revoked")
+
+        B._before_fenced_grant = stall_local
+        stale_local = deliver(session("evt_local_a", PI9))
+        check("the local stalled worker does not grant",
+              stale_local[1].get("outcome") != "granted", str(stale_local[1]))
+        check("the local licence stays withdrawn",
+              LIC.status_for(USER)["state"] == LIC.REVOKED,
+              str(LIC.status_for(USER)))
+        check("the local paid record stays withdrawn",
+              not ST._read(LG._key(f"paid:{USER}")))
+    finally:
+        B._before_fenced_grant = None
+        user_store._r, user_store._BACKEND, user_store._USE_REDIS = flags
 finally:
     user_store._r, user_store._BACKEND, user_store._USE_REDIS = saved
     proc.kill()

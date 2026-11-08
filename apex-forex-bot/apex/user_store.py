@@ -697,6 +697,86 @@ def publish_if_owner(lease_key, token, record_key, record_value):
     return int(res) == 1
 
 
+# Grant writes several records. The lease check, the refund tombstone check,
+# and those writes are one server step. A check in Python followed by a later
+# SET is the race where a refund lands in between and the stale worker puts
+# the licence back.
+_LUA_APPLY_IF_LEASE = (
+    "if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end "
+    "if redis.call('EXISTS', KEYS[2]) == 1 then return 2 end "
+    "local n = tonumber(ARGV[2]) "
+    "local i = 3 "
+    "for _ = 1, n do "
+    "redis.call('SET', ARGV[i], ARGV[i + 1]) "
+    "i = i + 2 "
+    "end "
+    "redis.call('DEL', KEYS[1]) "
+    "return 1"
+)
+
+# Reversal writes the tombstone before the withdrawn licence, in the same
+# step, and removes the paid record. A grant script then sees the tombstone.
+_LUA_REVERSE = (
+    "redis.call('SET', KEYS[1], ARGV[1]) "
+    "redis.call('SET', KEYS[2], ARGV[2]) "
+    "redis.call('DEL', KEYS[3]) "
+    "return 1"
+)
+
+
+def apply_if_lease(lease_key, token, tombstone_key, pairs):
+    """Write every pair only if `token` owns the lease and no tombstone exists.
+
+    1 when the writes landed and the lease was dropped. 0 when this token
+    does not own the lease. 2 when a tombstone is present. None when the
+    store could not be asked. The token check and the writes are one step.
+    """
+    if not _USE_REDIS:
+        return None
+    if _BACKEND == "redis" and _r is None:
+        current = get_blob(lease_key)
+        if current is None or str(current) != str(token):
+            return 0
+        if get_blob(tombstone_key):
+            return 2
+        for key, value in pairs:
+            if not set_blob(key, value):
+                return None
+        release_claim(lease_key, token)
+        return 1
+    argv = [str(token), str(len(pairs))]
+    for key, value in pairs:
+        argv.append(str(key))
+        argv.append(str(value))
+    res = _eval(_LUA_APPLY_IF_LEASE, [lease_key, tombstone_key], argv)
+    if res is None:
+        return None
+    return int(res)
+
+
+def commit_reversal(tombstone_key, tombstone_value, licence_key,
+                    licence_value, paid_key):
+    """Store the tombstone, withdraw the licence, and delete the paid record.
+
+    True when the step landed. None when the store could not be asked.
+    """
+    if not _USE_REDIS:
+        return None
+    if _BACKEND == "redis" and _r is None:
+        if not set_blob(tombstone_key, tombstone_value):
+            return None
+        if not set_blob(licence_key, licence_value):
+            return None
+        del_blob(paid_key)
+        return True
+    res = _eval(_LUA_REVERSE,
+                [tombstone_key, licence_key, paid_key],
+                [str(tombstone_value), str(licence_value)])
+    if res is None:
+        return None
+    return int(res) == 1
+
+
 def incr(key, ttl_s=60):
     """Atomically bump a counter, giving it a TTL the first time it appears.
 

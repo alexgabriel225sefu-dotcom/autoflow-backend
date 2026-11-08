@@ -750,6 +750,100 @@ def _release_payment(ref, token):
     _release_owned(_k_once_lease(ref), token, ref)
 
 
+# Test hook. A stalled worker pauses here, before the fenced write, so a
+# replacement can grant and a refund can withdraw. Production leaves it unset.
+_before_fenced_grant = None
+
+
+def _dumps(doc):
+    return json.dumps(doc, separators=(",", ":"))
+
+
+def _fenced_grant(ref, token, user_id, plan, expires_at, obj, lifetime):
+    """Write the licence, and the paid record when this charge is the offer.
+
+    Returns 'granted', 'lost', 'refunded', or 'unknown'. A lost lease or a
+    refund tombstone writes nothing. The check and the writes are one step
+    on the shared store, and one lock on the local store.
+    """
+    if _before_fenced_grant is not None:
+        _before_fenced_grant(ref, token)
+    from apex.platform import live_gate as _lg
+    now = time.time()
+    licence = {"state": _lic.ACTIVE, "plan": plan, "expiresAt": expires_at,
+               "maskedKey": None, "grantedAt": now}
+    if ref:
+        licence["paymentRef"] = str(ref)
+    pairs = [(_lic._key(user_id), _dumps(licence))]
+    if ref:
+        pairs.append((_k_ref(ref), _dumps({"userId": str(user_id), "at": now})))
+        pairs.append((_k_once(ref), _dumps({"at": now, "outcome": "granted"})))
+    if (lifetime and ref
+            and explicit_offer_charge(obj, _lg.PRICE_MINOR, _lg.CURRENCY)):
+        paid = {
+            "confirmed": True,
+            "priceMinor": _lg.PRICE_MINOR,
+            "currency": _lg.CURRENCY,
+            "term": _lg.TERM,
+            "source": "payment",
+            "recordedAt": now,
+            "actor": "system:billing",
+            "paymentRef": str(ref),
+        }
+        pairs.append((_lg._key(f"paid:{user_id}"), _dumps(paid)))
+    if user_store._USE_REDIS:
+        code = user_store.apply_if_lease(
+            _k_once_lease(ref), token, _k_refunded(ref), pairs)
+        if code is None:
+            return "unknown"
+        if code == 0:
+            return "lost"
+        if code == 2:
+            return "refunded"
+        return "granted"
+    with _fallback_lock:
+        if ref and _once_owner.get(ref) != token:
+            return "lost"
+        refunded = _refund_state(ref) if ref else "no"
+        if refunded == "yes":
+            return "refunded"
+        if refunded == "unknown":
+            return "unknown"
+        for key, raw in pairs:
+            _store._write(key, json.loads(raw))
+        if ref:
+            _once_owner.pop(ref, None)
+        return "granted"
+
+
+def _fenced_reverse(ref, user_id, event_id, etype):
+    """Tombstone, withdraw the licence, and delete the paid record together.
+
+    The tombstone is written in the same step as the withdrawal, so a grant
+    that still holds an old lease sees it and does not put the licence back.
+    """
+    now = time.time()
+    current = _lic._read(user_id) or {}
+    current["state"] = _lic.REVOKED
+    current["revokedAt"] = now
+    tomb = {"userId": str(user_id), "eventId": event_id,
+            "type": etype, "at": now}
+    from apex.platform import live_gate as _lg
+    paid_key = _lg._key(f"paid:{user_id}")
+    if user_store._USE_REDIS:
+        ok = user_store.commit_reversal(
+            _k_refunded(ref), _dumps(tomb),
+            _lic._key(user_id), _dumps(current),
+            paid_key)
+        if not ok:
+            raise user_store.StoreUnavailable("the reversal was not stored")
+        return
+    with _fallback_lock:
+        _store._write(_k_refunded(ref), tomb)
+        _store._write(_lic._key(user_id), current)
+        _store._delete(paid_key)
+
+
 def _amount_matches(obj, cfg):
     """(ok, detail) — did this payment charge the approved price?
 
@@ -1059,34 +1153,43 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                 return 200, {"ok": True, "handled": False,
                              "reason": "this payment was already refunded"}
             payment_claimed = bool(ref)
-            _lic.grant(user_id, plan=cfg["plan"], expires_at=expires,
-                       masked_key=None, now=now, payment_ref=ref)
-            # The founder plan and the live paid record are different facts.
-            # A missing amount still grants the plan (see _amount_matches)
-            # and does not write the paid record. A failed write raises, so
-            # the provider retries.
             from apex.platform import live_gate as _live_gate
             lifetime = (not cfg.get("periodDays")
                         and str(cfg.get("purchaseMode") or "").lower()
                         == "one_time")
-            _live_gate.note_confirmed_payment(
-                user_id, obj, payment_ref=ref, lifetime=lifetime)
             if ref:
-                _finish_payment(ref, pay_token)
+                # The licence, the paid record, the payment index, and the
+                # durable grant share the lease and the refund tombstone.
+                # A worker whose lease expired writes none of them.
+                result = _fenced_grant(
+                    ref, pay_token, user_id, cfg["plan"], expires, obj, lifetime)
+                if result == "unknown":
+                    raise user_store.StoreUnavailable("the grant was not stored")
+                if result == "lost":
+                    payment_claimed = False
+                    raise _LostLease("the payment lease was no longer ours")
+                if result == "refunded":
+                    _release_payment(ref, pay_token)
+                    payment_claimed = False
+                    _hold_for_review(event_id, etype, user_id, ref,
+                                     "this payment was already refunded or "
+                                     "disputed")
+                    _mark_done(event_id, "refunded-before-grant", event_token)
+                    return 200, {"ok": True, "handled": False,
+                                 "reason": "this payment was already refunded"}
                 payment_claimed = False
-                # Best effort, and deliberately NOT strict: the licence is
-                # written and the buyer is provisioned. Failing the delivery
-                # here would make the provider retry a grant that already
-                # worked. A missing reverse index costs a manual lookup on a
-                # refund; a retried grant costs the buyer their entitlement
-                # when the retry races the first one.
-                try:
-                    _store._write(_k_ref(ref), {"userId": str(user_id),
-                                                "at": time.time()})
-                except Exception as e:                       # noqa: BLE001
-                    print(f"[Billing] granted {user_id} but could not index "
-                          f"payment {ref} ({type(e).__name__}) — a refund on "
-                          f"it will need a manual lookup")
+                if lifetime and explicit_offer_charge(
+                        obj, _live_gate.PRICE_MINOR, _live_gate.CURRENCY):
+                    _live_gate._audit_best_effort(
+                        lambda audit: audit.record_entitlement_change(
+                            user_id=str(user_id), actor="system:billing",
+                            field="paid_licence", old_value=None,
+                            new_value="lifetime", reason="confirmed payment"))
+            else:
+                _lic.grant(user_id, plan=cfg["plan"], expires_at=expires,
+                           masked_key=None, now=now, payment_ref=ref)
+                _live_gate.note_confirmed_payment(
+                    user_id, obj, payment_ref=ref, lifetime=lifetime)
             notice = ("Licence activated", _notify.INFO,
                       "Your payment was confirmed and your licence is active.")
             outcome = "granted"
@@ -1101,17 +1204,15 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                 return 200, {"ok": True, "handled": False,
                              "reason": "a partial refund does not withdraw "
                                        "the licence"}
-            _lic.revoke(user_id)
             if ref:
-                # Remembered strictly, so a failure retries the whole reversal
-                # (revoking again is harmless).
-                _store._write_strict(_k_refunded(ref), {
-                    "userId": str(user_id), "eventId": event_id,
-                    "type": etype, "at": time.time()})
-            # The paid record has to go with the licence. Revoke does not
-            # stop a loop that is already running; that is a separate gap.
-            from apex.platform import live_gate as _live_gate
-            _live_gate.clear_paid_licence(user_id)
+                # Tombstone and withdrawal together. A stale grant then sees
+                # the tombstone and does not restore the licence or the paid
+                # record. Revoke does not stop a loop that is already running.
+                _fenced_reverse(ref, user_id, event_id, etype)
+            else:
+                _lic.revoke(user_id)
+                from apex.platform import live_gate as _live_gate
+                _live_gate.clear_paid_licence(user_id)
             notice = ("Licence suspended", _notify.CRITICAL,
                       "A payment was refunded, disputed or failed, so "
                       "the licence on this account was suspended.")

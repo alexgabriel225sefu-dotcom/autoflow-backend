@@ -74,15 +74,17 @@ def session(eid, etype, **obj):
 
 
 grants = []
-_real_grant = B._lic.grant
+_real_fenced = B._fenced_grant
 
 
-def counting_grant(*args, **kwargs):
-    grants.append(kwargs.get("payment_ref"))
-    return _real_grant(*args, **kwargs)
+def counting_fenced(*args, **kwargs):
+    result = _real_fenced(*args, **kwargs)
+    if result == "granted":
+        grants.append(args[0] if args else kwargs.get("ref"))
+    return result
 
 
-B._lic.grant = counting_grant
+B._fenced_grant = counting_fenced
 
 print("\n[1] an unpaid completed session does not grant")
 st, out = deliver(session(

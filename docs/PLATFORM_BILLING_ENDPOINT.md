@@ -83,11 +83,13 @@ lease lasts 60 seconds so a dead worker does not block a replacement
 forever. That duration is not what prevents a second grant. Publishing
 the durable record and deleting the lease happen in one compare against
 the token, so an expired worker cannot delete the replacement's lease.
-A crash after the licence write and before that record can make the
-replacement write the same active licence again. It does not grant if
-the refund tombstone is already stored, so a revoked licence is not
-turned back on. This is bounded recovery, not a promise that the licence
-function runs only once. A store that cannot be read answers 500. `async_payment_failed`
+The licence, the paid record, the payment index, and the durable grant
+are written in that same step. A worker whose lease has expired does not
+put a withdrawn licence or paid record back. A crash before the step can
+still let a replacement grant when no refund is stored. On one machine
+the local files use the process lock. Two processes without the shared
+store do not have this fence. A store that cannot be read answers 500.
+`async_payment_failed`
 is not subscribed. Because the unpaid session never granted, there is no
 licence for that failure to withdraw.
 
