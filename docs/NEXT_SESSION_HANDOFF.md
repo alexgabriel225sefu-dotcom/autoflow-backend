@@ -777,14 +777,14 @@ Branch: `codex/new-client-flow-signup-demo`, based on
 
 Commits:
 
-- `0e13b7f6` — canonical confirmation/reset redirects and readable auth errors;
-- `5f99281a` — read-only cTrader account refresh, selection clearing, and API/UI
-  contract tests;
-- `afd01394` — updated resend-error contract test.
+- `7c3e3247` — canonical confirmation/reset redirects and readable auth errors;
+- `949836f5` — updated resend-error contract test;
+- `5ff388fe` — this handoff update.
 
-Files changed include the Supabase redirect/error helpers and auth screens under
-`web/src/`, the Accounts refresh screen, cTrader link/API/rate-limit modules and
-their tests under `apex-forex-bot/`, plus `docs/SUPABASE_OAUTH_SETUP.md`.
+Files changed include the Supabase redirect/error helpers, auth screens and
+resend component under `web/src/`, plus `docs/SUPABASE_OAUTH_SETUP.md`.
+The base branch already contains the cTrader account refresh entry point from
+PR #151; this branch does not duplicate that backend path.
 
 What is covered:
 
@@ -795,14 +795,13 @@ What is covered:
   the canonical production origin (`https://www.apex4traders.com`) while
   preserving localhost for local development. Expired callback errors link to
   a new confirmation request and sign-in.
-- cTrader account refresh reads the linked token server-side, replaces the
-  account list from cTrader, clears the selected account, preserves the previous
-  readable list on failure, and never serialises a token to the browser.
+- The existing Accounts “Refresh accounts with cTrader” path remains on the
+  base branch and was not replaced or bypassed.
 
 Checks:
 
-- Python targeted scripts: `test_platform_ctrader_link.py`,
-  `test_platform_entitlement.py`, and `test_platform_rate_limit.py` passed.
+- Python targeted auth/platform scripts from the base branch were not changed
+  in this slice; the new auth behavior is covered by the web contracts below.
 - Web targeted Vitest: 5 files / 23 tests passed; Accounts and Settings
   contracts: 2 files / 6 tests passed.
 - Full web Vitest: 62 files passed, 854 tests passed, 24 skipped; the existing

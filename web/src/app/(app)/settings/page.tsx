@@ -8,7 +8,6 @@ import type { CtraderStatus, Me } from "@/lib/api";
 import { AppearanceControls } from "@/components/app/appearance-controls";
 import { YourData } from "@/components/app/your-data";
 import { resendConfirmation } from "@/components/auth/resend-confirmation";
-import { resendConfirmation } from "@/components/auth/resend-confirmation";
 
 export default function SettingsPage() {
   const me = useRead<Me>("me");
