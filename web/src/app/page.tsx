@@ -14,6 +14,8 @@ import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { HeroStage } from "@/components/marketing/hero-stage";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { ProductGuide } from "@/components/marketing/product-guide";
+import { JsonLd } from "@/components/marketing/json-ld";
+import { ORGANIZATION_LD, WEBSITE_LD } from "@/lib/json-ld";
 import { PricingSection } from "@/components/blocks/pricing-section";
 
 export const metadata: Metadata = {
@@ -47,6 +49,8 @@ const faqs = [
 export default function Landing() {
   return (
     <main className="mkt">
+      <JsonLd data={ORGANIZATION_LD} />
+      <JsonLd data={WEBSITE_LD} />
       <div className="mkt-wrap">
         <nav className="mkt-nav">
           <BrandLockup size={24} />
