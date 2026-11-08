@@ -101,7 +101,7 @@ describe("confirmation resend", () => {
     resend.mockResolvedValue({ error: { message: "rate limit" } });
     render(<SettingsPage />);
     fireEvent.click(await screen.findByRole("button", { name: /send another confirmation link/i }));
-    expect((await screen.findByRole("alert")).textContent).toContain("rate limit");
+    expect((await screen.findByRole("alert")).textContent).toContain("Too many requests");
   });
 });
 
