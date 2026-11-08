@@ -36,6 +36,7 @@ beforeEach(() => {
   refresh.mockReset();
   signUp.mockReset();
   resend.mockReset();
+  resend.mockResolvedValue({ error: null });
 });
 
 async function submit() {
@@ -79,11 +80,21 @@ describe("sign up", () => {
 
   it("shows a failure and allows trying again", async () => {
     signUp.mockResolvedValue({ data: { session: null, user: {} }, error: null });
-    resend.mockResolvedValue({ error: { message: "email rate limit exceeded" } });
+    resend.mockResolvedValue({ error: { message: "Please try again after 12 seconds" } });
     await submit();
     await userEvent.click(await screen.findByRole("button", { name: /resend the link/i }));
-    expect((await screen.findByRole("alert")).textContent).toContain("email rate limit exceeded");
+    expect((await screen.findByRole("alert")).textContent).toContain("Please wait 12 seconds");
     const btn = screen.getByRole("button", { name: /resend the link/i }) as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
+
+  it("shows local validation without calling Supabase", async () => {
+    render(<SignUpPage />);
+    await userEvent.type(screen.getByLabelText(/email/i), "not-an-email");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "short");
+    await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/valid email/i);
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
 });

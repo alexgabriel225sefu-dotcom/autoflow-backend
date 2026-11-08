@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/supabase/auth-error";
+import { authCallbackUrl } from "@/lib/supabase/redirect";
 
 /** Seconds before another link may be requested. */
 export const RESEND_COOLDOWN_SEC = 60;
@@ -20,9 +22,11 @@ export async function resendConfirmation(email: string): Promise<ResendOutcome> 
     const { error } = await createClient().auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: authCallbackUrl(window.location.origin) },
     });
-    if (error) return { ok: false, message: error.message || "The link could not be sent." };
+    if (error) {
+      return { ok: false, message: authErrorMessage(error.message, "resend") };
+    }
     return { ok: true, message: "If the address still needs confirming, another link is on its way." };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "The link could not be sent." };

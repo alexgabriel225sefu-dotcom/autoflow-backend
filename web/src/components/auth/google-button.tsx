@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/supabase/middleware";
+import { authCallbackUrl } from "@/lib/supabase/redirect";
 
 /**
  * "Continue with Google", shared by sign-in and sign-up.
@@ -30,7 +31,7 @@ export function GoogleButton({
     const { error } = await createClient().auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(target)}`,
+        redirectTo: authCallbackUrl(window.location.origin, { next: target }),
       },
     });
     // On success the browser is already leaving for Google; only a failure

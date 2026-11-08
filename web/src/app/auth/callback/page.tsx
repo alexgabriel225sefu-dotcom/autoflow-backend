@@ -134,7 +134,14 @@ function CallbackPageInner() {
           <h1>Could not sign you in</h1>
           <div className="card">
             <p role="alert">{error}</p>
-            <a href="/login">Back to sign in</a>
+            <p className="muted">
+              If this was a confirmation link, request a fresh one and check
+              your inbox again.
+            </p>
+            <div className="btn-row">
+              <a className="btn" href="/signup">Request a new confirmation link</a>
+              <a className="btn btn-ghost" href="/login">Back to sign in</a>
+            </div>
           </div>
         </div>
       </main>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { authCallbackUrl } from "@/lib/supabase/redirect";
 
 type SocialProvider = "google" | "apple";
 
@@ -18,11 +19,9 @@ export function SocialAuthButtons({ next = "/dashboard" }: { next?: string }) {
   async function signIn(provider: SocialProvider) {
     setBusy(provider);
     setError(null);
-    const callback = new URL("/auth/callback", window.location.origin);
-    callback.searchParams.set("next", next);
     const { error: authError } = await createClient().auth.signInWithOAuth({
       provider,
-      options: { redirectTo: callback.toString() },
+      options: { redirectTo: authCallbackUrl(window.location.origin, { next }) },
     });
     if (authError) {
       setBusy(null);

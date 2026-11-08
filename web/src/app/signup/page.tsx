@@ -6,6 +6,8 @@ import { PLAN_NOTICE } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/auth/password-field";
 import { AuthSubmit } from "@/components/auth/auth-submit";
+import { authCallbackUrl } from "@/lib/supabase/redirect";
+import { authErrorMessage } from "@/lib/supabase/auth-error";
 import { GoogleButton } from "@/components/auth/google-button";
 import { inboxLink } from "@/lib/inbox-link";
 import { ResendConfirmation } from "@/components/auth/resend-confirmation";
@@ -18,16 +20,31 @@ export default function SignUpPage() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  function validate() {
+    const trimmed = email.trim();
+    if (!trimmed || !/^\S+@\S+\.\S+$/.test(trimmed)) {
+      return "Enter a valid email address.";
+    }
+    if (password.length < 8) return "Use at least 8 characters for your password.";
+    return null;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    const validation = validate();
+    if (validation) {
+      setError(validation);
+      return;
+    }
     setBusy(true);
     setError(null);
     const { data, error } = await createClient().auth.signUp({
-      email, password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      email: email.trim(), password,
+      options: { emailRedirectTo: authCallbackUrl(window.location.origin) },
     });
     setBusy(false);
-    if (error) return setError(error.message);
+    if (error) return setError(authErrorMessage(error.message, "signup"));
     // A session means the address is already confirmed, or confirmation is
     // off. Say nothing about whether the address existed: the no-session
     // screen is the same either way.
@@ -83,10 +100,11 @@ export default function SignUpPage() {
         <GoogleButton label="Sign up with Google" onError={(m) => setError(m || null)} />
         <p className="auth-or"><span>or</span></p>
       </div>
-      <form onSubmit={onSubmit} className="card">
+      <form onSubmit={onSubmit} className="card" noValidate>
         <label className="field">
           <span>Email</span>
           <input type="email" required value={email} autoComplete="email"
+                 aria-invalid={Boolean(error && !/^\S+@\S+\.\S+$/.test(email.trim()))}
                  onChange={(e) => setEmail(e.target.value)} />
         </label>
         <PasswordField label="Password" value={password} onChange={setPassword}
