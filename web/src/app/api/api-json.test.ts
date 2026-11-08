@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { apiError, methodNotAllowed, withApiJson } from "./_json";
-import { GET as missing } from "./not-found";
+import { GET as missing, POST as missingPost } from "./not-found";
 import { GET as checkoutGet } from "./create-payment-intent/route";
 
 async function bodyOf(response: Response) {
@@ -13,6 +13,16 @@ describe("API JSON errors", () => {
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type") ?? "").toContain("application/json");
     expect(await bodyOf(response)).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+  });
+
+  it("the catch-all POST is JSON 404, the same envelope as GET", async () => {
+    const response = missingPost();
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type") ?? "").toContain("application/json");
+    expect(await bodyOf(response)).toMatchObject({
+      ok: false,
+      error: { code: "NOT_FOUND", message: "No such API endpoint." },
+    });
   });
 
   it("answers JSON for a wrong method", async () => {

@@ -5,6 +5,7 @@ export type ApiErrorCode =
   | "CHECKOUT_DISABLED"
   | "NOT_FOUND"
   | "METHOD_NOT_ALLOWED"
+  | "WEBHOOK_UNAVAILABLE"
   | "INTERNAL_ERROR";
 
 export function apiError(status: number, code: ApiErrorCode, message: string) {

@@ -30,6 +30,8 @@ import hashlib
 import hmac
 import json
 import os
+import re
+import threading
 import time
 
 from apex import user_store
@@ -53,6 +55,10 @@ REVOKING = ("charge.refunded", "charge.dispute.created",
 # The metadata key this server writes when it creates a checkout. The webhook
 # reads the user id from here and from nowhere else.
 USER_META_KEY = "a4tUserId"
+# Supabase ids used by this platform are not numeric. A legacy Telegram
+# checkout puts the chat id in client_reference_id. That number must never
+# be treated as a platform user, for a grant or a revoke.
+_PLATFORM_USER_ID = re.compile(r"^[A-Za-z0-9_.:@+-]{1,128}$")
 
 # 49700, not 49900. The owner set the Founder Lifetime price at 497 USD;
 # this is the ONE place it is written, which is why `offer_drift()` can
@@ -282,26 +288,66 @@ def _event_key(event_id):
     return f"{_store._ns()}:{_store._P}:billing:evt:{event_id}"
 
 
-def _already_done(event_id):
-    """True when this event has been processed. None when we cannot tell.
+# Used only when the shared claim cannot be asked (no Redis, or it errored).
+# Two webhook threads in one process must not both grant the same event.
+# "busy" means another thread in this process is still handling it: the
+# provider should retry, not be told the work is finished.
+_fallback_lock = threading.Lock()
+_fallback_inflight = set()
+BUSY = "busy"
 
-    Two mechanisms, because they fail differently. `user_store.claim` is a
-    cross-process SET NX and is the only one that is correct when more than
-    one instance is running; it returns None when there is no shared backend.
-    The record read is the fallback, and it is honest about being a read
-    followed by a write rather than an atomic operation.
+
+def _foreign_product(obj):
+    """True when the event names a product this platform does not sell.
+
+    The live Stripe account still delivers the legacy site's
+    `checkout.session.completed` events. Those sessions set
+    `metadata.product` to a legacy catalogue key such as `apex-forex` and
+    do not set `a4tUserId`. Pointing a second endpoint at this handler
+    delivers those events even while platform checkout is off. A present
+    product that is not the approved sku is not granted and does not revoke.
+
+    This platform's own Checkout Session does not set `metadata.product`,
+    so a missing product is not treated as foreign.
+    """
+    meta = obj.get("metadata") if isinstance(obj, dict) else None
+    if not isinstance(meta, dict):
+        return False
+    named = str(meta.get("product") or meta.get("sku") or "").strip()
+    if not named:
+        return False
+    return named not in (APPROVED_SKU, APPROVED_PLAN)
+
+
+def _already_done(event_id):
+    """True when this event has been processed. `BUSY` when this process
+    is already handling it and the shared claim could not be asked.
+
+    `user_store.claim` is a cross-process SET NX and is the only one that
+    is correct when more than one instance is running. It returns None when
+    there is no shared backend or the backend errored. The in-process set
+    covers that gap for two threads here. It does not replace Redis across
+    instances.
     """
     got = user_store.claim(_event_key(event_id), ttl_s=86400)
     if got is True:
         return False
     if got is False:
         return True
-    rec = _store._read(_event_key(event_id))
-    return bool(rec)
+    with _fallback_lock:
+        if event_id in _fallback_inflight:
+            return BUSY
+        rec = _store._read(_event_key(event_id))
+        if rec:
+            return True
+        _fallback_inflight.add(event_id)
+        return False
 
 
 def _mark_done(event_id, outcome):
     _store._write(_event_key(event_id), {"at": time.time(), "outcome": outcome})
+    with _fallback_lock:
+        _fallback_inflight.discard(event_id)
 
 
 def _release(event_id):
@@ -315,6 +361,8 @@ def _release(event_id):
         user_store.set_blob(_event_key(event_id), "", ttl_s=1)
     except Exception:
         pass
+    with _fallback_lock:
+        _fallback_inflight.discard(event_id)
 
 
 def _k_intent(user_id):
@@ -351,6 +399,20 @@ def _session_email(obj):
     return str(mail or obj.get("customer_email") or "").strip().lower()
 
 
+def _platform_user_candidate(value):
+    """A platform user id, or None.
+
+    Digit-only values are Telegram chat ids from the legacy checkout. They
+    are not platform users. Empty and oversized values are not either.
+    """
+    text = str(value or "").strip()
+    if not text or text.isdigit():
+        return None
+    if not _PLATFORM_USER_ID.match(text):
+        return None
+    return text
+
+
 def _trusted_user_of(obj):
     """(user_id, None) when the grant may go ahead, (claimed, why) otherwise.
 
@@ -364,9 +426,10 @@ def _trusted_user_of(obj):
     for a person to look at, never granted.
     """
     meta = obj.get("metadata") or {}
-    if meta.get(USER_META_KEY):
-        return str(meta[USER_META_KEY]), None
-    claimed = str(obj.get("client_reference_id") or "") or None
+    meta_user = _platform_user_candidate(meta.get(USER_META_KEY))
+    if meta_user:
+        return meta_user, None
+    claimed = _platform_user_candidate(obj.get("client_reference_id"))
     if not claimed:
         return None, None
     intent = _store._read_strict(_k_intent(claimed))
@@ -397,8 +460,8 @@ def _user_id_of(obj):
     anyone who knows a client's email buy them a licence, or worse, claim one.
     """
     meta = obj.get("metadata") or {}
-    uid = meta.get(USER_META_KEY) or obj.get("client_reference_id")
-    return str(uid) if uid else None
+    return (_platform_user_candidate(meta.get(USER_META_KEY))
+            or _platform_user_candidate(obj.get("client_reference_id")))
 
 
 def _paid(obj, event_type):
@@ -589,9 +652,24 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
         # on. Recorded as ignored rather than as handled.
         return 200, {"ok": True, "handled": False, "type": etype}
 
-    if _already_done(event_id):
+    done = _already_done(event_id)
+    if done == BUSY:
+        # Not marked done. The provider retries after the in-flight delivery
+        # finishes, instead of being told this event was already applied.
+        return 500, {"ok": False, "error": {
+            "code": "BILLING_FAILED",
+            "message": "this delivery is already being handled"}}
+    if done:
         # A duplicate is a success: the provider retried, the work is done.
         return 200, {"ok": True, "duplicate": True, "type": etype}
+
+    if etype in GRANTING and _foreign_product(obj):
+        # A legacy checkout on the same Stripe account. Do not grant, and
+        # do not treat it as a platform refund later: there is no licence
+        # here to withdraw.
+        _mark_done(event_id, "foreign-product")
+        return 200, {"ok": True, "handled": False,
+                     "reason": "this payment is not the Apex4Traders offer"}
 
     ref = _payment_ref(obj)
     user_id = _user_id_of(obj)
