@@ -56,6 +56,14 @@ describe("accounts", () => {
     expect(screen.getByText(/live accounts are not available here/i)).toBeTruthy();
   });
 
+  it("offers a way to bring a missing demo or live account in through cTrader", async () => {
+    await mount();
+    const link = await screen.findByRole("link", { name: /refresh accounts with ctrader/i });
+    expect(link.getAttribute("href")).toBe("/connect");
+    // The counts come from what cTrader returned, never from a guess.
+    expect(screen.getByText(/2 demo\s*·\s*1 live/i)).toBeTruthy();
+  });
+
   it("a failed read shows the error, not an empty list", async () => {
     routes["ctrader/status"] = { ok: false, status: 503, code: "ACCOUNTS_FAILED", message: "cTrader did not answer" };
     await mount();
