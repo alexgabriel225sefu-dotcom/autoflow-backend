@@ -139,7 +139,13 @@ export function ruleSentence(
   // and a sentence that read "Buy EURUSD when ..." without saying so would
   // describe a rule that trades. Rules stored before the field existed ran at
   // full, so absent reads as Full Automation.
-  s += ` When a setup appears: ${plainLevel(doc.automationLevel ?? "full")}.`;
+  //
+  // An EMPTY string is a draft where nobody has chosen yet (the form starts
+  // blank on purpose). It used to render "When a setup appears: ." with
+  // nothing after the colon.
+  s += doc.automationLevel === ""
+    ? " What happens when a setup appears is not chosen yet."
+    : ` When a setup appears: ${plainLevel(doc.automationLevel ?? "full")}.`;
   return s;
 }
 
