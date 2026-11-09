@@ -22,9 +22,14 @@ const ReadStatus = CandleReadStatus;
 export { ReplayView };
 
 type RuleRead = { rule: Record<string, unknown> };
+export function availableBacktestRules(rules: RuleSummary[] | undefined) {
+  return (Array.isArray(rules) ? rules : []).filter((rule) => rule.state === "active");
+}
 export function BacktestView() {
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 60_000);
-  const list = useMemo(() => (rules.result?.ok && Array.isArray(rules.result.data?.rules) ? rules.result.data.rules : []), [rules.result]);
+  const list = useMemo(() => (rules.result?.ok && Array.isArray(rules.result.data?.rules)
+    ? availableBacktestRules(rules.result.data.rules)
+    : []), [rules.result]);
   const [chosenRule, setRuleId] = useState("");
   const [symbolPick, setSymbol] = useState<string | null>(null);
   const [timeframePick, setTimeframe] = useState<string | null>(null);

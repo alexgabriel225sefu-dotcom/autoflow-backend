@@ -3,7 +3,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PLAN_NOTICE } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createImplicitClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/auth/password-field";
 import { AuthSubmit } from "@/components/auth/auth-submit";
 import { authCallbackUrl } from "@/lib/supabase/redirect";
@@ -39,7 +39,7 @@ export default function SignUpPage() {
     }
     setBusy(true);
     setError(null);
-    const { data, error } = await createClient().auth.signUp({
+    const { data, error } = await createImplicitClient().auth.signUp({
       email: email.trim(), password,
       options: { emailRedirectTo: authCallbackUrl(window.location.origin) },
     });
@@ -49,6 +49,12 @@ export default function SignUpPage() {
     // off. Say nothing about whether the address existed: the no-session
     // screen is the same either way.
     if (data.session) {
+      // Keep the normal SSR cookie session when email confirmation is disabled.
+      const { error: sessionError } = await createClient().auth.setSession(data.session);
+      if (sessionError) {
+        setError(authErrorMessage(sessionError.message, "signin"));
+        return;
+      }
       router.push("/dashboard");
       router.refresh();
       return;

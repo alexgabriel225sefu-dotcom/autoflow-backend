@@ -18,7 +18,7 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
-import { ForwardView, OverfitView, RiskGuardView, RuleLayerView } from "./simulation-views";
+import { availableBacktestRules, ForwardView, OverfitView, RiskGuardView, RuleLayerView } from "./simulation-views";
 import { RuleLayerResultCard } from "./simulation-result-cards";
 
 afterEach(cleanup);
@@ -28,6 +28,14 @@ beforeEach(() => {
 });
 
 describe("simulation screens", () => {
+  it("offers only active rules to backtest", () => {
+    expect(availableBacktestRules([
+      { ruleDocId: "draft", name: "Draft", state: "draft" },
+      { ruleDocId: "active", name: "Active", state: "active" },
+      { ruleDocId: "paused", name: "Paused", state: "paused" },
+    ] as never)).toEqual([{ ruleDocId: "active", name: "Active", state: "active" }]);
+  });
+
   it("starts forward testing with an honest empty state and reports a failed read", async () => {
     render(<ForwardView />);
     expect(screen.getByText("No hypothetical signals recorded in this session.")).toBeTruthy();

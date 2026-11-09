@@ -21,6 +21,10 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     auth: {
       signOut: () => signOut(),
+    },
+  }),
+  createImplicitClient: () => ({
+    auth: {
       resend: (body: unknown) => resend(body),
     },
   }),

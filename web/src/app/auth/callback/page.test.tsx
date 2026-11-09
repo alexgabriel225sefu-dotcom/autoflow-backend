@@ -12,7 +12,9 @@ const replace = vi.fn();
 let params = new URLSearchParams();
 const exchangeCodeForSession = vi.fn();
 const getSession = vi.fn();
+const setSession = vi.fn();
 const updateUser = vi.fn();
+const implicitGetSession = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }),
@@ -20,10 +22,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
+  createImplicitClient: () => ({ auth: { getSession: () => implicitGetSession() } }),
   createClient: () => ({
     auth: {
       exchangeCodeForSession: (code: string) => exchangeCodeForSession(code),
       getSession: () => getSession(),
+      setSession: (session: unknown) => setSession(session),
       updateUser: (body: { password: string }) => updateUser(body),
     },
   }),
@@ -35,6 +39,8 @@ beforeEach(() => {
   replace.mockReset();
   exchangeCodeForSession.mockReset();
   getSession.mockReset();
+  setSession.mockReset();
+  implicitGetSession.mockReset();
   updateUser.mockReset();
   params = new URLSearchParams();
   window.history.replaceState(null, "", "/auth/callback");
@@ -60,6 +66,20 @@ describe("auth callback", () => {
     await waitFor(() => expect(exchangeCodeForSession).toHaveBeenCalledWith("pkce-1"));
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
     expect(window.location.search).not.toContain("code=");
+  });
+
+  it("imports a confirmation session from an email link opened in another tab", async () => {
+    window.history.replaceState(null, "", "/auth/callback#access_token=implicit-session");
+    implicitGetSession.mockResolvedValue({
+      data: { session: { access_token: "implicit", refresh_token: "refresh" } }, error: null,
+    });
+    setSession.mockResolvedValue({ error: null });
+    getSession.mockResolvedValue({ data: { session: { access_token: "implicit" } }, error: null });
+    render(<CallbackPage />);
+    await waitFor(() => expect(implicitGetSession).toHaveBeenCalled());
+    await waitFor(() => expect(setSession).toHaveBeenCalledWith({ access_token: "implicit", refresh_token: "refresh" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
   });
 
   it("stays on the page with the Supabase message when exchange fails", async () => {

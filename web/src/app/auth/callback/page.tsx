@@ -2,7 +2,7 @@
 import { BrandLockup } from "@/components/brand/logo";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createImplicitClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/supabase/middleware";
 
 /**
@@ -16,6 +16,8 @@ function CallbackPageInner() {
   const params = useSearchParams();
   const recovery = params.get("mode") === "recovery";
   const code = params.get("code");
+  const hasImplicitSession = typeof window !== "undefined"
+    && window.location.hash.includes("access_token=");
   const queryError = params.get("error_description") || params.get("error");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(queryError);
@@ -30,7 +32,33 @@ function CallbackPageInner() {
       if (queryError) {
         if (!cancelled) setError(queryError);
       }
-      if (code) {
+      if (hasImplicitSession) {
+        // Confirmation links opened from another tab/device carry an implicit
+        // session instead of the PKCE code that belongs to the original tab.
+        // Import it into the cookie-backed client before routing to the app.
+        const implicit = createImplicitClient();
+        const { data: implicitData, error: implicitError } = await implicit.auth.getSession();
+        if (implicitError || !implicitData.session) {
+          if (!cancelled) {
+            setError(implicitError?.message || "This confirmation link did not contain a valid session.");
+            setHasSession(false);
+            setReady(true);
+          }
+          return;
+        }
+        const { error: sessionError } = await supabase.auth.setSession(implicitData.session);
+        if (sessionError) {
+          if (!cancelled) {
+            setError(sessionError.message);
+            setHasSession(false);
+            setReady(true);
+          }
+          return;
+        }
+        const url = new URL(window.location.href);
+        url.hash = "";
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+      } else if (code) {
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         const url = new URL(window.location.href);
         url.searchParams.delete("code");
@@ -68,7 +96,7 @@ function CallbackPageInner() {
       else router.replace("/login");
     })();
     return () => { cancelled = true; };
-  }, [code, queryError, recovery, router, params]);
+  }, [code, hasImplicitSession, queryError, recovery, router, params]);
 
   async function setNewPassword(e: React.FormEvent) {
     e.preventDefault();
