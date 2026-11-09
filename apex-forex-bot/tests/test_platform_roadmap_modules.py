@@ -249,6 +249,49 @@ def test_backtest_reports_risk_metrics_and_directional_breakdowns():
     assert result["longVsShort"]["short"]["trades"] == 1
 
 
+def test_api_backtest_uses_the_owned_rule_not_a_browser_copy():
+    """A posted rule document must not be able to change the calculation."""
+    from apex.platform import api
+
+    trusted = ruledoc.blank(user_id="u", account_id="a", symbols=["EUR_USD"], timeframe="1h")
+    trusted["state"] = "active"
+    trusted["sides"] = "BUY"
+    trusted["entry"] = {"combine": "AND", "conditions": [
+        {"id": "weekday", "params": {"days": [0, 1, 2, 3, 4, 5, 6]}}]}
+    trusted["exit"] = {"combine": "OR", "conditions": [
+        {"id": "rsi", "params": {"op": "above", "value": 100}}]}
+    forged = dict(trusted)
+    forged["sides"] = "SELL"
+    candles = [{"time": 1_758_542_400 + i * 3600, "open": 1.1,
+                "high": 1.11, "low": 1.09, "close": 1.105}
+               for i in range(20)]
+    original = api._selected_rule
+    api._selected_rule = lambda _user, _rule_id=None: trusted
+    try:
+        status, body = api._roadmap_analysis(
+            "backtest", {"ruleDocId": "owned", "rule": forged,
+                         "candles": candles, "symbol": "EUR_USD", "timeframe": "1h"},
+            user_id="u")
+    finally:
+        api._selected_rule = original
+    assert status == 200
+    assert body["longVsShort"]["long"]["trades"] > 0
+    assert body["longVsShort"]["short"]["trades"] == 0
+
+
+def test_api_backtest_refuses_without_an_owned_active_rule():
+    from apex.platform import api
+    original = api._selected_rule
+    api._selected_rule = lambda _user, _rule_id=None: None
+    try:
+        status, body = api._roadmap_analysis(
+            "backtest", {"candles": [], "rule": {"sides": "BUY"}}, user_id="u")
+    finally:
+        api._selected_rule = original
+    assert status == 409
+    assert body["error"]["code"] == "RULE_REQUIRED"
+
+
 def test_replay_explains_conditions_and_stop_without_lookahead():
     rule = ruledoc.blank(user_id="u", account_id="a", symbols=["EUR_USD"], timeframe="1h")
     rule["state"] = "active"
