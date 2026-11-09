@@ -201,9 +201,20 @@ def callback_page(status, payload):
     button = (f'<a class="btn" href="{_esc(link)}">{action}</a>' if base
               else '<p>Return to the Apex4Traders tab in your browser.</p>')
 
+    # A provider redirect is commonly opened as a short-lived popup on a
+    # phone. Requiring a tap here leaves the flow stranded when that tab is
+    # closed by the browser or the user returns to the original tab. The
+    # nonce and finish ticket are both one-time/short-lived hand-off values;
+    # redirecting them to the app lets it complete through the authenticated
+    # POST while preserving the browser-binding check. The visible link is
+    # retained as a fallback for browsers that disable meta refresh.
+    refresh = (f'<meta http-equiv="refresh" content="0;url={_esc(link)}">'
+               if ok and base and link else "")
+
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+{refresh}
 <title>{title} — Apex4Traders</title>
 <style>
  :root{{color-scheme:dark}}
