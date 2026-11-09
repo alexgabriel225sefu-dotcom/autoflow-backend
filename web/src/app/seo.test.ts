@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import robots from "./robots";
 import sitemap from "./sitemap";
@@ -42,5 +44,21 @@ describe("search engines can read the site", () => {
     for (const legal of ["/terms", "/refunds", "/tax", "/privacy"]) {
       expect(urls).not.toContain(`${SITE_URL}${legal}`);
     }
+  });
+});
+
+describe("link previews on phones", () => {
+  it("the root layout declares a large preview image and the summary card", () => {
+    const src = readFileSync(join(__dirname, "layout.tsx"), "utf8");
+    expect(src).toMatch(/images: \[\{ url: "\/og-image\.png", width: 1200, height: 630/);
+    expect(src).toMatch(/card: "summary_large_image"/);
+    expect(src).toMatch(/images: \["\/og-image\.png"\]/);
+  });
+
+  it("the preview image is in the repo and is a 1200x630 PNG", () => {
+    const buf = readFileSync(join(__dirname, "../../public/og-image.png"));
+    expect(buf.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(buf.readUInt32BE(16)).toBe(1200);
+    expect(buf.readUInt32BE(20)).toBe(630);
   });
 });

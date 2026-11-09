@@ -32,23 +32,35 @@ export const metadata: Metadata = {
   // A plain default, with no template: a template would append "· Apex4Traders"
   // to pages that still carry the previous product's name, which would read
   // worse than leaving them alone until that copy is decided on.
-  title: "Apex4Traders — rule-based trading automation",
+  title: "Your trading rule, tested on demo first",
   description:
-    "Build trading rules from named, testable conditions, preview what they " +
-    "would decide, and run them on a cTrader account you connect yourself.",
+    "Write your own rule, connect your cTrader account, and test it on a free " +
+    "14-day demo before you automate anything.",
   // One public origin for search engines. Without it the same page is
   // reachable at the onrender.com address too, and the two compete.
   metadataBase: new URL(SITE_URL),
   alternates: { canonical: "/" },
   applicationName: "Apex4Traders",
+  // The preview image is what a phone shows in Instagram, WhatsApp and the
+  // browser share sheet. Without it the platform crops the small site icon,
+  // which is why the logo read as "EX4".
   openGraph: {
     type: "website",
     url: SITE_URL,
     siteName: "Apex4Traders",
-    title: "Apex4Traders — rule-based trading automation",
+    title: "Your trading rule, tested on demo first",
     description:
-      "Connect your cTrader account, choose a rule and test it on demo " +
-      "before you automate it.",
+      "Write your own rule, connect your cTrader account, and test it on a free " +
+      "14-day demo before you automate anything.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Apex4Traders" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Your trading rule, tested on demo first",
+    description:
+      "Write your own rule, connect your cTrader account, and test it on a free " +
+      "14-day demo before you automate anything.",
+    images: ["/og-image.png"],
   },
 };
 
