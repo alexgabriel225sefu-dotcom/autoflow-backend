@@ -966,3 +966,28 @@ commits, so this repair was pushed without force-updating it. Open a PR from
 `codex/new-client-flow-signup-demo-repair` into the Claude base, read all four
 CI jobs, then run a fresh confirmation walkthrough and a cTrader demo-only
 smoke check.
+
+## Launch-readiness test portability — 2026-11-09
+
+Branch: `codex/launch-readiness-qa2`, based on
+`claude/apex4traders-platform-v1` at `ff36fcea9bdf5567e88ece20f177757437869570`.
+
+This pass fixes two local test-harness failures that blocked a trustworthy
+Windows pre-launch run without changing production trading behavior:
+
+- `web/src/test/e2e.test.ts` uses the Windows Python launcher (`py -3`) and
+  passes `PYTHONUTF8=1` to the backend fixture; Unix CI remains on `python3`.
+- `apex-forex-bot/scripts/loadtest_loops.py` reads current and peak RSS through
+  `GetProcessMemoryInfo` on Windows, while keeping `/proc` and `resource`
+  behavior on Unix.
+
+Targeted verification: load-test harness passed; real backend e2e passed 18/18;
+web TypeScript, ESLint (0 errors, 2 existing warnings) and Next build passed.
+The full Vitest run passed: 109 files, 1,146 tests passed and 7 skipped.
+No deploy, environment/flag, provider-dashboard, live action or order was
+performed.
+
+The full Python runner passed: all 280 test files passed under the Windows
+UTF-8 launcher. Next: commit and push this branch, then read all four CI jobs
+before considering the launch gate clear. Production email confirmation and
+cTrader OAuth still need a real end-to-end smoke test.

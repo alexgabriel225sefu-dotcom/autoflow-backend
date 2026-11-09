@@ -43,7 +43,12 @@ function seed(cmd: string) {
 
 beforeAll(async () => {
   const script = path.resolve(__dirname, "backend_fixture.py");
-  proc = spawn("python3", ["-u", script], { stdio: ["pipe", "pipe", "pipe"] });
+  const python = process.platform === "win32" ? "py" : "python3";
+  const pythonArgs = process.platform === "win32" ? ["-3", "-u", script] : ["-u", script];
+  proc = spawn(python, pythonArgs, {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: { ...process.env, PYTHONUTF8: "1" },
+  });
   await new Promise<void>((resolve, reject) => {
     let buf = "";
     const t = setTimeout(() => reject(new Error(`backend did not start: ${buf}`)), 90_000);
