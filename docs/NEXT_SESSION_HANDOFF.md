@@ -634,6 +634,34 @@ and none in the product.
 
 ## Roadmap, Codex items — 2026-11-09
 
+### cTrader callback hardening — `codex/ctrader-oauth-fix`
+
+- Done locally: the web cTrader callback now returns automatically to the
+  authenticated app with the one-time nonce and finish ticket, while keeping
+  a visible manual fallback. The retired Telegram callback fails closed in
+  production, the legacy Telegram bot module is retired on the base branch,
+  and legacy error text is HTML-escaped, length-bounded, and covered by a
+  restrictive CSP meta tag.
+- Branch head: `1ad55681` (rebased onto base commit `55de3d82`). Tests:
+  `py -3 tests/run_all.py` — 248 test files passed; targeted OAuth,
+  platform-server, cTrader and legacy-hardening scripts passed. In `web`,
+  `npx tsc --noEmit`, `npx eslint .` (0 errors, 2 existing unused-directive
+  warnings plus one existing unused variable), `npx vitest run` (109 files,
+  1,146 passed, 7 skipped) and
+  `npx next build` passed.
+- Codex Security standard scan `0cbf9b8d-00fb-4564-9ed5-1b0837e657f1`
+  completed on the pre-rebase snapshot with two remaining findings: HIGH
+  legacy Stripe fulfillment does not verify paid status/amount (blocked by
+  the no-`server.js` rule), and MEDIUM legacy plaintext broker-token
+  compatibility (needs a controlled production migration and token rotation).
+  A fresh head scan was attempted but could not pass the host's unknown worker
+  slot preflight; do not treat the older report as a clean final-head scan.
+- CI: PR #168 head `80809f287810a2a950dec7d0e8457c8e38e5e880` is green on
+  run 490 (`python`, `node`, `web`, and `config-drift`).
+- Partial: browser retest after this patch is still pending; no deploy or
+  provider-dashboard changes were made. The production callback still needs
+  the owner's approved deploy and a read-only smoke test.
+
 - Done: PR #159 merged as `6751b16b54bf40db737c73999e15ae44758c8b80`.
   Cross-tab signup confirmation now uses the implicit Supabase flow, the
   callback imports the one-time session into the cookie-backed client, and

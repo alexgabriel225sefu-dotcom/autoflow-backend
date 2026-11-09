@@ -319,6 +319,13 @@ check("and carries the nonce back to the app, so a dead tab is survivable",
       "?n=ABC123" in ok_html, ok_html[-200:])
 check("and carries the one-time browser finish ticket",
       "t=FINISH456" in ok_html, ok_html[-220:])
+check("the success page returns automatically to the app",
+      'http-equiv="refresh"' in ok_html and
+      f'url={ALLOWED}/connect?n=ABC123&amp;t=FINISH456' in ok_html,
+      ok_html[:500])
+check("the manual link remains as a fallback",
+      '<a class="btn"' in ok_html and "Finish connecting" in ok_html,
+      ok_html[-300:])
 # A nonce is generated server-side, but the page renders whatever arrives, so
 # it is treated as hostile input. Percent-encoded for the URL, HTML-escaped for
 # the attribute — once each, which is what the first version got wrong.

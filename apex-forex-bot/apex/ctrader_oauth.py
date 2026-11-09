@@ -27,6 +27,7 @@ import hmac
 import time
 import base64
 import hashlib
+from html import escape as _html_escape
 
 from apex import config as cfg
 from apex import user_store
@@ -323,6 +324,9 @@ def _html(title, body) -> str:
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<meta http-equiv='Content-Security-Policy' "
+        "content=\"default-src 'none'; style-src 'unsafe-inline'\">"
+        "<meta name='referrer' content='no-referrer'>"
         f"<title>{title}</title><style>body{{font-family:system-ui,sans-serif;"
         "background:#0b0e16;color:#e6e9ef;display:flex;min-height:100vh;margin:0;"
         "align-items:center;justify-content:center;text-align:center;padding:24px}"
@@ -336,6 +340,18 @@ def _html(title, body) -> str:
 def handle_callback(query: dict):
     """query: parsed query string (dict of lists OR dict of str).
     Returns (http_status, html). Also stores tokens + notifies the client."""
+    # This Telegram-era callback cannot prove that the person who approved a
+    # broker account is the Telegram user named in state. The web platform has
+    # a user session plus a one-time browser ticket and is the supported flow.
+    # Retire this public token-linking path in production so a forwarded
+    # authorize URL cannot attach somebody else's account to a chat.
+    if _production():
+        return 410, _html(
+            "cTrader connection moved",
+            "<div class='h err'>Use the Apex4Traders web app to connect cTrader.</div>"
+            "<div class='p'>This Telegram connection link is retired. "
+            "Your existing connection remains unchanged.</div>")
+
     def _q(k):
         v = query.get(k)
         if isinstance(v, list):
@@ -345,7 +361,8 @@ def handle_callback(query: dict):
     err = _q("error")
     if err:
         return 400, _html("cTrader", f"<div class='h err'>Authorization failed</div>"
-                          f"<div class='p'>{err}. Close this page and start the link again.</div>")
+                          f"<div class='p'>{_html_escape(err, quote=False)}. "
+                          "Close this page and start the link again.</div>")
 
     code = _q("code")
     state = _q("state")
@@ -375,7 +392,8 @@ def handle_callback(query: dict):
         accounts = ctrader.list_accounts(access)
     except Exception as e:
         return 502, _html("cTrader", "<div class='h err'>Connection error</div>"
-                          f"<div class='p'>{e}. Close this page and start the link again.</div>")
+                          f"<div class='p'>{_html_escape(str(e)[:200], quote=False)}. "
+                          "Close this page and start the link again.</div>")
 
     # Persist tokens + account list. Auto-select if exactly one account.
     updates = {
