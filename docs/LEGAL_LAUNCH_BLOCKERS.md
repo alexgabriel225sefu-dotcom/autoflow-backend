@@ -11,7 +11,11 @@ grep -rn "TO BE CONFIRMED" web/src
 **The site must not be described as legally ready until this list is empty.**
 Nothing here was guessed. Writing a plausible registered address or a
 plausible refund policy would be worse than leaving the field blank, because a
-blank is visibly unfinished and a plausible invention is not.
+blank is visibly unfinished and a plausible invention is not. The refund rule
+is no longer blank: the owner decided it. The free 14-day demo is the trial,
+and a licence purchase is final and non-refundable once access is granted,
+except where required by law, with the article 16(m) waiver recorded at
+checkout. L4 is the remaining lawyer review, not an open commercial question.
 
 The terms, refund policy and tax notice are drafts at version `2026-10-24`.
 Each page is marked `DRAFT - requires legal review`. Company name,
@@ -62,7 +66,7 @@ These are factual claims about the software, checkable by reading the code:
 | **L1** | **Legal entity name, registered address, company number** | Terms §10, Privacy §10 | The site does not say who the contract is with. |
 | **L2** | **Governing law and jurisdiction** | Terms §10 | No stated forum for a dispute. |
 | **L3** | **Support / contact address** | Terms §11, Privacy §10 | A client has no way to reach the operator. The old address belonged to another brand and was removed rather than replaced. |
-| **L4** | **Refund policy** | Terms §9 | The webhook already revokes a licence on refund; what a client is *entitled* to is not a code question. |
+| **L4** | **Lawyer review before the decided refund rule is published** | Terms §12, `/refunds` | The commercial rule is decided and stated: the free 14-day demo is the trial, and a licence purchase is final and non-refundable once access is granted, except where required by law. Checkout records the article 16(m) withdrawal waiver. What remains is a lawyer's review before `A4T_LEGAL_PUBLISH`, plus the contact address (L3). Whether a customer may ask for a refund is not an open question. |
 | **L5** | **Tax display and checkout legal wording** | Terms §9 | Price and plan are decided as a 497 USD one-time Founder Lifetime unlock. What remains is tax-inclusive/exclusive wording and the legal text around payment/refund. |
 | **L6** | **Hosting provider, data region, sub-processor list** | Privacy §5 | Required by most privacy regimes. Supabase, cTrader and Stripe are named because they are in the dependency list; the hosting provider and region are not something this repository can state. |
 | **L7** | **Retention periods** | Privacy §7 | How long account data, journal entries and disconnected broker links are kept. |

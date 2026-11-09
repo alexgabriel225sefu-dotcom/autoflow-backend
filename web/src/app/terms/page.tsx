@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CompanyBlock, DraftShell } from "@/components/legal/draft-shell";
 import { LegalSection, LegalSections } from "@/components/legal/legal-section";
+import {
+  DEMO_CONDITIONS_NOTE,
+  DEMO_IS_NOT_LIVE,
+  DURABLE_MEDIUM,
+  PURCHASE_NOTE,
+  REFUND_POLICY_VERSION,
+  WITHDRAWAL_CONSENT_LABEL,
+} from "@/content/refund-policy";
 
 export const metadata: Metadata = { title: "Terms of Service — Apex4Traders" };
 
@@ -21,9 +30,10 @@ export default function TermsPage() {
     <DraftShell title="Terms of Service">
       <div className="legacy-flag" style={{ marginTop: "var(--sp-4)" }}>
         DRAFT - requires legal review. This document is not final. Items
-        marked &ldquo;[TO BE CONFIRMED]&rdquo; are the owner&rsquo;s to
-        supply. Until they are filled in, these terms should not be relied
-        on as complete.
+        marked &ldquo;[TO BE CONFIRMED]&rdquo; are company and contact
+        details still to supply. Until those are filled in, these terms
+        should not be relied on as a complete contract. The refund rule in
+        section 12 is decided.
       </div>
 
       <LegalSections>
@@ -137,10 +147,10 @@ export default function TermsPage() {
           Access to the paid plan may require a licence. The price is the
           figure the server publishes for the one-time founder licence. It is
           not stated in this document, so this page cannot drift from the
-          offer. Whether a charge can be refunded, and on what conditions, is
-          the refund policy. That policy is a draft and is
-          <strong> [TO BE CONFIRMED — refund policy]</strong> until a lawyer
-          has reviewed it and it has been published.
+          offer. The refund rule is section 12 of these terms and the{" "}
+          <Link href="/refunds">Refunds page</Link>. It is decided there,
+          including the free 14-day demo trial and the withdrawal
+          acknowledgement checkout requires.
         </p>
       </LegalSection>
 
@@ -160,6 +170,34 @@ export default function TermsPage() {
         <h2>11. Contact</h2>
         <p>
           <strong>[TO BE CONFIRMED — support contact address.]</strong>
+        </p>
+      </LegalSection>
+
+      <LegalSection>
+        <h2>12. Refund policy</h2>
+        <p>Refund policy version {REFUND_POLICY_VERSION}.</p>
+        <p>{PURCHASE_NOTE}</p>
+        <p>
+          {DEMO_CONDITIONS_NOTE} {DEMO_IS_NOT_LIVE}
+        </p>
+        <p>
+          Under the EU Consumer Rights Directive 2011/83/EU, article 16(m),
+          the 14-day right of withdrawal for digital content is lost only
+          when all of the following are true. You request immediate access
+          before checkout starts. You acknowledge that you lose that right
+          once access is granted. We confirm that consent on a durable
+          medium. {DURABLE_MEDIUM} It names your account, the time you
+          consented, and refund policy version {REFUND_POLICY_VERSION}. The
+          same words are on the <Link href="/refunds">Refunds page</Link>.
+        </p>
+        <p>
+          Checkout cannot start until you tick this statement yourself.
+          It is not ticked for you: {WITHDRAWAL_CONSENT_LABEL}
+        </p>
+        <p>
+          A refund the law requires, or one we choose to make, still
+          withdraws the licence for that payment. A trading loss on your
+          broker account is not a charge this policy returns.
         </p>
       </LegalSection>
 </LegalSections>

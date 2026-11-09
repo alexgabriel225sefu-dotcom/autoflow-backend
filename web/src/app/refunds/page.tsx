@@ -1,24 +1,34 @@
 import type { Metadata } from "next";
 import { CompanyBlock, DraftShell } from "@/components/legal/draft-shell";
 import { LegalSection, LegalSections } from "@/components/legal/legal-section";
+import {
+  DEMO_CONDITIONS_NOTE,
+  DEMO_IS_NOT_LIVE,
+  DURABLE_MEDIUM,
+  PURCHASE_NOTE,
+  REFUND_POLICY_VERSION,
+  WITHDRAWAL_CONSENT_LABEL,
+} from "@/content/refund-policy";
 
 export const metadata: Metadata = { title: "Refund policy — Apex4Traders" };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Refund policy, version 2026-10-24.
+ * Refund policy, version 2026-11-09.
  *
- * DRAFT - requires legal review. Describes what the webhook already does
- * with a refund, and leaves the customer's entitlement as TO BE CONFIRMED.
- * It does not promise that a purchase can be undone.
+ * The commercial rule is decided: the free 14-day demo is the trial, and a
+ * licence purchase is final once access is granted, except where the law
+ * requires otherwise. Company identity is still unfilled. The draft mark
+ * is about that, not about whether a refund can be requested.
  */
 export default function RefundsPage() {
   return (
     <DraftShell title="Refund policy">
       <div className="legacy-flag" style={{ marginTop: "var(--sp-4)" }}>
-        DRAFT - requires legal review. This document is not final. It is not
-        a promise that any payment will be refunded. [TO BE CONFIRMED]
+        DRAFT - requires legal review of the company identity in section 4.
+        Those company details are not final. The refund rule in the sections
+        below is decided.
       </div>
 
       <LegalSections>
@@ -42,36 +52,47 @@ export default function RefundsPage() {
           A partial refund does not, by itself, withdraw the licence: the
           remainder of the charge is still a payment for the same licence.
           Withdrawing a licence does not close positions at your broker and
-          does not move money.
+          does not move money. This includes a refund the law requires and a
+          refund we choose to make.
         </p>
       </LegalSection>
 
       <LegalSection>
-        <h2>3. Whether you can ask for a refund</h2>
+        <h2>3. Refund policy</h2>
+        <p>Refund policy version {REFUND_POLICY_VERSION}.</p>
+        <p>{PURCHASE_NOTE}</p>
         <p>
-          <strong>[TO BE CONFIRMED — whether a customer may request a refund,
-          the time window, and any conditions.]</strong> That decision is not
-          one this software can make. Until it is written down by the owner
-          and reviewed by a lawyer, do not read this page as saying that a
-          refund is available, or that a refund is refused.
+          {DEMO_CONDITIONS_NOTE} {DEMO_IS_NOT_LIVE}
         </p>
         <p>
-          Trading losses, demo results, and a rule that behaved differently
-          from what you expected are not a stated ground for a refund in this
-          draft. The software carries out the configuration you switch on.
-          It does not promise a result that a refund could be measured
-          against.
+          Under the EU Consumer Rights Directive 2011/83/EU, article 16(m),
+          the 14-day right of withdrawal for digital content is lost only
+          when all of the following are true. You request immediate access
+          before checkout starts. You acknowledge that you lose that right
+          once access is granted. We confirm that consent on a durable
+          medium. {DURABLE_MEDIUM} It names your account, the time you
+          consented, and refund policy version {REFUND_POLICY_VERSION}.
+        </p>
+        <p>
+          Checkout cannot start until you tick this statement yourself.
+          It is not ticked for you: {WITHDRAWAL_CONSENT_LABEL}
+        </p>
+        <p>
+          A trading loss on your broker account is not a charge this policy
+          returns. Demo fills, spreads and slippage can differ from live
+          trading, and a difference of that kind is not a ground for undoing
+          the licence.
         </p>
       </LegalSection>
 
       <LegalSection>
-        <h2>4. How to ask, once a contact exists</h2>
+        <h2>4. Who to write to</h2>
         <CompanyBlock />
         <p>
-          <strong>[TO BE CONFIRMED — the address a refund request is sent
-          to.]</strong> There is no registered company and no support address
-          on this draft. Sending a request to an address that is not listed
-          here will not reach anyone.
+          <strong>[TO BE CONFIRMED — support contact address.]</strong> There
+          is no registered company and no support address on this page yet.
+          A message about a right the law still gives you has nowhere listed
+          to go until that address is published.
         </p>
       </LegalSection>
 

@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { api, type ApiError } from "@/lib/api";
 import { ErrorNotice } from "@/components/app/state";
+import { WITHDRAWAL_CONSENT_LABEL } from "@/content/refund-policy";
 
 const STRIPE_HOSTS = new Set(["buy.stripe.com", "checkout.stripe.com"]);
 
@@ -32,17 +33,17 @@ export function BuyButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
-  // The buyer confirms they tried the free demo. The server requires it and
-  // keeps the time it was given; this box only collects it.
-  const [tried, setTried] = useState(false);
+  // Unticked until the buyer ticks it. The server records the time, the
+  // policy version and the account, and refuses to start without a literal true.
+  const [waiver, setWaiver] = useState(false);
 
   async function buy() {
-    if (!tried) return;
+    if (!waiver) return;
     setBusy(true);
     setError(null);
     const result = await api<{ url?: string }>("billing/checkout", {
       method: "POST",
-      body: { acknowledgedTrial: true },
+      body: { immediateAccessConsent: true },
     });
     setBusy(false);
     if (!result.ok) {
@@ -73,14 +74,14 @@ export function BuyButton({
     <>
       {error ? <ErrorNotice error={error} /> : null}
       <label style={{ display: "flex", gap: ".5rem", alignItems: "flex-start", fontSize: ".85rem", margin: ".5rem 0" }}>
-        <input type="checkbox" checked={tried} onChange={(e) => setTried(e.target.checked)} />
-        <span>
-          I have tried the free demo. I understand this is a digital product that
-          is available immediately, and that I cannot get a refund just because I
-          changed my mind. Any refund right the law gives me stays.
-        </span>
+        <input
+          type="checkbox"
+          checked={waiver}
+          onChange={(e) => setWaiver(e.target.checked)}
+        />
+        <span>{WITHDRAWAL_CONSENT_LABEL}</span>
       </label>
-      <button type="button" disabled={busy || !tried} onClick={() => void buy()}>
+      <button type="button" disabled={busy || !waiver} onClick={() => void buy()}>
         {busy ? "Opening payment…" : "Buy Founder access"}
       </button>
     </>
