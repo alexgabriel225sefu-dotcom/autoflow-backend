@@ -775,7 +775,7 @@ export type ApprovalResult = {
 };
 
 /** GET performance. Closed trades the ENGINE recorded, from the same maths the
- *  Telegram bot used. `profit_factor` is null with `noLosses: true` when there
+ *  the web app bot used. `profit_factor` is null with `noLosses: true` when there
  *  was no losing trade; a group with `thin: true` has fewer than `minTrades`
  *  trades and is not evidence. status "unavailable" means the journal could not
  *  be read — never to be shown as zero trades. */

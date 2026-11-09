@@ -14,7 +14,7 @@ each rule would decide before starting it, and can stop it at any moment.
 
 | Not | Why the distinction matters |
 |---|---|
-| **A Telegram bot** | Telegram is not the login, not the identity, not the control surface, and not required for any function. A client without a Telegram account uses the platform in full. |
+| **A the web app bot** | the web app is not the login, not the identity, not the control surface, and not required for any function. A client without a the web app account uses the platform in full. |
 | **A broker** | We hold no money, open no accounts, and are not a counterparty. The trading account belongs to the client, at their broker, through cTrader. |
 | **A signal service** | We send no recommendations. The platform executes the rules a client writes; if the rule is silent, the platform is silent. |
 | **Investment advice** | We do not assess whether a strategy suits anyone, promise no returns, and publish no performance statistics. |
@@ -43,7 +43,7 @@ and can disconnect.
 | **RuleDoc / Rule Builder** | complete | 12 conditions, validation, activation that freezes a version, versioning. |
 | **Preview on real data** | complete | Evaluates a rule against candles fetched from the connected account. Places nothing, records nothing. |
 | **Journal** | complete | 12 distinct statuses; filter by account, instrument, period, rule and status; paged. |
-| **Notifications** | complete | An in-platform centre. No Telegram. |
+| **Notifications** | complete | An in-platform centre. No the web app. |
 | **Demo automation** | complete | Start, pause, resume, stop — demo accounts only. Idempotent and journalled. |
 
 The web client has **18 platform pages**: landing, sign up, login, email
@@ -63,12 +63,12 @@ shows fabricated data. (The project also carries pre-existing `terms`,
 | **Public deployment** | The platform runs locally and in staging. It is not published. |
 | **Payments / commercial licensing** | `licence.grant()` is called manually on the server. There is no checkout, billing or renewal. |
 | **Real execution on a live account** | See V2 and V3 below. |
-| **Physical removal of the legacy Telegram code** | The legacy code exists and still works. See below. |
+| **Physical removal of the legacy the web app code** | The legacy code exists and still works. See below. |
 
-### Why the Telegram code was not deleted
+### Why the the web app code was not deleted
 
-`apex/telegram.py` (6742 lines), `apex/ctrader_oauth.py` and the `chat_id`-keyed
-stores are intact, because **clients onboarded through Telegram have their
+`the retired chat module` (6742 lines), `apex/ctrader_oauth.py` and the `chat_id`-keyed
+stores are intact, because **clients onboarded through the web app have their
 tokens stored there** and deleting it would strand them.
 
 What was done instead:
@@ -77,9 +77,9 @@ What was done instead:
   could not be reused: it is keyed by `chat_id`, it signs the OAuth state with
   the bot token, and it completes the account link inside the callback.
 - A test asserts through the AST that **no module in `apex/platform/` imports
-  telegram** — across the whole package, not only the file someone happened to
+  the web app** — across the whole package, not only the file someone happened to
   look at.
-- A deployment with no `TELEGRAM_BOT_TOKEN` runs the platform in full.
+- A deployment with no `the retired bot token` runs the platform in full.
 
 The old code is **legacy and not part of Apex4Traders v1.**
 

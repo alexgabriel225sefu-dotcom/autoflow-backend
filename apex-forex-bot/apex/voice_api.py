@@ -275,7 +275,7 @@ _TAGS = ("<b>", "</b>", "<i>", "</i>", "<code>", "</code>", "<pre>", "</pre>")
 
 
 def speakable(text) -> str:
-    """Telegram HTML reads badly out loud. Strip it back to words.
+    """Markup reads badly out loud. Strip it back to words.
 
     The assistant writes for a chat bubble — bold, code spans, emoji. A phone
     reads the markup aloud, so "<b>Balance:</b>" becomes "less than b greater
@@ -343,8 +343,8 @@ def ask(token, text):
         # only whether it resolved, and what came of it.
         print("[Voice] turn REFUSED — token did not resolve to an account")
         return {"ok": False, "status": 401,
-                "reply": "That link is not valid any more. Send slash voice in "
-                         "Telegram to set it up again."}
+                "reply": "That link is not valid any more. Open voice setup "
+                         "in the platform and create a new link."}
     print(f"[Voice] turn from {user_id} — {len(str(text or ''))} chars")
     text = str(text or "").strip()
     if not text:
@@ -438,7 +438,7 @@ def confirm(token, confirm_id, agreed=True):
 
     from apex import assistant
     try:
-        # Straight to the same tool runner Telegram uses, with no guard, so
+        # Straight to the same tool runner the assistant uses, with no guard, so
         # there is exactly one execution path and no second interpretation.
         raw = assistant._run_tool(intent["tool"], intent.get("input") or {},
                                   user_id, None)
@@ -446,7 +446,7 @@ def confirm(token, confirm_id, agreed=True):
     except Exception as e:
         print(f"[Voice] confirm failed for {user_id}: {e}")
         return {"ok": False, "status": 502,
-                "reply": "That did not go through. Check Telegram before trying again."}
+                "reply": "That did not go through. Check the platform before trying again."}
 
     if res.get("ok") is False or res.get("error"):
         why = str(res.get("error") or "the broker refused it")

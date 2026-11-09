@@ -27,7 +27,7 @@ os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 #
 # setdefault, so a caller that exports its own value keeps it. This is a fake
 # constant with no meaning outside this process.
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 
 from apex import access, control, gates, ledger, ownership, user_store  # noqa: E402
 
@@ -226,10 +226,8 @@ check("and the handler refuses it by name explicitly",
       'if key == "paper":' in CA)
 check("with a message naming the real path",
       "typed confirmation" in CA)
-TG = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
-check("the Telegram activation path still exists",
-      "live_confirm" in TG and "_LIVE_INITIAL_RISK_CAP" in TG)
-check("and still caps initial risk", "_LIVE_INITIAL_RISK_CAP" in TG)
+check("the chat command that used to flip live is retired",
+      not os.path.exists(os.path.join(ROOT, "apex", "telegram.py")))
 
 # ── 5 / 6 ────────────────────────────────────────────────
 print("\n5+6. One financial close path, with ownership and idempotency")
@@ -407,12 +405,12 @@ check("the stateless fallback stays development-only",
       oauth.ALLOW_STATELESS is False)
 
 # ── 8 ────────────────────────────────────────────────────
-print("\n8. The LIVE confirmation token is consumed atomically")
-check("consumption is a compare-and-set, not read-then-write",
-      "consume_live_confirm" in TG,
-      "two concurrent confirmations could both read the token as valid")
-check("it is claimed through the shared store",
-      "user_store.claim(" in TG)
+print("\n8. The chat confirmation that flipped live is gone")
+_left = ""
+for _name in ("user_loop.py", "control_actions.py", "gates.py"):
+    _left += open(os.path.join(ROOT, "apex", _name), encoding="utf-8").read()
+check("nothing left consumes a live-confirmation token",
+      "consume_live_confirm" not in _left)
 
 
 # ── 9 ────────────────────────────────────────────────────

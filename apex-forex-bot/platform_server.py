@@ -2,13 +2,10 @@
 
 WHY THIS FILE EXISTS, AND WHY `main.py` COULD NOT BE USED
 
-`main.py` starts `apex.bot.main()`, which starts Telegram polling, the per-user
-trading loops and the operator dashboard. Deploying it under a second name would
-have created a SECOND live Telegram trading bot competing with the one already
-running — not a platform API. The platform's `/healthz`, `/readyz` and
-`/api/v1/*` routes happen to be mounted on that bot's HTTP handler, which is what
-made `python -u main.py` look like a plausible start command in the blueprint. It
-was not one.
+`main.py` used to start a chat poller, the per-user trading loops and the
+operator dashboard. That entry is retired. Deploying it under a second name
+would have started a second trading process, not a platform API. The
+`/healthz`, `/readyz` and `/api/v1/*` routes belong here.
 
 So this serves the platform surface and nothing else:
 
@@ -18,7 +15,7 @@ So this serves the platform surface and nothing else:
     OPTIONS any of those   CORS preflight
     everything else        404, as JSON
 
-It starts no Telegram poller, no trading loop, no ownership lease and no
+It starts no chat poller, no trading loop, no ownership lease and no
 operator dashboard. `apex.bot` is never imported — asserted by
 tests/test_platform_server.py, because "does not import the trading bot" is the
 property that makes this safe to deploy and the easiest one to lose by accident.

@@ -1,4 +1,4 @@
-"""Sentinel Telegram alerts must inform, not spam.
+"""Sentinel the platform alerts must inform, not spam.
 
 This loop ticks every few minutes and publishes a MarketState on every pass.
 Alerting on the state itself would mean a notification every 5 minutes,

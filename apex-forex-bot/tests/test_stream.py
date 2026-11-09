@@ -65,7 +65,7 @@ time.sleep(1.5)
 os.environ["REDIS_URL"] = f"redis://127.0.0.1:{PORT}/0"
 os.environ["APP_ENV"] = "production"
 os.environ["PRODUCT"] = "forex"
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-signing-secret")
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="apex-str-"))
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY",
                       base64.urlsafe_b64encode(os.urandom(32)).decode())
@@ -74,11 +74,6 @@ from apex import stream, markets, user_loop  # noqa: E402
 
 SRC = open(os.path.join(ROOT, "apex", "stream.py"), encoding="utf-8").read()
 BODY = "\n".join(l for l in SRC.splitlines() if not l.strip().startswith("#"))
-BOT = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
-HTML = open(os.path.join(ROOT, "apex", "static", "terminal.html"), encoding="utf-8").read()
-ROUTE = BOT[BOT.index('if self.path.startswith("/api/app/stream")'):]
-ROUTE = ROUTE[:ROUTE.index('if self.path.startswith("/api/app/automation") and self.command == "GET"')]
-CODE = "\n".join(l for l in ROUTE.splitlines() if not l.strip().startswith("#"))
 
 print("\n1. The stream adds no broker calls of its own")
 for forbidden in ("get_candles", "get_bid_ask", "get_price", "get_balance",
@@ -142,8 +137,6 @@ check(f"registration stops at the cap ({len(kept)})",
       len(kept) == stream._MAX_CLIENTS)
 cid, q = stream.register("chatY")
 check("an extra client is refused, not queued", cid is None and q is None)
-check("the route tells a refused client to keep polling",
-      "STREAM_BUSY" in CODE and "keep refreshing" in CODE)
 stream.reset()
 check("reset clears the registry", stream.client_count() == 0)
 
@@ -203,58 +196,6 @@ check("market events do reach everyone",
       any(e.get("beacon") == BEACON for e in a_seen)
       and any(e.get("beacon") == BEACON for e in b_seen))
 stream.reset()
-
-print("\n6. The route is authenticated before the stream opens")
-check("identity is checked before registering",
-      CODE.index("_telegram_identity") < CODE.index("_v_st.register"))
-check("a denied caller is refused", "_telegram_denied" in CODE)
-check("the chat id comes from the signature", '_v_chat = str(_v_user["id"])' in CODE)
-check("no identifier is read from the query string",
-      "parse_qs" not in CODE and '"chat_id"' not in CODE)
-check("the client is always unregistered", "finally:" in CODE
-      and "_v_st.unregister(_v_cid)" in CODE,
-      "a leaking registry is the memory leak the cap was meant to prevent")
-check("a dropped connection is a normal exit, not an error",
-      "BrokenPipeError" in CODE and "ConnectionResetError" in CODE)
-RX = re.compile(r'^\s+([a-z][\w]*) = (?!=)', re.M)
-check("every route local is prefixed",
-      not {m.group(1) for m in RX.finditer(CODE)})
-
-print("\n7. SSE headers a proxy will not swallow")
-check("the content type is text/event-stream", "text/event-stream" in CODE)
-check("the response is not cached", "no-store" in CODE)
-check("proxy buffering is disabled", "X-Accel-Buffering" in CODE,
-      "Render buffers the stream otherwise and nothing arrives until it closes")
-check("a keepalive frame is sent while idle", "keepalive" in CODE)
-
-print("\n8. The credential does not travel in a URL")
-check("the client opens the stream with fetch, not EventSource's URL",
-      "fetch('/api/app/stream'" in HTML)
-check("...carrying initData in a header",
-      "'Authorization':'Telegram '+initData" in HTML)
-check("initData is never appended to the stream URL",
-      not re.search(r"/api/app/stream\?[^'\"]*initData", HTML),
-      "a URL reaches proxy logs; a credential must not")
-
-print("\n9. Polling survives the stream")
-check("the 1.5s tick still runs", "setInterval(tick, 1500)" in HTML)
-check("the 6s refresh still runs", "setInterval(refresh, 6000)" in HTML)
-check("the stream is described as an accelerator, not a replacement",
-      "never a replacement" in HTML)
-check("a lost feed retries", "setTimeout(openStream, 5000)" in HTML)
-check("a browser with no EventSource still works",
-      "if(!window.EventSource) return" in HTML)
-
-print("\n10. A silent connection is not shown as live")
-check("staleness is detected independently of the socket",
-      "Date.now()-streamAt > 30000" in HTML,
-      "an open but silent socket looks identical to a working one")
-check("...and reported as delayed", "setConn('delayed'" in HTML)
-check("the connection state is rendered as a word, not only a colour",
-      "DELAYED" in HTML and "content:' \\u00b7 LIVE'" in HTML
-      or "' · LIVE'" in HTML)
-check("a stale market snapshot says so",
-      "last one the broker answered" in HTML)
 
 stream.reset()
 print("\n" + "=" * 50)

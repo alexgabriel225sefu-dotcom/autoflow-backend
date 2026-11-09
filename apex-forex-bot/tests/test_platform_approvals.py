@@ -6,7 +6,7 @@ The engine has three automation levels. In `approval` the loop finds a setup
 and calls `user_loop._suggest_trade`, which writes `pending_suggestion` onto
 the account, calls `alert_fn`, and places nothing. `automation.start` started
 the loop as `user_loop.start(user_id)` — with NO alert function — and the
-approval itself needed a Telegram tap no platform client has. So every
+approval itself needed a platform tap no platform client has. So every
 platform client ran a loop that found setups, wrote a proposal nobody could
 see, notified nobody, and placed nothing, while the dashboard said Running.
 

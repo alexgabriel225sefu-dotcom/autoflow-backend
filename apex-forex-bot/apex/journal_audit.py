@@ -1,7 +1,7 @@
 """Which journal rows are not this account's trades, and why.
 
 One place for the rules, because two callers apply them: the migration script
-and the Telegram admin command. A second copy would be free to drift, and the
+and the platform admin command. A second copy would be free to drift, and the
 two would then disagree about a client's money.
 
 The rules are deliberately conservative and each is checkable against the row

@@ -2,7 +2,7 @@
 
 ### Do I need to know how to code?
 No. Deployment is click-through (Railway button) and all configuration
-happens through Telegram. The source code is yours to read or modify, but
+happens through the web app. The source code is yours to read or modify, but
 you never have to touch it.
 
 ### What does it trade?
@@ -52,7 +52,7 @@ require logging in to your broker directly.
 ### Where are my credentials stored?
 Only on **your** server (Railway environment + `runtime.json` on your
 instance). They are never sent to us. The `/setkeys` and wizard messages are
-auto-deleted from Telegram after processing.
+auto-deleted from the web app after processing.
 
 ### How many trades per day should I expect?
 Typically 0–3. Forex moves at macro pace and the bot is selective by

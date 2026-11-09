@@ -18,7 +18,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ["PAPER_TRADING"] = "true"
-os.environ["TELEGRAM_BOT_TOKEN"] = "test:secret-token"
+os.environ["CTRADER_CLIENT_SECRET"] = "test:secret-token"
 
 from apex.brokers import ctrader  # noqa: E402
 from apex.ctrader_proto.OpenApiCommonMessages_pb2 import ProtoMessage  # noqa: E402

@@ -40,7 +40,7 @@ os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 #
 # setdefault, so a caller that exports its own value keeps it. This is a fake
 # constant with no meaning outside this process.
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 
 from apex import ledger, ownership, user_store  # noqa: E402
 
@@ -201,74 +201,14 @@ finally:
     restore()
 
 # ─────────────────────────────────────────────────────────────
-print("\nP0-01 — a repeated Stripe delivery must not mint a second license")
-from apex import stripe_license  # noqa: E402
-
-_records, _sent = {}, []
-
-
-def _fake_update(uid, updates, strict=False):
-    # `strict` mirrors the real signature: provisioning asks for a write it can
-    # be certain of, and a fake that cannot accept the flag would fail the call
-    # for the wrong reason.
-    _records.setdefault(str(uid), {}).update(updates)
-    return True
-
-
-def _fake_load(uid):
-    return dict(_records.get(str(uid), {}))
-
-
-try:
-    shared = FakeRedis()
-    install(shared)
-    user_store.update, user_store.load = _fake_update, _fake_load
-    stripe_license.user_store = user_store
-
-    import types
-    fake_access = types.ModuleType("apex.access")
-    fake_access.grant = lambda uid: True
-    fake_tg = types.ModuleType("apex.telegram")
-    fake_tg.send_activation_sequence = lambda uid, paid=False: _sent.append(uid)
-    sys.modules["apex.access"], sys.modules["apex.telegram"] = fake_access, fake_tg
-
-    EVENT = {"id": "evt_1", "type": "checkout.session.completed",
-             "data": {"object": {"payment_status": "paid",
-                                 "client_reference_id": "777", "id": "cs_1"}}}
-    stripe_license._verify_signature = lambda *a, **k: True
-    import apex.config as _cfg
-    _cfg.STRIPE_WEBHOOK_SECRET = "whsec_test"
-
-    import json as _json
-    body = _json.dumps(EVENT).encode()
-    s1, _ = stripe_license.handle_webhook(body, "sig")
-    first_key = _records["777"]["license_key"]
-    s2, r2 = stripe_license.handle_webhook(body, "sig")
-
-    check("first delivery activates", s1 == 200 and first_key)
-    check("the retry is recognised as a duplicate",
-          s2 == 200 and r2 == b"duplicate", (s2, r2))
-    check("the license key did NOT change",
-          _records["777"]["license_key"] == first_key)
-    check("and the buyer was messaged exactly once", len(_sent) == 1, _sent)
-
-    # Second defence: no shared backend, so the event-id claim cannot help.
-    _records.clear()
-    _sent.clear()
-    install(FakeRedis(), use_redis=False)
-    user_store.update, user_store.load = _fake_update, _fake_load
-    stripe_license.handle_webhook(body, "sig")
-    key_a = _records["777"]["license_key"]
-    st, rb = stripe_license.handle_webhook(body, "sig")
-    check("without Redis, the stored license still stops a second mint",
-          _records["777"]["license_key"] == key_a and rb == b"already active",
-          (rb, _records["777"]["license_key"], key_a))
-    check("and no second activation message", len(_sent) == 1, _sent)
-finally:
-    sys.modules.pop("apex.access", None)
-    sys.modules.pop("apex.telegram", None)
-    restore()
-    user_store.update, user_store.load = _ORIG_UPD, _ORIG_LOAD
+print("\nP0-01 — the platform webhook, not a second licence minter")
+_bill = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "apex", "platform", "billing.py"), encoding="utf-8").read()
+check("the legacy Telegram Stripe webhook is retired",
+      not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                      "apex", "stripe_license.py")))
+check("a duplicate platform delivery is still a success",
+      '"duplicate": True' in _bill)
 
 print("\nP0-02 — an ambiguous OAuth callback must not bind the wrong account")
 from apex import ctrader_oauth as oauth  # noqa: E402

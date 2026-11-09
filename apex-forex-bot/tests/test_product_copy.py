@@ -2,7 +2,7 @@
 
 TWO PRODUCTS, ONE REPOSITORY
 
-This repository holds Apex Trade Bot — the Telegram forex bot, which still
+This repository holds Apex Trade Bot — the platform forex bot, which still
 runs and is legitimately called that — and Apex4Traders, the web platform.
 A repository-wide ban on the old name would be false: it is the other
 product's actual name. So this audit is scoped to the Apex4Traders surfaces,

@@ -1,6 +1,6 @@
-"""An ad click has to survive the trip into Telegram, or the ads cannot be paid for.
+"""An ad click has to survive the trip into the platform, or the ads cannot be paid for.
 
-Telegram's deep-link payload is the constraint the whole design bends around:
+the platform's deep-link payload is the constraint the whole design bends around:
 
     "start — 1-64 characters. Only A-Z, a-z, 0-9, _ and - are allowed."
 
@@ -63,7 +63,7 @@ time.sleep(1.5)
 os.environ["REDIS_URL"] = f"redis://127.0.0.1:{PORT}/0"
 os.environ["APP_ENV"] = "production"          # exercise the production path
 os.environ["PRODUCT"] = "forex"
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="apex-attr-"))
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY",
                       base64.urlsafe_b64encode(os.urandom(32)).decode())
@@ -161,47 +161,12 @@ check("the access token rides in the query string, not a logged body",
 check("Meta's response is truncated before it is printed",
       "r.text[:200]" in body)
 
-print("\n10. The reporting path cannot break a completed sale")
-STRIPE = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                           "apex", "stripe_license.py"), encoding="utf-8").read()
-tail = STRIPE[STRIPE.index("activated {chat_id} with license"):]
-check("report_purchase is called after the licence is written",
-      "attribution.report_purchase" in tail)
-check("it is wrapped so an exception cannot reach Stripe",
-      "attribution reporting raised" in tail)
-check("the handler still answers 200 afterwards", tail.rstrip().endswith('return 200, b"ok"'))
-already = STRIPE[STRIPE.index("already licensed"):STRIPE.index("activated {chat_id}")]
-check("a redelivery does not report the sale a second time",
-      "report_purchase" not in already)
-
-print("\n11. /go redirects even when everything else fails")
-BOT = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "apex", "bot.py"), encoding="utf-8").read()
-go = BOT[BOT.index('if self.path == "/go"'):]
-go = go[:go.index("return") + 6]
-check("the redirect target is set before anything can throw",
-      go.index("target =") < go.index("try:"))
-check("a failure falls through to a plain bot link, not an error page",
-      "except Exception" in go and "self.send_response(302)" in go)
-check("the token is percent-encoded into the deep link", "_go_quote(_go_token" in go)
-check("the response is not cacheable", "no-store" in go)
-check("the referrer is not leaked onward", "Referrer-Policy" in go)
-check("the click is rate limited", "http_security.GO.check" in go)
-
-print("\n12. /start tells an ad click apart from a licence key")
-TG = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                       "apex", "telegram.py"), encoding="utf-8").read()
-start = TG[TG.index('cmd_l = cmd.lower().split("@")[0]'):]
-start = start[:start.index("licence_shape_ok")]
-check("the token is checked before .upper() destroys its case",
-      start.index("looks_like_token") < start.index("raw_arg.upper()"))
-check("the ad landing is reached", "_welcome_ad_click(chat_id, raw_arg)" in start)
-LAND = TG[TG.index("def _welcome_ad_click"):TG.index("def _license_ok")]
-check("the click is claimed", "attribution.claim(token, str(chat_id))" in LAND)
-check("an ad visitor is shown the offer, not a key error",
-      "_handle_purchase(chat_id)" in LAND)
-check("a messaging failure cannot stop the claim",
-      LAND.index("attribution.claim") < LAND.index("try:"))
+print("\n10. A completed sale is no longer reported from the retired bot webhook")
+check("the legacy Stripe licence handler is gone",
+      not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                      "apex", "stripe_license.py")))
+check("report_purchase still refuses to send a raw email",
+      'user_data["em"] = [_sha256(email)]' in body)
 
 print("\n" + "=" * 50)
 _redis.terminate()

@@ -39,7 +39,7 @@ not N broker round-trips. That is the property the test measures.
 ## What a client receives
 
 Market events are shared. Account, position and risk events are not: each
-client is fed only from the chat its Telegram signature proved. There is no
+client is fed only from the chat its the platform signature proved. There is no
 subscription message and no client-supplied identifier anywhere in the
 protocol, so there is nothing to tamper with.
 

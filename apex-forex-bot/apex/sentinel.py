@@ -128,7 +128,7 @@ def valid_signal(signal, now=None):
 
 
 def age(signal, now=None):
-    """Seconds since publication, or None. For logging and Telegram."""
+    """Seconds since publication, or None. For logging and the platform."""
     try:
         now = time.time() if now is None else float(now)
         return max(0.0, now - float(signal["timestamp"]))
@@ -279,7 +279,7 @@ def decide(signal, requested_action, now=None, min_confidence=None,
 
 
 def describe(signal, now=None):
-    """One human line for Telegram / the dashboard."""
+    """One human line for the platform / the dashboard."""
     if not signal:
         return "no AI signal"
     a = age(signal, now)

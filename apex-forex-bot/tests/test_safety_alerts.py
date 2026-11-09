@@ -18,7 +18,7 @@ dropped, and two of those are not reports:
   EXIT_FAILED  the rule asked to close and the broker refused. The position
                is still open.
 
-A Telegram client got both, through `telegram._user_alert`. A platform client
+A platform client got both, through `legacy._user_alert`. A platform client
 got neither, from any screen, ever. Their money sat unprotected at a broker
 and the dashboard said "Watching market".
 

@@ -2,7 +2,7 @@
 
 WHY THIS EXISTS
 
-The Telegram bot had /why. The platform's equivalent was the Render log: a
+The chat channel had /why. The platform's equivalent was the Render log: a
 client watching a Running dashboard with no trade could not tell a bot that was
 working from one that was broken, and "spread too wide" existed only in a log
 they cannot open. Silence makes a working bot look broken.

@@ -189,17 +189,14 @@ check("a different release does not", a != c)
 print("\n10. Wired end to end")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOOP = open(os.path.join(ROOT, "apex", "user_loop.py"), encoding="utf-8").read()
-TG = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
 CA = open(os.path.join(ROOT, "apex", "control_actions.py"), encoding="utf-8").read()
 check("the trading loop scans the calendar", "news_alerts.due(" in LOOP)
 check("and imports it", "news_alerts" in LOOP.split("while True:")[0])
-check("Telegram renders both messages", 'action in ("NEWS_AHEAD", "NEWS_CLEAR")' in TG)
 check("both are classified, so neither is silently swallowed",
       alert_policy.tier("NEWS_AHEAD") == "useful"
       and alert_policy.tier("NEWS_CLEAR") == "useful")
 check("a normal client receives them",
       alert_policy.allowed("NEWS_AHEAD", {}) and alert_policy.allowed("NEWS_CLEAR", {}))
-check("/news on|off is routed with its argument", "_handle_news(chat_id, args)" in TG)
 check("the toggle is remotely settable", '"news_alerts",' in CA)
 check("and typed as a bool, so \"false\" does not read as True",
       '"news_alerts"' in CA.split("_BOOL_KEYS")[1].split("}")[0])

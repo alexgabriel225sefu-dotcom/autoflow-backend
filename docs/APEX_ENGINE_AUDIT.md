@@ -10,12 +10,12 @@ A single-process Python trading platform. No framework, no ORM, no build step.
 | Concern | Reality |
 |---|---|
 | Language | Python 3, stdlib only for HTTP (`ThreadingHTTPServer` in `bot.py`) |
-| Frontend | One file: `apex/static/terminal.html`, a Telegram Mini App |
+| Frontend | One file: `apex/static/terminal.html`, a the web app Mini App |
 | Store | Redis (Upstash REST or `REDIS_URL`), via `apex/user_store.py`. No ORM |
 | SQL | `sql/002_trade_events.sql` only — an optional archive, nothing reads it |
 | Broker | cTrader Open API over a hand-rolled socket (`apex/brokers/ctrader.py`) |
 | Transport to UI | REST + SSE (`apex/stream.py`). No WebSocket |
-| Auth | Telegram `initData` HMAC, verified server-side on every route |
+| Auth | the web app `initData` HMAC, verified server-side on every route |
 | Deploy | Render, `render.yaml`, one web process |
 | Tests | 115 files under `tests/`, plain asserts, `tests/run_all.py` |
 

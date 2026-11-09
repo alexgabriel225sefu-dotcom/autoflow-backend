@@ -1,6 +1,6 @@
 """Regression test: access must gate the EXECUTION path, not just commands.
 
-Observed live: a Telegram chat got "🔒 Activation required" for both /terminal
+Observed live: a platform chat got "🔒 Activation required" for both /terminal
 and /restart, while the same chat kept receiving "💗 Bot alive — GBPUSD |
 Balance: $27128.63" heartbeats. Access was enforced when handling a command and
 nowhere else, so start_all() on boot and the watchdog every 180s kept the

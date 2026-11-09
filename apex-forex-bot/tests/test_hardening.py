@@ -35,7 +35,7 @@ os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 #
 # setdefault, so a caller that exports its own value keeps it. This is a fake
 # constant with no meaning outside this process.
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 
 import importlib  # noqa: E402
 import subprocess  # noqa: E402

@@ -124,7 +124,7 @@ for sibling in ("ruflo-mcp", "web", "public", "scripts"):
 #     OANDA_ENV=practice
 #
 # installed a systemd unit and started the bot — with real production secrets
-# (FOREX_TELEGRAM_BOT_TOKEN, GROQ_API_KEY) handed to that VM.
+# (FOREX_LEGACY_BOT_TOKEN, GROQ_API_KEY) handed to that VM.
 #
 # Two problems, and the second is why deleting it beat fixing it: it disabled
 # the entitlement gate, and it could not work anyway, because the engine's
@@ -185,7 +185,7 @@ check(f"{len(deploy_files)} deployment file(s) carry no disabled control",
       not offenders, f"offenders: {sorted(set(offenders))}")
 
 print("\n🔒  THE BROKER ALLOWLIST IS ENFORCED, NOT JUST DECLARED")
-# SUPPORTED_BROKERS said ["ctrader"] and one Telegram command checked it, but
+# SUPPORTED_BROKERS said ["ctrader"] and one the platform command checked it, but
 # nothing stopped the environment from naming another — the engine just took a
 # different branch. An unsupported broker is not a degraded mode; it is a
 # configuration that cannot place a correct order.
@@ -196,7 +196,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 import apex.config as _cfg  # noqa: E402
 
 _saved = os.environ.get("BROKER")
@@ -230,12 +230,14 @@ try:
         except ValueError:
             check(f"get_broker({dead!r}) is refused", True)
 
-    # …and the HTTP route that reached one directly is gone.
-    BOT_SRC = open(os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), "apex", "bot.py"), encoding="utf-8").read()
-    check("/api/mt/sync no longer answers",
-          'elif self.path == "/api/mt/sync":' not in BOT_SRC,
-          "an unauthenticated route still reaches the MetaTrader bridge")
+    # The process that used to expose /api/mt/sync is gone. The platform
+    # server must not have grown a replacement.
+    _ps = open(os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "platform_server.py"), encoding="utf-8").read()
+    check("/api/mt/sync is not served",
+          "/api/mt/sync" not in _ps
+          and not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(
+              os.path.abspath(__file__))), "apex", "bot.py")))
 finally:
     if _saved is None:
         os.environ.pop("BROKER", None)

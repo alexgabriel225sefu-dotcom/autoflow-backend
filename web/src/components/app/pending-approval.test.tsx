@@ -5,7 +5,7 @@
  *
  * The engine's Approval Required level proposes a trade and places nothing
  * until somebody says yes. For every client of this platform that "somebody"
- * did not exist: the only approve action in the codebase was a Telegram
+ * did not exist: the only approve action in the codebase was a the web app
  * button, so the loop found setups and waited for ever while the dashboard
  * said Running. This card is the answer, which makes it the one component on
  * the dashboard whose absence is indistinguishable from the bug.

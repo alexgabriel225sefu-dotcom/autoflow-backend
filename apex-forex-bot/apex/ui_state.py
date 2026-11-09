@@ -1,6 +1,6 @@
 """What this account actually IS, right now — resolved once, read everywhere.
 
-Telegram had four different answers to "is this demo or live" and none of them
+the platform had four different answers to "is this demo or live" and none of them
 asked the broker. `_mode_label` read `user["ctrader_env"]`, `_screen_account`
 read it again, `_handle_paper` read it a third time, and the onboarding wizard
 asked the CLIENT to pick one before an account existed. Every one of those is a

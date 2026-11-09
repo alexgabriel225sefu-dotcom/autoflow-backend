@@ -109,7 +109,7 @@ Base branches (the issue form offers only these):
 
 - `claude/apex4traders-platform-v1`: platform (`apex-forex-bot/apex/platform/`,
   `web/`).
-- `claude/arcads-external-api-gexx7-6n4pr9`: Telegram bot and sales site.
+- `claude/arcads-external-api-gexx7-6n4pr9`: the web app bot and sales site.
 
 Never `main` (stale, divergent, owner decision) and never
 `claude/arcads-external-api-gExX7` (the Render deploy branch for the sales site:
@@ -157,7 +157,7 @@ reverse.
 ### Forbidden for every queue task
 
 Trading strategy logic, live execution, payments and checkout, credentials, the
-legacy Telegram bot's behaviour, production deployment settings, and relaxing any
+legacy the web app bot's behaviour, production deployment settings, and relaxing any
 test in `tests/test_platform_live_invariants.py`. Also `.github/workflows/**` and
 `render.yaml`: several workflows run with repository secrets
 (`RAILWAY_TOKEN`, `ORACLE_SSH_KEY`, `TWELVE_DATA_KEY`) when their branch or paths
@@ -215,7 +215,7 @@ cd web && npm test && npx tsc --noEmit && npm run build
 ```
 
 Whichever parts the change touches must pass; an agent states which it ran. CI
-(`.github/workflows/tests.yml`) currently covers only the two Telegram-bot
+(`.github/workflows/tests.yml`) currently covers only the two the web app-bot
 branches and has no web job; see the audit. Until that is fixed, **CI green is
 not evidence for platform work**; the local run is.
 

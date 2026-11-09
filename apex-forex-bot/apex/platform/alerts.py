@@ -10,7 +10,7 @@ only trace was a `print` that somebody had to be reading the Render log to see.
 WHAT IT GUARANTEES
 
   * Optional. With `OPS_ALERT_WEBHOOK_URL` unset it does nothing at all.
-    The URL must be https; it is a secret (Slack/Discord/Telegram webhook
+    The URL must be https; it is a secret (Slack or Discord webhook
     paths are credentials) and is never logged or placed in a payload.
   * De-duplicated: one alert per (user, cause) per 30 minutes, held in this
     process. With N containers the worst case is N alerts, not a storm.
@@ -27,9 +27,8 @@ WHAT IT GUARANTEES
 
 PAYLOAD
 
-`{"text": "...", "content": "..."}`. Slack and Telegram read `text`, Discord
-reads `content`; the unknown key is ignored by each. For Telegram, put the
-chat id in the URL: https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>
+`{"text": "...", "content": "..."}`. Slack reads `text`, Discord reads
+`content`; the unknown key is ignored by each.
 
 STRUCTURED LOGS
 

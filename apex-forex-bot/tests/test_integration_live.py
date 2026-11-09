@@ -66,7 +66,7 @@ time.sleep(1.5)
 os.environ["REDIS_URL"] = f"redis://127.0.0.1:{PORT}/0"
 os.environ["APP_ENV"] = "production"          # exercise the production path
 os.environ["PRODUCT"] = "forex"
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="apex-integ-"))
 os.environ.setdefault(
     "TOKEN_ENCRYPTION_KEY",
@@ -146,7 +146,7 @@ try:
     # than it first looks and a test that overstates itself is worse than none.
     #
     # Both writers pass a DELTA, which is what every production caller does
-    # (checked: telegram, ui_state, control_actions, ctrader_oauth and
+    # (checked: legacy, ui_state, control_actions, ctrader_oauth and
     # user_loop all build an explicit patch; the only whole-record write is
     # /reset, which is meant to wipe). These two checks verify that concurrent
     # delta writes do not lose each other, and that expect_version is actually

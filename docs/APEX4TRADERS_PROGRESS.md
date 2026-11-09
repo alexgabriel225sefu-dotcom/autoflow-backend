@@ -129,7 +129,7 @@ Pre-existing: `/api/app/data`, `/api/app/tick`, `/api/app/history`,
 - Trades live in Redis (`user_store`), not Supabase. Supabase holds licences,
   bot configs and affiliate tables only. No `trades`/`trade_events` tables
   there — deliberately, per "do not create duplicate tables".
-- Mobile and Telegram Desktop rendering is **unverified** — built mobile-first
+- Mobile and the web app Desktop rendering is **unverified** — built mobile-first
   with safe-area handling, but never seen on a device.
 - All twelve screens from the brief now exist: Home, Markets, Symbol detail,
   Portfolio, History, Replay, Intelligence, Risk, Automation, Ask APEX,

@@ -553,8 +553,8 @@ check("and the sink itself only forwards to the two reporting modules",
 
 # ── 13. a watchdog restart does not take the delivery away ──────────────────
 #
-# `bot.py` starts `start_all` and the watchdog with `telegram._user_alert`,
-# which addresses a Telegram chat id. A platform identity is a Supabase uuid,
+# `bot.py` starts `start_all` and the watchdog with `legacy._user_alert`,
+# which addresses a platform chat id. A platform identity is a Supabase uuid,
 # so every event for a platform account the watchdog revived went to a chat
 # that does not exist. Survivable for a heartbeat; at this level the alert IS
 # the product, and a redeploy would have ended delivery for good.
@@ -574,7 +574,7 @@ CL.select_account(USER, 901)
 
 
 def _tg_alert(uid, payload):
-    """Stands in for telegram._user_alert, which bot.py gives the watchdog."""
+    """Stands in for legacy._user_alert, which bot.py gives the watchdog."""
     _seen["telegram"] = True
 
 

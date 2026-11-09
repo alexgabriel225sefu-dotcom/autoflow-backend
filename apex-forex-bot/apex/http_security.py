@@ -22,14 +22,11 @@ import os
 import threading
 import time
 
-# A Mini App and a dashboard that fetch their own origin only. `default-src
-# 'self'` plus the two CDNs the pages actually load. 'unsafe-inline' is
-# present for style and script because both pages are written as one inline
-# document; tightening that means restructuring the pages, which is a change
-# to make deliberately rather than as a side effect of adding a header.
+# The platform pages fetch their own origin. 'unsafe-inline' is present for
+# style and script because the operator page is one inline document.
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://telegram.org https://unpkg.com; "
+    "script-src 'self' 'unsafe-inline' https://unpkg.com; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: blob:; "
     "connect-src 'self'; "
@@ -37,7 +34,7 @@ _CSP = (
     "object-src 'none'; "
     "base-uri 'none'; "
     "form-action 'self'; "
-    "frame-ancestors https://web.telegram.org https://telegram.org"
+    "frame-ancestors 'self'"
 )
 
 _BASE = {

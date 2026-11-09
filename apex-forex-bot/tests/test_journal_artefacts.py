@@ -232,30 +232,11 @@ check("a rejected write returns False, not None",
 user_store._redis_set = _real_set
 user_store._USE_REDIS = False
 
-print("\n10. The Telegram surface: mark, and never delete by accident")
-_tg = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "apex", "telegram.py"), encoding="utf-8").read()
-check("/markartefacts is dispatched and admin-only",
-      'cmd_l == "/markartefacts" and is_adm' in _tg)
-check("its handler previews before writing",
-      '_markart_pending[str(chat_id)] = target' in _tg
-      and '"markart:yes"' in _tg,
-      "a write with no confirmation step is not reviewable")
-check("the confirm path writes through save_trades",
-      'user_store.save_trades(target, out)' in _tg)
-check("it reads RAW so it cannot drop existing marks",
-      _tg.count("load_trades(target, include_artefacts=True)") >= 2)
-# The bug this change would otherwise have introduced.
-_purge = _tg[_tg.index('data == "purgebad:yes"'):]
-_purge = _purge[:_purge.index('elif data ==', 10)]
-check("purgebad reads raw too — it rewrites the whole list",
-      "include_artefacts=True" in _purge,
-      "filtering there would delete every marked row as a side effect of "
-      "removing an oversized one")
-check("purgebad still deletes and markartefacts still does not",
-      "good = [t for t in trades" in _purge
-      and "save_trades" not in _purge,
-      "the two commands must stay distinguishable: one removes, one labels")
+print("\n10. A chat command can no longer mark a client's journal")
+_ca_early = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "apex", "control_actions.py"), encoding="utf-8").read()
+check("client_message does not deliver a retired chat command",
+      "chat commands are retired" in _ca_early)
 
 print("\n11. The control plane cannot start the flow on a client's behalf")
 _ca = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

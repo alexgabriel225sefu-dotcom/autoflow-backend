@@ -86,8 +86,8 @@ def _active_users():
 
 def _alert(uid, payload):
     try:
-        from apex import telegram as _tg
-        _tg._user_alert(uid, payload)
+        from apex import client_alerts
+        client_alerts.alert(uid, payload)
     except Exception as e:
         print(f"[Session] alert to {uid} failed: {e}")
 
@@ -197,10 +197,9 @@ def _schedule_selfcheck(uid, delay_s=None):
     """
     def _fire():
         try:
-            from apex import selfcheck, user_loop
-            from apex import telegram as _tg
+            from apex import selfcheck, user_loop, client_alerts
             selfcheck.run(uid, dash=user_loop.get_dash(uid),
-                          send=lambda u, text: _tg.send_to(u, text))
+                          send=lambda u, text: client_alerts.note(u, text))
         except Exception as e:
             print(f"[Session] self-check for {uid} failed: {e}")
 

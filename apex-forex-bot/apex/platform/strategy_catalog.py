@@ -2,7 +2,7 @@
 
 WHAT WAS WRONG
 
-A client arriving from the Telegram bot could choose between fifteen
+A client arriving from the chat channel could choose between fifteen
 strategies. The platform exposed exactly one — `platform_rule`, the custom
 rule builder — because `engine_config.translate` writes
 `applied["strategy"] = RULE_STRATEGY_ID` for every rule there is. So the owner's
@@ -384,7 +384,7 @@ def withheld():
     """The registered strategies this platform does not offer, with reasons.
 
     Served to the client rather than kept private. Somebody who used the
-    Telegram bot will look for grid and martingale, and "they are not on the
+    chat channel will look for grid and martingale, and "they are not on the
     list" is an answer that reads like an omission. The reason reads like a
     decision, which is what it is.
     """

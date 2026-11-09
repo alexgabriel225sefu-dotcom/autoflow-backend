@@ -237,10 +237,11 @@ try:
 finally:
     restore()
 
-BOT = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "apex", "bot.py"), encoding="utf-8").read()
-check("SIGTERM is handled", "signal.SIGTERM" in BOT or "_signal.SIGTERM" in BOT)
-check("and it releases the leases", "release_all()" in BOT)
+PS = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "platform_server.py"), encoding="utf-8").read()
+check("SIGTERM is handled by the platform process", "signal.SIGTERM" in PS)
+check("and shutdown releases the leases",
+      "begin_shutdown()" in PS and "_release_for_shutdown()" in PS)
 
 print("\n" + "=" * 50)
 if failures:

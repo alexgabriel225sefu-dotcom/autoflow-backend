@@ -23,7 +23,7 @@ The account holds three services, and all three deploy branch
 
 | Service | Root dir | Start command | What it is |
 |---|---|---|---|
-| `autoflow-backend-2` | `apex-forex-bot` | `python main.py` | The **legacy Telegram forex bot**. Live, auto-deploys on commit. |
+| `autoflow-backend-2` | `apex-forex-bot` | `python main.py` | The **legacy the web app forex bot**. Live, auto-deploys on commit. |
 | `autoflow-backend-1` | `ruflo-mcp` | `python server.py` | The MCP server. Live, auto-deploys. |
 | `aicashsystem` | *(repo root)* | `node server.js` | The old sales site. **Suspended** by the owner. |
 
@@ -36,7 +36,7 @@ Consequences, stated plainly:
    directory is the Next.js client, so the front end has never been built or
    served by the hosting account.
 3. `autoflow-backend-2` runs `apex-forex-bot/main.py`, which starts the
-   Telegram bot. The platform API is mounted *inside* that process
+   the web app bot. The platform API is mounted *inside* that process
    (`apex/bot.py` → `/api/v1/`), so on the deploy branch the platform API is
    reachable at that service's URL — but from the **bot's** branch, not from
    the platform's.
@@ -733,7 +733,7 @@ requirements.txt` fail with ResolutionImpossible. The recommendation was made
 from a `--no-deps` install, which proves the code works at that version and
 proves nothing about whether it can be installed.
 
-**Not applied here.** `requirements.txt` is the live Telegram bot's dependency
+**Not applied here.** `requirements.txt` is the live the web app bot's dependency
 file, and changing it alters that bot's next build. This branch is not deployed,
 so committing it would be latent rather than immediate — which is worse, not
 better, because it would take effect whenever the branches converge, without

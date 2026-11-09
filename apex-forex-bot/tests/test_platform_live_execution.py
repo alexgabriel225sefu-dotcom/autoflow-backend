@@ -702,7 +702,7 @@ try:
         reset()
 
     print("\n[20] guard_engine_order has NO opinion on a non-platform account")
-    # The Telegram bot's users reach `gates.authorize_order` too and have no
+    # The chat channel's users reach `gates.authorize_order` too and have no
     # platform cTrader connection. None means "not mine to answer" — which is
     # not the same as allowed, and the distinction is what keeps the legacy
     # product working while a platform client is held to every gate.

@@ -127,7 +127,7 @@ Values are not written here. The process reads:
 | Name | Role |
 |---|---|
 | `A4T_STRIPE_WEBHOOK_SECRET` | The only secret to set on the platform API. It is the signing secret of the new endpoint |
-| `STRIPE_WEBHOOK_SECRET` | Legacy process name. Leave it unset on the platform API. The handler reads it only when the platform name is unset. Do not copy it from the Telegram service |
+| `STRIPE_WEBHOOK_SECRET` | Legacy process name. Leave it unset on the platform API. The handler reads it only when the platform name is unset. Do not copy it from the the web app service |
 | `NEXT_PUBLIC_API_BASE_URL` | API origin the website uses when it forwards the public webhook. Not a secret. The path is fixed |
 | `A4T_CHECKOUT_ENABLED` | Must be on before a buyer can be sent to pay. Off leaves checkout at 503 |
 | `A4T_AUTHENTICATED_CHECKOUT_ENABLED` | Second gate, also required |
@@ -147,7 +147,7 @@ environment values and does not change Stripe.
 
 Moving that endpoint's URL would stop the legacy host from receiving
 `checkout.session.completed`, `charge.refunded`, and
-`charge.dispute.created`. Those events are what the legacy Telegram
+`charge.dispute.created`. Those events are what the legacy the web app
 fulfillment consumes. The platform handler is a different verifier and a
 different licence store. Pointing the existing endpoint at it would break
 the legacy consumer and would not prove signatures verify.
@@ -156,7 +156,7 @@ Create a separate endpoint. Do not edit `we_1TzH8rGpBbs5xtI5S0glUEVE`.
 On the platform API, set one key, `A4T_STRIPE_WEBHOOK_SECRET`, to the
 signing secret of that new endpoint. Do not set `STRIPE_WEBHOOK_SECRET`
 on the platform API, and do not rotate or replace the secret the
-Telegram service already uses. The handler answers 503 until
+the web app service already uses. The handler answers 503 until
 `A4T_STRIPE_WEBHOOK_SECRET` is set. If that name is unset, the handler
 will read `STRIPE_WEBHOOK_SECRET`; leaving the legacy name unset on this
 API is what keeps the two verifiers apart. No value is recorded here.

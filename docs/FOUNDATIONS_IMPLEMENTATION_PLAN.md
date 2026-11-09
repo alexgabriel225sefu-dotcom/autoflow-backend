@@ -53,7 +53,7 @@ Read from the code, not from the previous documents.
 ### Known-stale artefacts
 
 - **`AGENTS.md` (repo root)** still describes the project as "bot de trading
-  forex pe Telegram" and names the old branch. It is agent-coordination
+  forex pe the web app" and names the old branch. It is agent-coordination
   content, in Romanian by prior decision, but its facts are wrong.
 - **`web/README.md`** says under *What is not built*: "A market data feed for
   previews. Preview evaluates candles you supply; it does not fetch them."

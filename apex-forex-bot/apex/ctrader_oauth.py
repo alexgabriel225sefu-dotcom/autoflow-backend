@@ -1,44 +1,26 @@
-"""DEPRECATED — the Telegram-era cTrader onboarding. Do not extend.
+"""DEPRECATED — legacy cTrader callback. Do not extend.
 
 SUPERSEDED BY apex/platform/ctrader_link.py, which is the flow Apex4Traders
 uses. Nothing in the platform imports this module, and a test asserts that.
 
-It is kept, unchanged and working, for one reason: clients onboarded through
-Telegram have tokens stored by this code, and deleting it would strand them.
 It is not a fallback for the new flow and must not become one.
 
 Why it could not simply be reused, rather than replaced:
 
-  IDENTITY.   Everything here is keyed by Telegram chat_id. The platform is
-              keyed by supabase_user_id, and a client may have no Telegram
-              account at all.
-  SIGNING.    `_secret()` below signs the OAuth state with TELEGRAM_BOT_TOKEN,
-              putting a Telegram dependency inside a security primitive. The
-              new flow derives its key from TOKEN_ENCRYPTION_KEY instead.
+  IDENTITY.   Everything here is keyed by a caller id. The platform is keyed
+              by supabase_user_id.
+  SIGNING.    `_secret()` signs the OAuth state with CTRADER_CLIENT_SECRET.
+              The new flow derives its key from TOKEN_ENCRYPTION_KEY instead.
   BINDING.    handle_callback() completes the link on the spot, so whoever
-              opens the authorize link binds an account to the chat named in
+              opens the authorize link binds an account to the id named in
               the state. An attacker who starts a flow for their own account
               and gets a victim to approve it captures the victim's trading
               account. The new flow parks the code and requires an
               authenticated completion by the user who began it.
 
-──────────────────────────────────────────────────────────────────────────────
-
-cTrader OAuth2 onboarding — links a client's cTrader account to the bot.
-
-Flow (all from the client's phone, no PC needed):
-  1. Client sends /ctrader in Telegram.
-  2. Bot replies with an authorize link (state = signed chat_id).
-  3. Client opens it, logs into cTrader, approves access.
-  4. cTrader redirects to CTRADER_REDIRECT_URI?code=...&state=...
-     → that URL is served by the bot's HTTP server (bot.py do_GET).
-  5. handle_callback() verifies state, exchanges the code for tokens, fetches
-     the client's trading accounts, stores them on the user record, and pings
-     the client back in Telegram with the result.
-
-Security: state is HMAC-signed with the Telegram bot token (always secret and
-present), so a third party cannot forge a callback that binds tokens to someone
-else's chat. Codes are single-use and short-lived on cTrader's side.
+The callback still verifies a signed state, exchanges the code, stores the
+tokens, and records an in-platform note. Codes are single-use and short-lived
+on cTrader's side.
 """
 import os
 import hmac
@@ -91,7 +73,7 @@ _pending = {}  # chat_id -> ts
 
 # A callback with no verifiable state cannot be attributed to anyone. There is
 # no amount of care that turns "somebody authorized a broker account" into
-# "THIS Telegram user authorized it" without a signed correlation value, and
+# "THIS user authorized it" without a signed correlation value, and
 # the consequence of getting it wrong is that one client's broker account —
 # real money — is wired to another client's chat.
 #
@@ -142,12 +124,12 @@ def assert_safe_config():
     """
     # A signing secret is not optional. Checked here so the failure lands at
     # startup rather than on the first client who tries to link an account.
-    if not (cfg.TELEGRAM_BOT_TOKEN or cfg.CTRADER_CLIENT_SECRET):
+    if not cfg.CTRADER_CLIENT_SECRET:
         raise OAuthSigningSecretMissing(
             "No OAuth state signing secret is configured. `state` is what "
-            "proves a callback belongs to the chat that began the flow, so "
-            "without it one person's broker account can be bound to another "
-            "person's chat. Set TELEGRAM_BOT_TOKEN (or CTRADER_CLIENT_SECRET).")
+            "proves a callback belongs to the account that began the flow, so "
+            "without it one person's broker account can be bound to another. "
+            "Set CTRADER_CLIENT_SECRET.")
     if ALLOW_STATELESS and _production():
         raise StatelessCallbackInProduction(
             "CTRADER_ALLOW_STATELESS_CALLBACK is on and this is production. "
@@ -195,9 +177,9 @@ def _recent_pending():
 
     The original returned `max(fresh)` — the most recent of however many people
     were mid-authorization. That is not a tie-break, it is an account-linking
-    vulnerability: with two clients running /ctrader in the same ten minutes,
+    vulnerability: with two clients linking in the same ten minutes,
     a callback without a usable state binds one person's broker tokens to the
-    other person's Telegram chat, and neither can tell it happened.
+    other person's account, and neither can tell it happened.
 
     Narrowing it to "exactly one pending" removed the two-client case but not
     the premise, which is that an unauthenticated callback is trusted at all:
@@ -211,7 +193,7 @@ def _recent_pending():
             print(f"[cTrader OAuth] REFUSED a callback with no valid state "
                   f"({len(fresh)} authorization(s) pending). An unsigned "
                   f"callback cannot be attributed to a client; the user must "
-                  f"retry /ctrader.")
+                  f"retry the link.")
         return None
     if len(fresh) != 1:
         print(f"[cTrader OAuth] stateless callback allowed by config but "
@@ -279,26 +261,26 @@ def _secret() -> bytes:
     This used to end in `or "apex"` — a string published in this repository.
     `state` is what proves a callback belongs to the chat that started the
     flow; anyone who can forge one can bind THEIR cTrader account to SOMEBODY
-    ELSE'S Telegram chat, or the reverse. A signing key readable from the
+    ELSE'S account, or the reverse. A signing key readable from the
     source is not a key.
 
-    The bot token is always set in any deployment that can talk to Telegram at
-    all, so this is unreachable in practice — which is exactly why it must
+    The client secret is what a deployment that can link an account already
+    has, so this is unreachable in practice — which is exactly why it must
     raise rather than paper over it. An unreachable branch that silently
     weakens a signature is the kind that gets reached after some future
     refactor moves config loading around.
     """
-    raw = cfg.TELEGRAM_BOT_TOKEN or cfg.CTRADER_CLIENT_SECRET
+    raw = cfg.CTRADER_CLIENT_SECRET
     if not raw:
         raise OAuthSigningSecretMissing(
-            "No OAuth state signing secret: set TELEGRAM_BOT_TOKEN (or "
-            "CTRADER_CLIENT_SECRET). Without one, a callback cannot be tied "
-            "to the chat that started it.")
+            "No OAuth state signing secret: set CTRADER_CLIENT_SECRET. "
+            "Without one, a callback cannot be tied to the account that "
+            "started it.")
     return raw.encode()
 
 
 def make_state(chat_id) -> str:
-    """Signed, time-stamped state carrying the Telegram chat id."""
+    """Signed, time-stamped state carrying the caller id."""
     payload = f"{chat_id}.{int(time.time())}"
     sig = hmac.new(_secret(), payload.encode(), hashlib.sha256).hexdigest()[:16]
     token = f"{payload}.{sig}"
@@ -363,7 +345,7 @@ def handle_callback(query: dict):
     err = _q("error")
     if err:
         return 400, _html("cTrader", f"<div class='h err'>Authorization failed</div>"
-                          f"<div class='p'>{err}. Please return to Telegram and try /ctrader again.</div>")
+                          f"<div class='p'>{err}. Close this page and start the link again.</div>")
 
     code = _q("code")
     state = _q("state")
@@ -382,7 +364,7 @@ def handle_callback(query: dict):
         chat_id = _recent_pending()
     if not code or not chat_id:
         return 400, _html("cTrader", "<div class='h err'>Invalid or expired link</div>"
-                          "<div class='p'>Please return to Telegram and send /ctrader to get a fresh link.</div>")
+                          "<div class='p'>Close this page and start the link again from the platform.</div>")
 
     try:
         tok = ctrader.exchange_code(code, redirect_uri())
@@ -393,7 +375,7 @@ def handle_callback(query: dict):
         accounts = ctrader.list_accounts(access)
     except Exception as e:
         return 502, _html("cTrader", "<div class='h err'>Connection error</div>"
-                          f"<div class='p'>{e}. Return to Telegram and try /ctrader again.</div>")
+                          f"<div class='p'>{e}. Close this page and start the link again.</div>")
 
     # Persist tokens + account list. Auto-select if exactly one account.
     updates = {
@@ -437,20 +419,20 @@ def handle_callback(query: dict):
         print(f"[cTrader OAuth] CREDENTIAL WRITE FAILED for {chat_id}: {e}")
         return 500, _html("cTrader", "<div class='h err'>Could not save the connection</div>"
                           "<div class='p'>Your broker authorized us, but we could not store "
-                          "the connection. Nothing was linked. Please return to Telegram and "
-                          "send /ctrader to try again.</div>")
+                          "the connection. Nothing was linked. Close this page and "
+                          "start the link again.</div>")
     _pending.pop(str(chat_id), None)
 
     # A loop that was already running (auto-restore at boot) still holds the OLD
     # token/balance — it reads the user record only at start. Restart it so the
     # fresh credentials and the mirrored balance take effect immediately.
     try:
-        from apex import telegram as _tg
-        _tg._restart_user_loop(chat_id)
+        from apex import client_alerts
+        client_alerts.restart_loop(chat_id)
     except Exception as e:
         print(f"[cTrader OAuth] loop restart failed: {e}")
 
-    # Notify the client in Telegram (best-effort), ONCE.
+    # Notify the client in the platform (best-effort), ONCE.
     #
     # The whole block below fired twice in production — the client saw
     # "cTrader connected!" and the setup card duplicated. This endpoint is a
@@ -465,50 +447,28 @@ def handle_callback(query: dict):
         return 200, _html("cTrader",
                           "<div class='h ok'>✅ Connected</div>"
                           "<div class='p'>Your cTrader account is linked. "
-                          "You can close this page and return to Telegram.</div>")
+                          "You can close this page.</div>")
     try:
-        from apex import telegram as tg
+        from apex import client_alerts
         if len(accounts) == 1 and gate_reason:
             a = accounts[0]
-            live_link = os.getenv("BROKER_LIVE_LINK", "").strip()
-            link_line = f"\n\n👉 {live_link}" if live_link else ""
-            tg.send_to(chat_id,
-                       f"❌ <b>Account not eligible</b>\n\n"
-                       f"Account <code>{a['ctid']}</code> — {gate_reason}."
-                       f"{link_line}\n\n"
-                       "Once you have the right account, send /ctrader again.")
-        elif len(accounts) == 1:
-            a = accounts[0]
-            env = "LIVE 🔴" if a["live"] else "demo 🧪"
-            u_now = user_store.load(chat_id)
-            bal_line = tg.balance_line_from(bal, bal_err,
-                                            u_now.get("paper_balance"))
-            if not tg.already_onboarded(u_now):
-                tg.send_to(chat_id,
-                           f"✅ <b>cTrader connected!</b>\n\n"
-                           f"Account <code>{a['ctid']}</code> ({env})\n"
-                           f"{bal_line}\n"
-                           "Setting up your account — 2 quick taps. 👇")
-                tg.onboard_start(chat_id)
-            else:
-                tg.send_to(chat_id, tg.reconnect_summary(
-                    u_now,
-                    f"✅ <b>cTrader reconnected!</b>\n\n"
-                    f"Account <code>{a['ctid']}</code> ({env})\n{bal_line}"))
+            client_alerts.note(
+                chat_id,
+                f"Account {a['ctid']} is not eligible: {gate_reason}.")
         elif accounts:
-            lines = "\n".join(
-                f"• <code>{a['ctid']}</code> — {'LIVE 🔴' if a['live'] else 'demo 🧪'}"
-                for a in accounts)
-            tg.send_to(chat_id,
-                       "✅ <b>cTrader connected!</b>\n\nYou have multiple accounts:\n"
-                       f"{lines}\n\nPick one with <code>/ctaccount &lt;id&gt;</code>")
+            client_alerts.note(
+                chat_id,
+                "cTrader connected. "
+                + ", ".join(f"{a['ctid']} ({'live' if a['live'] else 'demo'})"
+                            for a in accounts))
         else:
-            tg.send_to(chat_id, "⚠️ cTrader connected but no trading accounts were found. "
-                       "Open a demo account in cTrader, then send /ctrader again.")
+            client_alerts.note(
+                chat_id,
+                "cTrader connected but no trading accounts were found.")
     except Exception as e:
         print(f"[cTrader OAuth] notify failed: {e}")
 
     return 200, _html("cTrader",
-                      "<div class='h ok'>✅ Connected</div>"
+                      "<div class='h ok'>Connected</div>"
                       "<div class='p'>Your cTrader account is linked. "
-                      "You can close this page and return to Telegram.</div>")
+                      "You can close this page.</div>")

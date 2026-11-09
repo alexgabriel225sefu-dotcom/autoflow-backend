@@ -95,9 +95,9 @@ api, web = SVCS.get("apex4traders-api", {}), SVCS.get("apex4traders-web", {})
 check("the API installs from requirements.txt",
       "requirements.txt" in api.get("buildCommand", ""), api.get("buildCommand"))
 # THIS CHECK USED TO ASSERT `main.py`, AND IT WAS GREEN THE WHOLE TIME THE
-# BLUEPRINT WAS WRONG. `main.py` starts apex.bot.main() — Telegram polling, the
+# BLUEPRINT WAS WRONG. `main.py` starts apex.bot.main() — the platform polling, the
 # per-user trading loops, the operator dashboard — so applying that blueprint
-# would have deployed a SECOND live Telegram trading bot under the name of the
+# would have deployed a SECOND live the platform trading bot under the name of the
 # platform API. The test agreed with the blueprint instead of with the product,
 # which is the failure mode of writing a test from the artifact rather than from
 # what the artifact has to do.
@@ -158,7 +158,7 @@ check("it is NOT /readyz", api.get("healthCheckPath") != "/readyz",
 check("the web health check is /", web.get("healthCheckPath") == "/",
       str(web.get("healthCheckPath")))
 # And the endpoint the blueprint names has to exist in the code.
-health_src = open(os.path.join(SERVICE_DIR, "apex", "bot.py"),
+health_src = open(os.path.join(SERVICE_DIR, "platform_server.py"),
                   encoding="utf-8").read()
 check("/healthz is actually served by the transport", '"/healthz"' in health_src)
 

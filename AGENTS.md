@@ -11,23 +11,23 @@ Repo-ul ține **două produse**, cu identități separate:
 1. **Apex4Traders** (`apex-forex-bot/apex/platform/`, Python, + `web/`,
    Next.js) — platforma web de automatizare pe reguli, conectată la cTrader.
    Ăsta e produsul la care se lucrează acum. Identitatea clientului vine din
-   Supabase, nu din Telegram. Automatizarea rulează **doar pe conturi demo**;
+   Supabase, nu din the web app. Automatizarea rulează **doar pe conturi demo**;
    tranzacționarea live nu e implementată.
 2. **Apex Trade Bot** (restul din `apex-forex-bot/`, Python) — botul de forex
-   pe Telegram, plus site-ul de vânzări (`server.js`, Node). E produsul
+   pe the web app, plus site-ul de vânzări (`server.js`, Node). E produsul
    anterior și încă rulează.
 
 Brokerul e **cTrader** în ambele. OANDA e cod legacy, NU se folosește — nu
 "repara" botul spre OANDA.
 
 Cele două nu împart identitatea clientului și nici entitlement-ul:
-`apex/stripe_license.py` e pe `chat_id` de Telegram, `apex/platform/licence.py`
+`apex/stripe_license.py` e pe `chat_id` de the web app, `apex/platform/licence.py`
 e pe user id de Supabase. Nu le uni fără o migrare explicită.
 
 ## Branch
 
 - Platforma Apex4Traders se dezvoltă pe **`claude/apex4traders-platform-v1`**.
-- Botul de Telegram și site-ul se dezvoltă pe
+- Botul de the web app și site-ul se dezvoltă pe
   **`claude/arcads-external-api-gexx7-6n4pr9`**.
 - `claude/arcads-external-api-gExX7` e branch-ul de deploy Render — se
   auto-deployează la fiecare commit. Se ține identic ca conținut.
@@ -81,7 +81,7 @@ Nu există predare automată — predarea se face prin git + un fișier de hando
 | Fir | Branch | Handoff | Protocol |
 |---|---|---|---|
 | Apex4Traders (platforma) | `claude/apex4traders-platform-v1` | `docs/NEXT_SESSION_HANDOFF.md` | **`docs/CODEX_CLAUDE_PROTOCOL.md`** |
-| Apex Trade Bot (Telegram) + site | `claude/arcads-external-api-gexx7-6n4pr9` | `HANDOFF.md` (rădăcină) | — |
+| Apex Trade Bot (the web app) + site | `claude/arcads-external-api-gexx7-6n4pr9` | `HANDOFF.md` (rădăcină) | — |
 
 Pentru platformă, `docs/CODEX_CLAUDE_PROTOCOL.md` e normativ: definește rolurile
 (Claude implementează și testează, Codex face arhitectură, securitate, release

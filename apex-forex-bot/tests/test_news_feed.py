@@ -155,18 +155,10 @@ news._cache["events"] = [{"impact": "High", "time": "not-a-date"}, "garbage", No
 check("a malformed calendar yields an empty panel, not an exception",
       news.feed() == [] and news.today() == [] and news.upcoming() == [])
 
-print("\n6. The panel is actually wired end to end")
+print("\n6. The trading alerts read this feed, not a second calendar")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BOT = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
-HTML = open(os.path.join(ROOT, "apex", "static", "terminal.html"), encoding="utf-8").read()
-check("the API sends the feed", '"newsFeed": news_feed' in BOT)
-check("built from news.feed(), not the guard's view", "news_mod.feed()" in BOT)
-check("the page reads it", "d.newsFeed" in HTML)
-check("a page cached from before still renders",
-      '"newsToday": news_today' in BOT and "d.newsToday" in HTML)
-check("impact is shown to the reader", "'HIGH'" in HTML and "'MED'" in HTML)
-check("expected/previous figures are shown", "'exp '" in HTML and "'prev '" in HTML)
-check("the stand-aside note is conditional on e.guarded", "e.guarded?" in HTML)
+ALERTS = open(os.path.join(ROOT, "apex", "news_alerts.py"), encoding="utf-8").read()
+check("heads-up alerts are built from news.feed()", "news.feed(" in ALERTS)
 
 print("\n" + "=" * 50)
 if failures:

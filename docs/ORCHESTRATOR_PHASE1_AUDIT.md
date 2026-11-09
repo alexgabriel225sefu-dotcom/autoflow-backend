@@ -27,7 +27,7 @@ the repository is public every issue and comment is untrusted input
 | Branch | Role | Deploys? |
 |---|---|---|
 | `claude/apex4traders-platform-v1` | Platform + web development; Render services `apex4traders-api` and `apex4traders-web` track it | **Manual only** (both services: `autoDeploy: no`, trigger off) |
-| `claude/arcads-external-api-gexx7-6n4pr9` | Telegram bot + sales site development | No |
+| `claude/arcads-external-api-gexx7-6n4pr9` | the web app bot + sales site development | No |
 | `claude/arcads-external-api-gExX7` | Render deploy branch for the sales site / bot | **Yes: `AGENTS.md` says every commit deploys.** `render.yaml` declares `autoDeploy: true` for `autoflow-backend`. The live service's setting was **not verified** here |
 | `main` | Default branch, old, divergent | Only `docker-publish.yml` runs on a push to it |
 | `codex/*` | Codex working branches | No |

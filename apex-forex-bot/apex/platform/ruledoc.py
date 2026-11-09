@@ -174,7 +174,7 @@ def blank(*, user_id, account_id, symbols=None, timeframe="1h"):
         # WHICH ENGINE STRATEGY DECIDES, or None for "my conditions do".
         #
         # The platform exposed exactly one way to trade — write a rule — while
-        # the engine ships fifteen ready-made strategies that a Telegram
+        # the engine ships fifteen ready-made strategies that a platform
         # client could pick from a menu. Those were unreachable here, so a
         # client who wanted Trend Following had to reproduce it in conditions,
         # and could not.
@@ -318,7 +318,7 @@ def validate(doc, *, known_condition_ids=None, known_strategy_ids=None):
              "conditions you built yourself")
     elif has_preset and not _ID_RE.match(preset):
         _err(problems, "strategy", "must be 1-64 chars of [A-Za-z0-9_-]")
-    elif has_preset and known_strategy_ids is not None \
+    elif has_preset and known_strategy_ids is not None\
             and preset not in set(known_strategy_ids):
         # Fail closed. An id nothing offers would be written onto the account
         # as cfg.STRATEGY, and the loop would hold every bar naming a strategy

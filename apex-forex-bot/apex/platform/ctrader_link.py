@@ -1,4 +1,4 @@
-"""Linking a cTrader account to an Apex4Traders account. No Telegram anywhere.
+"""Linking a cTrader account to an Apex4Traders account. No the platform anywhere.
 
 THE ATTACK THIS FLOW IS SHAPED AROUND
 
@@ -31,14 +31,13 @@ server-side and does hold one. The equivalent protection is implemented
 instead: state is random, HMAC-signed, single-use, time-limited, and bound to
 a user id that the completing session must match.
 
-THE SIGNING KEY IS NOT THE TELEGRAM TOKEN
+THE SIGNING KEY IS NOT A SHARED BOT SECRET
 
-ctrader_oauth.py signs state with `TELEGRAM_BOT_TOKEN or CTRADER_CLIENT_SECRET`.
-That is a Telegram dependency in the middle of a security primitive, and this
-flow must work on a deployment with no bot at all. The key here is derived by
-HMAC from TOKEN_ENCRYPTION_KEY (or CTRADER_CLIENT_SECRET, which any working
-OAuth deployment must already have), with a domain separation string so the
-derived key is never the same bytes as the key it came from.
+The legacy callback module signs state with CTRADER_CLIENT_SECRET. This flow
+does not. The key here is derived by HMAC from TOKEN_ENCRYPTION_KEY (or
+CTRADER_CLIENT_SECRET, which any working OAuth deployment must already have),
+with a domain separation string so the derived key is never the same bytes
+as the key it came from. It works with no extra token configured.
 """
 
 import base64
@@ -88,7 +87,7 @@ class LinkConfigError(LinkError):
 
 
 def _secret() -> bytes:
-    """The state signing key. Derived, never used raw, never Telegram's.
+    """The state signing key. Derived, never used raw, never the platform's.
 
     Deriving rather than using TOKEN_ENCRYPTION_KEY directly means a leak of
     one does not hand over the other, and the domain string means this key
@@ -644,7 +643,7 @@ def selected_mode(user_id):
     WHY THE ORDER GATE NEEDS THIS, AND WHY IT IS HERE
 
     `gates._live` answers "is real money at stake?" from the user record's
-    `paper` flag, which only the legacy Telegram path ever writes. A platform
+    `paper` flag, which only the legacy the platform path ever writes. A platform
     client's record has no such flag, so that question answered "no" for
     every platform account — including one trading a LIVE cTrader account.
     Every gate behind it (the release switch, the paid plan, the mode the
@@ -820,7 +819,7 @@ def select_account(user_id, ctid):
         # afterwards put the account being re-selected into the list and then
         # measured the list as full, so the one client this seed exists to
         # protect was the one it locked out.
-        if not traded and rec.get("selectedCtid") is not None \
+        if not traded and rec.get("selectedCtid") is not None\
                 and rec.get("selectedMode") == LIVE:
             traded = [str(rec["selectedCtid"])]
 
@@ -977,7 +976,7 @@ def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None,
     supabase_user_id. Nothing copies the tokens into the user record, because
     two namespaces holding the same secret means two places to rotate, two to
     revoke and two to leak — and the user record's ctrader_* fields belong to
-    the Telegram-era flow, which must not blend with a Supabase identity.
+    the platform-era flow, which must not blend with a Supabase identity.
 
     Returns None when nothing usable is connected, so a caller can tell
     "not connected" from "connected but broken" without catching anything.

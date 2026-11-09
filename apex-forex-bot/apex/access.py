@@ -80,14 +80,14 @@ def _write(d):
 
 
 
-# Privileged identity is CONFIGURATION, not source. A Telegram id embedded
+# Privileged identity is CONFIGURATION, not source. A platform id embedded
 # here meant the repository carried a privileged identity, changing the
 # operator required a code change and a deploy, and any fork or clone of this
 # repo inherited an admin who may no longer be one.
 #
 # Startup validates that at least one is configured — an empty admin list is
 # not a safe default, it is a bot nobody can administer.
-_ADMIN_ENV_VARS = ("ADMIN_CHAT_IDS", "ADMIN_CHAT_ID", "TELEGRAM_CHAT_ID")
+_ADMIN_ENV_VARS = ("ADMIN_CHAT_IDS", "ADMIN_CHAT_ID")
 
 
 def _env_admins():

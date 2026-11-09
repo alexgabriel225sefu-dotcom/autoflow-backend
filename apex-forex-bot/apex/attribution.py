@@ -1,9 +1,9 @@
 """Carry an ad click from the ad into the sale.
 
-A Telegram deep link — t.me/BOT?start=PAYLOAD — accepts at most 64 characters
+A platform deep link — t.me/BOT?start=PAYLOAD — accepts at most 64 characters
 drawn from [A-Za-z0-9_-]. A Meta click identifier does not fit: it is longer
 than that and uses characters the payload rejects. So an ad that links straight
-into Telegram arrives carrying nothing. Every sale is then unattributed, Meta's
+into the platform arrives carrying nothing. Every sale is then unattributed, Meta's
 optimiser never learns who buys, and the cost per purchase never comes down —
 which is the whole point of running the ads.
 
@@ -14,7 +14,7 @@ This module is the bridge across that gap:
              mint a 24-char token    short enough for the deep link
              store the identifiers   under that token, in the shared store
         ──▶  t.me/BOT?start=<token>  the token is what travels
-    /start   claim(token, chat_id)   the click is now tied to a Telegram chat
+    /start   claim(token, chat_id)   the click is now tied to a platform chat
     Stripe   report_purchase(chat)   the webhook already knows the chat from
                                      client_reference_id
 
@@ -36,7 +36,7 @@ import time
 from apex import user_store
 
 # ── Token ───────────────────────────────────────────────────────────────
-# "ax" + 22 url-safe characters = 24, inside Telegram's 64-character limit and
+# "ax" + 22 url-safe characters = 24, inside the platform's 64-character limit and
 # built from the character set the payload allows. The prefix is what lets
 # /start tell an attribution token apart from a licence key, which is the other
 # thing that arrives in that position.
@@ -108,7 +108,7 @@ def record_click(*, fbclid="", fbp="", utm=None, ip="", user_agent="", url="") -
     """Store one ad click and return the token that stands for it.
 
     Returns the token even when the store is unavailable: the redirect to
-    Telegram has to happen either way. A visitor must never be left staring at
+    the platform has to happen either way. A visitor must never be left staring at
     an error page because attribution could not be written — the sale matters
     more than the measurement.
     """
@@ -132,7 +132,7 @@ def record_click(*, fbclid="", fbp="", utm=None, ip="", user_agent="", url="") -
 
 
 def claim(token, chat_id) -> bool:
-    """Tie a stored click to the Telegram chat that opened it.
+    """Tie a stored click to the platform chat that opened it.
 
     First claim wins. Re-running /start with an older token must not overwrite
     the click that actually brought the buyer in, and a second visitor cannot

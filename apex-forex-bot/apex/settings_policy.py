@@ -3,7 +3,7 @@
 Two sources can change this bot's configuration at runtime, and they do NOT
 deserve the same trust:
 
-  OPERATOR   an admin typing /setkeys into Telegram. Authenticated as the
+  OPERATOR   an admin typing /setkeys into the platform. Authenticated as the
              account that owns the bot, and every change is audited.
   REMOTE     the licence server's saved configuration, fetched at startup by
              `bot.load_remote()`. Whoever controls that response — the server,
@@ -49,6 +49,7 @@ that the remote source is the untrusted one:
 Values are validated, not merely accepted: a key being settable does not make
 RISK_PER_TRADE=50 a sensible number.
 """
+import os
 import re
 
 __all__ = [
@@ -148,7 +149,7 @@ def _secret(min_len, max_len=512):
     return check
 
 
-_chat_id = _text(r"-?\d{1,20}", 21, "a numeric Telegram id")
+_chat_id = _text(r"-?\d{1,20}", 21, "a numeric account id")
 _timeframe = _choice("m1", "m5", "m15", "m30", "h1", "h4", "d1")
 
 
@@ -211,8 +212,6 @@ _SECRETS = {
 # Provisioning credentials the configurator legitimately sends on first
 # deploy. Secret, so never logged by value.
 _REMOTE_PROVISIONING = {
-    "TELEGRAM_BOT_TOKEN": ("TELEGRAM_BOT_TOKEN", _secret(20)),
-    "TELEGRAM_CHAT_ID":   ("TELEGRAM_CHAT_ID",   _chat_id),
     "DASHBOARD_TOKEN":    ("DASHBOARD_TOKEN",    _secret(16)),
     "GROQ_API_KEY":       ("GROQ_API_KEY",       _secret(16)),
     "GEMINI_API_KEY":     ("GEMINI_API_KEY",     _secret(16)),
@@ -269,13 +268,13 @@ MINIAPP_FORBIDDEN = frozenset({
 })
 
 # REMOTE is split in two, because "change my stop loss" and "replace my
-# Telegram bot token" are not the same request and must not travel the same
+# chat channel token" are not the same request and must not travel the same
 # path.
 #
 # Before this split, REMOTE_SETTABLE was {**_TRADING, **_REMOTE_PROVISIONING}
 # and load_remote() applied the lot on every startup. The allowlist stopped
 # arbitrary environment injection — that part worked — but any response from
-# the licence server could still ROTATE the bot's Telegram token, its dashboard
+# the licence server could still ROTATE the bot's the platform token, its dashboard
 # token or its AI key, silently, as a side effect of a routine configuration
 # fetch. Whoever controls that response then controls the bot's identity.
 #
@@ -366,7 +365,7 @@ def validate_provisioning(key, raw):
 def provisioning_allowed(key, current_value) -> bool:
     """May this provisioning credential be applied?
 
-    Only when nothing is configured yet. A bot that already has a Telegram
+    Only when nothing is configured yet. A bot that already has a platform
     token has been provisioned; a later response carrying a different one is
     either a mistake or an attempt to take the bot over, and there is no
     version of "silently rotate the identity of a running trading bot" that is
@@ -385,3 +384,106 @@ def cfg_attr(key):
     k = str(key).strip().upper()
     entry = OPERATOR_SETTABLE.get(k) or REMOTE_SETTABLE.get(k)
     return entry[0] if entry else None
+
+
+def apply_config(data, source="config", validate=None):
+    """Apply a {ENV_NAME: value} dict to the environment and the live cfg module.
+
+    Every key is checked against an allowlist before it reaches os.environ.
+    `validate` picks which allowlist applies.
+    """
+    from apex import config as cfg
+    if validate is None:
+        validate = validate_operator
+    applied, refused = 0, []
+    for raw_key, raw_value in (data or {}).items():
+        if raw_value is None or raw_value == "":
+            continue
+        try:
+            key, value = validate(raw_key, raw_value)
+        except SettingRejected as e:
+            refused.append(str(e))
+            continue
+        os.environ[key] = str(value).lower() if isinstance(value, bool) else str(value)
+        applied += 1
+        attr = cfg_attr(key)
+        if attr == "SCAN_SYMBOLS":
+            cfg.SCAN_SYMBOLS = str(value).split(",")
+        elif attr and hasattr(cfg, attr):
+            setattr(cfg, attr, value)
+    if refused:
+        print(f"[config] {source}: refused {len(refused)} setting(s) — "
+              + "; ".join(refused[:10]))
+    return applied
+
+
+def apply_provisioning(data):
+    """Apply first-deploy credentials. Never overwrite one already set."""
+    from apex import config as cfg
+    applied, refused, held = 0, [], []
+    for raw_key, raw_value in (data or {}).items():
+        if raw_value is None or raw_value == "":
+            continue
+        try:
+            key, value = validate_provisioning(raw_key, raw_value)
+        except SettingRejected as e:
+            refused.append(str(e))
+            continue
+        if not provisioning_allowed(key, os.environ.get(key)):
+            held.append(key)
+            continue
+        os.environ[key] = str(value)
+        attr = cfg_attr(key)
+        if attr and hasattr(cfg, attr):
+            setattr(cfg, attr, value)
+        applied += 1
+    if held:
+        print(f"[config] provisioning: {len(held)} credential(s) already set, "
+              f"left alone — {', '.join(held)}")
+    if refused:
+        print(f"[config] provisioning: refused {len(refused)} — "
+              + "; ".join(refused[:5]))
+    return applied
+
+
+def load_remote():
+    """Fetch the saved configurator config and apply it. Never raises."""
+    from apex import config as cfg
+    import requests
+    key = cfg.LICENSE_KEY
+    server = cfg.LICENSE_SERVER
+    if not key:
+        print("load_remote: LICENSE_KEY not set — skipping remote config.")
+        return False
+    try:
+        ua = {"User-Agent": "Apex4Traders/1.0"}
+        sr = requests.post(f"{server}/api/bot-session",
+                           json={"licenseKey": key}, timeout=10, headers=ua)
+        if sr.status_code != 200:
+            print(f"load_remote: licence exchange returned {sr.status_code}.")
+            return False
+        session_token = (sr.json() or {}).get("token")
+        if not session_token:
+            print("load_remote: licence exchange returned no token.")
+            return False
+        r = requests.get(f"{server}/api/bot-config", timeout=10,
+                         headers={**ua, "Authorization": f"Bearer {session_token}"})
+        if r.status_code != 200:
+            print(f"load_remote: config fetch returned {r.status_code}.")
+            return False
+        data = r.json()
+        if not data.get("success") or not data.get("config"):
+            print("load_remote: no config in response.")
+            return False
+        incoming = {k: v for k, v in data["config"].items() if k not in os.environ}
+        runtime = {k: v for k, v in incoming.items()
+                   if k.strip().upper() not in REMOTE_PROVISIONING}
+        provisioning = {k: v for k, v in incoming.items()
+                        if k.strip().upper() in REMOTE_PROVISIONING}
+        n = apply_config(runtime, "remote", validate=validate_remote)
+        p = apply_provisioning(provisioning)
+        print(f"Remote config loaded ({n} setting(s), {p} credential(s)).")
+        return True
+    except Exception as e:
+        print(f"Could not load remote config ({e}) — using env vars only.")
+        return False

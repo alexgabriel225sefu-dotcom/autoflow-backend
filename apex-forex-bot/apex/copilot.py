@@ -4,7 +4,7 @@ Three rules shape this module, and each exists because the obvious
 implementation gets it wrong.
 
 **Scope is taken, never given.** Every query runs against the chat id the
-Telegram signature proved. A question is text; it is never allowed to select
+the platform signature proved. A question is text; it is never allowed to select
 whose data is loaded. "Show me trades for 8963896517" is answered about the
 asker's own account or refused — never resolved. This is the whole reason the
 Copilot is a module rather than a prompt: an LLM that receives an account id in
@@ -222,7 +222,7 @@ _INTENTS = (
 def answer(chat_id, question):
     """One reply, scoped to `chat_id` and nothing else.
 
-    `chat_id` comes from the caller, which got it from a verified Telegram
+    `chat_id` comes from the caller, which got it from a verified the platform
     signature. Nothing in `question` can change it — that is the point.
     """
     chat_id = str(chat_id)
@@ -268,7 +268,7 @@ def answer(chat_id, question):
 
     # A courtesy reply is the only canned text this module owns.
     # quick_answers.resolve() returns a handler KEY; the copy for it lives in
-    # telegram.py. Echoing a key back as an answer produced "Handled." wearing
+    # legacy.py. Echoing a key back as an answer produced "Handled." wearing
     # a FACT label — an invented answer about someone's account, which is the
     # exact thing this module exists to prevent.
     try:

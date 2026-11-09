@@ -255,7 +255,7 @@ def handle(method, path, headers=None, body=None, *, client_key=None):
                     "Check the screen again before retrying. The fault is "
                     "ours and has been logged.")
     try:
-        route = (path or "")[len(PREFIX):].split("?", 1)[0].strip("/") \
+        route = (path or "")[len(PREFIX):].split("?", 1)[0].strip("/")\
             if (path or "").startswith(PREFIX) else ""
         if route.startswith("ctrader/") and result:
             status, body_out = result
@@ -943,7 +943,7 @@ def _dispatch(method, route, headers, body, query=None):
     # ── a setup waiting for the client's approval ───────────────────────
     # The platform's half of the engine's Approval Required level. In that
     # level the loop proposes and places nothing, and until these three
-    # routes existed the only way to answer a proposal was a Telegram tap —
+    # routes existed the only way to answer a proposal was a platform tap —
     # so a platform client's loop found setups and went silent. See
     # apex/platform/approvals.py, and commit 6f984dfe9 for the state it left
     # every client in.

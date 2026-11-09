@@ -1170,7 +1170,7 @@ CRITICAL_FIELDS = {
     "automation", "copilot", "loss_streak",
     # The record of a live position across a restart. It was written with a
     # plain load-merge-save, so a concurrent write to ANY unrelated field
-    # (a Telegram command touching watchlist, asset_class, ...) could clobber
+    # (a platform command touching watchlist, asset_class, ...) could clobber
     # it back to the pre-trade value with no error. Restart recovery then read
     # a stale "flat" snapshot, skipped reconciliation, and the real P&L was
     # booked as a deposit/withdrawal — invisible to the drawdown guards. That

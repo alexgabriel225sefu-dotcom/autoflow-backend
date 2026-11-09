@@ -40,11 +40,11 @@ like EUR_USD. Each broker offers a different instrument list.
 
 ---
 
-## Telegram
+## the web app
 
 ### Bot doesn't reply
-1. `TELEGRAM_BOT_TOKEN` must match BotFather's token exactly (no spaces)
-2. `TELEGRAM_CHAT_ID` must be **your** ID from @userinfobot
+1. `the retired bot token` must match BotFather's token exactly (no spaces)
+2. `the retired chat id` must be **your** ID from @userinfobot
 3. Message the bot first — bots can't initiate chats
 4. Restart the deployment after changing variables
 

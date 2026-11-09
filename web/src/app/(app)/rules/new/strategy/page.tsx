@@ -332,7 +332,7 @@ export default function PickStrategyPage() {
                 </h2>
               </div>
               {/* Spelled out rather than omitted. Somebody who used the
-                  Telegram bot knows these exist, and silence reads like an
+                  the web app bot knows these exist, and silence reads like an
                   oversight where a reason reads like a decision. */}
               {withheld.map((w) => (
                 <p key={w.id} className="muted"

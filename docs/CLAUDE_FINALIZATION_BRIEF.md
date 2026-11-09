@@ -12,4 +12,4 @@ The remaining launch blockers are:
 6. Journal entries must distinguish provider rejection from internal engine failure. Do not label an internal exception `Broker Error`; keep safe, redacted causes only.
 7. Verify mobile at 390x844. Dashboard, rules/new, positions, and performance must hydrate the authenticated demo account instead of remaining in Account/Loading skeletons.
 
-Do not touch Telegram, payments, checkout, or live execution. Do not relax live-invariant tests. Keep product copy and code in English. Add regression tests for every defect and run the complete Python suite plus `npm test` and `npx tsc --noEmit` before opening or updating a PR. Report changed files, commits, test exit codes, deployment status, and anything not verified.
+Do not touch the web app, payments, checkout, or live execution. Do not relax live-invariant tests. Keep product copy and code in English. Add regression tests for every defect and run the complete Python suite plus `npm test` and `npx tsc --noEmit` before opening or updating a PR. Report changed files, commits, test exit codes, deployment status, and anything not verified.

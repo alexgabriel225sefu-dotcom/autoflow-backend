@@ -98,7 +98,7 @@ authorization code server-side and returns a nonce.
 | `REDIS_URL` or Upstash pair | production | Without a shared backend, startup is refused unless `ALLOW_LOCAL_BACKEND_DEV=true` **and** `APP_ENV=dev`. |
 | `APP_ENV` | yes | `dev` or `production`. |
 | `APEX_ALLOW_LIVE_ACCOUNTS` | no | Leave unset. Live is not implemented. |
-| `TELEGRAM_BOT_TOKEN` | **no** | Legacy only. The platform works without it. |
+| `the retired bot token` | **no** | Legacy only. The platform works without it. |
 
 ### Web (`web`)
 
@@ -198,27 +198,27 @@ rule costs nothing.
 
 ---
 
-## Telegram: legacy, and not part of Apex4Traders v1
+## the web app: legacy, and not part of Apex4Traders v1
 
 Verified, not assumed:
 
-- **`apex/platform/` imports nothing from Telegram.** Asserted across the whole
+- **`apex/platform/` imports nothing from the web app.** Asserted across the whole
   package through the AST in `tests/test_platform_ctrader_link.py`, so the file
   that reintroduces it fails the suite.
 - **`web/src` contains one mention**, in `src/test/backend_fixture.py`, which
-  *removes* `TELEGRAM_BOT_TOKEN` from the environment before starting the
+  *removes* `the retired bot token` from the environment before starting the
   backend. It is a negative assertion — proof the flow runs without a bot
   token — not a dependency.
-- **The old Telegram code still exists and still works.** `apex/telegram.py`,
+- **The old the web app code still exists and still works.** `the retired chat module`,
   `apex/ctrader_oauth.py` and the `chat_id`-keyed stores are untouched, because
-  clients onboarded through Telegram have tokens stored there and deleting it
+  clients onboarded through the web app have tokens stored there and deleting it
   would strand them.
 - `apex/ctrader_oauth.py` carries a `DEPRECATED` header explaining why it could
   not be reused: it is keyed by `chat_id`, it signs OAuth state with the bot
   token, and it completes the account link inside the callback.
 
 **None of it is part of the Apex4Traders v1 platform path.** A deployment with
-no `TELEGRAM_BOT_TOKEN` set runs the platform completely.
+no `the retired bot token` set runs the platform completely.
 
 ---
 

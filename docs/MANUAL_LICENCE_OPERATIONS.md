@@ -49,7 +49,7 @@ disabled — so any `active` licence in the store today was written by hand.
 ## 2. Finding the user id
 
 A licence is keyed by the **Supabase user id**, not by e-mail, not by a
-Telegram chat id, and not by a cTrader account number.
+the web app chat id, and not by a cTrader account number.
 
 - The client can read their own id from `GET /api/v1/me` (`user.userId`).
 - An operator finds it in the Supabase dashboard under Authentication →
@@ -152,9 +152,9 @@ by someone who knows they are reversing it.
   do that, and an attempt to make it able to is a change to the live-trading
   milestone, not an operational task.
 
-## 7. The legacy Telegram entitlement is a different thing
+## 7. The legacy the web app entitlement is a different thing
 
-`apex/stripe_license.py` is keyed by Telegram `chat_id` and belongs to the
+`apex/stripe_license.py` is keyed by the web app `chat_id` and belongs to the
 older forex bot. It is deliberately a separate store. Granting there does
 nothing for a platform user, and the two must not be merged without an
 explicit migration, or one product's identifiers start silently entitling the

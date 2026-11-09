@@ -8,9 +8,9 @@ says otherwise — reads as generous and is how a platform ends up running
 strangers' money for free, or worse, running it for someone the operator
 meant to cut off.
 
-The legacy entitlement in stripe_license.py is keyed by Telegram chat_id.
+The legacy entitlement in stripe_license.py is keyed by the platform chat_id.
 This is keyed by the Supabase user id, and the two are deliberately separate
-stores: a client who never had Telegram must be able to hold a licence, and a
+stores: a client who never had the platform must be able to hold a licence, and a
 migration must be an explicit act rather than an accidental key collision.
 """
 

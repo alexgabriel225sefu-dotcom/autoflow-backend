@@ -84,7 +84,7 @@ from apex.platform import store as _store
 # The same table as apex/candle_cache.py's `_PERIOD_SECONDS` and
 # apex/miniapp_api.py's `_TF_SECONDS`, restated rather than imported: those
 # live in the legacy engine, and the live claim must not acquire a dependency
-# on a module the legacy Telegram bot also pulls in. A timeframe missing from
+# on a module the legacy chat channel also pulls in. A timeframe missing from
 # here is refused, which is why it is safe for this copy to be narrower than
 # theirs rather than more generous.
 BAR_SECONDS = {

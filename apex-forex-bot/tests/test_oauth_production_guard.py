@@ -33,7 +33,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-oauth-")
 
 from apex import ctrader_oauth as oauth, user_store  # noqa: E402
@@ -150,12 +150,17 @@ try:
 finally:
     user_store.claim, user_store._USE_REDIS = _claim, _redis
 
-print("\n6. The guard is actually called at startup")
-BOT = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "apex", "bot.py"), encoding="utf-8").read()
-head = BOT.split("def main():")[1][:1200]
-check("bot.main() asserts the configuration", "assert_safe_config()" in head,
-      "checking at point of use means the service starts and looks healthy")
+print("\n6. The platform process does not boot the retired bot")
+# The loud startup call lived in the bot process, which is gone. The legacy
+# callback is not mounted on platform_server. The runtime refusal in
+# stateless_allowed() is what still holds if that module is invoked.
+PS = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "platform_server.py"), encoding="utf-8").read()
+check("platform_server does not import the bot",
+      "import apex.bot" not in PS and "from apex.bot" not in PS
+      and "from apex import bot" not in PS)
+check("an unsigned callback is still refused at use",
+      oauth.stateless_allowed() is False)
 
 print("\n" + "=" * 50)
 if failures:

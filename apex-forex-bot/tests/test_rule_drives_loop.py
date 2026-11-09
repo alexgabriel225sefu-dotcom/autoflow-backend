@@ -356,7 +356,7 @@ _stopped = RS.PlatformRuleStrategy().signal(frame(FALLING))
 check("HOLD once automation is stopped, even on a satisfied rule",
       _stopped.get("action") == "HOLD", str(_stopped))
 
-# A legacy Telegram account has no platform rule at all. It can only reach
+# A legacy the platform account has no platform rule at all. It can only reach
 # this module by holding this strategy id, and if it ever does, the answer is
 # no trade — never the engine's own strategies under a rule's name.
 _unknown = RS.PlatformRuleStrategy().signal(

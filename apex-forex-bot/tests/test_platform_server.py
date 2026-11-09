@@ -4,9 +4,9 @@ WHY THIS FILE EXISTS
 
 The deployment blueprint originally said `startCommand: python -u main.py`, and
 that was wrong in the worst available way. `main.py` starts `apex.bot.main()`,
-which starts Telegram polling, the per-user trading loops and the operator
+which starts the platform polling, the per-user trading loops and the operator
 dashboard. Deploying it under a second name would have created a SECOND live
-Telegram trading bot alongside the one already running.
+the platform trading bot alongside the one already running.
 
 It looked plausible because the platform's `/healthz`, `/readyz` and `/api/v1/*`
 routes are mounted on that bot's HTTP handler, so the health check path in the

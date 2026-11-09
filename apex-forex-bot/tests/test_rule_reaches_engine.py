@@ -353,7 +353,7 @@ if os.path.exists(terms) and os.path.exists(page):
 # `engine_config.translate` wrote fourteen engine keys and not `automation`.
 # A platform client's record therefore carried neither that key nor the
 # legacy `copilot` boolean, and `apex.automation.mode()` resolves THAT exact
-# state to "approval" — correctly, for a Telegram client, where it means
+# state to "approval" — correctly, for a platform client, where it means
 # nobody chose and unattended trading is the wrong default.
 #
 # On the platform it meant the product did not work. In approval mode the

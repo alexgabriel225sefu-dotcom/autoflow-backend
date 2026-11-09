@@ -38,7 +38,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-liveexec-")
 
 from apex import gates, account_mode as am  # noqa: E402

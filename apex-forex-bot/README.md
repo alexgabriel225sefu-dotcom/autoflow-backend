@@ -1,7 +1,7 @@
 # 💱 Apex Forex Bot
 
 AI-powered trading bot — **forex majors and metals** on one cTrader account.
-**cTrader + MetaTrader 5. Telegram-controlled. Zero config files.**
+**cTrader + MetaTrader 5. the web app-controlled. Zero config files.**
 
 What it trades and what it deliberately refuses: [docs/ASSETS.md](docs/ASSETS.md).
 
@@ -23,7 +23,7 @@ excludes the other projects in this monorepo, because an unrelated commit
 restarting the trading loop can orphan an open position mid-trade.
 
 There is no deploy command, and nothing in the bot can deploy itself. `/deploy`
-in Telegram reports what is running — service, branch, commit, uptime — and
+in the web app reports what is running — service, branch, commit, uptime — and
 cannot change it.
 
 ### Configuration
@@ -33,8 +33,8 @@ Set in the Render dashboard, under the service's **Environment**:
 | Variable | Where to get it |
 |---|---|
 | `PRODUCT` | `forex` — the bot refuses to start without it |
-| `TELEGRAM_BOT_TOKEN` | Create a bot at [@BotFather](https://t.me/BotFather) → `/newbot` |
-| `ADMIN_CHAT_ID` | Message [@userinfobot](https://t.me/userinfobot) → it replies with your ID |
+| `the retired bot token` | Create a bot at [@BotFather](https://the-retired-chat/BotFather) → `/newbot` |
+| `ADMIN_CHAT_ID` | Message [@userinfobot](https://the-retired-chat/userinfobot) → it replies with your ID |
 | `TOKEN_ENCRYPTION_KEY` | Fernet key — see [docs/CONFIG.md](docs/CONFIG.md). Startup is refused without it in production |
 | `UPSTASH_REDIS_REST_URL` / `..._TOKEN` | Shared state. Startup is refused without a shared backend in production |
 | `GEMINI_API_KEY` *(optional)* | Powers AI chat and voice control. Trading works without it |
@@ -42,7 +42,7 @@ Set in the Render dashboard, under the service's **Environment**:
 Two of those refuse to start rather than degrade, on purpose: credentials in
 plaintext and per-container state are both worse than an outage you can see.
 
-### Step 3 — Open Telegram
+### Step 3 — Open the web app
 Find your bot and send:
 ```
 /setup
@@ -52,7 +52,7 @@ The bot walks you through connecting your **cTrader account**
 
 ---
 
-## What you can do from Telegram
+## What you can do from the web app
 
 | Command | Action |
 |---|---|
@@ -93,7 +93,7 @@ The bot walks you through connecting your **cTrader account**
 |---|---|
 | [docs/SETUP.md](docs/SETUP.md) | Step-by-step deployment + cTrader account |
 | [docs/METATRADER.md](docs/METATRADER.md) | MetaTrader 5 / IC Markets integration |
-| [docs/CONFIG.md](docs/CONFIG.md) | Every setting + all Telegram commands |
+| [docs/CONFIG.md](docs/CONFIG.md) | Every setting + all the web app commands |
 | [docs/STRATEGIES.md](docs/STRATEGIES.md) | How the bot decides to trade |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Fixes for common problems |
 | [docs/FAQ.md](docs/FAQ.md) | Common questions |

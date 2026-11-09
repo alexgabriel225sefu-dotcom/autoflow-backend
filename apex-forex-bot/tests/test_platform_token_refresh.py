@@ -129,7 +129,7 @@ check("it returns False", ok is False)
 check("and the loop keeps its old token rather than a blank one",
       cfg.CTRADER_ACCESS_TOKEN == "stale-token", cfg.CTRADER_ACCESS_TOKEN)
 
-# ── 4. a Telegram account still takes the legacy path ───────────────────────
+# ── 4. a platform account still takes the legacy path ───────────────────────
 # The other product must be unaffected: no platform connection is consulted,
 # and the legacy refresh-token read still decides.
 print("\n[4] a Telegram account falls through to the legacy path")
