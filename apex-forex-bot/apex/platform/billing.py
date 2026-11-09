@@ -481,11 +481,20 @@ def _k_intent(user_id):
     return f"{_store._ns()}:{_store._P}:billing:intent:{user_id}"
 
 
+def _k_consent(user_id):
+    """The withdrawal-waiver consent for this account.
+
+    Written before checkout starts. The user id is a path segment, so account
+    export and erasure already pick the record up.
+    """
+    return f"{_store._ns()}:{_store._P}:billing:consent:{user_id}"
+
+
 def _k_review(event_id):
     return f"{_store._ns()}:{_store._P}:billing:review:{event_id}"
 
 
-def record_link_intent(user_id, email, *, now=None, acknowledged_at=None):
+def record_link_intent(user_id, email, *, now=None, consent=None):
     """Note that THIS server sent `user_id` to the Payment Link.
 
     Called by `stripe_checkout.start_checkout` from an authenticated session.
@@ -499,9 +508,120 @@ def record_link_intent(user_id, email, *, now=None, acknowledged_at=None):
         raise ValueError("a user id is required")
     rec = {"userId": uid, "email": str(email or "").strip().lower(),
            "at": time.time() if now is None else now}
-    if acknowledged_at is not None:
-        rec["acknowledgedTrialAt"] = acknowledged_at
+    if isinstance(consent, dict):
+        rec["withdrawalConsentAt"] = int(consent["consentedAt"])
+        rec["withdrawalPolicyVersion"] = str(consent["policyVersion"])
+        rec["withdrawalConsentUserId"] = str(consent["userId"])
     _store._write_strict(_k_intent(uid), rec)
+
+
+def record_withdrawal_consent(user_id, *, now=None):
+    """Store the article 16(m) consent. Raises if the write does not land.
+
+    The policy version is this server's, never a value from the browser.
+    A later consent keeps an access time already recorded for this account.
+    """
+    from apex.platform import refund_policy as rp
+    uid = str(user_id or "").strip()
+    if not uid:
+        raise ValueError("a user id is required")
+    consented_at = int(time.time() if now is None else now)
+    granted = None
+    prev = _store._read_strict(_k_consent(uid))
+    if isinstance(prev, dict) and prev.get("accessGrantedAt") is not None:
+        granted = int(prev["accessGrantedAt"])
+    rec = {
+        "userId": uid,
+        "policyVersion": rp.POLICY_VERSION,
+        "consentedAt": consented_at,
+        "statement": rp.CONSENT_STATEMENT,
+        "accessGrantedAt": granted,
+    }
+    rec["confirmation"] = rp.confirmation_text(
+        user_id=uid, policy_version=rp.POLICY_VERSION,
+        consented_at=consented_at, access_granted_at=granted)
+    return _store._write_strict(_k_consent(uid), rec)
+
+
+def _consent_from_session(user_id, obj):
+    """Consent carried on a Checkout Session this server created, or None."""
+    from apex.platform import refund_policy as rp
+    meta = obj.get("metadata") if isinstance(obj, dict) else None
+    if not isinstance(meta, dict):
+        return None
+    if str(meta.get(rp.META_USER) or "").strip() != str(user_id):
+        return None
+    version = str(meta.get(rp.META_VERSION) or "").strip()
+    if not rp.version_ok(version):
+        return None
+    try:
+        consented_at = int(meta.get(rp.META_AT))
+    except (TypeError, ValueError):
+        return None
+    return {"userId": str(user_id), "policyVersion": version,
+            "consentedAt": consented_at}
+
+
+def stamp_access_granted(user_id, obj, *, granted_at, payment_ref=None):
+    """Write the durable confirmation and return its text, or None.
+
+    Prefers the Checkout Session metadata for this payment, then the consent
+    stored before checkout. A payment with neither keeps the short notice.
+    """
+    from apex.platform import refund_policy as rp
+    uid = str(user_id or "").strip()
+    if not uid:
+        return None
+    source = _consent_from_session(uid, obj)
+    stored = _store._read_strict(_k_consent(uid))
+    if source is None and isinstance(stored, dict) and str(stored.get("userId")) == uid:
+        version = str(stored.get("policyVersion") or "")
+        if rp.version_ok(version) and stored.get("consentedAt") is not None:
+            source = {"userId": uid, "policyVersion": version,
+                      "consentedAt": int(stored["consentedAt"])}
+    if source is None:
+        return None
+    when = int(granted_at)
+    text = rp.confirmation_text(
+        user_id=uid, policy_version=source["policyVersion"],
+        consented_at=source["consentedAt"], access_granted_at=when)
+    rec = dict(stored) if isinstance(stored, dict) else {}
+    rec.update({
+        "userId": uid,
+        "policyVersion": source["policyVersion"],
+        "consentedAt": int(source["consentedAt"]),
+        "statement": rp.CONSENT_STATEMENT,
+        "accessGrantedAt": when,
+        "confirmation": text,
+    })
+    if payment_ref:
+        rec["paymentRef"] = str(payment_ref)
+    _store._write_strict(_k_consent(uid), rec)
+    return text
+
+
+def purchase_confirmation_public(user_id):
+    """What the licence page may show. No payment secret."""
+    from apex.platform import refund_policy as rp
+    uid = str(user_id or "").strip()
+    rec = _store._read_strict(_k_consent(uid)) if uid else None
+    if not isinstance(rec, dict) or str(rec.get("userId") or "") != uid:
+        return {"recorded": False}
+    text = rec.get("confirmation")
+    if not isinstance(text, str) or not text.strip():
+        text = rp.confirmation_text(
+            user_id=uid, policy_version=rec.get("policyVersion"),
+            consented_at=rec.get("consentedAt"),
+            access_granted_at=rec.get("accessGrantedAt"))
+    return {
+        "recorded": True,
+        "userId": uid,
+        "policyVersion": rec.get("policyVersion"),
+        "consentedAt": rec.get("consentedAt"),
+        "statement": rec.get("statement") or rp.CONSENT_STATEMENT,
+        "accessGrantedAt": rec.get("accessGrantedAt"),
+        "confirmation": text,
+    }
 
 
 def _session_email(obj):
@@ -1190,8 +1310,24 @@ def handle_event(raw_body: bytes, sig_header: str, *, secret=None, now=None):
                            masked_key=None, now=now, payment_ref=ref)
                 _live_gate.note_confirmed_payment(
                     user_id, obj, payment_ref=ref, lifetime=lifetime)
-            notice = ("Licence activated", _notify.INFO,
-                      "Your payment was confirmed and your licence is active.")
+            # The short sentence stays. When this payment carried a withdrawal
+            # waiver, the same notification is the durable confirmation: who
+            # consented, when, and which policy version. A failure to write
+            # that sentence is not a failure to grant — the retry would see
+            # the payment as already granted and would not send it again.
+            notice_body = "Your payment was confirmed and your licence is active."
+            try:
+                extra = stamp_access_granted(
+                    user_id, obj,
+                    granted_at=time.time() if now is None else now,
+                    payment_ref=ref)
+            except Exception as exc:                        # noqa: BLE001
+                print(f"[Billing] purchase confirmation was not stored "
+                      f"({type(exc).__name__})")
+                extra = None
+            if extra:
+                notice_body = f"{notice_body} {extra}"
+            notice = ("Licence activated", _notify.INFO, notice_body)
             outcome = "granted"
         else:
             if etype == "charge.refunded" and not _fully_refunded(obj):

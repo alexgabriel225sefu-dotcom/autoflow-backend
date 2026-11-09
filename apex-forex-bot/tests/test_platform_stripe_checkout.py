@@ -78,7 +78,7 @@ A._id.verify_token = lambda tok, **kw: _Principal()
 def call(body=None, acknowledged=True):
     body = dict(body or {})
     if acknowledged:
-        body.setdefault("acknowledgedTrial", True)
+        body.setdefault("immediateAccessConsent", True)
     raw = json.dumps(body).encode()
     return A.handle("POST", "/api/v1/billing/checkout",
                     {"Authorization": "Bearer x"}, raw)
@@ -196,17 +196,43 @@ check("client_reference_id is the signed-in user",
       form.get("client_reference_id") == USER, str(form))
 check("metadata carries the same user",
       form.get(f"metadata[{B.USER_META_KEY}]") == USER, str(form))
-check("the session records when the buyer confirmed they had tried the demo",
-      form.get("metadata[acknowledgedTrialAt]", "").isdigit(), str(form))
-# The confirmation is required, and only a literal true counts.
+consent = B.purchase_confirmation_public(USER)
+check("the server stored the waiver before Stripe was called",
+      consent.get("recorded") is True
+      and consent.get("userId") == USER
+      and consent.get("policyVersion") == "2026-11-09"
+      and str(consent.get("consentedAt", "")).isdigit()
+      and "I request immediate access" in (consent.get("statement") or ""),
+      str(consent)[:300])
+check("session metadata carries the time, the policy version and the user",
+      form.get("metadata[withdrawalConsentAt]") == str(consent.get("consentedAt"))
+      and form.get("metadata[withdrawalPolicyVersion]") == "2026-11-09"
+      and form.get("metadata[withdrawalConsentUserId]") == USER,
+      str(form))
+check("a policy version sent by the browser is ignored",
+      "1999-01-01" not in (seen.get("body") or b"").decode())
+# The waiver is required, and only a literal true counts.
 SC._transport = transport
 try:
     _st, _out = call({"method": "session"}, acknowledged=False)
-    check("no confirmation is refused with its own code",
-          _st == 400 and _out["error"]["code"] == "ACKNOWLEDGEMENT_REQUIRED", str(_out)[:160])
+    check("no waiver is refused with its own code",
+          _st == 400 and _out["error"]["code"] == "WITHDRAWAL_CONSENT_REQUIRED",
+          str(_out)[:200])
     for _bad in ("yes", 1, "true", None):
-        _st, _ = call({"method": "session", "acknowledgedTrial": _bad}, acknowledged=False)
-        check(f"{_bad!r} is not a confirmation", _st == 400, str(_st))
+        _st, _ = call({"method": "session", "immediateAccessConsent": _bad}, acknowledged=False)
+        check(f"{_bad!r} is not a waiver", _st == 400, str(_st))
+    _st, _ = call({"method": "session", "acknowledgedTrial": True}, acknowledged=False)
+    check("the old demo checkbox does not start checkout", _st == 400, str(_st))
+    seen.clear()
+    _st, _ = call({
+        "method": "session",
+        "immediateAccessConsent": True,
+        "policyVersion": "1999-01-01",
+    })
+    _form = dict(urllib.parse.parse_qsl((seen.get("body") or b"").decode()))
+    check("the metadata version is the server's",
+          _form.get("metadata[withdrawalPolicyVersion]") == "2026-11-09",
+          str(_form))
 finally:
     SC._transport = None
 check("success and cancel come back to /license",

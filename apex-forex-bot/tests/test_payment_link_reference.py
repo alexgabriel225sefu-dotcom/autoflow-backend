@@ -93,7 +93,7 @@ check("recorded for review with the reason", isinstance(review, dict)
       and "no checkout" in review.get("reason", ""), str(review))
 
 print("\n[2] a recorded intent with a DIFFERENT e-mail is held")
-SC.start_checkout(_P("alice", "Alice@Example.test"), {"method": "payment_link", "acknowledgedTrial": True})
+SC.start_checkout(_P("alice", "Alice@Example.test"), {"method": "payment_link", "immediateAccessConsent": True})
 st, out = deliver(link_obj("alice", "someone-else@example.test"), "evt_2")
 check("not granted", out.get("handled") is False and not founder("alice"),
       str(out))

@@ -25,6 +25,8 @@ describe("pricing page", () => {
     expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
     expect(screen.getByRole("link", { name: "Pricing" }).getAttribute("aria-current")).toBe("page");
     await waitFor(() => expect(screen.getByText("$499")).toBeTruthy());
+    expect(screen.getByText(/Licence purchases are final and non-refundable once access is granted, except where required by law/)).toBeTruthy();
+    expect(screen.getByText(/Demo conditions \(fills, spreads, slippage\) can differ from live trading/)).toBeTruthy();
   });
 
   it("does not invent a price when the server cannot be reached", async () => {
