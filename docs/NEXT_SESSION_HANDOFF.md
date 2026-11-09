@@ -4,19 +4,25 @@
 
 1. **Current branch:** `codex/security-findings-fix`, based on
    `claude/apex4traders-platform-v1`.
-2. **Current commit:** `30f34407` (`fix(security): migrate legacy plaintext
-   user secrets`); CI for this branch is not yet run.
+2. **Current commits:** `30f34407` (migration and backup rewrap) and
+   `cb0d3805` (fail-closed broker runtime reads and structural backup checks);
+   CI for this branch is not yet run.
 3. **Completed:** added explicit, optimistic-concurrency migration for legacy
    plaintext user secrets; production reads now fail closed for unmigrated
-   sensitive values; backup verification rejects plaintext string and JSON
-   sensitive fields; added regression coverage and a maintenance script.
+   user and platform broker values; backup dumps rewrap legacy plaintext and
+   verification rejects plaintext string/JSON sensitive fields; added
+   regression coverage and a maintenance script for both namespaces.
 4. **Changed files:** `apex-forex-bot/apex/user_store.py`,
-   `apex-forex-bot/apex/backup.py`, `apex-forex-bot/tests/test_accounts_at_rest.py`,
+   `apex-forex-bot/apex/backup.py`,
+   `apex-forex-bot/apex/platform/ctrader_link.py`,
+   `apex-forex-bot/apex/platform/admin_audit.py`,
+   `apex-forex-bot/tests/test_accounts_at_rest.py`,
    `apex-forex-bot/tests/test_backup_restore.py`,
    `apex-forex-bot/scripts/migrate_sensitive_records.py`.
-5. **Tests:** `tests/test_accounts_at_rest.py` and
-   `tests/test_backup_restore.py` passed; the migration script `--help` also
-   passed with UTF-8 output settings. A local UTF-8-compatible per-file sweep
+5. **Tests:** `tests/test_accounts_at_rest.py`,
+   `tests/test_backup_restore.py`, `tests/test_platform_ctrader_link.py`,
+   and `tests/test_platform_admin_audit.py` passed; the migration script
+   `--help` also passed with UTF-8 output settings. A local UTF-8-compatible per-file sweep
    passed `225/225` files with no failures or timeouts. The official
    `tests/run_all.py` first hit the Windows child-output decoding bug in
    `test_access_gates_loop.py`; the UTF-8 rerun was stopped after the long
