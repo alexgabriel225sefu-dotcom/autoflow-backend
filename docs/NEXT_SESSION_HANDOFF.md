@@ -632,6 +632,25 @@ showing regexes (`AKIA[0-9A-Z]{16}`, a Kubernetes `-----BEGIN PRIVATE KEY-----`
 example, a PGP regex in an agent definition), none of them a real credential,
 and none in the product.
 
+## Roadmap, Codex items — 2026-11-09
+
+- Done: PR #159 merged as `6751b16b54bf40db737c73999e15ae44758c8b80`.
+  Cross-tab signup confirmation now uses the implicit Supabase flow, the
+  callback imports the one-time session into the cookie-backed client, and
+  Backtest only offers active rules. The Settings resend test now mocks the
+  implicit client.
+- CI: green on head `7787e793b6f8df65d82ca559618a93cd2bf863d7` — `node`,
+  `config-drift`, `python`, and `web` all passed.
+- Deploy: web service `srv-das11tfavr4c738irjv0` is live on
+  `6751b16b54bf40db737c73999e15ae44758c8b80`. API was not changed or
+  redeployed. `/healthz`, `/`, and `/signup` returned 200; no new Render
+  error logs were found after deploy start.
+- Partial: the full local Vitest run was interrupted after the targeted
+  Settings suite passed; CI web passed the complete suite. `tests/run_all.py`
+  remains unverified locally on Windows.
+- Next: run the fresh confirmation walkthrough and demo-only cTrader smoke
+  check; keep live trading and checkout closed.
+
 ## 7. Hard limits
 
 - **Do not merge to `main`.** It is old and divergent.
