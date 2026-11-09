@@ -992,3 +992,18 @@ UTF-8 launcher. Commit `6b564473` was pushed and its GitHub Tests workflow
 run 475 is green across all four jobs: web, python, node and config-drift.
 Production email confirmation and cTrader OAuth still need a real end-to-end
 smoke test.
+
+## Deploy record — 2026-11-09
+
+Owner explicitly authorized deploy. PR #163 was squash-merged into
+`claude/apex4traders-platform-v1` as `5bb8b4f99053555db6d42bfd265b99be364afec0`.
+Render workspace `tea-d7i5tnaqqhas738sjhf0` deployed that commit manually to
+`apex4traders-web` (`dep-dbovjc6i0phs73eussd0`) and `apex4traders-api`
+(`dep-dbovjcjm8hqs73f5l6p0`); both reached `live`.
+
+Post-deploy checks: API `/healthz`, public homepage, signup page and Render
+web URL all returned HTTP 200. Web logs had no errors. API startup logged one
+`revival_failed` / `ENGINE_REFUSED` ownership handoff event while the previous
+instance was still active; the service remained healthy and no further error
+was observed. Live execution remained disabled and no order or environment
+setting was changed.
