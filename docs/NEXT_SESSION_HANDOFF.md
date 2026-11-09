@@ -831,7 +831,8 @@ complete. CI on the pushed branch is still pending.
 
 ## Rate-limit follow-up — 2026-11-08
 
-Branch: `codex/new-client-flow-signup-demo`.
+Branch: `codex/new-client-flow-signup-demo`, based on
+`claude/apex4traders-platform-v1`.
 
 The web client previously throttled each historical endpoint independently. A
 dashboard, chart and journal could therefore spend the shared candles budget
@@ -903,6 +904,9 @@ Codex.
 
 ## New-client walkthrough repairs — 2026-11-08
 
+Branch: `codex/new-client-flow-signup-demo-repair`, commit `6689bb10`, based on
+`claude/apex4traders-platform-v1`.
+
 The production walkthrough found two concrete client-flow defects. A signup
 confirmation opened from Mailinator in a new tab showed Supabase's PKCE
 verifier error, even though the account could later sign in. The signup and
@@ -938,5 +942,8 @@ security scan is still incomplete, and the legacy `server.js` dependency and
 provider-cost findings remain outside this branch's allowed files.
 
 No deploy, provider-dashboard change, environment/flag change, live action or
-order was performed. Next: push this repair, read all four CI jobs, then run a
-fresh confirmation walkthrough and a cTrader demo-only smoke check.
+order was performed. The original Codex branch already had unrelated remote
+commits, so this repair was pushed without force-updating it. Open a PR from
+`codex/new-client-flow-signup-demo-repair` into the Claude base, read all four
+CI jobs, then run a fresh confirmation walkthrough and a cTrader demo-only
+smoke check.
