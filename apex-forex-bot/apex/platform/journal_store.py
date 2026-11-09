@@ -84,6 +84,7 @@ def append(entry):
                        "status": entry.status, "kind": entry.kind,
                        "symbol": entry.symbol,
                        "accountId": entry.account_id,
+                       "environment": getattr(entry, "environment", None),
                        "ruleDocId": entry.rule_doc_id})
         if len(idx) > MAX_ENTRIES:
             for dropped in idx[MAX_ENTRIES:]:
@@ -131,9 +132,33 @@ def _present(row):
     return out
 
 
-def _matches(head, *, account_id, symbol, since, until, rule_doc_id, status):
+_LEGACY_ENGINE = "the engine refused to start this loop"
+
+
+def _legacy_engine_refusal(error):
+    return isinstance(error, str) and error.strip().lower().startswith(_LEGACY_ENGINE)
+
+
+def _effective_status(stored, error):
+    """How a row is filtered. The stored status is not rewritten.
+
+    Engine refusals filed before they had their own status still say
+    broker_error on disk. The Broker error filter must not show them under
+    an Engine error label, and the Engine error filter must still find them.
+    """
+    if stored == _j.BROKER_ERROR and _legacy_engine_refusal(error):
+        return _j.ENGINE_ERROR
+    return stored
+
+
+def _matches(head, *, account_id, symbol, since, until, rule_doc_id, status,
+             environment=None):
     if account_id is not None and str(head.get("accountId")) != str(account_id):
         return False
+    if environment is not None:
+        recorded = head.get("environment")
+        if recorded is not None and str(recorded).lower() != str(environment).lower():
+            return False
     if symbol is not None:
         n = lambda s: str(s or "").replace("_", "").replace("/", "").upper()
         if n(head.get("symbol")) != n(symbol):
@@ -150,7 +175,7 @@ def _matches(head, *, account_id, symbol, since, until, rule_doc_id, status):
 
 
 def query(owner_id, *, account_id=None, symbol=None, since=None, until=None,
-          rule_doc_id=None, status=None, limit=50, offset=0):
+          rule_doc_id=None, status=None, environment=None, limit=50, offset=0):
     """A page of this client's journal, newest first.
 
     Filtering happens on the INDEX, which carries just enough of each entry to
@@ -169,7 +194,26 @@ def query(owner_id, *, account_id=None, symbol=None, since=None, until=None,
     heads = [h for h in _read_index(owner, strict=True)
              if _matches(h, account_id=account_id, symbol=symbol,
                          since=since, until=until, rule_doc_id=rule_doc_id,
-                         status=status)]
+                         status=None if status in (_j.BROKER_ERROR, _j.ENGINE_ERROR) else status,
+                         environment=environment)]
+    if status in (_j.BROKER_ERROR, _j.ENGINE_ERROR):
+        heads = [h for h in heads if h.get("status") in (_j.BROKER_ERROR, _j.ENGINE_ERROR)]
+        docs = (_store._read_many_strict([_k_entry(owner, h["id"]) for h in heads])
+                if heads else [])
+        confirmed = []
+        unread_bodies = 0
+        for head, row in zip(heads, docs):
+            if not isinstance(row, dict) or str(row.get("userId")) != owner:
+                unread_bodies += 1
+                continue
+            if _effective_status(head.get("status"), row.get("error")) == status:
+                confirmed.append(head)
+        heads = confirmed
+        # Bodies that could not be classified are reported, never deleted,
+        # and never guessed into the other filter.
+        extra_unreadable = unread_bodies
+    else:
+        extra_unreadable = 0
     page = heads[offset:offset + limit]
     # ONE round trip for the page, not one per row in series.
     docs = _store._read_many_strict([_k_entry(owner, h["id"]) for h in page])
@@ -191,7 +235,7 @@ def query(owner_id, *, account_id=None, symbol=None, since=None, until=None,
         "limit": limit,
         "offset": offset,
         "hasMore": offset + len(page) < len(heads),
-        "unreadable": unreadable,
+        "unreadable": unreadable + extra_unreadable,
     }
 
 

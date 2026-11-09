@@ -37,7 +37,7 @@ import { collapseRepeated, plainAutomation, plainDecision, plainLicence, plainRe
 import { OverviewBand, type Tile } from "@/components/app/overview-band";
 import { FirstRunChecklist } from "@/components/app/first-run";
 import { JourneyStrip } from "@/components/app/journey-strip";
-import { AccountsDuo } from "@/components/app/accounts-duo";
+import { AccountsDuo, type AccountFigure } from "@/components/app/accounts-duo";
 import { WelcomeColour } from "@/components/app/welcome-colour";
 import { PipelineFlow } from "@/components/app/pipeline-flow";
 import { LivingBackdrop } from "@/components/app/living-backdrop";
@@ -87,6 +87,7 @@ export default function Dashboard() {
   const ord = useRead<OrdersRead>("orders", 60_000);
   const jr = useRead<JournalPage>("journal?limit=8", 45_000);
   const rules = useRead<{ rules: RuleSummary[] }>("rules", 120_000);
+  const reads = useRead<{ accounts: AccountFigure[] }>("accounts/reads", 45_000);
   const [busy, setBusy] = useState(false);
   // A refusal from the account picker. Its own state rather than a shared
   // one: it must survive the status reload that follows, which is the
@@ -110,9 +111,16 @@ export default function Dashboard() {
     ?? null;
 
   const lastSync = Math.max(...[ct, auto, pos, jr].map((r) => r.lastSync ?? 0)) || null;
-  const autoPlain = plainAutomation(running?.state, !!activeRule, {
-    closed: running?.marketClosed, message: running?.marketMessage,
-  });
+  const loopSplit = running?.desiredState === "running" && running.loopActive === false;
+  const autoPlain = loopSplit
+    ? {
+        label: "Loop not active",
+        detail: "Automation is marked running. The loop is not active on this server.",
+        tone: "neutral" as const,
+      }
+    : plainAutomation(running?.state, !!activeRule, {
+        closed: running?.marketClosed, message: running?.marketMessage,
+      });
   const licPlain = plainLicence(licence);
   const isDemo = selected?.mode === "demo";
   // A live account the SERVER has cleared, and cleared for live specifically.
@@ -120,6 +128,8 @@ export default function Dashboard() {
   // account the client just switched away from, because the picker and `me`
   // refresh on different clocks.
   const liveCleared = gateCleared(execution);
+  const demoAccount = account?.accounts.find((a) => a.mode === "demo") ?? null;
+  const startDemoWhileLiveClosed = Boolean(demoAccount) && !isDemo && !liveCleared;
   const liveCopy = liveNotice(execution);
   const runningThis = running?.state === "running" || running?.state === "paused";
 
@@ -135,16 +145,18 @@ export default function Dashboard() {
     },
     {
       label: "State",
-      value: running
-        ? (running.state === "running" && running.marketClosed
+      value: !running ? null : loopSplit
+        ? "Loop not active"
+        : (running.state === "running" && running.marketClosed
           ? "Market closed"
-          : { running: "Running", paused: "Paused", stopped: "Stopped", blocked: "Blocked" }[running.state])
-        : null,
-      note: running?.state === "running" && running.marketClosed
-        ? (running.marketMessage ?? "The loop is idle until the market reopens.")
-        : running?.blockReason
-          ?? (running && running.state !== "stopped" && running.state !== "blocked" ? running.levelLabel ?? null : null),
-      tone: running?.state === "running" && !running.marketClosed ? "long" : "neutral",
+          : { running: "Running", paused: "Paused", stopped: "Stopped", blocked: "Blocked" }[running.state]),
+      note: loopSplit
+        ? "Marked running. The loop is not active on this server."
+        : running?.state === "running" && running.marketClosed
+          ? (running.marketMessage ?? "The loop is idle until the market reopens.")
+          : running?.blockReason
+            ?? (running && running.state !== "stopped" && running.state !== "blocked" ? running.levelLabel ?? null : null),
+      tone: running?.state === "running" && !running.marketClosed && !loopSplit ? "long" : "neutral",
     },
     {
       label: "Rule",
@@ -207,7 +219,7 @@ export default function Dashboard() {
         <DashboardCustomise hidden={hidden} />
         <button className="btn btn-ghost btn-sm" onClick={() => {
           void ct.reload(); void auto.reload(); void pos.reload(); void ord.reload();
-          void jr.reload(); void rules.reload(); void me.reload();
+          void jr.reload(); void rules.reload(); void me.reload(); void reads.reload();
           invalidate("automation/why");
         }}>
           <RefreshCw className="ico" aria-hidden /> Refresh
@@ -215,7 +227,11 @@ export default function Dashboard() {
         </span>
       </div>
 
-      <JourneyStrip auto={auto.result} rules={rules.result} mode={selected?.mode ?? null} />
+      <JourneyStrip
+        auto={auto.result} rules={rules.result} mode={selected?.mode ?? null}
+        liveOpen={liveCleared}
+        hasDemo={Boolean(account?.accounts.some((a) => a.mode === "demo"))}
+      />
 
       <PipelineFlow
         account={selected ? `#${selected.ctid} · ${selected.mode === "demo" ? "Demo" : "Live"}` : null}
@@ -229,7 +245,11 @@ export default function Dashboard() {
       <AccountsDuo
         accounts={account?.accounts ?? null} selected={selected}
         execution={execution} running={running}
+        figures={reads.result?.ok ? reads.result.data.accounts : null}
       />
+      {reads.result && !reads.result.ok ? (
+        <ErrorNotice error={reads.result} onRetry={reads.reload} />
+      ) : null}
 
       <FirstRunChecklist
         me={me.result} ct={ct.result} auto={auto.result} rules={rules.result}
@@ -371,7 +391,7 @@ export default function Dashboard() {
                     <p className="muted" style={{ fontSize: ".82rem", marginTop: "var(--sp-2)" }}>
                       Choose an account above before starting.
                     </p>
-                  ) : !isDemo && !liveCleared ? (
+                  ) : !isDemo && !liveCleared && !demoAccount ? (
                     <div className="notice notice-warn" role="alert">
                       {/* WHY THIS IS NOT JUST `!isDemo` ANY MORE.
                           A hardcoded refusal was right while no deployment
@@ -398,19 +418,40 @@ export default function Dashboard() {
                       ) : null}
                     </div>
                   ) : (
+                    <>
+                    {startDemoWhileLiveClosed ? (
+                      <div className="notice notice-warn" role="status">
+                        <p style={{ fontWeight: 600 }}>Live trading is not enabled</p>
+                        <p className="muted">{liveCopy.lead} Demo automation stays available.</p>
+                      </div>
+                    ) : null}
                     <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>
                       {!runningThis ? (
                         <ConfirmAction
-                          label="Start"
-                          question={activeRule ? `Start watching with "${activeRule.name || "this rule"}"?` : "Start?"}
-                          disabled={!activeRule || !execution?.canAutomate}
+                          label={startDemoWhileLiveClosed ? "Start on demo" : "Start"}
+                          question={startDemoWhileLiveClosed
+                            ? `Start on demo account #${demoAccount?.ctid}? No live order is sent.`
+                            : (activeRule ? `Start watching with "${activeRule.name || "this rule"}"?` : "Start?")}
+                          disabled={!activeRule || (startDemoWhileLiveClosed ? licence === "revoked" : !execution?.canAutomate)}
                           disabledReason={
                             !activeRule ? "Activate a rule first"
+                              : startDemoWhileLiveClosed ? undefined
                               : !execution?.canAutomate
                                 ? execution?.message ?? "Access is being checked"
                                 : undefined
                           }
-                          onConfirm={() => control("start")}
+                          onConfirm={async () => {
+                            if (startDemoWhileLiveClosed && demoAccount
+                                && String(selected?.ctid) !== String(demoAccount.ctid)) {
+                              const picked = await api("ctrader/select", { method: "POST", body: { ctid: demoAccount.ctid } });
+                              if (!picked.ok) {
+                                setSelectErr(picked);
+                                return picked.message || "Could not use the demo account.";
+                              }
+                              invalidateBrokerViews();
+                            }
+                            return control("start");
+                          }}
                         />
                       ) : null}
                       {/* A PAUSE STOPS THE WHOLE LOOP, not just new entries.
@@ -436,6 +477,7 @@ export default function Dashboard() {
                                        onConfirm={() => control("stop")} />
                       ) : null}
                     </div>
+                    </>
                   )}
 
                   {controlResult ? (

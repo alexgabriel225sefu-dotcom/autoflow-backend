@@ -217,8 +217,23 @@ def status(user_id, *, weekend_reader=None):
     rec = _read(user_id)
     level = _level_of(rec)
     shown, block_reason = _truthful_state(user_id, rec)
+    # The stored record is what the client asked for. `state` above is what
+    # the loop is actually doing. They are different facts: a stored RUNNING
+    # whose loop is down used to be reported as Stopped, while "why no trade"
+    # still said the automation was marked running. Neither fact is written
+    # back here.
+    desired = rec.get("state") or STOPPED
+    if desired == RUNNING:
+        try:
+            loop_active = _loop_alive(user_id)
+        except Exception:  # noqa: BLE001
+            loop_active = None
+    else:
+        loop_active = False
     closed = _weekend_idle(weekend_reader)
     return {"status": "ok", "state": shown,
+            "desiredState": desired,
+            "loopActive": loop_active,
             "blockReason": block_reason,
             "ruleDocId": rec.get("ruleDocId"), "mode": rec.get("mode"),
             "startedAt": rec.get("startedAt"),

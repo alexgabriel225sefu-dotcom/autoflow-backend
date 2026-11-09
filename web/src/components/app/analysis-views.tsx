@@ -40,6 +40,12 @@ function checkText(v: boolean | null | string): string {
 type Health = {
   score: number; status: "healthy" | "degraded" | "blocked" | "not_connected";
   checks: Record<string, boolean | null | "not_applicable" | "market_closed">; warnings: string[];
+  accountMode?: "demo" | "live" | null;
+  accountId?: string | number | null;
+  linkedAccounts?: {
+    mode?: string; accountId?: string | number; balance: number | null; equity: number | null;
+    positions?: string; orders?: string; errorCode?: string | null; correlationId?: string | null;
+  }[] | null;
 };
 
 export function HealthView() {
@@ -56,7 +62,28 @@ export function HealthView() {
             <div className="grid grid-3">
               <div className="stat"><span className="stat-k">Score</span><strong className="stat-v">{d.score}/100</strong></div>
               <div className="stat"><span className="stat-k">Status</span><strong className="stat-v" data-status={d.status}>{d.status}</strong></div>
+              {d.accountMode ? (
+                <div className="stat"><span className="stat-k">Score account</span>
+                  <strong className="stat-v">{d.accountMode}{d.accountId != null ? ` #${d.accountId}` : ""}</strong></div>
+              ) : null}
             </div>
+            {d.linkedAccounts === null ? (
+              <p className="muted">The other linked accounts could not be read. That is not an all-clear.</p>
+            ) : d.linkedAccounts?.length ? (
+              <ul className="plain-list">
+                {d.linkedAccounts.map((a) => (
+                  <li key={`${a.mode}-${a.accountId}`}>
+                    <strong>{a.mode === "live" ? "Live" : a.mode === "demo" ? "Demo" : "Account"} #{a.accountId}</strong>{" "}
+                    <span className="muted">
+                      balance {a.balance == null ? "unknown" : a.balance} · equity {a.equity == null ? "unknown" : a.equity}
+                      {" · "}positions {a.positions || "unknown"} · orders {a.orders || "unknown"}
+                      {a.errorCode ? ` · ${a.errorCode}` : ""}
+                      {a.correlationId ? ` · ref ${a.correlationId}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <p className="muted" style={{ fontSize: ".8rem" }}>
               Parts that could not be read lower the score; they are never counted as healthy.
             </p>
@@ -118,55 +145,86 @@ export function IncidentsView() {
   );
 }
 
-type Risk =
-  | { status: "unavailable"; reason: string }
-  | {
-    status: "ok"; totalRisk: number; riskFraction: number | null;
-    symbols: Record<string, { long: number; short: number; risk: number }>;
-    unreadablePositions: number; warnings: string[];
-  };
+type RiskAccount = {
+  status: "unavailable" | "ok";
+  reason?: string;
+  mode?: "demo" | "live" | null;
+  accountId?: string | number | null;
+  totalRisk?: number;
+  riskFraction?: number | null;
+  symbols?: Record<string, { long: number; short: number; risk: number }>;
+  unreadablePositions?: number;
+  warnings?: string[];
+  currencyExposure?: Record<string, number> | null;
+  correlatedPairs?: { symbols: string[]; sharedCurrencies: string[]; direction: string }[] | null;
+  gapScenario?: { status?: string; reason?: string } | null;
+  errorCode?: string | null;
+  correlationId?: string | null;
+};
+
+type Risk = RiskAccount & { accounts?: RiskAccount[] };
+
+function correlationText(d: RiskAccount): string {
+  if (d.correlatedPairs == null || d.currencyExposure == null) {
+    return "Correlation: unknown. This is not zero.";
+  }
+  const pairs = d.correlatedPairs.length
+    ? d.correlatedPairs.map((p) => `${p.symbols.join(" & ")} share ${p.sharedCurrencies.join(", ")} (${p.direction})`).join("; ")
+    : "No shared-currency correlation in the positions that could be read.";
+  const gap = d.gapScenario?.status === "ok" ? "Gap scenario is available." : "Gap scenario: unknown.";
+  return `${pairs} ${gap}`;
+}
+
+function RiskCard({ d }: { d: RiskAccount }) {
+  const label = d.mode === "live" ? "Live account" : d.mode === "demo" ? "Demo account" : "Account";
+  if (d.status === "unavailable") {
+    return (
+      <div className="notice" role="alert">
+        <p style={{ fontWeight: 600 }}>Risk could not be read</p>
+        <p className="muted">{d.reason}. This is not a statement that nothing is at risk.
+          {d.errorCode ? ` ${d.errorCode}` : ""}{d.correlationId ? ` · ref ${d.correlationId}` : ""}</p>
+      </div>
+    );
+  }
+  if (d.status !== "ok") return null;
+  return (
+    <>
+      <section className="card">
+        <div className="card-head"><h2>{label}{d.accountId != null ? ` #${d.accountId}` : ""}</h2></div>
+        <div className="grid grid-3">
+          <div className="stat"><span className="stat-k">Risk if every stop is hit</span><strong className="stat-v">{d.totalRisk}</strong></div>
+          <div className="stat"><span className="stat-k">Of balance</span>
+            <strong className="stat-v">{d.riskFraction == null ? "unknown" : `${(d.riskFraction * 100).toFixed(2)}%`}</strong></div>
+          <div className="stat"><span className="stat-k">Unreadable positions</span><strong className="stat-v">{d.unreadablePositions}</strong></div>
+        </div>
+        {(d.warnings ?? []).map((w) => <p key={w} className="muted" role="note" style={{ fontSize: ".8rem" }}>{w}</p>)}
+      </section>
+      <section className="card">
+        <div className="card-head"><h2>By instrument</h2></div>
+        {Object.keys(d.symbols ?? {}).length === 0 ? <p className="empty">No open positions with a readable stop.</p> : (
+          <ul className="plain-list">
+            {Object.entries(d.symbols ?? {}).map(([s, v]) => (
+              <li key={s}><strong>{s}</strong>{" "}
+                <span className="muted">long {v.long} · short {v.short} · risk {v.risk}</span></li>
+            ))}
+          </ul>
+        )}
+        <p className="muted" style={{ fontSize: ".78rem" }}>{correlationText(d)}</p>
+      </section>
+    </>
+  );
+}
 
 export function RiskView() {
   const r = useRead<Risk>("risk", 30_000);
   const d = r.result?.ok ? r.result.data : null;
+  const cards = d?.accounts?.length ? d.accounts : d ? [d] : [];
   return (
     <main>
-      <Head title="Portfolio risk map" sub="Risk across all open positions" r={r} />
+      <Head title="Portfolio risk map" sub="Risk across open positions, per account" r={r} />
       {r.loading && !r.result ? <Spinner /> : null}
       {r.result && !r.result.ok ? <ErrorNotice error={r.result} onRetry={r.reload} /> : null}
-      {d && d.status === "unavailable" ? (
-        <div className="notice" role="alert">
-          <p style={{ fontWeight: 600 }}>Risk could not be read</p>
-          <p className="muted">{d.reason}. This is not a statement that nothing is at risk.</p>
-        </div>
-      ) : null}
-      {d && d.status === "ok" ? (
-        <>
-          <section className="card">
-            <div className="grid grid-3">
-              <div className="stat"><span className="stat-k">Risk if every stop is hit</span><strong className="stat-v">{d.totalRisk}</strong></div>
-              <div className="stat"><span className="stat-k">Of balance</span>
-                <strong className="stat-v">{d.riskFraction == null ? "unknown" : `${(d.riskFraction * 100).toFixed(2)}%`}</strong></div>
-              <div className="stat"><span className="stat-k">Unreadable positions</span><strong className="stat-v">{d.unreadablePositions}</strong></div>
-            </div>
-            {d.warnings.map((w) => <p key={w} className="muted" role="note" style={{ fontSize: ".8rem" }}>{w}</p>)}
-          </section>
-          <section className="card">
-            <div className="card-head"><h2>By instrument</h2></div>
-            {Object.keys(d.symbols).length === 0 ? <p className="empty">No open positions with a readable stop.</p> : (
-              <ul className="plain-list">
-                {Object.entries(d.symbols).map(([s, v]) => (
-                  <li key={s}><strong>{s}</strong>{" "}
-                    <span className="muted">long {v.long} · short {v.short} · risk {v.risk}</span></li>
-                ))}
-              </ul>
-            )}
-            <p className="muted" style={{ fontSize: ".78rem" }}>
-              Exposure per currency, correlation and gap scenarios are not computed yet.
-            </p>
-          </section>
-        </>
-      ) : null}
+      {cards.map((card, i) => <RiskCard key={`${card.mode ?? "account"}-${card.accountId ?? i}`} d={card} />)}
     </main>
   );
 }

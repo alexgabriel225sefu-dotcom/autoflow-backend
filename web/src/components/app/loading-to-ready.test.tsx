@@ -66,38 +66,40 @@ describe("the status strip at 390x844: loading → ready, and loading → failed
 });
 
 // ── a whole page, with the real hook, behind a slow and then a failed API ───
-let pending: ((r: ApiResult<unknown>) => void) | null = null;
+const pending: Array<(r: ApiResult<unknown>) => void> = [];
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
-  return { ...actual, api: vi.fn(() => new Promise<ApiResult<unknown>>((res) => { pending = res; })) };
+  return { ...actual, api: vi.fn(() => new Promise<ApiResult<unknown>>((res) => { pending.push(res); })) };
 });
 
 describe("the performance page at 390x844 behind a slow API", () => {
   it("is a spinner while waiting, then the figures, then no spinner", async () => {
     const { default: Page } = await import("../../app/(app)/performance/page");
-    pending = null;
+    pending.length = 0;
     render(<Page />);
     expect(document.body.textContent).not.toContain("Closed trades");
-    await waitFor(() => expect(pending).not.toBeNull());
+    await waitFor(() => expect(pending.length).toBeGreaterThanOrEqual(2));
     await act(async () => {
-      pending!({ ok: true, status: 200, data: {
+      const answer = { ok: true, status: 200, data: {
         status: "ok", period: "all", mode: "demo",
         summary: { trades: 3, wins: 2, losses: 1, win_rate: 66.7, net: 5, profit_factor: 2, expectancy: 1.67,
                    max_drawdown: 1, avg_win: 3, avg_loss: -1, best: 4, worst: -1, noLosses: false, r: null },
         byStrategy: [], bySymbol: [], minTrades: 3, excluded: { unknownMode: 0, otherMode: 0 },
         journalTrades: 0, note: "n", source: { closedTrades: "broker deal history", windowDays: 30, journalReadable: true, attributed: 0, unattributed: 3 },
-      } } as ApiResult<unknown>);
+      } } as ApiResult<unknown>;
+      pending.splice(0).forEach((resolve) => resolve(answer));
     });
     await waitFor(() => expect(screen.queryByText("Closed trades")).not.toBeNull());
   });
 
   it("a failure that arrives instead is an error with Retry — not a skeleton", async () => {
     const { default: Page } = await import("../../app/(app)/performance/page");
-    pending = null;
+    pending.length = 0;
     render(<Page />);
-    await waitFor(() => expect(pending).not.toBeNull());
+    await waitFor(() => expect(pending.length).toBeGreaterThanOrEqual(2));
     await act(async () => {
-      pending!({ ok: false, status: 0, code: "AUTH_UNAVAILABLE", message: "Your session could not be confirmed in time." } as ApiResult<unknown>);
+      const answer = { ok: false, status: 0, code: "AUTH_UNAVAILABLE", message: "Your session could not be confirmed in time." } as ApiResult<unknown>;
+      pending.splice(0).forEach((resolve) => resolve(answer));
     });
     await waitFor(() => expect(document.body.textContent).toMatch(/AUTH_UNAVAILABLE|could not be confirmed in time/));
     expect(screen.queryByRole("button", { name: /retry|try again/i })).not.toBeNull();

@@ -456,13 +456,15 @@ export function formatOfferPrice(offer: PublicOffer, locale?: string): string {
 }
 
 /** Reads that can be "we could not ask". `status` is never assumed. */
-export type ReadState = "ok" | "not_connected" | "reauth_required" | "unavailable";
+export type ReadState = "ok" | "not_connected" | "reauth_required" | "unavailable" | "env_mismatch" | "malformed";
 export type PositionsRead = {
   connected: boolean;
   status: ReadState;
   accountId?: number | string;
   mode?: "demo" | "live";
   reason?: string;
+  errorCode?: string | null;
+  correlationId?: string | null;
   positions?: Position[];
 };
 export type OrdersRead = Omit<PositionsRead, "positions"> & { orders?: Order[] };
@@ -686,7 +688,8 @@ export type PreviewResult = { decision: Decision; explanation?: DecisionExplanat
 
 export type JournalEntry = {
   entryId: string; kind: string; status: string | null; ts: number;
-  symbol: string | null; accountId: string | null; ruleDocId: string | null;
+  symbol: string | null; accountId: string | null; environment?: "demo" | "live" | null;
+  ruleDocId: string | null;
   decision?: Decision; error?: string | null; correlationId: string;
   /** Derived by the server from `decision` when read; not part of the stored record. */
   explanation?: DecisionExplanation;
@@ -884,6 +887,10 @@ export type RiskGuard = { state: "ok" | "holding" | "unknown"; reasons: string[]
 
 export type AutomationState = {
   state: "stopped" | "running" | "paused" | "blocked";
+  /** What was stored. Distinct from `state`, which is what the loop is doing. */
+  desiredState?: "stopped" | "running" | "paused" | "blocked";
+  /** Whether this process is actually running the loop. Null if it could not be read. */
+  loopActive?: boolean | null;
   /** Why the chip is not RUNNING. Set when the stored record was stale. */
   blockReason?: string | null;
   /** The weekend sentence, present only while the forex week is shut. */

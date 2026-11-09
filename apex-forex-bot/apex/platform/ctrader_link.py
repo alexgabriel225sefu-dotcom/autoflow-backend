@@ -969,7 +969,8 @@ def access_token_for(user_id, *, now=None, refresher=None, skew_s=120):
     return access
 
 
-def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None):
+def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None,
+                           purpose="trade"):
     """THE one way anything server-side reads a client's cTrader credentials.
 
     There is exactly one canonical store for these: this namespace, keyed by
@@ -1014,11 +1015,13 @@ def get_ctrader_connection(user_id, *, ctid=None, now=None, refresher=None):
         want_mode = match.get("mode")
     if rec.get("needsReconnect"):
         raise LinkError("REAUTH_REQUIRED", RECONNECT_REASON)
-    if want_mode == LIVE and not live_allowed():
-        # Read-only or not, opening a live account means a live broker
-        # session. The environment gate is the same one select_account uses;
-        # having two different answers to "may this touch live?" is how one of
-        # them ends up being the wrong one.
+    if want_mode == LIVE and not live_allowed() and purpose != "read":
+        # Selecting a live account, and any session a loop or an order could
+        # use, stays blocked unless the deployment has opened live accounts.
+        # A labelled read of an account the client already linked is not that
+        # session: broker_read is the only caller that passes purpose="read",
+        # and that module cannot place or close an order. The live execution
+        # gate is a separate lock and is not consulted here.
         raise LinkError("LIVE_BLOCKED",
                         "live accounts are blocked in this environment")
     token = access_token_for(user_id, now=now, refresher=refresher)

@@ -25,10 +25,12 @@ describe("journeySteps", () => {
     expect(states({ auto: null, rules: null })).toEqual(["unknown", "unknown", "unknown"]);
   });
   it("names the account type that is selected, not always demo", () => {
-    const title = (mode: "demo" | "live" | null) =>
-      journeySteps({ auto: auto("stopped"), rules: rules([rule("active")]), mode })[1].title;
+    const title = (mode: "demo" | "live" | null, extra: { liveOpen?: boolean; hasDemo?: boolean } = {}) =>
+      journeySteps({ auto: auto("stopped"), rules: rules([rule("active")]), mode, ...extra })[1].title;
     expect(title("demo")).toBe("Start on demo");
-    expect(title("live")).toBe("Start on your live account");
+    expect(title("live")).toBe("Live trading is not enabled");
+    expect(title("live", { hasDemo: true })).toBe("Start on demo");
+    expect(title("live", { liveOpen: true })).toBe("Start on your live account");
     expect(title(null)).toBe("Start automation");
   });
   it("renders three links and marks the current step", () => {

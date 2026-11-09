@@ -3,15 +3,15 @@ import { RefreshCw } from "lucide-react";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice, ReadPanel, Spinner, StatusPill } from "@/components/app/state";
 import { DataTable, Num, Side } from "@/components/app/table";
-import type { Order, OrdersRead } from "@/lib/api";
+import type { CtraderStatus, Order, OrdersRead } from "@/lib/api";
 
-export default function OrdersPage() {
-  const r = useRead<OrdersRead>("orders", 60_000);
+function OrdersBook({ path, title }: { path: string; title?: string }) {
+  const r = useRead<OrdersRead>(path, 60_000);
   return (
     <main>
       <div className="page-head">
         <div>
-          <h1>Orders</h1>
+          <h1>{title || "Orders"}</h1>
           <span className="sub">Last synced {whenSynced(r.lastSync)}</span>
         </div>
         <span className="btn-row">
@@ -58,4 +58,24 @@ export default function OrdersPage() {
       ) : null}
     </main>
   );
+}
+
+export default function OrdersPage() {
+  const ct = useRead<CtraderStatus>("ctrader/status", 60_000);
+  const accounts = ct.result?.ok && Array.isArray(ct.result.data.accounts)
+    ? ct.result.data.accounts : [];
+  if (accounts.length) {
+    return (
+      <main>
+        {accounts.map((a) => (
+          <OrdersBook
+            key={`${a.mode}-${a.ctid}`}
+            path={`accounts/${encodeURIComponent(String(a.ctid))}/orders`}
+            title={`${a.mode === "live" ? "Live" : "Demo"} #${a.ctid}`}
+          />
+        ))}
+      </main>
+    );
+  }
+  return <OrdersBook path="orders" />;
 }

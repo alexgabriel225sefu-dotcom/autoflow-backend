@@ -35,6 +35,9 @@ there.
 import copy
 import threading
 import time
+import uuid
+
+from apex.platform import read_telemetry as _telemetry
 
 from apex import forex
 from apex.platform import ctrader_link as _link
@@ -45,7 +48,13 @@ DEFAULT_TIMEOUT_S = 12.0
 NOT_CONNECTED = "not_connected"
 REAUTH_REQUIRED = "reauth_required"
 UNAVAILABLE = "unavailable"
+ENV_MISMATCH = "env_mismatch"
+MALFORMED = "malformed"
 OK = "ok"
+
+
+class MalformedPayload(ValueError):
+    """The broker answered with a shape this reader cannot trust."""
 
 # Deal history is expensive: cTrader may walk as many as forty pages for one
 # seven-day read, and the historical request budget is shared by every reader
@@ -137,11 +146,93 @@ def _bound_account(broker):
         return None
 
 
-def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
+def _connect(getter, user_id, ctid):
+    """Open a read session. Test doubles that predate purpose= still work."""
+    try:
+        return getter(user_id, ctid=ctid, purpose="read")
+    except TypeError as exc:
+        if "purpose" not in str(exc):
+            raise
+        return getter(user_id, ctid=ctid)
+
+
+def _http_for(error_code, status):
+    return {
+        "AUTH_FAILED": 401,
+        "ENV_MISMATCH": 409,
+        "NOT_CONNECTED": 409,
+        "TIMEOUT": 504,
+        "RATE_LIMITED": 429,
+        "DISCONNECTED": 503,
+        "MALFORMED": 502,
+        "BROKER_UNAVAILABLE": 503,
+    }.get(error_code, 401 if status == REAUTH_REQUIRED else 503)
+
+
+def _classify(exc):
+    if isinstance(exc, MalformedPayload):
+        return "MALFORMED", MALFORMED
+    if isinstance(exc, TimeoutError) or "timeout" in type(exc).__name__.lower() \
+            or "timed out" in str(exc).lower():
+        return "TIMEOUT", UNAVAILABLE
+    text = str(exc).lower()
+    if "429" in text or "rate limit" in text or "too many requests" in text:
+        return "RATE_LIMITED", UNAVAILABLE
+    if isinstance(exc, (ConnectionError, BrokenPipeError, ConnectionResetError)) \
+            or "disconnect" in text or "connection reset" in text \
+            or "broken pipe" in text:
+        return "DISCONNECTED", UNAVAILABLE
+    if _is_auth_failure(exc):
+        return "AUTH_FAILED", REAUTH_REQUIRED
+    return "BROKER_UNAVAILABLE", UNAVAILABLE
+
+
+def _observe(operation, started, result):
+    """Log the outcome and attach a correlation id to a failed read."""
+    if not isinstance(result, dict):
+        return result
+    elapsed = int((time.perf_counter() - started) * 1000)
+    environment = result.get("mode") if result.get("mode") in ("demo", "live") else None
+    if result.get("status") == OK:
+        _telemetry.record(
+            operation=operation, error_code=None, http_status=200,
+            correlation_id=result.get("correlationId") or uuid.uuid4().hex,
+            duration_ms=elapsed, environment=environment)
+        return result
+    if result.get("status") == NOT_CONNECTED:
+        # Nothing was asked of a broker, so two identical "not connected"
+        # answers stay identical. The log still records the attempt.
+        _telemetry.record(
+            operation=operation, error_code="NOT_CONNECTED", http_status=409,
+            correlation_id=uuid.uuid4().hex, duration_ms=elapsed,
+            environment=environment)
+        return {k: v for k, v in result.items()
+                if k not in ("errorCode", "correlationId")}
+    code = result.get("errorCode")
+    if not code:
+        code = {
+            REAUTH_REQUIRED: "AUTH_FAILED",
+            NOT_CONNECTED: "NOT_CONNECTED",
+            ENV_MISMATCH: "ENV_MISMATCH",
+            MALFORMED: "MALFORMED",
+        }.get(result.get("status"), "BROKER_UNAVAILABLE")
+    corr = result.get("correlationId") or uuid.uuid4().hex
+    out = dict(result)
+    out["errorCode"] = code
+    out["correlationId"] = corr
+    _telemetry.record(
+        operation=operation, error_code=code,
+        http_status=_http_for(code, out.get("status")),
+        correlation_id=corr, duration_ms=elapsed, environment=environment)
+    return out
+
+
+def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None,
+          expected_mode=None):
     """(broker, connection) or a status dict that the caller returns as-is."""
     getter = connection_fn or _link.get_ctrader_connection
     try:
-        conn = getter(user_id, ctid=ctid)
+        conn = _connect(getter, user_id, ctid)
     except _link.LinkConfigError:
         # A failed token persistence step is an infrastructure failure, not
         # evidence that the client has no account. Let the API return 503.
@@ -171,6 +262,17 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
         raise _link.LinkError(
             "ACCOUNT_BINDING_MISMATCH",
             "the broker connection did not match the requested account")
+
+    if expected_mode in ("demo", "live") and conn.get("mode") \
+            and str(conn.get("mode")) != str(expected_mode):
+        # The caller named an environment. Serving the other one would put
+        # demo history on a live card, which is the bug this check exists for.
+        return None, {
+            "connected": True, "status": ENV_MISMATCH,
+            "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+            "reason": "this account is not in the requested environment",
+            "errorCode": "ENV_MISMATCH",
+        }
 
     if broker_fn is None:
         from apex import user_loop, user_store
@@ -217,24 +319,35 @@ def _open(user_id, *, ctid=None, connection_fn=None, broker_fn=None):
 
 
 def _read(user_id, key, call, *, ctid=None, connection_fn=None,
-          broker_fn=None):
+          broker_fn=None, expected_mode=None):
+    started = time.perf_counter()
     broker, other = _open(user_id, ctid=ctid, connection_fn=connection_fn,
-                          broker_fn=broker_fn)
+                          broker_fn=broker_fn, expected_mode=expected_mode)
     if broker is None:
-        return other
+        return _observe(key, started, other)
     conn = other
     try:
         data = call(broker)
+        if key in ("positions", "orders", "deals", "candles", "symbols") \
+                and not isinstance(data, list):
+            raise MalformedPayload(key)
     except Exception as e:  # noqa: BLE001
         # Deliberately not an empty list. "We could not ask" and "there is
         # nothing" look identical to a dashboard and mean opposite things.
-        if _is_auth_failure(e):
-            return _reauth(user_id, e)
-        return {"connected": True, "status": UNAVAILABLE,
-                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                "reason": _human_broker_fault(e, conn.get("accessToken"))}
-    return {"connected": True, "status": OK, "accountId": conn.get("ctid"),
-            "mode": conn.get("mode"), key: data}
+        code, status = _classify(e)
+        if status == REAUTH_REQUIRED:
+            failed = _reauth(user_id, e)
+            failed["accountId"] = conn.get("ctid")
+            failed["mode"] = conn.get("mode")
+        else:
+            failed = {"connected": True, "status": status,
+                      "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                      "reason": _human_broker_fault(e, conn.get("accessToken"))}
+        failed["errorCode"] = code
+        return _observe(key, started, failed)
+    return _observe(key, started, {
+        "connected": True, "status": OK, "accountId": conn.get("ctid"),
+        "mode": conn.get("mode"), key: data})
 
 
 def _quote(broker, symbol):
@@ -255,6 +368,8 @@ def _quote(broker, symbol):
 
 def _enrich_positions(broker):
     rows = broker.get_all_positions()
+    if not isinstance(rows, list):
+        raise MalformedPayload("positions")
     out = []
     for original in rows:
         row = dict(original)
@@ -356,26 +471,34 @@ def _deal_rows(broker, days):
 
 
 def deals(user_id, *, days=7, **kw):
+    started = time.perf_counter()
+
+    def _done(result):
+        return _observe("deals", started, result)
+
     broker, other = _open(user_id, ctid=kw.get("ctid"),
                           connection_fn=kw.get("connection_fn"),
-                          broker_fn=kw.get("broker_fn"))
+                          broker_fn=kw.get("broker_fn"),
+                          expected_mode=kw.get("expected_mode"))
     if broker is None:
-        return other
+        return _done(other)
     conn = other
     try:
         parsed_days = int(days if days is not None else 7)
     except (TypeError, ValueError):
         # Keep the same honest validation/error envelope as the uncached path.
-        return {"connected": True, "status": UNAVAILABLE,
-                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                "reason": "days must be a whole number"}
+        return _done({"connected": True, "status": UNAVAILABLE,
+                      "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                      "reason": "days must be a whole number",
+                      "errorCode": "BROKER_UNAVAILABLE"})
     # Range-checked BEFORE the per-request lock key is built (same bounds as
     # `_deal_rows`). The key includes `days`, the locks are never pruned, and an
     # unchecked value made every distinct number a new entry for ever.
     if parsed_days < 1 or parsed_days > MAX_DEAL_DAYS:
-        return {"connected": True, "status": UNAVAILABLE,
-                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                "reason": f"days must be between 1 and {MAX_DEAL_DAYS}"}
+        return _done({"connected": True, "status": UNAVAILABLE,
+                      "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                      "reason": f"days must be between 1 and {MAX_DEAL_DAYS}",
+                      "errorCode": "BROKER_UNAVAILABLE"})
     key = (str(user_id), str(conn.get("ctid")), parsed_days)
     with _deals_cache_lock:
         fetch_lock = _deals_fetch_locks.setdefault(key, threading.Lock())
@@ -386,16 +509,24 @@ def deals(user_id, *, days=7, **kw):
         with _deals_cache_lock:
             cached = _deals_cache.get(key)
             if cached and now - cached[0] < DEALS_CACHE_TTL_S:
-                return {"connected": True, "status": OK,
-                        "accountId": conn.get("ctid"),
-                        "mode": conn.get("mode"),
-                        "deals": copy.deepcopy(cached[1])}
+                return _done({"connected": True, "status": OK,
+                              "accountId": conn.get("ctid"),
+                              "mode": conn.get("mode"),
+                              "deals": copy.deepcopy(cached[1])})
         try:
             rows = _deal_rows(broker, parsed_days)
+            if not isinstance(rows, list):
+                raise MalformedPayload("deals")
         except Exception as e:  # noqa: BLE001
-            return {"connected": True, "status": UNAVAILABLE,
-                    "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                    "reason": _scrub(e, conn.get("accessToken"))}
+            code, status = _classify(e)
+            failed = {"connected": True, "status": status,
+                      "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                      "reason": _scrub(e, conn.get("accessToken")),
+                      "errorCode": code}
+            if status == REAUTH_REQUIRED:
+                failed = _reauth(user_id, e)
+                failed["errorCode"] = code
+            return _done(failed)
         stored_at = time.monotonic()
         with _deals_cache_lock:
             _deals_cache[key] = (stored_at, copy.deepcopy(rows))
@@ -404,9 +535,9 @@ def deals(user_id, *, days=7, **kw):
                                 key=lambda item: _deals_cache[item][0])
                 for old_key in oldest[:len(_deals_cache) - DEALS_CACHE_MAX]:
                     _deals_cache.pop(old_key, None)
-    return {"connected": True, "status": OK,
-            "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-            "deals": rows}
+    return _done({"connected": True, "status": OK,
+                  "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                  "deals": rows})
 
 
 def orders(user_id, **kw):
@@ -514,21 +645,30 @@ def quote(user_id, *, symbol, **kw):
     sym = str(symbol or "").strip().upper().replace("/", "_")
     if not sym:
         raise ValueError("symbol is required")
+    started = time.perf_counter()
     broker, other = _open(user_id, ctid=kw.get("ctid"),
                           connection_fn=kw.get("connection_fn"),
-                          broker_fn=kw.get("broker_fn"))
+                          broker_fn=kw.get("broker_fn"),
+                          expected_mode=kw.get("expected_mode"))
     if broker is None:
-        return other
+        return _observe("quote", started, other)
     conn = other
     try:
         bid, ask, received = _quote(broker, sym)
     except Exception as e:  # noqa: BLE001
-        return {"connected": True, "status": UNAVAILABLE,
-                "accountId": conn.get("ctid"), "mode": conn.get("mode"),
-                "reason": _human_broker_fault(e, conn.get("accessToken"))}
-    return {"connected": True, "status": OK, "accountId": conn.get("ctid"),
-            "mode": conn.get("mode"), "symbol": sym,
-            "bid": bid, "ask": ask, "receivedAt": received}
+        code, status = _classify(e)
+        failed = {"connected": True, "status": status,
+                  "accountId": conn.get("ctid"), "mode": conn.get("mode"),
+                  "reason": _human_broker_fault(e, conn.get("accessToken")),
+                  "errorCode": code}
+        if status == REAUTH_REQUIRED:
+            failed = _reauth(user_id, e)
+            failed["errorCode"] = code
+        return _observe("quote", started, failed)
+    return _observe("quote", started, {
+        "connected": True, "status": OK, "accountId": conn.get("ctid"),
+        "mode": conn.get("mode"), "symbol": sym,
+        "bid": bid, "ask": ask, "receivedAt": received})
 
 
 # The multiple of ATR the engine puts its stop at when it places ATR stops

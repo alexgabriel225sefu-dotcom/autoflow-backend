@@ -5,7 +5,7 @@ import { ErrorNotice, Spinner } from "@/components/app/state";
 import { When } from "@/components/app/table";
 import { humanise } from "@/components/app/rule-summary";
 import { collapseRepeated, plainDecision } from "@/components/app/plain";
-import type { JournalEntry, JournalPage } from "@/lib/api";
+import type { CtraderStatus, JournalEntry, JournalPage } from "@/lib/api";
 import { downloadText, journalToCsv } from "./csv";
 import { JournalNote } from "@/components/app/journal-note";
 
@@ -41,22 +41,31 @@ const STOPPED_BY: Record<string, string> = {
   infrastructure: "our systems", account: "your account", unknown: "an unclassified cause",
 };
 
-export default function JournalView() {
+function JournalScope({ account }: {
+  account: { ctid: string | number; mode: "demo" | "live" } | null;
+}) {
   const [status, setStatus] = useState("");
   const [symbol, setSymbol] = useState("");
   const [offset, setOffset] = useState(0);
   const qs = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
   if (status) qs.set("status", status);
   if (symbol.trim()) qs.set("symbol", symbol.trim());
+  if (account) {
+    qs.set("accountId", String(account.ctid));
+    qs.set("environment", account.mode);
+  }
   const r = useRead<JournalPage>(`journal?${qs.toString()}`);
 
   return (
-    <main>
+    <section aria-label={account ? `${account.mode} journal` : "Journal"}>
       <div className="page-head">
         <div>
-          <h1>Journal</h1>
+          {account ? (
+            <h2>{account.mode === "live" ? "Live account" : "Demo account"} <span className="mono">#{account.ctid}</span></h2>
+          ) : <h1>Journal</h1>}
           <span className="sub">
             Every evaluation, including the ones that decided to do nothing.
+            {account ? " Scoped to this account and environment." : ""}
           </span>
         </div>
         {r.result?.ok ? (
@@ -209,7 +218,7 @@ export default function JournalView() {
                       </a>
                     ) : null}
                     {e.accountId ? (
-                      <span className="pill pill-muted mono">#{e.accountId}</span>
+                      <span className="pill pill-muted mono">#{e.accountId}{e.environment ? ` · ${e.environment}` : ""}</span>
                     ) : null}
                   </div>
                   <JournalNote entryId={e.entryId} />
@@ -234,6 +243,24 @@ export default function JournalView() {
           </section>
         )
       ) : null}
+    </section>
+  );
+}
+
+export default function JournalView() {
+  const ct = useRead<CtraderStatus>("ctrader/status", 120_000);
+  const accounts = ct.result?.ok && Array.isArray(ct.result.data.accounts)
+    ? ct.result.data.accounts : [];
+  if (!accounts.length) return <JournalScope account={null} />;
+  return (
+    <main>
+      <div className="page-head">
+        <div>
+          <h1>Journal</h1>
+          <span className="sub">Demo and live history stay separate. Nothing is deleted.</span>
+        </div>
+      </div>
+      {accounts.map((a) => <JournalScope key={`${a.mode}-${a.ctid}`} account={a} />)}
     </main>
   );
 }

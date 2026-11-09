@@ -95,6 +95,7 @@ function base() {
     positions: { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", positions: [] } },
     orders: { ok: true, data: { connected: true, status: "ok", accountId: 501, mode: "demo", orders: [] } },
     journal: { ok: true, data: { status: "ok", entries: [], total: 0, limit: 8, offset: 0, hasMore: false } },
+    "accounts/reads": { ok: true, data: { status: "ok", connected: true, accounts: [], selected: null } },
     rules: { ok: true, data: { rules: [] } },
     // The pending-approval card reads this. Stubbed as "we asked, and none is
     // waiting" — the ordinary case. Left out, every test here would render
@@ -169,6 +170,42 @@ describe("dashboard — account state", () => {
     // Controls only. `automation/why` is a read and is allowed; what this
     // pins is that no start/pause/resume/stop is ever sent.
     expect(calls.some((c) => c.path.startsWith("automation/") && c.init?.method === "POST")).toBe(false);
+    expect(screen.queryByText("Start on your live account")).toBeNull();
+  });
+
+  it("reads both accounts and keeps demo startable while live is closed", async () => {
+    routes["ctrader/status"] = { ok: true, data: {
+      connected: true,
+      accounts: [{ ctid: 501, mode: "demo" }, { ctid: 902, mode: "live" }],
+      selected: { ctid: 902, mode: "live" }, liveAllowed: false,
+    } };
+    routes["accounts/reads"] = { ok: true, data: { status: "ok", connected: true, accounts: [
+      { ctid: 501, mode: "demo", balance: 2500, equity: 2512.5,
+        account: { status: "ok" }, positions: { status: "ok", count: 1 }, orders: { status: "ok", count: 0 } },
+      { ctid: 902, mode: "live", balance: null, equity: null,
+        account: { status: "unavailable", reason: "the broker did not answer", errorCode: "TIMEOUT", correlationId: "cid-live" },
+        positions: { status: "unavailable", count: null, reason: "the broker did not answer", errorCode: "TIMEOUT", correlationId: "cid-live" },
+        orders: { status: "ok", count: 0 } },
+    ] } };
+    routes.me = { ok: true, data: {
+      user: { userId: "u1", email: "t@example.test", emailVerified: true },
+      licence: { state: "active", expiresAt: null, plan: "demo" },
+      execution: execution({
+        accountMode: "live", canAutomate: false, badge: "LIVE BLOCKED",
+        reason: "LIVE_NOT_AVAILABLE",
+        message: "live trading is not available in this release",
+      }),
+    } };
+    routes.rules = { ok: true, data: { rules: [
+      { ruleDocId: "r1", name: "EURUSD trend", state: "active", version: 1, symbols: ["EURUSD"], timeframe: "1h", updatedAt: 0 },
+    ] } };
+    await renderDash();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start on demo" })).toBeTruthy());
+    expect(screen.queryByText("Start on your live account")).toBeNull();
+    expect(screen.getByText(/Balance 2,500/)).toBeTruthy();
+    expect(screen.getByText(/Balance unknown/)).toBeTruthy();
+    expect(screen.getByText(/TIMEOUT/)).toBeTruthy();
+    expect(screen.getByText(/cid-live/)).toBeTruthy();
   });
 
   it("DOES offer them when the server has cleared this live account", async () => {
@@ -293,6 +330,26 @@ describe("dashboard — automation state", () => {
     ] } };
     await renderDash();
     await waitFor(() => expect(screen.getByText(label)).toBeDefined());
+  });
+
+  it("shows a stored running state and a dead loop as two facts", async () => {
+    routes.automation = { ok: true, data: {
+      state: "stopped", desiredState: "running", loopActive: false,
+      blockReason: "the loop is not running",
+      ruleDocId: "r1", mode: "demo", startedAt: 0,
+    } };
+    routes["automation/why"] = { ok: true, data: {
+      status: "ok", state: "running", reason: "loop_inactive",
+      summary: "Automation is marked as running, but its loop is not active on the server right now.",
+      level: null, levelLabel: null, loopActive: false, marketOpen: true,
+      halted: false, openPosition: null, maxPositions: null,
+      riskGuard: { state: "unknown", reasons: [] }, skipsToday: null,
+      skips: [], recorded: [], recordedCount: 0, recordedReadable: true,
+    } };
+    await renderDash();
+    await waitFor(() => expect(screen.getAllByText("Loop not active").length).toBeGreaterThan(0));
+    expect(screen.getAllByText(/Marked running/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/marked as running, but its loop is not active/)).toBeTruthy();
   });
 
   it("a running loop in the weekend window says the market is closed, not that it is watching", async () => {
