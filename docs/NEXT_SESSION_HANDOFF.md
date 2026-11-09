@@ -988,6 +988,7 @@ No deploy, environment/flag, provider-dashboard, live action or order was
 performed.
 
 The full Python runner passed: all 280 test files passed under the Windows
-UTF-8 launcher. Next: commit and push this branch, then read all four CI jobs
-before considering the launch gate clear. Production email confirmation and
-cTrader OAuth still need a real end-to-end smoke test.
+UTF-8 launcher. Commit `6b564473` was pushed and its GitHub Tests workflow
+run 475 is green across all four jobs: web, python, node and config-drift.
+Production email confirmation and cTrader OAuth still need a real end-to-end
+smoke test.
