@@ -35,7 +35,10 @@ export type ForwardEvent = {
 
 export type OverfitResult = { status: string; warnings: string[]; disclaimer: string };
 export type RiskGuardResult = { allowed: boolean; mode: string; blocks: { guard: string; reason: string }[]; state?: Record<string, unknown>; stopNewEntriesOnly?: boolean };
-export type RuleLayerResult = { units: number; unitLabel: string; riskAmount: number; metadata?: { minLot?: number | null; lotStep?: number | null; contractSize?: number | null; digits?: number | null; minimumStopDistancePips?: number | null; sources?: Record<string, string> } };
+type RuleLayerMetadata = { minLot?: number | null; lotStep?: number | null; contractSize?: number | null; digits?: number | null; minimumStopDistancePips?: number | null; sources?: Record<string, string> };
+export type RuleLayerResult =
+  | { status: "unavailable"; reason: string; metadata?: RuleLayerMetadata }
+  | { status?: "ok"; units: number; unitLabel: string; riskAmount: number; metadata?: RuleLayerMetadata };
 
 function Metric({ label, value }: { label: string; value: unknown }) {
   return <div className="stat"><span className="stat-k">{label}</span><strong className="stat-v">{value == null ? "unknown" : String(value)}</strong></div>;
@@ -88,6 +91,9 @@ export function RiskGuardResultCard({ result }: { result: RiskGuardResult }) {
 }
 
 export function RuleLayerResultCard({ result }: { result: RuleLayerResult }) {
+  if (result.status === "unavailable") {
+    return <div className="notice" role="alert"><p style={{ fontWeight: 600 }}>Rule layer could not be read</p><p className="muted">{result.reason}. No sizing or instrument value was calculated.</p></div>;
+  }
   const metadata = result.metadata;
   const rows = [
     ["Minimum lot", metadata?.minLot], ["Lot step", metadata?.lotStep],

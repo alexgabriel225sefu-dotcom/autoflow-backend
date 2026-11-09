@@ -856,3 +856,47 @@ passed, 25 skipped; the existing `src/test/e2e.test.ts` remains the only
 failure because Windows resolved `python` to the Microsoft Store alias (exit
 9009), before the API test could start. CI must be treated as authoritative.
 No deployment was made.
+
+## Audit repair — 2026-11-08
+
+Branch: `codex/new-client-flow-signup-demo`.
+
+Repaired the read-only backtest boundary. The API now resolves the selected
+active rule from the authenticated user's store and refuses with
+`RULE_REQUIRED` when it cannot read one; a browser-posted rule document is no
+longer accepted as the source of trading terms. The Backtest screen now sends
+only `ruleDocId` and the bounded candle snapshot. Added regression coverage for
+both ownership and refusal behavior in `tests/test_platform_roadmap_modules.py`.
+
+Files changed:
+
+- `apex-forex-bot/apex/platform/api.py` — server-owned rule resolution for
+  backtests;
+- `apex-forex-bot/tests/test_platform_roadmap_modules.py` — forged-rule and
+  missing-rule tests;
+- `web/src/components/app/simulation-views.tsx` — send the rule id, not a
+  browser rule copy.
+- `web/src/components/app/simulation-result-cards.tsx` — render a 200 response
+  with `status: unavailable` as an explicit failed read, not a sizing card;
+- `web/src/components/app/simulation-views.test.tsx` — regression coverage for
+  that unavailable-data response.
+
+Verification: `test_platform_roadmap_modules.py` (23 checks, including the two
+new API checks), `test_platform_api.py`,
+`test_platform_security_hardening.py`, `test_platform_ctrader_link.py` and
+`test_platform_rate_limit.py` passed. The full Python runner remains blocked by
+the Windows encoding/subprocess harness failure recorded above. Web `tsc`,
+ESLint and Vitest could not run in this worktree because `web/node_modules/.bin`
+is incomplete; no web pass is claimed. The Codex Security standard scan is
+still running and has not produced a clean verdict.
+
+Unfixed audit items: root `server.js` has dependency advisories and
+unauthenticated provider-cost routes, but it is outside the allowed platform
+file boundary and must be handled by the owner/Claude on the legacy service.
+No deploy, provider-dashboard change, environment/flag change, live action or
+order was performed.
+
+Next: run CI on the pushed patch, then review the remaining production risk-map
+and rule-layer broker-read failures with real server logs before changing any
+fallback behavior. Keep unknown data failed/unknown and do not deploy from
+Codex.
