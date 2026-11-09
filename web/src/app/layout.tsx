@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     description:
       "Write your own rule, connect your cTrader account, and test it on a free " +
       "14-day demo before you automate anything.",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Apex4Traders: Rules you can read." }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Apex4Traders" }],
   },
   twitter: {
     card: "summary_large_image",
