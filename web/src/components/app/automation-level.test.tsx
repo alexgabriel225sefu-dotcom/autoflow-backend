@@ -82,4 +82,12 @@ describe("the rule sentence says who acts on a setup", () => {
     delete doc.automationLevel;
     expect(ruleSentence(doc as never)).toContain("When a setup appears: Full Automation.");
   });
+
+  it("a draft with no level chosen yet does not end on an empty clause", async () => {
+    // The form starts blank on purpose; it used to read "When a setup appears: ."
+    const { ruleSentence } = await import("./rule-summary");
+    const s = ruleSentence(toDoc({ ...BLANK, automationLevel: "" }));
+    expect(s).not.toMatch(/appears: \./);
+    expect(s).toContain("What happens when a setup appears is not chosen yet.");
+  });
 });
