@@ -639,20 +639,23 @@ and none in the product.
 - Done locally: the web cTrader callback now returns automatically to the
   authenticated app with the one-time nonce and finish ticket, while keeping
   a visible manual fallback. The retired Telegram callback fails closed in
-  production, Telegram no longer advertises that path, and legacy error text
-  is HTML-escaped, length-bounded, and covered by a restrictive CSP meta tag.
-- Tests: `py -3 tests/run_all.py` — 281 test files passed; targeted OAuth,
+  production, the legacy Telegram bot module is retired on the base branch,
+  and legacy error text is HTML-escaped, length-bounded, and covered by a
+  restrictive CSP meta tag.
+- Branch head: `1ad55681` (rebased onto base commit `55de3d82`). Tests:
+  `py -3 tests/run_all.py` — 248 test files passed; targeted OAuth,
   platform-server, cTrader and legacy-hardening scripts passed. In `web`,
   `npx tsc --noEmit`, `npx eslint .` (0 errors, 2 existing unused-directive
-  warnings), `npx vitest run` (109 files, 1,146 passed, 7 skipped) and
+  warnings plus one existing unused variable), `npx vitest run` (109 files,
+  1,146 passed, 7 skipped) and
   `npx next build` passed.
 - Codex Security standard scan `0cbf9b8d-00fb-4564-9ed5-1b0837e657f1`
-  completed with two remaining findings: HIGH legacy Stripe fulfillment does
-  not verify paid status/amount (blocked by the no-`server.js` rule), and
-  MEDIUM legacy plaintext broker-token compatibility (needs a controlled
-  production migration and token rotation). The scan warned that the working
-  tree changed while it ran; run a fresh scan on the final commit before
-  treating the report as a complete release artifact.
+  completed on the pre-rebase snapshot with two remaining findings: HIGH
+  legacy Stripe fulfillment does not verify paid status/amount (blocked by
+  the no-`server.js` rule), and MEDIUM legacy plaintext broker-token
+  compatibility (needs a controlled production migration and token rotation).
+  A fresh head scan was attempted but could not pass the host's unknown worker
+  slot preflight; do not treat the older report as a clean final-head scan.
 - Partial: browser retest after this patch and remote CI are still pending;
   no deploy or provider-dashboard changes were made. Do not claim the
   production callback is verified until CI and the owner-approved deploy
