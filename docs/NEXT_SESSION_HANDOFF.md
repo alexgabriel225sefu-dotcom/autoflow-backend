@@ -966,3 +966,32 @@ commits, so this repair was pushed without force-updating it. Open a PR from
 `codex/new-client-flow-signup-demo-repair` into the Claude base, read all four
 CI jobs, then run a fresh confirmation walkthrough and a cTrader demo-only
 smoke check.
+
+## Post-deploy walkthrough and Codex Security audit — 2026-11-09
+
+Production web was checked after the web deploy of commit `6751b16b` (the
+platform branch now contains the later docs/image commits). The public landing,
+signup, login, password reset, protected-dashboard redirect and invalid auth
+callback were exercised in the in-app browser. A throwaway account
+`apex.walkthrough.20261109@mailinator.com` was created without completing
+confirmation. Signup reached the check-email screen, resend was rate-limited
+with a readable `Resend available in 60s` state, unconfirmed sign-in explained
+that the email must be confirmed, reset-password returned a neutral success
+message, and an invalid callback explained the missing PKCE verifier. No
+orders, account changes or live actions were performed.
+
+Codex Security standard scan `825222dd-f83d-4c8e-8d1b-08f868317f62` completed
+with partial coverage and one high-confidence/high-severity finding:
+the legacy `server.js` Stripe `checkout.session.completed` handler can activate
+a licence without checking paid status or approved amount/currency. This path
+is outside the allowed edit boundary for this platform branch and must be
+fixed by the owner/Claude on the suspended legacy service before checkout is
+enabled. The report and SARIF are retained in the scan directory recorded by
+Codex Security. Auth/session and tenant-isolation review found no confirmed
+IDOR; simulation paths showed no confirmed broker order sink.
+
+Still unverified: real confirmation-mail delivery and link reuse/expiry,
+cross-browser cTrader OAuth/account selection, and a fully credentialed
+demo-rule walkthrough. Production API `/healthz`, landing, signup, login and
+reset routes returned 200; unauthenticated `/api/v1/accounts` returned 401.
+Browser console error logs were empty during the walkthrough.
