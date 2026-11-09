@@ -656,10 +656,11 @@ and none in the product.
   compatibility (needs a controlled production migration and token rotation).
   A fresh head scan was attempted but could not pass the host's unknown worker
   slot preflight; do not treat the older report as a clean final-head scan.
-- Partial: browser retest after this patch and remote CI are still pending;
-  no deploy or provider-dashboard changes were made. Do not claim the
-  production callback is verified until CI and the owner-approved deploy
-  smoke test pass.
+- CI: PR #168 head `80809f287810a2a950dec7d0e8457c8e38e5e880` is green on
+  run 490 (`python`, `node`, `web`, and `config-drift`).
+- Partial: browser retest after this patch is still pending; no deploy or
+  provider-dashboard changes were made. The production callback still needs
+  the owner's approved deploy and a read-only smoke test.
 
 - Done: PR #159 merged as `6751b16b54bf40db737c73999e15ae44758c8b80`.
   Cross-tab signup confirmation now uses the implicit Supabase flow, the
