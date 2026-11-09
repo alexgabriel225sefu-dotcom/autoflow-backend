@@ -38,6 +38,42 @@ import threading
 import time
 
 
+def _windows_memory_kb():
+    """Return current and peak working-set sizes on Windows, when available."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class _Counters(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = _Counters()
+        counters.cb = ctypes.sizeof(counters)
+        handle = ctypes.windll.kernel32.GetCurrentProcess()
+        get_memory = ctypes.windll.psapi.GetProcessMemoryInfo
+        get_memory.argtypes = [wintypes.HANDLE, ctypes.POINTER(_Counters), wintypes.DWORD]
+        get_memory.restype = wintypes.BOOL
+        ok = get_memory(handle, ctypes.byref(counters), counters.cb)
+        if not ok:
+            return None
+        return counters.WorkingSetSize // 1024, counters.PeakWorkingSetSize // 1024
+    except (AttributeError, OSError, TypeError, ValueError):
+        return None
+
+
 def rss_kb():
     """Resident set in KB, current. Linux /proc, else peak from resource."""
     try:
@@ -47,6 +83,9 @@ def rss_kb():
                     return int(line.split()[1])
     except OSError:
         pass
+    windows = _windows_memory_kb()
+    if windows is not None:
+        return windows[0]
     try:
         import resource
         peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -63,6 +102,9 @@ def peak_rss_kb():
                     return int(line.split()[1])
     except OSError:
         pass
+    windows = _windows_memory_kb()
+    if windows is not None:
+        return windows[1]
     return rss_kb()
 
 
