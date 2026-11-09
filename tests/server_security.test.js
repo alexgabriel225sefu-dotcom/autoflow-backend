@@ -698,10 +698,10 @@ test('no environment secret is interpolated into a log call', () => {
 // ── Finding 9: least privilege on the config response ──────────────────
 const { _filterBotConfig, _BOT_CONFIG_FIELDS } = _internal;
 
-test('the config response is filtered to keys the bot can apply', () => {
+test('the config response is filtered to keys the service can apply', () => {
   const out = _filterBotConfig({
     RISK_PER_TRADE: '0.01',
-    TELEGRAM_BOT_TOKEN: 'provisioning-credential',
+    GROQ_API_KEY: 'provisioning-credential',
     PATH: '/evil',
     LD_PRELOAD: '/evil.so',
     TOKEN_ENCRYPTION_KEY: 'every-stored-credential',
@@ -711,9 +711,9 @@ test('the config response is filtered to keys the bot can apply', () => {
     OANDA_API_TOKEN: 'a broker that no longer exists',
     SOME_FORGOTTEN_KEY: 'x',
   });
-  // Kept: a trading setting and a provisioning credential the bot needs.
+  // Kept: a trading setting and a provisioning credential the service needs.
   assert.strictEqual(out.RISK_PER_TRADE, '0.01');
-  assert.strictEqual(out.TELEGRAM_BOT_TOKEN, 'provisioning-credential');
+  assert.strictEqual(out.GROQ_API_KEY, 'provisioning-credential');
   // Withheld: everything the bot would discard anyway, so sending it is a
   // secret travelling for no reason.
   for (const k of ['PATH', 'LD_PRELOAD', 'TOKEN_ENCRYPTION_KEY', 'JWT_SECRET',

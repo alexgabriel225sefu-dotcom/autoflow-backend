@@ -85,7 +85,7 @@ with socket.socket() as s:
     PORT = s.getsockname()[1]
 os.environ["PORT"] = str(PORT)
 
-from apex import bot  # noqa: E402
+import platform_server  # noqa: E402
 from apex.platform import ctrader_link as link  # noqa: E402
 from apex.platform import licence  # noqa: E402
 from apex import user_loop, user_store  # noqa: E402
@@ -162,7 +162,8 @@ class _StubBroker:
 # outage in a test that had nothing wrong.
 user_loop._make_broker = lambda user, user_id=None, ctid=None: (_StubBroker(), {})
 
-bot._start_dashboard_server()
+_server = platform_server.build_server(PORT)
+threading.Thread(target=_server.serve_forever, daemon=True).start()
 
 
 def seed(what):
