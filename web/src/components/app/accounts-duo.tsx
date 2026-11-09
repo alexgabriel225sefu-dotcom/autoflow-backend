@@ -15,16 +15,64 @@ import type { AutomationState, CtAccount, Execution } from "@/lib/api";
 import { liveCleared, liveNotice } from "@/components/app/live-access";
 import { BorderBeam } from "@/components/ui/border-beam";
 
+export type AccountFigure = {
+  ctid: number | string;
+  mode: "demo" | "live" | "unknown";
+  balance: number | null;
+  equity: number | null;
+  account: { status: string; reason?: string | null; errorCode?: string | null; correlationId?: string | null };
+  positions: { status: string; count: number | null; reason?: string | null; errorCode?: string | null; correlationId?: string | null };
+  orders: { status: string; count: number | null; reason?: string | null; errorCode?: string | null; correlationId?: string | null };
+};
+
 type Props = {
   accounts: CtAccount[] | null;
   selected: { ctid: number | string; mode: "demo" | "live" } | null;
   execution: Execution | null;
   running: AutomationState | null;
+  figures?: AccountFigure[] | null;
 };
 
-export function AccountsDuo({ accounts, selected, execution, running }: Props) {
+function money(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return "unknown";
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function count(status: string | undefined, value: number | null | undefined): string {
+  if (status !== "ok" || value == null) return "unknown";
+  return String(value);
+}
+
+function ReadLines({ figure }: { figure: AccountFigure | null }) {
+  if (!figure) return <p>Balance unknown · Equity unknown</p>;
+  const failed = figure.account.status !== "ok" ? figure.account
+    : figure.positions.status !== "ok" ? figure.positions
+    : figure.orders.status !== "ok" ? figure.orders : null;
+  return (
+    <>
+      <p>
+        Balance {money(figure.balance)} · Equity {money(figure.equity)}
+        {" · "}Positions {count(figure.positions.status, figure.positions.count)}
+        {" · "}Orders {count(figure.orders.status, figure.orders.count)}
+      </p>
+      {failed ? (
+        <p role="alert">
+          {failed.reason || "This read failed."}
+          {failed.errorCode ? ` · ${failed.errorCode}` : ""}
+          {failed.correlationId ? ` · ref ${failed.correlationId}` : ""}
+          {failed.status === "reauth_required" || failed.errorCode === "AUTH_FAILED"
+            ? " Reconnect cTrader, then refresh." : " Refresh to try this read again."}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+export function AccountsDuo({ accounts, selected, execution, running, figures = null }: Props) {
   const demo = accounts?.find((a) => a.mode === "demo") ?? null;
   const live = accounts?.find((a) => a.mode === "live") ?? null;
+  const figureFor = (account: CtAccount | null) =>
+    account && figures ? figures.find((f) => String(f.ctid) === String(account.ctid)) ?? null : null;
   const automating = running?.state === "running" || running?.state === "paused";
   const demoActive = automating && selected?.mode === "demo";
   const liveActive = automating && selected?.mode === "live";
@@ -39,8 +87,8 @@ export function AccountsDuo({ accounts, selected, execution, running }: Props) {
           <em data-tone={demoActive ? "on" : "idle"}>{demoActive ? "Automating" : demo ? "Ready" : "Not chosen"}</em>
         </header>
         <strong>{demo ? `#${demo.ctid}` : "No demo account yet"}</strong>
-        <p>Free for 14 days. Test a rule with no real money.</p>
-        <Link href={demo ? "/trade" : "/accounts"}>{demo ? "Automate on demo" : "Choose a demo account"}</Link>
+        {demo ? <ReadLines figure={figureFor(demo)} /> : <p>Free for 14 days. Test a rule with no real money.</p>}
+        <Link href={demo ? "/trade" : "/accounts"}>{demo ? "Start on demo" : "Choose a demo account"}</Link>
       </article>
 
       <article className="duo-card" data-active={liveActive ? "true" : undefined} data-kind="live">
@@ -51,8 +99,9 @@ export function AccountsDuo({ accounts, selected, execution, running }: Props) {
           </em>
         </header>
         <strong>{live ? `#${live.ctid}` : "Real money, same rules"}</strong>
-        <p>{cleared ? notice.lead : "Real-money accounts are a paid plan. Open the live page to see what is needed."}</p>
-        <Link href="/live">{cleared ? "Open live" : "See what live needs"}</Link>
+        {live ? <ReadLines figure={figureFor(live)} /> : null}
+        <p>{cleared ? notice.lead : "Live trading is not enabled. This account is shown so you can read it. No order is sent."}</p>
+        <Link href="/live">{cleared ? "Open live" : "Not enabled — see why"}</Link>
       </article>
     </section>
   );

@@ -600,12 +600,36 @@ def _dispatch(method, route, headers, body, query=None):
     if route == "risk" and method == "GET":
         p = _authenticate(headers)
         from apex.platform import risk_map as _risk_map
-        positions = _read.positions(p.user_id)
-        if positions.get("status") != _read.OK:
+        q = query or {}
+        link = _link.public_status(p.user_id)
+        linked = [a for a in (link.get("accounts") or [])
+                  if isinstance(a, dict) and a.get("ctid") not in (None, "")]
+        wanted = q.get("accountId")
+        if wanted:
+            linked = [a for a in linked if str(a.get("ctid")) == str(wanted)]
+            if not linked:
+                return _err(404, "NO_SUCH_ACCOUNT",
+                            "that account is not one of the connected ones")
+        if not linked:
+            positions = _read.positions(p.user_id)
+            account = _read.account(p.user_id)
+            return _ok(_risk_map.from_reads(positions, account))
+        views = []
+        for account in linked:
+            mode = account.get("mode") if account.get("mode") in ("demo", "live") else None
+            if q.get("mode") in ("demo", "live") and mode != q.get("mode"):
+                continue
+            positions = _read.positions(
+                p.user_id, ctid=account.get("ctid"), expected_mode=mode)
+            balance = _read.account(
+                p.user_id, ctid=account.get("ctid"), expected_mode=mode)
+            views.append(_risk_map.from_reads(positions, balance))
+        if not views:
             return _ok(_risk_map.build([], unreadable=True))
-        account = _read.account(p.user_id)
-        balance = account.get("balance") if account.get("status") == _read.OK else None
-        return _ok(_risk_map.build(positions.get("positions") or [], balance=balance))
+        selected = (link.get("selected") or {}).get("ctid")
+        primary = next((v for v in views if str(v.get("accountId")) == str(selected)),
+                       views[0])
+        return _ok(dict(primary, accounts=views))
 
     if route == "health-score" and method == "GET":
         p = _authenticate(headers)
@@ -674,7 +698,7 @@ def _dispatch(method, route, headers, body, query=None):
                     _risk_guard.state_from_trades(trades, balance, now=now))
             except Exception:
                 guard = None
-        return _ok(_health_score.assemble(
+        score = _health_score.assemble(
             connected=connected, market_open=market_open,
             session_valid=session_valid, rule_valid=rule_valid,
             store_available=store_available,
@@ -684,7 +708,27 @@ def _dispatch(method, route, headers, body, query=None):
             timeframe=timeframe, now=now,
             candle_status=candle_status, candle_stamp=candle_stamp,
             positions_status=positions_status, positions=position_rows,
-            guard=guard))
+            guard=guard)
+        score["accountId"] = selected.get("ctid")
+        score["accountMode"] = selected.get("mode")
+        try:
+            from apex.platform import account_reads as _account_reads
+            snap = _account_reads.snapshot(p.user_id)
+            score["linkedAccounts"] = [{
+                "mode": row.get("mode"),
+                "accountId": row.get("ctid"),
+                "balance": row.get("balance"),
+                "equity": row.get("equity"),
+                "positions": (row.get("positions") or {}).get("status"),
+                "orders": (row.get("orders") or {}).get("status"),
+                "errorCode": ((row.get("positions") or {}).get("errorCode")
+                              or (row.get("account") or {}).get("errorCode")),
+                "correlationId": ((row.get("positions") or {}).get("correlationId")
+                                  or (row.get("account") or {}).get("correlationId")),
+            } for row in (snap.get("accounts") or [])]
+        except Exception:
+            score["linkedAccounts"] = None
+        return _ok(score)
 
     if route == "incidents" and method == "GET":
         p = _authenticate(headers)
@@ -729,6 +773,11 @@ def _dispatch(method, route, headers, body, query=None):
     # Every one of these answers {connected, status, ...} and omits its data
     # key unless status is "ok". An empty list of positions is a claim, and it
     # is only made when the broker was actually asked and actually answered.
+    if route == "accounts/reads" and method == "GET":
+        p = _authenticate(headers)
+        from apex.platform import account_reads as _account_reads
+        return _ok(_account_reads.snapshot(p.user_id))
+
     m = _ACCOUNT_RE.match(route)
     if m:
         if method != "GET":
@@ -985,6 +1034,7 @@ def _dispatch(method, route, headers, body, query=None):
             since=_num(q.get("since"), "since"),
             until=_num(q.get("until"), "until"),
             rule_doc_id=q.get("ruleDocId"), status=q.get("status"),
+            environment=q.get("environment") or q.get("mode"),
             limit=_num(q.get("limit"), "limit") or 50,
             offset=_num(q.get("offset"), "offset") or 0))
 

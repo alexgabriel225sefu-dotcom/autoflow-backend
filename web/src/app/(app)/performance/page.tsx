@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import { useRead, whenSynced } from "@/lib/use-api";
 import { ErrorNotice, Spinner } from "@/components/app/state";
-import type { PerfGroup, PerfSummary, PerformanceRead } from "@/lib/api";
+import type { CtraderStatus, PerfGroup, PerfSummary, PerformanceRead } from "@/lib/api";
 import { CurrencyTicker, formatMoney } from "@/components/app/currency-ticker";
 
 /**
@@ -77,28 +77,26 @@ function Groups({ title, rows, minTrades }: { title: string; rows: PerfGroup[]; 
   );
 }
 
-export default function PerformancePage() {
-  const [period, setPeriod] = useState<(typeof PERIODS)[number]["id"]>("all");
-  const r = useRead<PerformanceRead>(`performance?period=${period}&mode=demo`, 60_000);
+function PerformanceBlock({ period, mode, accountId }: {
+  period: (typeof PERIODS)[number]["id"];
+  mode: "demo" | "live";
+  accountId?: string | number | null;
+}) {
+  const qs = new URLSearchParams({ period, mode });
+  if (accountId != null && accountId !== "") qs.set("accountId", String(accountId));
+  const r = useRead<PerformanceRead>(`performance?${qs.toString()}`, 60_000);
   const d = r.result?.ok ? r.result.data : null;
 
   return (
-    <main>
+    <section aria-label={`${mode} performance`}>
       <div className="page-head">
         <div>
-          <h1>Performance</h1>
-          <span className="sub">Demo account · last synced {whenSynced(r.lastSync)}</span>
+          <h2>{mode === "live" ? "Live" : "Demo"} performance{accountId != null ? ` #${accountId}` : ""}</h2>
+          <span className="sub">{mode === "live" ? "Live account" : "Demo account"} · last synced {whenSynced(r.lastSync)}</span>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={r.reload} disabled={r.loading}>
           <RefreshCw className="ico" aria-hidden /> Refresh
         </button>
-      </div>
-
-      <div className="seg" role="group" aria-label="Period" style={{ marginBottom: "var(--sp-3)" }}>
-        {PERIODS.map((p) => (
-          <button key={p.id} type="button" aria-pressed={period === p.id}
-                  onClick={() => setPeriod(p.id)}>{p.label}</button>
-        ))}
       </div>
 
       {r.loading && !r.result ? <Spinner /> : null}
@@ -156,6 +154,29 @@ export default function PerformancePage() {
           <Groups title="By instrument" rows={d.bySymbol} minTrades={d.minTrades} />
         </>
       ) : null}
+    </section>
+  );
+}
+
+export default function PerformancePage() {
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]["id"]>("all");
+  const ct = useRead<CtraderStatus>("ctrader/status", 120_000);
+  const listed = ct.result?.ok && Array.isArray(ct.result.data.accounts)
+    ? ct.result.data.accounts : [];
+  const accounts = listed.filter(
+    (a): a is { ctid: string | number; mode: "demo" | "live" } => a.mode === "demo" || a.mode === "live");
+  const blocks = accounts.length ? accounts : [{ ctid: null as string | number | null, mode: "demo" as const }];
+  return (
+    <main>
+      <div className="seg" role="group" aria-label="Period" style={{ marginBottom: "var(--sp-3)" }}>
+        {PERIODS.map((p) => (
+          <button key={p.id} type="button" aria-pressed={period === p.id}
+                  onClick={() => setPeriod(p.id)}>{p.label}</button>
+        ))}
+      </div>
+      {blocks.map((a) => (
+        <PerformanceBlock key={`${a.mode}-${a.ctid ?? "none"}`} period={period} mode={a.mode} accountId={a.ctid} />
+      ))}
     </main>
   );
 }

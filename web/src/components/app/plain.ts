@@ -246,6 +246,18 @@ export function plainRead(status: string, reason?: string): Plain | null {
         detail: reason ?? "The broker did not answer.",
         tone: "short",
       };
+    case "env_mismatch":
+      return {
+        label: "Wrong account environment",
+        detail: reason ?? "This read was not for the account on screen.",
+        tone: "short",
+      };
+    case "malformed":
+      return {
+        label: "Broker reply could not be read",
+        detail: reason ?? "The reply was not a position or order list. Nothing was treated as empty.",
+        tone: "short",
+      };
     default:
       return { label: status, detail: reason, tone: "short" };
   }

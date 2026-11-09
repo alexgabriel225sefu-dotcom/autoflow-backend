@@ -123,15 +123,15 @@ class JournalEntry:
     """One link in the chain, already redacted."""
 
     __slots__ = ("entry_id", "kind", "status", "ts", "correlation_id",
-                 "user_id", "account_id", "rule_doc_id", "rule_doc_version",
-                 "symbol", "snapshot", "decision", "execution_request",
-                 "broker_result", "position", "error")
+                 "user_id", "account_id", "environment", "rule_doc_id",
+                 "rule_doc_version", "symbol", "snapshot", "decision",
+                 "execution_request", "broker_result", "position", "error")
 
     def __init__(self, *, kind, correlation_id, user_id, status=None,
-                 account_id=None, rule_doc_id=None, rule_doc_version=None,
-                 symbol=None, snapshot=None, decision=None,
-                 execution_request=None, broker_result=None, position=None,
-                 error=None, ts=None, entry_id=None):
+                 account_id=None, environment=None, rule_doc_id=None,
+                 rule_doc_version=None, symbol=None, snapshot=None,
+                 decision=None, execution_request=None, broker_result=None,
+                 position=None, error=None, ts=None, entry_id=None):
         if kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}, got {kind!r}")
         if status is not None and status not in STATUSES:
@@ -150,6 +150,8 @@ class JournalEntry:
         self.correlation_id = correlation_id
         self.user_id = str(user_id)
         self.account_id = account_id
+        self.environment = (str(environment).lower()
+                            if environment in ("demo", "live") else None)
         self.rule_doc_id = rule_doc_id
         self.rule_doc_version = rule_doc_version
         self.symbol = symbol
@@ -166,7 +168,8 @@ class JournalEntry:
             "entryId": self.entry_id, "kind": self.kind, "ts": self.ts,
             "correlationId": self.correlation_id, "userId": self.user_id,
             "status": self.status,
-            "accountId": self.account_id, "ruleDocId": self.rule_doc_id,
+            "accountId": self.account_id, "environment": self.environment,
+            "ruleDocId": self.rule_doc_id,
             "ruleDocVersion": self.rule_doc_version, "symbol": self.symbol,
             "snapshot": self.snapshot, "decision": self.decision,
             "executionRequest": self.execution_request,

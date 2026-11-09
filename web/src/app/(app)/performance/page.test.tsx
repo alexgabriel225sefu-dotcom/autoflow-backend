@@ -45,7 +45,7 @@ describe("PerformancePage", () => {
     answer = ok();
     render(<PerformancePage />);
     await waitFor(() => expect(paths.length).toBeGreaterThan(0));
-    expect(paths[0]).toBe("performance?period=all&mode=demo");
+    expect(paths).toContain("performance?period=all&mode=demo");
   });
 
   it("choosing a period asks the server for that period", async () => {

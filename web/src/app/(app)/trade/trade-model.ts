@@ -440,6 +440,12 @@ export function startState(input: {
              reason: "Pick the account this should run on." };
   }
   const id = String(sel.ctid);
+  const demo = status.accounts.find((a) => a.mode === "demo");
+  // Live execution closed: a linked demo account stays the thing that can
+  // start. The live account is still readable; it is not a start target.
+  if (sel.mode === "live" && !execution?.canAutomate && demo) {
+    return { kind: "demo", label: "Start on demo", reason: null, accountId: String(demo.ctid) };
+  }
   if (sel.mode === "demo") {
     return { kind: "demo", label: "Start on demo", reason: null, accountId: id };
   }

@@ -125,24 +125,39 @@ describe("startState", () => {
     const s = startState({ status: status({}), execution: exec({}) });
     expect(s).toMatchObject({ kind: "demo", label: "Start on demo", accountId: "7" });
   });
-  const liveSel = status({ selected: { ctid: 9, mode: "live" } });
+  const liveOnly = status({
+    accounts: [{ ctid: 9, mode: "live" }],
+    selected: { ctid: 9, mode: "live" },
+    liveAllowed: true,
+  });
+  const both = status({
+    accounts: [{ ctid: 7, mode: "demo" }, { ctid: 9, mode: "live" }],
+    selected: { ctid: 9, mode: "live" },
+    liveAllowed: true,
+  });
   it("a live account starts ONLY when the server says it can automate", () => {
-    expect(startState({ status: liveSel, execution: exec({ canAutomate: true }) }).kind)
+    expect(startState({ status: liveOnly, execution: exec({ canAutomate: true }) }).kind)
       .toBe("live");
-    expect(startState({ status: liveSel, execution: exec({ canAutomate: false }) }).kind)
+    expect(startState({ status: liveOnly, execution: exec({ canAutomate: false }) }).kind)
       .toBe("live_closed");
-    expect(startState({ status: liveSel, execution: null }).kind).toBe("live_closed");
+    expect(startState({ status: liveOnly, execution: null }).kind).toBe("live_closed");
+  });
+  it("a closed live account does not hide a linked demo", () => {
+    expect(startState({ status: both, execution: exec({ canAutomate: false }) }))
+      .toMatchObject({ kind: "demo", label: "Start on demo", accountId: "7" });
+    expect(startState({ status: both, execution: exec({ canAutomate: true }) }).kind)
+      .toBe("live");
   });
   it("a closed live account says what the next step is", () => {
-    expect(startState({ status: liveSel, execution: exec({
+    expect(startState({ status: liveOnly, execution: exec({
       liveGate: { request: { status: "pending" }, status: "closed", summary: "s" } }) }))
       .toMatchObject({ kind: "live_closed", label: "Awaiting approval", href: "/live" });
-    expect(startState({ status: liveSel, execution: exec({
+    expect(startState({ status: liveOnly, execution: exec({
       liveGate: { request: { status: "none" }, status: "closed", summary: "Terms not accepted" } }) }))
       .toMatchObject({ label: "Request live access", reason: "Terms not accepted" });
   });
   it("an unreadable live status is shown as unknown, never as closed or open", () => {
-    expect(startState({ status: liveSel, execution: exec({
+    expect(startState({ status: liveOnly, execution: exec({
       liveGate: { request: { status: "none" }, status: "unknown", summary: "" } }) }))
       .toMatchObject({ label: "Live status unknown" });
   });

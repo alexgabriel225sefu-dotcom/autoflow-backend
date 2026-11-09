@@ -94,7 +94,10 @@ export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () 
   );
 }
 
-type ReadLike = { connected: boolean; status: ReadState; reason?: string };
+type ReadLike = {
+  connected: boolean; status: ReadState | string; reason?: string;
+  errorCode?: string | null; correlationId?: string | null;
+};
 
 /**
  * Renders children ONLY when the backend confirmed status "ok".
@@ -153,7 +156,15 @@ export function ReadPanel({
     <div className="notice notice-error" role="alert">
       <p>Could not read your account.</p>
       <p className="muted">{read.reason ?? "The broker did not answer."}</p>
-      <p className="muted">{emptyLabel ? "" : ""}</p>
+      {read.errorCode || read.correlationId ? (
+        <p className="muted">
+          {read.errorCode ? read.errorCode : "Read failed"}
+          {read.correlationId ? ` · ref ${read.correlationId}` : ""}
+          {read.status === "reauth_required" || read.errorCode === "AUTH_FAILED"
+            ? ". Reconnect cTrader, then refresh."
+            : ". Refresh to try this read again."}
+        </p>
+      ) : null}
     </div>
   );
 }

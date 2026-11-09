@@ -6,7 +6,7 @@ import { ErrorNotice, ReadPanel, Spinner, StatusPill } from "@/components/app/st
 import { DataTable, Num, Side, When } from "@/components/app/table";
 import { CurrencyTicker } from "@/components/app/currency-ticker";
 import { PositionDetail } from "@/components/app/position-detail";
-import type { ClosedTrade, DealsRead, Position, PositionsRead } from "@/lib/api";
+import type { ClosedTrade, CtraderStatus, DealsRead, Position, PositionsRead } from "@/lib/api";
 
 /** cTrader has used both second and millisecond epochs across read paths.
  * Reject dates outside the lifetime of the product instead of showing a
@@ -75,12 +75,12 @@ const dealColumns = [
   { key: "closed", header: "Closed", cell: (d: ClosedTrade) => d.closedAt == null ? <Num value={null} /> : <When ts={d.closedAt} /> },
 ];
 
-export default function PositionsPage() {
+function PositionBook({ path, title }: { path: string; title?: string }) {
   // Only the id is kept. The row itself is looked up in the latest read, so
   // the detail shows what the broker last said and not a copy from the click.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [lastSeen, setLastSeen] = useState<Position | null>(null);
-  const r = useRead<PositionsRead>("positions", 20_000);
+  const r = useRead<PositionsRead>(path, 20_000);
   const accountId = r.result?.ok ? r.result.data.accountId : undefined;
   const dealsPath = accountId ? `accounts/${accountId}/deals?days=7` : null;
   const deals = useRead<DealsRead>(dealsPath, 60_000);
@@ -103,7 +103,7 @@ export default function PositionsPage() {
     <main>
       <div className="page-head">
         <div>
-          <h1>Positions</h1>
+          <h1>{title || "Positions"}</h1>
           <span className="sub">
             {summary}
             {r.result?.ok && unknownPnl === 0 ? <> <CurrencyTicker value={totalPnl} /></> : null}
@@ -139,4 +139,24 @@ export default function PositionsPage() {
       {deals.result && !deals.result.ok ? <section className="card"><h2>Closed trades · last 7 days</h2><ErrorNotice error={deals.result} onRetry={deals.reload} /></section> : null}
     </main>
   );
+}
+
+export default function PositionsPage() {
+  const ct = useRead<CtraderStatus>("ctrader/status", 60_000);
+  const accounts = ct.result?.ok && Array.isArray(ct.result.data.accounts)
+    ? ct.result.data.accounts : [];
+  if (accounts.length) {
+    return (
+      <main>
+        {accounts.map((a) => (
+          <PositionBook
+            key={`${a.mode}-${a.ctid}`}
+            path={`accounts/${encodeURIComponent(String(a.ctid))}/positions`}
+            title={`${a.mode === "live" ? "Live" : "Demo"} #${a.ctid}`}
+          />
+        ))}
+      </main>
+    );
+  }
+  return <PositionBook path="positions" />;
 }
