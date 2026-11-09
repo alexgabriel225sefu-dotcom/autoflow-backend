@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ.setdefault("PAPER_TRADING", "true")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-sess-")
 

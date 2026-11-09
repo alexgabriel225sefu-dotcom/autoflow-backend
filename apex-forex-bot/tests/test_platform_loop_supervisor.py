@@ -8,8 +8,8 @@ store, so the automation record and the dashboard both go on reporting RUNNING
 over a loop that no longer exists.
 
 The engine has always had the cure: `start_all` on boot and `start_watchdog`
-every 180 seconds. Both are called in `apex/bot.py` and `apex/telegram.py` —
-the TELEGRAM entry points — and `platform_server.py` called neither. `bot.py`
+every 180 seconds. Both are called in `apex/bot.py` and `apex/legacy.py` —
+the LEGACY entry points — and `platform_server.py` called neither. `bot.py`
 is not deployed anywhere, so NOTHING in production revived a platform client's
 loop after a deploy, an instance recycle or a crash. The logs show
 `[API] signal 15 — shutting down` on an ordinary day.
@@ -24,7 +24,7 @@ It does not ask whether the supervisor FUNCTION exists. A function nothing
 calls is exactly what the engine's watchdog was from this server's point of
 view. It asserts the wiring: that `main` calls it, that a boot revives a
 platform account marked active, that the periodic cycle does too, and — the
-half that protects the other product — that a Telegram account is left alone.
+half that protects the other product — that a platform account is left alone.
 
 Run: python3 tests/test_platform_loop_supervisor.py
 """

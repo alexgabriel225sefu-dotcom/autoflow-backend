@@ -87,7 +87,7 @@ A handoff can be one commit stale; the log cannot.
 - A new session **continues from the latest pushed commit**. It does not restart
   finished work, and it does not re-derive a decision the handoff records.
 
-The Telegram bot and the sales site live on
+The the web app bot and the sales site live on
 `claude/arcads-external-api-gexx7-6n4pr9`, and Render deploys from
 `claude/arcads-external-api-gExX7`. Check the branch before the first commit:
 the two work streams touch the same files under `apex-forex-bot/apex/`.

@@ -31,7 +31,7 @@ failure costs.
     read each other's — data loss wearing a warning label.
 
   * HARDCODED OPERATOR IDENTITY. Payment and fulfilment alerts fell back to
-    one person's Telegram id and personal email, so an unconfigured
+    one person's the platform id and personal email, so an unconfigured
     deployment silently delivered another operator's alerts to them.
 
   * CRYPTO REMOVED, NOT DISABLED. A disabled mode is still a mode: config
@@ -50,7 +50,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-hard-")
 
 from apex import config as cfg, forex  # noqa: E402
@@ -72,7 +72,6 @@ def read(*parts):
 
 
 SERVER = read(REPO, "server.js")
-TG = read(ROOT, "apex", "telegram.py")
 
 print("\n🔒  FINAL HARDENING — FAILURE INJECTION\n")
 
@@ -87,16 +86,17 @@ check("a licence-store error answers 503, not valid:true",
 check("the deny is logged, not silent",
       re.search(r"addLog\(`verify-license: licence store unreachable", SERVER) is not None)
 
-print("\n2. …but revalidation must not revoke a paying customer")
-check("revalidation ignores a 5xx body", "if r.status_code >= 500:" in
-      TG.split("def _revalidate_license")[1].split("\ndef ")[0],
-      "the 503 carries valid:false; reading it without the status revokes everyone")
-check("first activation still denies on 5xx",
-      "if r.status_code >= 500:" in
-      TG.split("def _license_ok")[1].split("\ndef ")[0])
-check("the opposite directions are explained where they are decided",
-      "opposite of _license_ok" in TG,
-      "an asymmetry nobody documents gets 'fixed' into a symmetry later")
+print("\n2. …but a store outage must not revoke a paying customer")
+# The chat verifier that ignored a 5xx body lived on the retired bot. The
+# loop's remaining rule is the same shape: an unreachable access store is
+# unknown, and unknown keeps the loop. New live risk stays blocked while a
+# licence cannot be confirmed.
+_ENT = read(ROOT, "apex", "user_loop.py").split("def _entitled(")[1].split("\ndef ")[0]
+_LIVE = read(ROOT, "apex", "gates.py").split("def live_entitlement")[1].split("\ndef ")[0]
+check("an unreachable access store does not stop the loop",
+      'state == "unknown"' in _ENT and "return True" in _ENT)
+check("an unverifiable licence blocks new live orders",
+      "license_grace_since" in _LIVE)
 
 # ── 3. secrets ────────────────────────────────────────────────────────────
 print("\n3. No production secret has a fallback")

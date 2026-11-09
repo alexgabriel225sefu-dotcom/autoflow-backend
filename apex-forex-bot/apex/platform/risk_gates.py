@@ -97,7 +97,7 @@ SUPPORTED_ORDER_TYPES = frozenset({"MARKET"})
 # these. The numbers are the ones the product already runs on, so this file
 # introduces no new policy:
 #
-#   maxRiskPercentLive   telegram._LIVE_INITIAL_RISK_CAP (1%), the ceiling the
+#   maxRiskPercentLive   legacy._LIVE_INITIAL_RISK_CAP (1%), the ceiling the
 #                        legacy bot applies when an account is switched to real
 #                        money whatever it was configured with while simulating.
 #   maxRiskPercentDemo   ruledoc's own ceiling on sizing.riskPercent. The
@@ -319,7 +319,7 @@ def _g_inputs(ctx):
         return ("BALANCE_NOT_CALLABLE",
                 "the balance must arrive as a callable read at decision "
                 "time; a number here would be a figure of unknown age")
-    if not isinstance(ctx["intent"].symbol, str) or \
+    if not isinstance(ctx["intent"].symbol, str) or\
             not ctx["intent"].symbol.strip():
         return ("NO_SYMBOL", "the order names no instrument")
     if ctx["intent"].side not in ("BUY", "SELL"):
@@ -360,8 +360,8 @@ def _g_stop(ctx):
     sl = ctx["rule"].get("stopLoss")
     sl = sl if isinstance(sl, dict) else {}
     mode = sl.get("mode")
-    if mode == "atr" and not _pos(sl.get("atrMultiple")) or \
-            mode == "pips" and not _pos(sl.get("pips")) or \
+    if mode == "atr" and not _pos(sl.get("atrMultiple")) or\
+            mode == "pips" and not _pos(sl.get("pips")) or\
             mode not in ("atr", "pips"):
         return ("NO_STOP",
                 "this rule has no stop, so the trade has no defined risk and "
@@ -724,7 +724,7 @@ def _g_slippage(ctx):
     already know.
     """
     order = ctx["rule"].get("order")
-    cap = (order or {}).get("maxSlippagePoints") if isinstance(order, dict) \
+    cap = (order or {}).get("maxSlippagePoints") if isinstance(order, dict)\
         else None
     if not _pos(cap):
         return WAIVED

@@ -7,7 +7,7 @@ THE BUG, AND IT MADE EVERY LIVE GATE IN THE PRODUCT DECORATIVE
 real money at stake? It answered it with `_live(u)`, which is
 `not u.get("paper", True)` — the user record's paper flag.
 
-Only `telegram._handle_paper` ever writes that flag. A platform client's
+Only `legacy._handle_paper` ever writes that flag. A platform client's
 record has no `paper` key at all, so the answer was False for every platform
 account, whatever account they had selected at the broker.
 

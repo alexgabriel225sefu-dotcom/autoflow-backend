@@ -1,4 +1,4 @@
-"""The platform's own notification centre. Nothing here reaches Telegram.
+"""The platform's own notification centre. Nothing here reaches the platform.
 
 WHY THIS IS NOT THE JOURNAL
 
@@ -13,9 +13,9 @@ has decided something is worth a person's attention writes here.
 
 DELIVERY IS IN-PLATFORM, DELIBERATELY
 
-The old product pushed everything through a Telegram bot, which made Telegram
+The old product pushed everything through a chat channel, which made the platform
 load-bearing for knowing your account had been disconnected. A client with no
-Telegram must still learn that. So notifications live here and are read
+the platform must still learn that. So notifications live here and are read
 through the API; email can be added later as an ADDITIONAL channel, never as
 the only one.
 """

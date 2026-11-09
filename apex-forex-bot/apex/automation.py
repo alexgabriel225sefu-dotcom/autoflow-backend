@@ -14,7 +14,7 @@ names are now what they do:
 honest names, so nothing about how a running account trades changes.
 
 The mode has to be read in two places that cannot import each other: the
-trading loop, which decides whether to execute, and Telegram, which decides
+trading loop, which decides whether to execute, and the platform, which decides
 what to show. A second copy of this resolution would drift, and the direction
 it would drift in is "the UI says Approval Required while the loop executes
 unattended" — so it lives here, alone.

@@ -4,7 +4,7 @@ The APEX engine shipped while the market was closed, so it had never run once
 against live conditions. Verifying that means reading logs at the moment the
 market reopens — which needs a person awake, with time, and with budget. So the
 platform does it instead: this runs in the process that already exists, on the
-host already paid for, and sends the answer to Telegram.
+host already paid for, and sends the answer to the platform.
 
 The property that took a real bug to find: an unreadable journal must not
 produce the same report as an empty one. `trade_events.recent` returns a dict,
@@ -135,10 +135,6 @@ check("...as a daemon so it cannot hold shutdown open", "t.daemon = True" in WAT
 check("...after a delay, since the loop has not ticked at the open",
       "_SELFCHECK_DELAY_S" in WATCH,
       "an immediate report would truthfully say 'no pass' every week")
-TG = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
-check("there is an on-demand command", 'cmd_l == "/engine"' in TG)
-check("...listed for clients", '("engine", "What APEX has been doing")' in TG)
-
 print("\n" + "=" * 50)
 if failures:
     print(f"FAILED {len(failures)}: {', '.join(failures[:8])}")

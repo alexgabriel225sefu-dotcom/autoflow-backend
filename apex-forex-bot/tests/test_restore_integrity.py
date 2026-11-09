@@ -36,7 +36,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-restore-")
 # Encryption ON, as in every real deployment. verify() refuses a snapshot whose
 # credentials are plaintext — correctly — so a test that seeded plaintext would

@@ -401,7 +401,7 @@ proprietarului (7585109158) **nu are nici `automation`, nici `copilot`** — dec
 rula pe `full` prin exact acest fallback. După deploy va rula pe `approval`:
 botul va cere aprobare pentru fiecare intrare în loc să deschidă singur.
 
-**O singură comandă îl aduce înapoi:** `/automation full` în Telegram.
+**O singură comandă îl aduce înapoi:** `/automation full` în the web app.
 Dă-o după deploy, altfel botul pare că „s-a oprit din tranzacționat".
 
 Conturile care au `copilot` setat explicit nu sunt afectate — `False` rămâne
@@ -593,7 +593,7 @@ Analiza jurnalului a găsit de ce pierdea botul și de unde venea `-27k`:
 1. **`/markartefacts` NU a fost rulat încă.** Jurnalul arată în continuare 84 de
    rânduri, iar `/report` îi spune clientului **-$27.052**, cifră falsă.
    Comanda trebuie tastată de proprietarul contului (e în `_MSG_DENY`), din
-   Telegram. Scriptul echivalent: `apex-forex-bot/scripts/mark_journal_artefacts.py`
+   the web app. Scriptul echivalent: `apex-forex-bot/scripts/mark_journal_artefacts.py`
    (dry-run implicit, `--apply` scrie, e idempotent).
 2. **Verifică datele de luni.** Cele patru remedii au prins doar ~6 ore de piață
    deschisă vineri 2026-09-04. Fără o săptămână de date, nu se poate spune dacă
@@ -614,7 +614,7 @@ precompilat. Alternativ, Visual Studio Build Tools cu workload C++.
 
 ## Ce e proiectul
 - **Apex Trade Bot** by **AI Cash Systems** (owner: Alex Otvos, România).
-- Bot de trading Telegram vândut ca licență one-time + site de vânzări + program de afiliere.
+- Bot de trading the web app vândut ca licență one-time + site de vânzări + program de afiliere.
   - `apex-forex-bot/` — Python, bot forex **$497**.
   - `server.js` + `public/` — site Node, checkout/IPN Digistore24, livrare licențe, API afiliere.
   - Afiliații se recrutează prin marketplace-ul Digistore24 (30% comision).

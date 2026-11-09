@@ -3,7 +3,7 @@
 WHY THIS EXISTS
 
 The platform could service three levels (signals, approval, full) and had no
-way to ask for one: every rule omitted the field and ran at `full`. The Telegram
+way to ask for one: every rule omitted the field and ran at `full`. The platform
 bot let a client choose who acts on a setup, and the choice that matters most
 on a money product is "tell me, don't trade" or "ask me first".
 

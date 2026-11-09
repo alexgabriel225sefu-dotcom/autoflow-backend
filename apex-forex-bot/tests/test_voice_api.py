@@ -29,7 +29,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-voice-")
 
 from apex import voice_api, user_store, assistant  # noqa: E402
@@ -274,7 +274,7 @@ check("no token is 401", voice_api.ask("", "hello").get("status") == 401)
 check("a revoked token is 401",
       (voice_api.revoke("500"), voice_api.ask(tok, "hi").get("status"))[1] == 401)
 check("the refusal is speakable",
-      "Telegram" in voice_api.ask("", "hi")["reply"])
+      "not valid" in voice_api.ask("", "hi")["reply"])
 tok = voice_api.mint("500")
 check("an empty question is refused", voice_api.ask(tok, "  ").get("status") == 400)
 
@@ -283,137 +283,16 @@ check("markup is removed", voice_api.speakable("<b>Balance:</b> $10") == "Balanc
 check("entities are decoded", voice_api.speakable("A &amp; B") == "A & B")
 check("nothing crashes on None", voice_api.speakable(None) == "")
 
-print("\n14. Wired end to end")
+print("\n14. The voice door still refuses money on the asking turn")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BOT = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
-TG = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
 AS = open(os.path.join(ROOT, "apex", "assistant.py"), encoding="utf-8").read()
-check("the route exists", '"/api/voice"' in BOT)
-# Scope the read to the branch's own body. A substring check against the whole
-# file — or even the text after the route — matches the COMMENT explaining why
-# the operator token is not used here, so it would pass on prose alone.
-# The end marker used to be the /api/mt/sync branch. That route was removed —
-# it was an execution path for a broker this build no longer supports — so the
-# slice now ends at the do_POST handler's final `else`, which is structural
-# rather than a route name that can disappear again.
-VOICE_BRANCH = BOT.split('elif self.path == "/api/voice":')[1].split(
-    "            else:\n                self.send_response(404)")[0]
-check("identity comes from the per-client voice token",
-      "voice_api.ask(" in VOICE_BRANCH and "voice_api.confirm(" in VOICE_BRANCH,
-      VOICE_BRANCH[:200])
-check("the operator's dashboard gate does not stand in for it",
-      "_authorized()" not in VOICE_BRANCH,
-      "DASHBOARD_TOKEN reads every account; this route must read exactly one")
-check("a confirmation is routed by id, never by re-reading the words",
-      'req.get("confirmId")' in VOICE_BRANCH)
-# A GET used to fall through to the dashboard gate and answer "503 — dashboard
-# disabled", which is true of the dashboard and says nothing about the endpoint
-# asked for, and wrote no log line at all — so a shortcut misconfigured to send
-# GET was indistinguishable from a request that never left the phone.
-check("a GET on the voice endpoint is answered as method-not-allowed",
-      'self.path.startswith("/api/voice")' in BOT
-      and "405" in BOT.split('self.path.startswith("/api/voice")')[1][:900],
-      "a POST-only endpoint must say so, not blame the dashboard")
-check("and it is logged, so the two silences are told apart",
-      "[Voice] GET on /api/voice" in BOT)
-check("/voice is routed with its argument", "_handle_voice(chat_id, args)" in TG)
-# Apple refuses to import unsigned .shortcut files — "Importing unsigned
-# shortcut files is not supported" — so a ready-built file cannot be handed
-# over, and there is no point serving one. The instructions build the SHORT
-# version instead: three actions, added top to bottom into an empty shortcut
-# so each lands at the end and nothing is ever dragged, and no variable wired
-# into Speak Text. Dragging an action and wiring that variable are the two
-# things that went wrong every time this was assembled by hand.
-check("nothing offers a downloadable shortcut file",
-      "voice/shortcut" not in TG and "voice/shortcut" not in BOT,
-      "iOS cannot import it, so it must not be advertised")
-check("the instructions point at the plain-text endpoint",
-      "/api/voice/say" in TG)
-check("they say to start from an empty shortcut",
-      "empty" in TG.split("Build it")[1][:600])
-# (that Speak Text needs no wiring is asserted on the RENDERED text in
-# section 18 — a source check breaks on a string split across two lines)
-check("the guard reaches the tool runner", "def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None)" in AS)
-check("Telegram still calls the assistant unguarded, unchanged",
-      "assistant.chat(" in TG)
+check("the guard reaches the tool runner",
+      "def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None)" in AS)
 check("only tool-capable providers are preferred for acting",
       assistant.TOOL_CAPABLE == ("Gemini",), assistant.TOOL_CAPABLE)
-SAY = BOT.split('elif self.path == "/api/voice/say":')[1].split(
-    'elif self.path == "/api/voice":')[0]
-check("there is a plain-text endpoint for a three-action shortcut",
-      'elif self.path == "/api/voice/say":' in BOT)
-check("it answers text, not JSON", "text/plain" in SAY and "json.dumps" not in SAY,
-      "plain text is what lets Speak Text chain itself with nothing to wire")
-check("and always 200, so a refusal is spoken rather than swallowed",
-      "self.send_response(200)" in SAY and "out.get(\"status\"" not in SAY)
-check("a non-JSON body is taken as the question itself",
-      "tok, said = hdr_tok, raw" in SAY,
-      "this is the shape that needs no variable picked by hand")
-check("and its key comes from the Authorization header",
-      "hdr_tok" in SAY and "Bearer" in SAY)
-check("JSON still wins when it is JSON", "if req:" in SAY)
 check("both money tools are guarded",
       voice_api.FINANCIAL_TOOLS == {"execute_trade", "close_position"},
       voice_api.FINANCIAL_TOOLS)
-
-print("\n15. /ai reads the key you typed with it")
-# `/ai <key>` is the obvious thing to type. It used to be read as a bare /ai:
-# the key was dropped, the instructions came back, and the key sat in the chat
-# history. Reported live, with a Google ephemeral token (AQ.…) that also is
-# not an API key — so the refusal has to say what it actually saw.
-from apex import telegram  # noqa: E402
-
-_sent = []
-_real_send, _real_del = telegram.send_to, telegram._delete_message
-try:
-    telegram.send_to = lambda cid, text, *a, **k: _sent.append(text)
-    telegram._delete_message = lambda *a, **k: None
-
-    telegram._handle_ai_setup("900", "abc123", 1)
-    wrong = _sent[-1]
-    check("a truncated key is rejected, not silently ignored",
-          "doesn't look like a full key" in wrong, wrong[:120])
-    check("and the refusal says what it actually got",
-          "abc1" in wrong and "6 characters" in wrong, wrong[:200])
-    check("it names both places to copy a real one",
-          "aistudio.google.com/apikey" in wrong and "console.groq.com" in wrong)
-
-    _sent.clear()
-    telegram._handle_ai_setup("900", "", 1)
-    check("a bare /ai still shows the setup screen",
-          "Activate AI chat" in _sent[-1], _sent[-1][:80])
-finally:
-    telegram.send_to, telegram._delete_message = _real_send, _real_del
-
-print("\n16. Key formats change; a prefix list must not be the gate")
-# Google AI Studio issued keys beginning AIza for years and now issues them
-# beginning AQ. — reported live by a client whose brand-new Gemini key was
-# refused as "not an AI key" while working perfectly everywhere else. Any
-# hard-coded prefix list goes stale the same way, so where the client has
-# SAID they are handing over a key, Google decides, not us.
-check("the historic Gemini format still works",
-      telegram._detect_ai_key("AIzaSyABCDEFGHIJKLMNOPQRSTUV") == "gemini")
-check("the current Gemini format works",
-      telegram._detect_ai_key("AQ.Ab8RN6I8FYogIlADmgnaJNnDxNDD") == "gemini")
-check("Groq's prefix still wins outright",
-      telegram._detect_ai_key("gsk_abcdefghijklmnopqrstuvwxyz01") == "groq")
-check("an unrecognised format is accepted when offered explicitly",
-      telegram._detect_ai_key("zz9PlaskFooBarBaz1234567890abcdefXYZ",
-                              explicit=True) == "gemini",
-      "the next format change must not need a deploy")
-check("but a bare message is never swallowed as a secret",
-      telegram._detect_ai_key("zz9PlaskFooBarBaz1234567890abcdefXYZ") is None,
-      "a bare paste is deleted from the chat — that must need a known prefix")
-check("ordinary chat is not mistaken for a key even when explicit",
-      telegram._detect_ai_key("cum merge botul meu azi", explicit=True) is None)
-check("nor is something far too short",
-      telegram._detect_ai_key("abc123", explicit=True) is None)
-
-ROUTE = open(os.path.join(ROOT, "apex", "telegram.py"), encoding="utf-8").read()
-check("the /ai command passes its argument through",
-      "_handle_ai_setup(chat_id, args, msg_id)" in ROUTE)
-check("the explicit path lets the provider decide",
-      "_detect_ai_key(key, explicit=True)" in ROUTE)
 
 print("\n17. A key check must test the KEY, not a model that may be gone")
 # Reported live: a valid Groq key was refused. The check sent a chat
@@ -502,62 +381,7 @@ try:
 finally:
     _ul.get_dash = _keep
 
-print("\n18. One button, and it upgrades itself when the link exists")
-# Apple refuses unsigned .shortcut files and only an Apple device can sign
-# one, so the first copy has to be built on an iPhone and shared — which
-# yields a permanent iCloud link every later client installs with one tap.
-# The button must not have to change when that link appears: setting
-# VOICE_SHORTCUT_URL has to upgrade everyone at once.
-from apex import config as _cfg  # noqa: E402
-
-os.environ["RENDER_EXTERNAL_URL"] = "https://example.invalid"
-_shots = []
-_rs, _rd = telegram.send_to, telegram._delete_message
-_was_url = getattr(_cfg, "VOICE_SHORTCUT_URL", "")
-try:
-    telegram.send_to = lambda cid, text, *a, **k: _shots.append(text)
-    telegram._delete_message = lambda *a, **k: None
-
-    _cfg.VOICE_SHORTCUT_URL = ""
-    telegram._handle_voice("700")
-    screen = _shots[-1]
-    check("the screen exists before anything is set up",
-          "Voice control" in screen, screen[:80])
-
-    telegram._handle_voice("700", "new")
-    manual = _shots[-1]
-    check("with no published link, it explains the three steps",
-          "3 steps" in manual and "/api/voice/say" in manual, manual[:120])
-    check("and says to start from an EMPTY shortcut", "empty" in manual)
-    check("and that Speak Text needs no variable wired into it",
-          "fills itself in" in manual,
-          "wiring that variable is what kept silently coming undone")
-
-    _cfg.VOICE_SHORTCUT_URL = "https://www.icloud.com/shortcuts/EXAMPLE"
-    _shots.clear()
-    telegram._handle_voice("700", "new")
-    oneTap = _shots[-1]
-    check("once published, the same button is a one-tap install",
-          "icloud.com/shortcuts/EXAMPLE" in oneTap, oneTap[:120])
-    check("and no longer asks anyone to build anything",
-          "3 steps" not in oneTap and "Get Contents of URL" not in oneTap)
-    check("the key is still handed over separately, once",
-          any("copy it now" in m for m in _shots))
-
-    check("both routes explain how to HEAR alerts, not just read them",
-          "Announce Notifications" in manual and "Announce Notifications" in oneTap,
-          "spoken alerts are an iOS setting, not something the bot can switch on")
-finally:
-    telegram.send_to, telegram._delete_message = _rs, _rd
-    _cfg.VOICE_SHORTCUT_URL = _was_url
-
-check("the menu carries it, so it is reachable without knowing a command",
-      '("🎙 Voice control", "nav:voice")' in TG)
-check("the screen offers activation as a button",
-      '"voice:new"' in TG and "Activate voice control" in TG)
-check("and the buttons are routed",
-      'if data == "nav:voice"' in TG and 'if data == "voice:new"' in TG
-      and 'if data == "voice:off"' in TG)
+print("\n18. Publishing a shortcut is a setting, not a chat command")
 check("the link is a setting, so publishing it needs no deploy",
       "VOICE_SHORTCUT_URL" in open(
           os.path.join(ROOT, "apex", "config.py"), encoding="utf-8").read())

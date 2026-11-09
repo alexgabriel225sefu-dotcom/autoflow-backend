@@ -56,7 +56,7 @@ time.sleep(1.5)
 os.environ["REDIS_URL"] = f"redis://127.0.0.1:{PORT}/0"
 os.environ["APP_ENV"] = "production"
 os.environ["PRODUCT"] = "forex"
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-signing-secret")
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="apex-mkt-"))
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY",
                       base64.urlsafe_b64encode(os.urandom(32)).decode())
@@ -144,68 +144,6 @@ check("the previous rows are still served", any(r["available"] for r in out["row
 check("...and it is flagged stale", out.get("stale") is True, str(out.get("stale")))
 check("the UI is told when it was from", isinstance(out.get("asOf"), int))
 
-print("\n6. The endpoint is scoped to an authenticated client")
-BOT = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
-route = BOT[BOT.index('if self.path.startswith("/api/app/markets")'):]
-route = route[:route.index("/api/app/tick")]
-check("identity is checked before any broker work",
-      route.index("_telegram_identity") < route.index("_make_broker"),
-      "an unauthenticated caller must not be able to make us poll a broker")
-check("a denied caller is refused", "_telegram_denied" in route)
-check("a broker failure answers a reason, not an empty list",
-      "MARKET_DATA_UNAVAILABLE" in route)
-
-print("\n7. The screen renders unavailable as unavailable")
-HTML = open(os.path.join(ROOT, "apex", "static", "terminal.html"), encoding="utf-8").read()
-check("a row with no price says so", "'</div><div class=\"mpx\">unavailable</div>" in HTML
-      or 'unavailable</div>' in HTML)
-check("free margin is not derived and shown as a broker fact",
-      "not reported by the ctrader account api" in HTML.lower())
-check("markets polls on its own cadence, not the position tick",
-      "setInterval(()=>loadMarkets(), 30000)" in HTML)
-
-print("\n8. Symbol detail refuses an instrument the platform does not trade")
-SYM = BOT[BOT.index('if self.path.startswith("/api/app/symbol")'):]
-SYM = SYM[:SYM.index('if self.path.startswith("/api/app/account")')]
-SYMC = "\n".join(l for l in SYM.splitlines() if not l.strip().startswith("#"))
-check("the symbol is checked against the universe BEFORE a broker is built",
-      SYMC.index("_y_mk.universe()") < SYMC.index("_make_broker"),
-      "a crafted value must not become a broker request")
-check("an unknown instrument is refused by name", "UNKNOWN_INSTRUMENT" in SYMC)
-check("the timeframe is an allowlist, not free text",
-      '("1m", "5m", "15m", "1h", "4h", "1d")' in SYMC)
-check("the symbol is length-clamped", "[:16]" in SYMC)
-check("candles go through the broker's cached path",
-      "_y_br.get_candles(" in SYMC,
-      "get_candles routes through candle_cache, so two clients on the same "
-      "instrument cost one historical request")
-check("no candles is stated, not drawn as an empty chart",
-      "MARKET_DATA_UNAVAILABLE" in SYMC)
-check("spread is omitted when either quote is missing",
-      "_y_bid is not None and _y_ask is not None" in SYMC,
-      "a spread computed from one live and one stale quote is a made-up number")
-check("the position drawn on the chart is read server-side",
-      "get_dash(_y_chat)" in SYMC and '"position"' in SYMC)
-check("...and is never taken from the request",
-      "_y_qs.get(\"pos\")" not in SYMC and '"entryPrice"' in SYMC)
-check("identity is checked first",
-      SYMC.index("_telegram_identity") < SYMC.index("_y_mk.universe()"))
-import re as _re
-check("every route local is prefixed",
-      not {m.group(1) for m in _re.finditer(r'^\s+([a-z][\w]*) = (?!=)', SYMC, _re.M)})
-
-print("\n9. The screen opens an instrument, and says when it cannot")
-check("a market row opens the instrument", "openSymbol(row.dataset.sym)" in HTML)
-check("the screen exists", 'id="s-symbol"' in HTML and 'id="symChart"' in HTML)
-check("it has its own chart object, not a shared one", "symChart=mkChart(" in HTML)
-check("an untraded instrument is worded plainly",
-      "not one the platform trades" in HTML)
-check("unavailable data is worded, not blanked",
-      "Market data for this instrument is unavailable" in HTML)
-check("a missing quote renders as unavailable, not zero",
-      'class="na">Not available' in HTML)
-
-mk.reset()
 print("\n" + "=" * 50)
 _redis.terminate()
 if failures:

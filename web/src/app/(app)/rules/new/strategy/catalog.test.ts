@@ -4,7 +4,7 @@
  * WHY THIS FILE EXISTS
  *
  * The platform exposed one way to trade — write a rule — while the engine
- * ships fifteen ready-made strategies a Telegram client could pick from a
+ * ships fifteen ready-made strategies a the web app client could pick from a
  * menu. The picker closes that, and there are exactly two places the browser
  * can get it wrong on its own.
  *

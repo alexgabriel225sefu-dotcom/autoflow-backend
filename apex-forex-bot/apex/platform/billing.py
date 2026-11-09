@@ -13,8 +13,8 @@ WHY THE SIGNATURE IS CHECKED HERE AND NOT BY AN SDK
 The verification is thirty lines of stdlib HMAC. Handing the raw body to a
 library that parses it first is how a webhook ends up trusting a body it then
 re-reads; keeping the check on the exact bytes received removes that gap. The
-legacy Telegram-era handler in apex/stripe_license.py does the same thing for
-the same reason, and this is deliberately a separate store keyed by the
+platform webhook does the same thing for
+the same reason, and this is deliberately a store keyed by the
 Supabase user id.
 
 THE OWNER-APPROVED OFFER
@@ -60,8 +60,8 @@ REVOKING = ("charge.refunded", "charge.dispute.created",
 # The metadata key this server writes when it creates a checkout. The webhook
 # reads the user id from here and from nowhere else.
 USER_META_KEY = "a4tUserId"
-# Supabase ids used by this platform are not numeric. A legacy Telegram
-# checkout puts the chat id in client_reference_id. That number must never
+# Supabase ids used by this platform are not numeric. A legacy
+# checkout puts a numeric id in client_reference_id. That number must never
 # be treated as a platform user, for a grant or a revoke.
 _PLATFORM_USER_ID = re.compile(r"^[A-Za-z0-9_.:@+-]{1,128}$")
 
@@ -633,7 +633,7 @@ def _session_email(obj):
 def _platform_user_candidate(value):
     """A platform user id, or None.
 
-    Digit-only values are Telegram chat ids from the legacy checkout. They
+    Digit-only values are numeric ids from the legacy checkout. They
     are not platform users. Empty and oversized values are not either.
     """
     text = str(value or "").strip()

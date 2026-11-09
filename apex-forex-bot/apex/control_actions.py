@@ -15,7 +15,7 @@ _SETTABLE = {
     "strategy", "risk", "symbol", "autopilot", "autopilot_universe", "watchlist",
     "timeframe", "sl_pips", "tp_pips", "leverage", "min_confidence",
     # "paper" is DELIBERATELY ABSENT. Setting it false is live activation, and
-    # the Telegram path that owns that transition also demands risk acceptance,
+    # the platform path that owns that transition also demands risk acceptance,
     # a typed confirmation code and an initial risk cap. Exposing it here made
     # a second activation route that skipped all three — one generic setter
     # call and a demo client is trading real money. There is exactly one
@@ -116,7 +116,7 @@ def _allowed_values(key):
     them: at import time `strategy_api.available()` is EMPTY (0 entries, vs 17
     once they are loaded). A list built at module level here would therefore
     reject every valid strategy rather than only the invalid ones — the
-    opposite of what this check is for. telegram._handle_strategy already
+    opposite of what this check is for. legacy._handle_strategy already
     resolves the same set this way, at call time.
 
     Every set comes from the registry or map the runtime itself reads, so a
@@ -249,9 +249,8 @@ def _summarize(uid):
 
 
 def build():
-    """Return {action: handler} wired to the live bot. Imported lazily to dodge
-    the telegram <-> user_loop import cycle."""
-    from apex import telegram as tg
+    """Return {action: handler}. Alerts stay in the platform, not in a chat bot."""
+    from apex import client_alerts
 
     def h_status(args):
         uids = user_store.all_active() or []
@@ -357,12 +356,12 @@ def build():
 
     def h_restart_loop(args):
         uid = str(args["user_id"])
-        tg._restart_user_loop(uid)
+        client_alerts.restart_loop(uid)
         return {"user": uid, "restarted": True, "running": user_loop.is_running(uid)}
 
     def h_bot_on(args):
         uid = str(args["user_id"])
-        tg._auto_start_user(uid)
+        client_alerts.start_loop(uid)
         return {"user": uid, "running": user_loop.is_running(uid)}
 
     def h_bot_off(args):
@@ -384,7 +383,7 @@ def build():
             raise ValueError(
                 "'paper' is not remotely settable. Switching to live money is "
                 "an activation, not a setting: it requires risk acceptance and "
-                "a typed confirmation from the account holder in Telegram.")
+                "a typed confirmation from the account holder.")
         if key not in _SETTABLE:
             raise ValueError(f"'{key}' is not remotely settable")
         val = coerce_setting(key, args["value"])
@@ -410,13 +409,13 @@ def build():
         else:
             patch = {key: val}
         user_store.update(uid, patch)
-        tg._restart_user_loop(uid)
+        client_alerts.restart_loop(uid)
         return {"user": uid, "set": patch, "running": user_loop.is_running(uid)}
 
     def h_send_message(args):
         uid = str(args["user_id"])
         text = str(args["text"])[:3500]
-        tg.send_to(uid, text)
+        client_alerts.note(uid, text)
         return {"user": uid, "sent": True}
 
     def h_force_close(args):
@@ -462,16 +461,10 @@ def build():
     }
 
     def h_client_message(args):
-        """Deliver `text` to the bot as if the client had typed it.
+        """The chat-command channel is retired with the chat channel.
 
-        The bot's command dispatch lived inside the getUpdates loop, so the
-        only way to exercise a command was for a human to type it — which
-        meant remote verification was reading code and hoping. This runs the
-        IDENTICAL dispatch a real message runs: same handlers, same replies
-        sent to the client's own Telegram.
-
-        It genuinely acts as the client, so it is deliberately narrower than
-        the client is: see _MSG_DENY.
+        Destructive commands stay refused. There is no chat left to deliver
+        the others to; the platform's own controls are the remaining path.
         """
         uid = str(args["user_id"])
         text = str(args.get("text") or "").strip()
@@ -485,11 +478,8 @@ def build():
                 f"refused: {cmd} is not available through the control plane — "
                 f"it is destructive or moves real money, so it has to be sent "
                 f"by the account owner")
-        from apex import control
-        control.event("mcp_msg", text[:120], user_id=uid)
-        tg.dispatch_command(uid, text)
-        return {"user": uid, "delivered": text,
-                "note": "the bot replied in the client's Telegram"}
+        raise ValueError(
+            "chat commands are retired, so this command is not delivered")
 
     # ── Operations API (apex/ops_api.py) ──────────────────
     # Small, explicit, read-only tools rather than one powerful generic one.

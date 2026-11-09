@@ -23,10 +23,10 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-mcache-")
 
-from apex import miniapp_cache as mc  # noqa: E402
+from apex import view_cache as mc  # noqa: E402
 
 failures = []
 
@@ -89,9 +89,9 @@ check("the balance is gone", mc.get_balance("u4") is None)
 LOOP = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          "apex", "user_loop.py"), encoding="utf-8").read()
 check("every open and close invalidates it",
-      "miniapp_cache.invalidate(user_id)" in LOOP)
+      "view_cache.invalidate(user_id)" in LOOP)
 check("...from the one function they ALL pass through",
-      LOOP.index("miniapp_cache.invalidate(user_id)")
+      LOOP.index("view_cache.invalidate(user_id)")
       > LOOP.index("def _persist_open_position"),
       "loop, manual /buy//close and the MCP tools all call this")
 
@@ -101,15 +101,11 @@ mc.put_tick("a", {"who": "a"})
 check("b does not see a's tick", mc.get_tick("b") is None)
 check("a still does", mc.get_tick("a") == {"who": "a"})
 
-print("\n7. The route reads through it")
-BOT = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "apex", "bot.py"), encoding="utf-8").read()
-_tick_block = BOT[BOT.index('/api/app/tick'):BOT.index("# ── Mini App: history")]
-check("a cache hit returns before any broker object is built",
-      _tick_block.index("_mc.get_tick(chat_id)") < _tick_block.index("_make_broker"))
-check("the balance read goes through the cache", "_mc.get_balance(chat_id)" in _tick_block)
-check("the position list goes through the cache", "_mc.get_positions(chat_id)" in _tick_block)
-check("a fresh payload is stored for the next poll", "cache=_mc.put_tick" in _tick_block)
+print("\n7. The trading loop drops a stale view when a position changes")
+LOOP = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "apex", "user_loop.py"), encoding="utf-8").read()
+check("an open-position write invalidates the view cache",
+      "view_cache.invalidate(user_id)" in LOOP)
 
 print("\n" + "=" * 50)
 if failures:

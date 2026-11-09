@@ -13,7 +13,7 @@ deployable trading service.
 
 | Service | State | What it is | Deployed by |
 |---|---|---|---|
-| `apex-forex-bot/` | **ACTIVE** | The trading bot. Python, cTrader Open API, Telegram-controlled. The only thing that can place an order. | `apex-forex-bot/render.yaml` (Render web service, `rootDir: apex-forex-bot`, `buildFilter: apex-forex-bot/**`) |
+| `apex-forex-bot/` | **ACTIVE** | The trading bot. Python, cTrader Open API, the web app-controlled. The only thing that can place an order. | `apex-forex-bot/render.yaml` (Render web service, `rootDir: apex-forex-bot`, `buildFilter: apex-forex-bot/**`) |
 | `server.js` + `public/` | **ACTIVE** | Sales site, Stripe checkout, licence issuance and verification. Places no orders. | root `render.yaml` (Render, `node server.js`) |
 | `ruflo-mcp/` | **ACTIVE** | Operator MCP server. Read-mostly control plane; financial actions route through the bot's own gates. | `ruflo-mcp/render.yaml` |
 | `web/`, `html/`, `my-video/`, `freelance-projects/`, `scripts/` | **NOT FOR PRODUCTION** | Marketing assets, experiments and one-off scripts. Nothing deploys them. | — |
@@ -32,7 +32,7 @@ two places in `user_loop.py`, both immediately after `gates.authorize_order()`
 returns allowed.
 
 ```
-Telegram  ─┐
+the web app  ─┐
 MCP        │
 Mini App   ├──> user_loop.force_trade()  ─┐
 Voice      │                              │
@@ -59,7 +59,7 @@ Auto-Pilot / strategy ───────────────────�
 `force_trade` / `force_close` like everything else.
 
 Closes converge the same way on `gates.authorize_close()` — user close,
-Telegram, MCP, Mini App, strategy exit, protective stop, weekend flatten,
+the web app, MCP, Mini App, strategy exit, protective stop, weekend flatten,
 emergency sweep and restart recovery.
 
 `authorize_close` deliberately has **different** semantics from
@@ -88,10 +88,10 @@ harm, and those exceptions are listed.
 | Signed key with NO licence row | **deny** — no row means never sold | `server.js::/api/verify-license` |
 | Licence row not active / refunded / expired | **deny** | `server.js::/api/verify-license` |
 | No licence store configured at all | **503 → deny** | `server.js::/api/verify-license` |
-| `REQUIRE_LICENSE` unset in production | **licence gate ON** | `telegram.py::_license_required` |
+| `REQUIRE_LICENSE` unset in production | **licence gate ON** | `the retired chat module::_license_required` |
 | `RUFLO_MCP_SECRET` unset in production | **startup refused** | `ruflo-mcp/server.py` |
 | Licence in grace (unverifiable) | **no NEW live orders** | `gates.live_entitlement` |
-| Licence verifier unreachable, first activation | **deny** | `telegram.py::_license_ok` |
+| Licence verifier unreachable, first activation | **deny** | `the retired chat module::_license_ok` |
 | Ownership lease unreadable, live account | **no order** | `gates.authorize_order` |
 | Redis unreachable, live account | **no order** (`COORDINATION_UNAVAILABLE`) | `ledger.claim(fail_closed=True)` |
 | Entitlement unknown | **no order** | `gates.authorize_order` |
@@ -104,7 +104,7 @@ harm, and those exceptions are listed.
 Both are documented at the point of decision, because an undocumented
 asymmetry gets "fixed" into a symmetry by the next person.
 
-1. **Licence revalidation** (`telegram.py::_revalidate_license`) — fail-open
+1. **Licence revalidation** (`the retired chat module::_revalidate_license`) — fail-open
    for the INTERFACE, never for new money. Three outcomes:
 
    - **VALID** → clear any grace, carry on.
@@ -146,7 +146,7 @@ webhook ──> _fulfillOrder()
         licences table (active:true written ONLY here, on payment)
               │
               v
-        FORX-XXXX-XXXX-XXXX emailed with a Telegram deep link
+        FORX-XXXX-XXXX-XXXX emailed with a the web app deep link
               │
               v
         /start FORX-… ──> _license_ok() ──> POST /api/verify-license
@@ -228,7 +228,7 @@ routes it to a screen with no retry button, and reconciliation decides.
 
 Startup fails without these in production.
 
-**`apex-forex-bot`**: `PRODUCT=forex`, `TELEGRAM_BOT_TOKEN`,
+**`apex-forex-bot`**: `PRODUCT=forex`, `the retired bot token`,
 `TOKEN_ENCRYPTION_KEY`, `ADMIN_CHAT_IDS` (or `ADMIN_CHAT_ID`), and a shared
 Redis (`REDIS_URL` or `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`).
 `REQUIRE_LICENSE` is not mandatory but IS consequential: unset in production
@@ -252,7 +252,7 @@ Also expected, but not fatal: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
 so loudly). `GET /api/readiness` reports all of them.
 
 No production secret has a fallback value. No admin identity is hardcoded —
-operators come from `ADMIN_CHAT_IDS` / `ADMIN_CHAT_ID` / `TELEGRAM_CHAT_ID`,
+operators come from `ADMIN_CHAT_IDS` / `ADMIN_CHAT_ID` / `the retired chat id`,
 and an empty admin list is reported at startup rather than defaulted.
 
 ---

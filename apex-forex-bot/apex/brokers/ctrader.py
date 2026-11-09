@@ -16,7 +16,7 @@ its own client connects without verifying the certificate.
 Auth is two-stage:
     1. Application auth   — ProtoOAApplicationAuthReq(clientId, clientSecret)
     2. Account auth       — ProtoOAAccountAuthReq(ctidTraderAccountId, accessToken)
-The accessToken comes from the OAuth2 web flow (see oauth.py / the Telegram
+The accessToken comes from the OAuth2 web flow (see oauth.py / the platform
 onboarding). clientId/clientSecret identify YOUR registered Open API application
 (one per business, created once at openapi.ctrader.com/apps).
 
@@ -143,14 +143,14 @@ def _period():
 
 
 # ── OAuth2 web flow (REST — simple requests) ─────────────────────────────────
-# Used by the server-side callback + Telegram onboarding, not by the trading loop.
+# Used by the server-side callback + the platform onboarding, not by the trading loop.
 
 _OAUTH_AUTH = "https://id.ctrader.com/my/settings/openapi/grantingaccess/"
 _OAUTH_TOKEN = "https://openapi.ctrader.com/apps/token"
 
 
 def authorize_url(redirect_uri: str, state: str, scope: str = None) -> str:
-    """Link the client opens to grant access. `state` carries the Telegram id
+    """Link the client opens to grant access. `state` carries the platform id
     (signed) so the callback knows which user authorized. Scope defaults to
     cfg.CTRADER_SCOPE — use "accounts" before KYC (paper mode), "trading" once
     the app is Active (live orders)."""

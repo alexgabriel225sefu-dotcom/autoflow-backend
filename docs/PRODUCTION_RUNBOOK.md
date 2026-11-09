@@ -321,7 +321,7 @@ file to `main` (owner decision; this work is forbidden from merging itself), or
    `"status": "fail"` exists.
 4. Add a third: `a4t web home`, URL `https://apex4traders-web.onrender.com/`.
 5. **Alert contacts** (My Settings, Alert Contacts): make sure your e-mail is
-   verified, then add either *Telegram* or *Slack* (both free) so a down event
+   verified, then add either *the web app* or *Slack* (both free) so a down event
    reaches your phone as a notification, not an e-mail you read tomorrow. Keep
    the mobile push on as well.
 6. Edit each monitor and tick every alert contact. Set the notification to
@@ -339,11 +339,11 @@ That is what the operator alerts below are for.
 
 `apex/platform/alerts.py` posts a short message to a webhook you own. It is
 off until you set **`OPS_ALERT_WEBHOOK_URL`** (https only, treat the URL as a
-secret: Slack/Discord/Telegram webhook paths are credentials). Setting it
+secret: Slack/Discord/the web app webhook paths are credentials). Setting it
 restarts the service.
 
 - Slack: an Incoming Webhook URL. Discord: a channel webhook URL.
-  Telegram: `https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID>`.
+  the web app: `https://the retired chat api/bot<TOKEN>/sendMessage?chat_id=<ID>`.
   The body carries both `text` and `content`, so each reads the field it knows.
 - Alerts fire when: the supervisor found a loop dead and **revived** it
   (`loop_revived`); a revival was **refused** for a reason other than a lapsed

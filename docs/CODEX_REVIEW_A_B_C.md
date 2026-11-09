@@ -101,7 +101,7 @@ API-ul expune un motiv.
 | `strategy_modules.signal()` | motivul conține modul invalid |
 | `strategy_modules.advise_risk()` | întoarce multiplicator, nu ordin; valoarea rămâne în banda 0,4–1,2 |
 | `strategy_modules.exit()` | `exit is False` — un refuz nu forțează ieșirea |
-| `telegram._sim_strategy()` | **zero tranzacții deschise**, sold neatins |
+| `the web app._sim_strategy()` | **zero tranzacții deschise**, sold neatins |
 | `scanner.scan_symbol()` | status `WATCH`/`INVALID`, **niciodată `READY`**; dovada păstrează modul |
 
 Apelanții sunt **exercitați, nu mock-uiți**. Un mock ar demonstra că ideea
@@ -109,7 +109,7 @@ testului despre apelant e sigură, ceea ce nu e afirmația făcută aici.
 
 Mutant verificat: reintroducerea fallback-ului în `signal_for_mode()` face să
 pice **7 verificări doar în această secțiune**. Cel mai elocvent rezultat —
-`telegram._sim_strategy` trece de la `{"n": 0}` la **`{"n": 8}`**: opt
+`the web app._sim_strategy` trece de la `{"n": 0}` la **`{"n": 8}`**: opt
 tranzacții reale deschise pentru o strategie care nu există. Asta e exact ce
 făcea defectul.
 
@@ -176,7 +176,7 @@ Conține cheia și valoarea respinsă. Dacă vrei totuși o enumerare, spune.
 ### 5. Fixture-ul celor șase apelanți a cerut lumânări cu mișcare reală
 
 Prima versiune a secțiunii 8 folosea 260 de lumânări identice. Două teste au
-picat — `telegram._sim_strategy` cu `ZeroDivisionError`, iar
+picat — `the web app._sim_strategy` cu `ZeroDivisionError`, iar
 `scanner.scan_symbol` cu „indicators failed". Cauza nu era codul testat:
 ATR-ul și indicatorii normalizați pe interval împart la amplitudinea barei, iar
 o serie constantă are amplitudine zero, deci apelantul nici nu ajungea la

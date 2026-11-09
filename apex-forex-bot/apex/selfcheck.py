@@ -9,7 +9,7 @@ reopens. That someone is a person with finite time and, in this case, a finite
 token budget.
 
 So the bot does it. This runs inside the process that already exists, on the
-host that is already paid for, and sends the answer to Telegram. It costs
+host that is already paid for, and sends the answer to the platform. It costs
 nothing to run and needs nobody awake at 22:00 on a Sunday.
 
 WHAT IT REPORTS, AND WHY EACH LINE IS THERE
@@ -115,7 +115,7 @@ def build(user_id, *, since_ts=None, dash=None):
 
 
 def format_report(r):
-    """Telegram HTML. Reads the same whether the news is good or bad."""
+    """the platform HTML. Reads the same whether the news is good or bad."""
     ok = r.get("scannerRan")
     if ok is None:
         return ("🔧 <b>APEX engine — status unavailable</b>\n\n"
@@ -175,7 +175,7 @@ def format_report(r):
 def run(user_id, *, dash=None, send=None):
     """Build and send. Returns the report dict, or None if it could not build.
 
-    `send` is injected so this module never imports Telegram — it is called
+    `send` is injected so this module never imports the platform — it is called
     from the session watcher, which already owns that dependency, and keeping
     it out means this can be tested without a bot token.
     """

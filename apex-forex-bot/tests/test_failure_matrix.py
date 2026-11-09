@@ -41,7 +41,7 @@ os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 #
 # setdefault, so a caller that exports its own value keeps it. This is a fake
 # constant with no meaning outside this process.
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 
 from apex import (control, ctrader_oauth as oauth, ledger, ops_api,  # noqa: E402
                   ownership, user_loop, user_store)
@@ -123,65 +123,11 @@ print("\n🧪 FAILURE MATRIX — every row fails CLOSED\n")
 
 # ── payment ──────────────────────────────────────────────
 print("payment")
-from apex import stripe_license  # noqa: E402
-import apex.config as _cfg  # noqa: E402
-import types  # noqa: E402
-
-_recs, _sent = {}, []
-_o = (user_store.load, user_store.update)
-EVENT = {"id": "evt_matrix", "type": "checkout.session.completed",
-         "data": {"object": {"payment_status": "paid",
-                             "client_reference_id": "42", "id": "cs_m"}}}
-BODY = json.dumps(EVENT).encode()
-try:
-    st = Store(); install(st)
-    stripe_license._verify_signature = lambda *a, **k: True
-    _cfg.STRIPE_WEBHOOK_SECRET = "whsec_test"
-    fa = types.ModuleType("apex.access"); fa.grant = lambda uid: True
-    ft = types.ModuleType("apex.telegram")
-    ft.send_activation_sequence = lambda uid, paid=False: _sent.append(uid)
-    # Both sys.modules AND the package attribute: `from apex import telegram`
-    # reads the attribute off the already-imported `apex` package, so replacing
-    # only sys.modules leaves the real module bound.
-    import apex as _apexpkg
-    _real_attrs = (getattr(_apexpkg, "access", None), getattr(_apexpkg, "telegram", None))
-    sys.modules["apex.access"], sys.modules["apex.telegram"] = fa, ft
-    _apexpkg.access, _apexpkg.telegram = fa, ft
-    user_store.load = lambda uid: dict(_recs.get(str(uid), {}))
-    user_store.update = lambda uid, up, strict=False: (
-        _recs.setdefault(str(uid), {}).update(up) or True)
-
-    s1, _ = stripe_license.handle_webhook(BODY, "sig")
-    key1 = _recs["42"]["license_key"]
-    s2, b2 = stripe_license.handle_webhook(BODY, "sig")
-    row("payment duplicated → ONE licence, not two",
-        s2 == 200 and b2 == b"duplicate" and _recs["42"]["license_key"] == key1)
-    row("payment duplicated → ONE activation message", len(_sent) == 1, _sent)
-
-    # Redis down during provisioning: the buyer is charged, so a 200 would be
-    # unrecoverable — Stripe would never retry.
-    _recs.clear(); _sent.clear()
-    st.down = True
-
-    def _dead(uid, up, strict=False):
-        if strict:
-            raise user_store.PersistenceError("redis down")
-        return False
-    user_store.update = _dead
-    s3, _ = stripe_license.handle_webhook(BODY, "sig")
-    row("payment + Redis failure → 500 so Stripe RETRIES", s3 == 500, s3)
-    row("license write failure → the buyer is NOT marked provisioned",
-        "42" not in _recs or not _recs["42"].get("license_key"))
-finally:
-    sys.modules.pop("apex.access", None); sys.modules.pop("apex.telegram", None)
-    for _n, _v in zip(("access", "telegram"), _real_attrs):
-        if _v is not None:
-            setattr(_apexpkg, _n, _v)
-            sys.modules[f"apex.{_n}"] = _v
-        else:
-            delattr(_apexpkg, _n) if hasattr(_apexpkg, _n) else None
-    user_store.load, user_store.update = _o
-    restore_store()
+_bill = open(os.path.join(ROOT, "apex", "platform", "billing.py"), encoding="utf-8").read()
+row("the legacy Telegram Stripe webhook is retired",
+    not os.path.exists(os.path.join(ROOT, "apex", "stripe_license.py")))
+row("the platform webhook still treats a duplicate delivery as success",
+    '"duplicate": True' in _bill)
 
 # ── OAuth ────────────────────────────────────────────────
 print("\nOAuth")

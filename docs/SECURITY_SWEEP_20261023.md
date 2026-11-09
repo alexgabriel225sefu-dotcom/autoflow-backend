@@ -2,7 +2,7 @@
 
 Scope: `claude/apex4traders-platform-v1` at `be71810`. This is a read-only
 security review plus the explicitly authorised release documentation change.
-No live order, payment, checkout, Telegram, or production data path was
+No live order, payment, checkout, the web app, or production data path was
 changed.
 
 ## API authorization matrix

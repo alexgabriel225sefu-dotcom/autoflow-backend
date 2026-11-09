@@ -1,4 +1,4 @@
-"""Performance for the web: the same figures the Telegram bot showed.
+"""Performance for the web: the same figures the chat channel showed.
 
 This is a thin READ over `apex.performance`, which already computes win rate,
 profit factor, expectancy and drawdown (and the per-strategy split). Nothing is
@@ -61,7 +61,7 @@ NOTE = ("Closed trades from your broker's deal history: the last 30 days, or "
 
 
 def _finite(v):
-    return v if isinstance(v, (int, float)) and not isinstance(v, bool) \
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool)\
         and math.isfinite(v) else None
 
 
@@ -184,7 +184,7 @@ def read(user_id, *, period="all", mode="demo", ctid=None, deals_reader=None,
         return {"status": "unavailable",
                 "reason": "the broker's closed-trade history could not be read just now"}
     if not isinstance(got, dict) or got.get("status") != "ok":
-        reason = ((got or {}).get("reason") if isinstance(got, dict) else None) \
+        reason = ((got or {}).get("reason") if isinstance(got, dict) else None)\
             or "the broker's closed-trade history is not available"
         return {"status": "unavailable", "reason": str(reason)[:200],
                 "brokerStatus": (got or {}).get("status") if isinstance(got, dict) else None}
@@ -235,7 +235,7 @@ def read(user_id, *, period="all", mode="demo", ctid=None, deals_reader=None,
         in_period = rows
 
     unknown = [r for r in in_period if _mode_of(r) == "unknown"]
-    wrong = [r for r in in_period if _mode_of(r) not in (mode, "unknown")] \
+    wrong = [r for r in in_period if _mode_of(r) not in (mode, "unknown")]\
         if mode != "all" else []
     chosen = in_period if mode == "all" else [r for r in in_period if _mode_of(r) == mode]
     attributed = sum(1 for r in chosen if r.get("_attributed"))

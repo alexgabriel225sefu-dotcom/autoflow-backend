@@ -3,7 +3,7 @@
 WHY THIS FILE IS STRICT
 
 A panic button that prints "all closed" while one position is open is the most
-expensive sentence this product can show. The Telegram bot's /emergency stopped
+expensive sentence this product can show. The chat channel's /emergency stopped
 the loop and said so; the web needs the same button, and it must not claim more
 than it measured.
 

@@ -708,7 +708,7 @@ def trend_signal(ind, strat=None, open_position=None):
     # In a trade → close early only if the structure flips against us.
     if open_position:
         side = open_position.get("side")
-        flip = (side == "BUY" and liv.get("trend") == "BEARISH" and fnum(liv.get("strength")) >= 0.8) or \
+        flip = (side == "BUY" and liv.get("trend") == "BEARISH" and fnum(liv.get("strength")) >= 0.8) or\
                (side == "SELL" and liv.get("trend") == "BULLISH" and fnum(liv.get("strength")) >= 0.8)
         if flip:
             return {"action": "CLOSE", "confidence": 72, "criteriaScore": 3,
@@ -1022,7 +1022,7 @@ def auto_engine(ind, strat, open_position):
     return mean_reversion_signal(ind, open_position)
 
 
-# ── Strategy-mode registry (used by the loop, Telegram and the backtester) ──
+# ── Strategy-mode registry (used by the loop, the platform and the backtester) ──
 STRATEGY_MODES = {
     "auto": {
         "label": "Auto (regime-adaptive)",
@@ -1103,7 +1103,7 @@ def signal_for_mode(mode, ind, strat=None, open_position=None):
 
     Callers are unaffected: every live one passes a mode it has already
     constrained — ai.rule_and_ai() normalises against _MODE_INTRO first,
-    StrategyModule passes its own registered id, telegram iterates
+    StrategyModule passes its own registered id, legacy iterates
     STRATEGY_MODES itself, user_loop._engine_or_hold only calls this for modes
     in STRATEGY_MODES, and backtest.py routes "criteria" to its own signal.
     The remaining paths (a typo'd BT_STRATEGY, a scanner mode) previously got

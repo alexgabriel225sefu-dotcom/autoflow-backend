@@ -481,7 +481,7 @@ def guard_engine_order(user_id, *, symbol, side, units, origin="unknown",
 
     `gates.authorize_order` calls this for every LIVE order, whoever asked.
     Most of the accounts that reach it are not platform clients at all — the
-    Telegram bot has traded through that gate since long before the platform
+    chat channel has traded through that gate since long before the platform
     existed — so the FIRST thing this establishes is whether the platform has
     any say over this account. No platform cTrader connection means no
     platform opinion, and it returns None: not "allowed", which would be a
@@ -500,7 +500,7 @@ def guard_engine_order(user_id, *, symbol, side, units, origin="unknown",
         _conn = _ctl._read_conn(str(user_id))
     except _ctl.LinkError:
         # NOT_CONNECTED. There is no platform cTrader account here, so the
-        # platform has no say over this order — every Telegram-bot user lands
+        # platform has no say over this order — every platform-bot user lands
         # exactly here, and they traded through this gate for a long time
         # before the platform existed.
         #

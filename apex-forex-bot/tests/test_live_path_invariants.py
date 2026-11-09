@@ -3,7 +3,7 @@
 ONE — every NEW live order clears the same gate. `gates.authorize_order`
 holds entitlement, the risk guard as the loop published it, ownership, and
 the idempotency claim. Four entry points reach it today: the strategy loop,
-manual Telegram, the AI assistant (and through it the voice channel), and the
+manual the platform, the AI assistant (and through it the voice channel), and the
 operator control plane. A fifth added later must not be able to reach the
 broker without it, and the way that happens is not malice — it is somebody
 adding a feature and calling `broker.place_order` because that is the obvious
@@ -144,7 +144,10 @@ check("the loop's own closes go through one helper",
       "_authorized_close" in LOOP_SRC,
       "so a new close added to the loop inherits the gate by construction")
 
-print("\n4. LIVE is an activation — exactly one writer, and it is the gated one")
+print("\n4. Nothing in the remaining tree writes the live/demo flag")
+# The only writer was _handle_paper in the retired chat channel. A new writer
+# here would be a new path onto live money, and it would have to be gated
+# before it existed. Zero writers is the retirement, not a hole.
 writers = []
 for path, tree in modules():
     for n in ast.walk(tree):
@@ -158,31 +161,9 @@ for path, tree in modules():
                 fn = enclosing(tree, n.lineno)
                 writers.append((os.path.relpath(path, ROOT), n.lineno,
                                 fn.name if fn else "<module>"))
-check("exactly one place writes the live/demo flag", len(writers) == 1, writers)
-check("and it is _handle_paper",
-      bool(writers) and writers[0][2] == "_handle_paper", writers)
-
-print("\n5. That writer applies every activation gate")
-TG = os.path.join(APEX, "telegram.py")
-tg_tree = ast.parse(open(TG, encoding="utf-8").read())
-hp = next((n for n in ast.walk(tg_tree)
-           if isinstance(n, ast.FunctionDef) and n.name == "_handle_paper"), None)
-check("_handle_paper exists", hp is not None)
-body = ast.get_source_segment(open(TG, encoding="utf-8").read(), hp) if hp else ""
-check("it requires recorded risk acceptance", "risk_accepted" in body)
-check("it asks the BROKER which account this is", "environment(" in body,
-      "ctrader_env is writable; the connected account is not")
-check("it requires a single-use confirmation", "consume_live_confirm" in body)
-check("it caps the initial risk", "_LIVE_INITIAL_RISK_CAP" in body)
-check("it writes an audit entry", "live_trading_activated" in body)
-
-print("\n6. The onboarding buttons route through it instead of writing directly")
-src = open(TG, encoding="utf-8").read()
-for data, arg in (("ob:mode:real", '"off"'), ("ob:mode:paper", '"on"')):
-    seg = src.split(f'if data == "{data}":')[1][:220]
-    check(f"{data} calls _handle_paper({arg})",
-          "_handle_paper(chat_id, " + arg in seg, seg[:120])
-    check(f"{data} does not write paper itself", '"paper"' not in seg, seg[:120])
+check("no module writes the paper flag", writers == [], writers)
+check("the chat handler that used to is gone",
+      not os.path.exists(os.path.join(APEX, "telegram.py")))
 
 print("\n7. The control plane cannot set it either")
 CA = open(os.path.join(APEX, "control_actions.py"), encoding="utf-8").read()

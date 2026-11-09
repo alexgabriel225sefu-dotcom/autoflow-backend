@@ -2,7 +2,7 @@
 
 The position cap and the correlation guard were real, correct, and reachable
 from exactly one place: the autonomous loop. An autonomous entry was checked
-against exposure; a manual /buy from Telegram was not. §14 requires manual,
+against exposure; a manual /buy from the platform was not. §14 requires manual,
 assisted, automatic and AI-proposed to route through the same risk engine, so
 the logic moved to apex/portfolio.py and gates.authorize_order calls it.
 

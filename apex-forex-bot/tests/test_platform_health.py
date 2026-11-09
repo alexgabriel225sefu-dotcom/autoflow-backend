@@ -497,20 +497,16 @@ finally:
 # /healthz starts with /health. The older plain-text route matches on a
 # prefix, so ordering is the whole correctness argument and it is not
 # something a unit test of the module can see.
-print("\n[11] /healthz is matched before the legacy /health prefix")
-src = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
-body_start = src.index("def do_GET(self):")
-segment = src[body_start:body_start + 2000]
-i_new = segment.find("_platform_health()")
-i_old = segment.find('startswith("/health")')
-check("both routes are present in do_GET", i_new >= 0 and i_old >= 0,
-      f"{i_new} {i_old}")
-check("and the JSON one comes first", 0 <= i_new < i_old, f"{i_new} vs {i_old}")
-check("the transport answers both paths",
-      '"/healthz", "/readyz"' in src)
-check("and forwards no request header into the health module",
-      "self.headers" not in src[src.index("def _platform_health(self):"):
-                                src.index("def _platform_api(self):")])
+print("\n[11] /healthz is answered before any API route")
+src = open(os.path.join(ROOT, "platform_server.py"), encoding="utf-8").read()
+segment = src[src.index("def _dispatch(self):"):src.index("def do_OPTIONS")]
+check("health is dispatched before the API",
+      segment.index("self._health()") < segment.index("self._api()"))
+check("the transport answers both probes",
+      '"/healthz"' in src and '"/readyz"' in src)
+check("and forwards no request header into the health probe",
+      "self.headers" not in src[src.index("def _health(self):"):
+                                src.index("def _api(self):")])
 
 shutil.rmtree(_TMP, ignore_errors=True)
 

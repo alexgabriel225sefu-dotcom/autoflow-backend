@@ -60,7 +60,7 @@ time.sleep(1.5)
 os.environ["REDIS_URL"] = f"redis://127.0.0.1:{PORT}/0"
 os.environ["APP_ENV"] = "production"
 os.environ["PRODUCT"] = "forex"
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-signing-secret")
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="apex-evt-"))
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY",
                       base64.urlsafe_b64encode(os.urandom(32)).decode())

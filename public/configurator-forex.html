@@ -298,7 +298,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
       <!-- 5 · Connections -->
       <div class="sec">
-        <div class="sh"><div class="sn">5</div><strong>Connections</strong><em>broker · AI · Telegram</em></div>
+        <div class="sh"><div class="sn">5</div><strong>Connections</strong><em>broker · AI</em></div>
         <div class="sb">
           <div id="oandaFields">
             <div class="ilbl" style="margin-top:0">OANDA API Credentials</div>
@@ -319,10 +319,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </div>
           <input id="aiKey" class="inp" type="text" placeholder="Groq API key — console.groq.com" autocomplete="off" spellcheck="false">
           <p class="hn" style="margin-top:5px">Groq is free and fast — ideal for starting. Get a key at <b>console.groq.com</b>.</p>
-          <div class="ilbl">Telegram <span style="color:var(--t2);font-weight:400">(optional — highly recommended)</span></div>
-          <input id="tgTok" class="inp" type="text" placeholder="Bot Token — from @BotFather" autocomplete="off" spellcheck="false">
-          <input id="tgCid" class="inp" type="text" placeholder="Chat ID — from @userinfobot" autocomplete="off" spellcheck="false">
-          <p class="hn" style="margin-top:5px">Get trade alerts + control via /stop, /pause, /status.</p>
           <div class="ilbl">Dashboard Token <span style="color:var(--t2);font-weight:400">(optional)</span></div>
           <input id="dtok" class="inp" type="text" placeholder="Password to protect your dashboard URL" autocomplete="off" spellcheck="false">
           <div class="ilbl">Your License Key</div>
@@ -485,8 +481,6 @@ function buildConfig(){
   const oaAcc=(document.getElementById('oaAcc').value||document.getElementById('oaAcc2').value).trim();
   const oaTok=(document.getElementById('oaTok').value||document.getElementById('oaTok2').value).trim();
   const aiKv=document.getElementById('aiKey').value.trim();
-  const tgT=document.getElementById('tgTok').value.trim();
-  const tgC=document.getElementById('tgCid').value.trim();
   const dt=document.getElementById('dtok').value.trim();
   const cfg={
     BROKER:S.broker==='MT5'?'mt':'oanda',
@@ -505,8 +499,6 @@ function buildConfig(){
   if(oaAcc)cfg.OANDA_ACCOUNT_ID=oaAcc;
   if(oaTok)cfg.OANDA_API_TOKEN=oaTok;
   if(aiKv){if(S.ai==='GROQ')cfg.GROQ_API_KEY=aiKv;else cfg.ANTHROPIC_API_KEY=aiKv;}
-  if(tgT)cfg.TELEGRAM_BOT_TOKEN=tgT;
-  if(tgC)cfg.TELEGRAM_CHAT_ID=tgC;
   if(dt)cfg.DASHBOARD_TOKEN=dt;
   if(S.broker==='MT5'&&dt)cfg.MT_BRIDGE_SECRET=dt; // EA's BRIDGE_SECRET must match
   return cfg;

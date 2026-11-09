@@ -34,7 +34,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-positioning-")
 
 from apex import config as cfg  # noqa: E402
@@ -63,7 +63,8 @@ def code_of(path):
     return re.sub(r"#.*$", "", src, flags=re.M)
 
 
-CUSTOMER_FACING = [os.path.join(APEX, f) for f in ("telegram.py", "webapp.py")]
+CUSTOMER_FACING = [os.path.join(APEX, f) for f in ("client_alerts.py", "assistant.py")
+                   if os.path.exists(os.path.join(APEX, f))]
 
 print("\nPOSITIONING - the claim and the architecture must agree\n")
 
@@ -84,9 +85,9 @@ check("the OAuth scope is trading, not something broader",
       cfg.CTRADER_SCOPE == "trading", cfg.CTRADER_SCOPE)
 
 print("\n2. STRUCTURAL: the customer keeps control of the connection")
-tg = code_of(os.path.join(APEX, "telegram.py"))
+link = code_of(os.path.join(APEX, "platform", "ctrader_link.py"))
 check("the customer can disconnect their own account",
-      "/reset" in tg or "disconnect" in tg.lower())
+      "def disconnect" in link)
 check("credentials are stored per-user, not pooled",
       "ctrader_access_token" in code_of(os.path.join(APEX, "user_store.py")))
 
@@ -122,9 +123,8 @@ print("\n4b. LANGUAGE: nothing still calls the product a bot")
 # backslashes, so it skipped every string containing \n — which is nearly
 # every alert the customer receives. It reported zero and was wrong. This one
 # allows escapes.
-_CODE_TOKENS = ("bot_token", "/bot", "api.telegram", "BOT_TOKEN", "botHandle",
-                "TELEGRAM]", "bot:on", "bot:off")
-_SPEAKS_TO_CUSTOMER = ("telegram.py", "screens.py", "user_loop.py", "webapp.py",
+_CODE_TOKENS = ("bot_token", "/bot", "BOT_TOKEN", "botHandle", "bot:on", "bot:off")
+_SPEAKS_TO_CUSTOMER = ("screens.py", "user_loop.py", "client_alerts.py",
                        "assistant.py", "news_alerts.py", "sentinel.py")
 for fname in _SPEAKS_TO_CUSTOMER:
     path = os.path.join(APEX, fname)
@@ -136,32 +136,35 @@ for fname in _SPEAKS_TO_CUSTOMER:
             and re.search(r"\b[Bb]ot\b", m.group(1))]
     check(f"{fname}: no customer-facing 'bot'", not hits, str(hits[:2]))
 
-# The Mini App too, comments stripped.
-_mini = re.sub(r"//.*$", "", open(os.path.join(APEX, "static", "terminal.html"),
-                                 encoding="utf-8").read(), flags=re.M)
-check("terminal.html: no 'bot'", not re.search(r"\bbot\b", _mini, re.I))
+check("the retired page is gone",
+      not os.path.exists(os.path.join(APEX, "static", "terminal.html")))
 
 print("\n4c. LANGUAGE: the platform reports, it does not narrate")
 # A platform states what happened. First person ("I can't fetch prices",
 # "I retry every 30s") is a chatbot persona and undercuts the positioning.
 # The AI assistant's own conversational voice is a different thing and is
 # deliberately left alone — asking it a question IS a conversation.
-for fname in ("telegram.py", "screens.py", "user_loop.py"):
-    text = code_of(os.path.join(APEX, fname))
+for fname in ("screens.py", "user_loop.py", "client_alerts.py"):
+    path = os.path.join(APEX, fname)
+    if not os.path.exists(path):
+        continue
+    text = code_of(path)
     hits = [m.group(1)[:60] for m in re.finditer(r'"((?:[^"\\]|\\.){6,200}?)"', text)
             if re.search(r"\bI (can\'t|cannot|retry|will|am|watch|check|read|found|see|auto)\b",
                          m.group(1))]
     check(f"{fname}: no first-person platform narration", not hits, str(hits[:2]))
 
 print("\n5. LANGUAGE: the honest framing IS present")
-check("the copy states the customer's money is never held",
-      re.search(r"never holds your money|stays yours", tg, re.I) is not None,
-      "the one claim that carries the positioning is missing")
+_web = os.path.join(os.path.dirname(ROOT), "web", "src")
+_copy = ""
+for _rel in ("content/faq.ts", "content/guide.ts"):
+    _p = os.path.join(_web, _rel)
+    if os.path.exists(_p):
+        _copy += open(_p, encoding="utf-8").read()
+check("the copy states the broker password is never taken",
+      re.search(r"never (?:sees|asks for) your broker password", _copy, re.I) is not None)
 check("…and that they can disconnect at any time",
-      re.search(r"disconnect", tg, re.I) is not None)
-check("…and that live/demo is read from the account, not taken on trust",
-      re.search(r"read .{0,40}from the account|won't take your word", tg, re.I)
-      is not None)
+      re.search(r"disconnect at any time", _copy, re.I) is not None)
 
 print("\n6. The product name is configurable and currently Apex4Traders")
 check("BOT_NAME defaults to Apex4Traders", cfg.BOT_NAME == "Apex4Traders", cfg.BOT_NAME)

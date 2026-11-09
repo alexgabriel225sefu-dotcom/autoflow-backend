@@ -261,20 +261,7 @@ _ex = caller("strategy_modules.exit", lambda: _probe.exit(_market(_pos)),
 check("strategy_modules.exit: does not force an exit on a refusal",
       _ex is not None and _ex.get("exit") is False, str(_ex)[:70])
 
-# 5 — telegram._sim_strategy(): a backtest loop. A refusal must open no trade.
-from apex import telegram as _tg  # noqa: E402
-
-_sim = None
-try:
-    _sim = _tg._sim_strategy(BAD, _candles, "EURUSD", 20, 40, 0.01, 1000.0)
-    check("telegram._sim_strategy: does not raise", True)
-except Exception as e:
-    check("telegram._sim_strategy: does not raise", False,
-          f"{type(e).__name__}: {e}")
-check("telegram._sim_strategy: zero trades opened",
-      _sim is not None and _sim.get("n") == 0, str(_sim))
-check("telegram._sim_strategy: balance untouched",
-      _sim is not None and abs(_sim.get("net", 1)) < 1e-9, str(_sim))
+# The chat backtest that used to live on the bot is retired with it.
 
 # 6 — scanner.scan_symbol(): must yield no executable setup.
 from apex import scanner as _scanner, setups as _setups  # noqa: E402

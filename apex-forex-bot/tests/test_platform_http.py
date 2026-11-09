@@ -77,7 +77,6 @@ def _fake_get(url, **kw):
 
 requests.get = _fake_get
 
-from apex import bot  # noqa: E402
 from apex.platform import identity as I  # noqa: E402
 
 # The HTTP callback exchanges the authorization code itself — cTrader's code

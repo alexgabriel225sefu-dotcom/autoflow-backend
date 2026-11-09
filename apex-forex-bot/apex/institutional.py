@@ -225,7 +225,7 @@ def action_bias(state, threshold=0.25):
 
 
 def describe(state):
-    """One line for Telegram / the dashboard, honest about its own coverage."""
+    """One line for the platform / the dashboard, honest about its own coverage."""
     if not state:
         return "no institutional state"
     p = state.get("institutional_proxy")

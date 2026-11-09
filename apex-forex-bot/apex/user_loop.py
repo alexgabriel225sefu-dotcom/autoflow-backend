@@ -433,7 +433,7 @@ def _price_open_position(pos, symbol, price):
 
     bot.py — the single-account loop — has always done this, but the per-user
     loop that actually runs in production never did, and every reader of that
-    number defaulted it to zero: Telegram's /status printed `PnL: +$0.00` on a
+    number defaulted it to zero: the platform's /status printed `PnL: +$0.00` on a
     position that was $22 down, and the web terminal read `pnlUsd`/`pnlPips`
     that were simply absent. A trade showing exactly $0.00 the whole time it is
     open reads as a broken bot, and it hides the one number the client most
@@ -471,7 +471,7 @@ def _price_open_position(pos, symbol, price):
 
 # Tick cadence. This was hardcoded to 300 while config computed
 # LOOP_INTERVAL_MS (60s in scalp mode) and used it only for DISPLAY —
-# telegram.py and logger.py told the client "Interval: 1m" while the loop ran
+# legacy.py and logger.py told the client "Interval: 1m" while the loop ran
 # every five minutes. On a 1m strategy that decides entries up to five bars
 # late, and it biases WHICH setups get seen: a level touch that lasts one bar
 # is usually missed, while price stalling at a level across several bars is
@@ -656,8 +656,11 @@ def _strategy_label(key):
     to "what is it trading" in the same conversation.
     """
     try:
-        from apex import telegram as _tg
-        return _tg.friendly_strategy(key)[0]
+        from apex import strategy_api
+        cls = strategy_api._REGISTRY.get(key)
+        label = getattr(cls, "label", None) if cls is not None else None
+        if label:
+            return label
     except Exception:
         pass
     try:
@@ -1190,8 +1193,8 @@ def _persist_open_position(user_id, cfg, pos):
     # client watches a trade close and still sees it listed for seconds
     # afterwards, which is precisely the staleness a terminal must not have.
     try:
-        from apex import miniapp_cache
-        miniapp_cache.invalidate(user_id)
+        from apex import view_cache
+        view_cache.invalidate(user_id)
     except Exception:
         pass
     if getattr(cfg, "PAPER_TRADING", False):
@@ -1232,7 +1235,7 @@ def _make_broker(user, user_id=None, ctid=None):
     ONE construction path, TWO places credentials can come from, and never
     both for the same client.
 
-    A Telegram-era client has their cTrader tokens on their user record, put
+    An older client has their cTrader tokens on their user record, put
     there by apex/ctrader_oauth.py. An Apex4Traders client has them in the
     platform namespace, keyed by their Supabase id, and the user record holds
     none — the tokens are deliberately not copied across, because one secret
@@ -1291,7 +1294,7 @@ def _make_broker(user, user_id=None, ctid=None):
             #
             # The demo/live distinction lives in `ctrader_env`, which is the
             # right axis and is what selects demo.ctraderapi.com. The user
-            # record is still not written here — telegram._handle_paper
+            # record is still not written here — legacy._handle_paper
             # remains the only writer of the stored flag, which
             # test_live_path_invariants.py enforces.
             paper = False
@@ -1424,7 +1427,7 @@ def _refresh_platform_token(user_id, cfg) -> bool:
     `access_token_for`, which refreshes a token near expiry and persists the
     result to the platform namespace — the only store that owns it.
 
-    Returns False for a Telegram account so the caller falls through to the
+    Returns False for an account that is not on this platform so the caller falls through to the
     legacy path unchanged, and False when the refresh genuinely failed, which
     the caller reports the same way it always has.
     """
@@ -1969,7 +1972,7 @@ def _loop(user_id, alert_fn, gen=None):
     last_ai_error_tick = -_AI_ERROR_THROTTLE  # allow first error immediately
     last_warn_tick = -_SKIP_WARN_THROTTLE     # smart-alert skip warnings (throttled)
     last_mkt_tick = -_SKIP_WARN_THROTTLE      # market-pulse heads-up (throttled)
-    was_weekend_closed = market.is_weekend_close_window()  # fire the Telegram
+    was_weekend_closed = market.is_weekend_close_window()  # fire the platform
                          # notice only on the Fri→closed and Sun→open EDGE,
                          # not every tick for the whole weekend
     weekend_failed = set()   # symbols the weekend flatten could not close, as
@@ -2044,7 +2047,7 @@ def _loop(user_id, alert_fn, gen=None):
     # finds it — but if it closed at the broker during the restart gap
     # itself (old process dead, new one not ticking yet), nobody was ever
     # alive to see the transition and it used to vanish: no BROKER_CLOSE, no
-    # journal entry, no Telegram alert — just a balance drop nobody could
+    # journal entry, no the platform alert — just a balance drop nobody could
     # explain. Compare the broker's current truth against the last position
     # this process persisted before it went down.
     if not cfg.PAPER_TRADING:
@@ -2263,7 +2266,7 @@ def _loop(user_id, alert_fn, gen=None):
         """Move the Auto-Pilot focus, and persist it.
 
         The rotation only ever wrote dash["symbol"], which is in-memory. Every
-        Telegram command reads the STORED user["symbol"] instead, so the two
+        the platform command reads the STORED user["symbol"] instead, so the two
         drifted apart the moment Auto-Pilot moved: the dashboard and heartbeat
         showed XAUUSD while /status, /chart and — worst — a bare /buy still
         used whatever pair the record was last left on. A manual buy would open
@@ -2288,7 +2291,7 @@ def _loop(user_id, alert_fn, gen=None):
         discipline, not just the trades: 'refused 14 weak setups today'.
 
         This wrote to the dashboard and nowhere else, so of the 25 places that
-        refuse an entry only six ever reached Telegram, and the HTF gate — the
+        refuse an entry only six ever reached the platform, and the HTF gate — the
         one doing most of the refusing — was not among them. A client watching
         their phone saw the bot go quiet for a day with no explanation.
 
@@ -2324,8 +2327,8 @@ def _loop(user_id, alert_fn, gen=None):
             _skip_alerted.clear()
             if _prev:
                 try:
-                    from apex import telegram as _tg
-                    _tg.send_daily_summary(user_id)
+                    from apex import client_alerts
+                    client_alerts.daily_note(user_id)
                 except Exception as e:
                     print(f"[UserLoop:{user_id}] daily summary failed: {e}")
         dash["skipsToday"] = dash.get("skipsToday", 0) + 1
@@ -2363,7 +2366,7 @@ def _loop(user_id, alert_fn, gen=None):
             print(f"[UserLoop:{user_id}] decision log (skip) failed: {_e}")
 
         # Every refusal goes to stdout too. The dashboard keeps the last 30 and
-        # Telegram deliberately shows each distinct reason once per three
+        # the platform deliberately shows each distinct reason once per three
         # hours — both are the right behaviour for a person, and both make the
         # logs useless for debugging: searching Render for why the bot went
         # quiet returned nothing at all, because no refusal was ever written
@@ -3032,7 +3035,7 @@ def _loop(user_id, alert_fn, gen=None):
                     strategies.rescale_peak(prev_balance, paper_balance, user_id=user_id)
                 # cTrader executed the SL/TP server-side: the position we were
                 # managing vanished between ticks. Tell the client — silence
-                # here made broker-side exits invisible in Telegram.
+                # here made broker-side exits invisible in the platform.
                 if (prev_pos and not open_pos
                         and _position_still_open(broker, prev_pos, symbol, user_id)):
                     # Focus rotated off a live position. Not a close — keep
@@ -3168,7 +3171,7 @@ def _loop(user_id, alert_fn, gen=None):
                             # LIVE: this branch used to leave paper_balance (the
                             # displayed "balance") completely untouched on a
                             # real close — it's only bumped by `net` in paper
-                            # mode above, so the Telegram message reported the
+                            # mode above, so the platform message reported the
                             # PRE-close balance while claiming a P&L for the
                             # trade that supposedly just happened to it. A
                             # fresh broker read is the authoritative number.
@@ -3266,7 +3269,7 @@ def _loop(user_id, alert_fn, gen=None):
             # ── The account's money, published once ──────────────────────
             #
             # This block replaces a floating figure that was the FOCUSED
-            # position's P&L alone. Every reader of the dash — Telegram's
+            # position's P&L alone. Every reader of the dash — the platform's
             # /status, the SSE stream, the risk screen's exposure list, the
             # symbol chart's entry lines, and the copilot's "what is open?"
             # — took that as the account's number. With two trades open, the
@@ -3900,7 +3903,7 @@ def _loop(user_id, alert_fn, gen=None):
                 floating_pnl=_float_for_stop)
             # Publish the verdict for the UI. strategies.should_stop() advances
             # the peak-balance and daily-reset state as a side effect, so the
-            # Telegram screens must NEVER call it themselves just to draw a
+            # the platform screens must NEVER call it themselves just to draw a
             # badge — they read this instead. Observability only: nothing
             # downstream branches on it.
             dash["riskGuard"] = {"halted": bool(stop_check["stop"]),
@@ -4389,7 +4392,7 @@ def _loop(user_id, alert_fn, gen=None):
             #
             # Evaluate the verdict on refused candidates too, for the record
             # only: entry_ok is already False, nothing downstream reads this,
-            # and no Telegram message is sent — these fire on ordinary refused
+            # and no the platform message is sent — these fire on ordinary refused
             # ticks and would be pure noise. The log is the right home for a
             # sample you intend to count later.
             if (not entry_ok and _sentinel_mode != "off"
@@ -5337,7 +5340,7 @@ def _entitled(user_id):
     """
     user_id = str(user_id)
     # An Apex4Traders identity is not in access.py — that store is keyed by
-    # Telegram chat_id and always answers "denied" for a Supabase id. Its
+    # the platform chat_id and always answers "denied" for a Supabase id. Its
     # entitlement lives in the platform licence store instead, so the same
     # question is asked of the store that can answer it. This ADDS an
     # authority for platform identities; it removes none. A platform user with
@@ -5372,13 +5375,13 @@ def _entitled(user_id):
 def _alert_fn_for(user_id, alert_fn):
     """Where THIS user's loop events go, which is not always what the caller said.
 
-    A PLATFORM CLIENT'S ALERTS CANNOT GO TO TELEGRAM, AND TWO CALLERS SEND THEM
+    A PLATFORM CLIENT'S ALERTS CANNOT GO TO LEGACY, AND TWO CALLERS SEND THEM
     THERE ANYWAY.
 
     `platform.automation.start` hands over the platform's own alert sink, so a
     loop a client starts is wired correctly. The other two ways a loop starts
     are `start_all` on boot and the watchdog every 180 seconds, and `bot.py`
-    gives both of them `telegram._user_alert` — which addresses a Telegram chat
+    gives both of them a chat alerter — which addresses a chat id
     id. A platform identity is a Supabase uuid and is not a chat, so every
     event for a platform account that the watchdog revived went to a chat that
     does not exist.
@@ -5394,7 +5397,7 @@ def _alert_fn_for(user_id, alert_fn):
     clean, which is why `gates.py` asks it the same question in the same way.
 
     An unclassifiable user keeps the caller's own alert function. A store that
-    cannot be read is not a reason to redirect a paying Telegram client's
+    cannot be read is not a reason to redirect a paying client's
     alerts somewhere they have never been.
     """
     try:
@@ -5458,7 +5461,7 @@ def _weekend_orders_paused():
 def _platform_unlicensed(user_id):
     """True when this is a platform account whose licence is not active.
 
-    Operators are active: `licence.status_for` says so. A Telegram account
+    Operators are active: `licence.status_for` says so. An account outside this platform
     is not this check. Unreadable for a known platform account means do not
     place.
     """
@@ -5689,15 +5692,8 @@ def start_watchdog(alert_fn=None, interval=180):
                     # the loop itself, and the _entitled check below then sees
                     # that and completes the shutdown.
                     #
-                    # Lazily imported, like the two other telegram uses in this
-                    # module: telegram imports user_loop, so a module-level
-                    # import here would be circular.
-                    try:
-                        from apex import telegram as _tg
-                        _tg._revalidate_license(uid)
-                    except Exception as e:
-                        print(f"[Watchdog] licence re-check failed for {uid} "
-                              f"({e}) — leaving the loop alone")
+                    # The platform licence poll is retired. Entitlement is
+                    # the next check: a loop that is no longer entitled stops.
                     # Enforcement sweep. start() refuses new loops for chats
                     # that lost access, but a loop ALREADY running when the
                     # grant was revoked kept trading forever — nothing ever
@@ -6010,7 +6006,7 @@ def force_trade(user_id, side, symbol=None, lots=None, *,
     _claim_ok, _claim_why = _decision.allowed, _decision.reason
     if not _claim_ok:
         # Manual /buy and the MCP open_trade land here. A double-tap on the
-        # Telegram button is the everyday version of the same bug — but it is
+        # the platform button is the everyday version of the same bug — but it is
         # only ONE of the reasons this gate refuses. This used to report every
         # refusal as "an identical order was sent moments ago", so a client
         # whose licence had lapsed (NOT_ENTITLED), who was halted by the

@@ -228,7 +228,7 @@ def run_user(uid, days, apply, out_dir):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--user", help="one Telegram chat id")
+    ap.add_argument("--user", help="one the web app chat id")
     ap.add_argument("--all", action="store_true", help="every active user")
     ap.add_argument("--days", type=int, default=120,
                     help="how far back to read the broker's deals (default 120)")

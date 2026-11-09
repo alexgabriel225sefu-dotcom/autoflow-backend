@@ -139,7 +139,7 @@ that does, and only through the existing gate.
 
 ---
 
-# Direction change — Telegram removed, Supabase Auth as the identity
+# Direction change — the web app removed, Supabase Auth as the identity
 
 Decided by the operator after Phase 3. Both questions left open above are now
 closed: `RuleDecision` stayed `RuleDecision`, and the platform API lives in
@@ -150,7 +150,7 @@ closed: `RuleDecision` stayed `RuleDecision`, and the platform API lives in
 The platform identity is **`supabase_user_id`**. Not `chat_id`.
 
 That was possible without rewriting the engine for one reason, verified in the
-code: `user_loop.py` has 18 references to Telegram and **zero to `chat_id`** —
+code: `user_loop.py` has 18 references to the web app and **zero to `chat_id`** —
 it uses `user_id` as an opaque string, which is all `user_store` ever required.
 A Supabase id is also a string. The engine cannot tell the difference.
 
@@ -198,23 +198,23 @@ It is the **anon** key, not `SUPABASE_SERVICE_KEY`. The service key bypasses
 Row Level Security; it must not be used to verify a session and must never
 reach anywhere a client can read it.
 
-## Telegram inventory — measured, not assumed
+## the web app inventory — measured, not assumed
 
-24 files under `apex/` touch Telegram or `chat_id`:
+24 files under `apex/` touch the web app or `chat_id`:
 
-| File | `chat_id` | `telegram` | What it means |
+| File | `chat_id` | `the web app` | What it means |
 |---|---|---|---|
-| `telegram.py` | 953 | 85 | the bot itself, 6,742 lines |
+| `the retired chat module` | 953 | 85 | the bot itself, 6,742 lines |
 | `ctrader_oauth.py` | 33 | 21 | **the OAuth flow is keyed by `chat_id`** |
 | `access.py` | 33 | 2 | the admin/allowed lists |
 | `stripe_license.py` | 25 | 4 | entitlement by `chat_id` |
-| `bot.py` | 24 | 67 | the HTTP server + the Telegram wiring |
+| `bot.py` | 24 | 67 | the HTTP server + the the web app wiring |
 | `user_loop.py` | 0 | 18 | notifications only — the engine is clean |
 | `gates.py` | 0 | 2 | the gate is nearly clean |
 
 **Nothing had been deleted or isolated at the time of writing.** The new path
 was built alongside the old one, and the new flow does not import
-`telegram.py`.
+`the retired chat module`.
 
 ## What remained at the end of this phase
 
@@ -222,18 +222,18 @@ was built alongside the old one, and the new flow does not import
 > written. Items 1–4 have since been implemented. For the current state see
 > `docs/PLATFORM_V1_RELEASE_CHECKLIST.md`, which is kept up to date.
 
-1. **Notification port** — `user_loop` sent directly to Telegram. An in-platform
+1. **Notification port** — `user_loop` sent directly to the web app. An in-platform
    notification interface was needed (notification centre, activity feed), with
-   Telegram reduced to an optional adapter.
+   the web app reduced to an optional adapter.
 2. **cTrader OAuth on the web** — `ctrader_oauth.py` is keyed by `chat_id` and
-   redirects back into Telegram. A web callback bound to `supabase_user_id` was
+   redirects back into the web app. A web callback bound to `supabase_user_id` was
    needed, with the token encrypted and never returned to the frontend.
 3. **Broker-dependent endpoints** — `accounts`, `positions`, `orders`,
    `journal`, `notifications`, `preview`. They answered 501 UNSUPPORTED.
 4. **Frontend** in `web/` (Next.js 16, Tailwind, shadcn already present):
    sign up/login, dashboard, Rule Builder, preview, positions, activity,
    journal, licence, settings.
-5. **Telegram isolation** — a compatibility layer marked deprecated, which the
+5. **the web app isolation** — a compatibility layer marked deprecated, which the
    new flow does not import.
 
 No deployment. No live trading. `PAPER_TRADING`, `CTRADER_ENV` and the default

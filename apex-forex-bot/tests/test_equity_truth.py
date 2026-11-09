@@ -7,7 +7,7 @@ figure and they disagreed with each other and with the client's own terminal.
   * the full Mini App payload re-derived it with a candle read per position;
   * the poll route summed what it could price and counted the rest as zero.
 
-Telegram read the first, so a client holding two trades was shown one trade's
+the platform read the first, so a client holding two trades was shown one trade's
 result under an account-wide label. The Mini App alternated between the second
 and the third depending on which one answered last. None of them matched
 cTrader, because all three multiplied a mid price locally while cTrader's own
@@ -56,11 +56,8 @@ def src(*parts):
 
 
 LOOP = src("apex", "user_loop.py")
-BOT = src("apex", "bot.py")
 CT = src("apex", "brokers", "ctrader.py")
 STREAM = src("apex", "stream.py")
-TG = src("apex", "telegram.py")
-HTML = src("apex", "static", "terminal.html")
 
 print("\n1. cTrader's own unrealised P&L is available to read")
 check("the broker exposes it", "def get_positions_pnl" in CT)
@@ -112,53 +109,11 @@ check("a stale P&L cannot survive into an estimate",
       '_row.pop("pnlUsd", None)' in LOOP,
       "_price_open_position returns its input untouched when it cannot price")
 
-print("\n5. No route computes a second version of the figure")
-# The two Mini App money routes must READ the loop's number, not re-derive it.
-_data = BOT[BOT.index('"/api/app/data"'):BOT.index('"/api/app/history"')]
-_tick = BOT[BOT.index("/api/app/tick"):BOT.index("# ── Mini App: history")]
-for label, block in (("the full payload", _data), ("the poll", _tick)):
-    check(f"{label} reads floatingPnl from the loop",
-          'udash.get("floatingPnl")' in block)
-    check(f"{label} publishes the provenance",
-          '"equitySource": udash.get("equitySource")' in block
-          or '"equitySource": equity_source' in block)
-check("the full payload no longer re-prices other positions itself",
-      "br.get_all_positions() if not u.get" not in _data,
-      "that was one candle read per position and a third disagreeing answer")
-check("equity is composed from the balance the same response reports",
-      "round(float(balance_live) + floating, 2)" in _data,
-      "an equity that does not equal the balance printed beside it plus the "
-      "floating printed beside that reads as broken even when both are right")
-check("the poll prefers the broker's per-position figure",
-      '_brk.get("pnlSource") == "broker"' in _tick)
-
-print("\n6. Every screen that shows the number also shows what it is worth")
+print("\n5. The stream carries the broker's figure, not a second one")
 check("the stream carries the provenance",
       '"equitySource": dash.get("equitySource")' in STREAM)
 check("...and the position ids the client's own terminal uses",
       '"positionId": p.get("positionId")' in STREAM)
-check("Telegram says when the figure is only an estimate",
-      "estimated — cTrader is the exact figure" in TG)
-check("...and when it is incomplete", "incomplete —" in TG)
-check("...and it reports equity, not just floating",
-      "Equity:" in TG and "balance + floating, as cTrader computes it" in TG)
-
-print("\n7. The Mini App builds that line once, for all three paths")
-check("there is a single balance-line renderer", "function balanceLine(d)" in HTML)
-check("the full refresh uses it", "Q('balSub').innerHTML=balanceLine(d);" in HTML)
-check("the poll uses it", "Q('balSub').innerHTML=balanceLine(t);" in HTML)
-check("the stream uses it", "Q('balSub').innerHTML=balanceLine(ev);" in HTML)
-check("no path builds the line inline any more",
-      HTML.count("'Balance $'+") == 1,
-      "the one occurrence must be inside balanceLine itself")
-check("the estimate is labelled on screen",
-      "estimated, cTrader is exact" in HTML)
-check("an incomplete figure is labelled on screen",
-      "position(s) unpriced" in HTML)
-check("floating shows even when no position is focused",
-      "(d.positions && d.positions.length) || d.position || fl !== 0" in HTML,
-      "gating on the focused position hid the figure from a client holding a "
-      "trade the platform was not currently watching")
 
 print("\n8. Nothing here can move money or take the loop down")
 _blk = LOOP[LOOP.index('dash["positions"] = ') - 4000:LOOP.index('dash["unpricedPositions"]')]
@@ -262,18 +217,6 @@ for field in ("exitPrice", "entryPrice", "balance", "closedAt"):
     check(f"the deal lookup returns {field}", f'"{field}": ' in CT)
 check("the post-close balance is scaled like money",
       "_bal = cpd.balance / scale" in CT)
-
-print("\n12. An unknown direction is never drawn as LONG")
-check("there is one direction renderer", "function dirLabel(side)" in HTML)
-check("...and it answers only for a side it was actually given",
-      "side==='BUY'" in HTML and "Direction not recorded" in HTML,
-      "the old expression was `side==='SELL' ? SHORT : LONG`, so every trade "
-      "with no recorded side was drawn as a long one")
-check("no call site still defaults to LONG",
-      "'SELL')?'\U0001f534 SHORT':'\U0001f7e2 LONG'" not in HTML
-      and "side==='SELL'?'\U0001f534 SHORT':'\U0001f7e2 LONG'" not in HTML)
-check("every call site uses the renderer", HTML.count("dirLabel(") == 4,
-      "three call sites plus the definition")
 
 print("\n" + "=" * 50)
 if failures:

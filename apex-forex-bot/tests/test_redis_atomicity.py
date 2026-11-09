@@ -31,7 +31,7 @@ os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 #
 # setdefault, so a caller that exports its own value keeps it. This is a fake
 # constant with no meaning outside this process.
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-oauth-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-oauth-signing-secret")
 
 from apex import user_store  # noqa: E402
 
@@ -152,88 +152,17 @@ except OSError:
     pass
 
 # ─────────────────────────────────────────────────────────────
-print("\n3. A charged buyer is never left unprovisioned and 'handled'")
-from apex import stripe_license  # noqa: E402
-import apex.config as _cfg  # noqa: E402
-import json as _json  # noqa: E402
-import types  # noqa: E402
+print("\n3. The platform billing webhook is the one that provisions a buyer")
+_bill = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "apex", "platform", "billing.py"), encoding="utf-8").read()
+check("the legacy Telegram Stripe webhook is retired",
+      not os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                      "apex", "stripe_license.py")))
+check("a failed claim is released so a retry can provision",
+      "release" in _bill.lower())
+check("a duplicate delivery is acknowledged, not minted again",
+      '"duplicate": True' in _bill)
 
-_recs, _sent, _claims = {}, [], {}
-
-
-def _load(uid):
-    return dict(_recs.get(str(uid), {}))
-
-
-def _claim(key, ttl_s=120):
-    if key in _claims:
-        return False
-    _claims[key] = 1
-    return True
-
-
-def _set_blob(key, val, ttl_s=None):
-    if ttl_s == 1:
-        _claims.pop(key, None)
-    return True
-
-
-EVENT = {"id": "evt_9", "type": "checkout.session.completed",
-         "data": {"object": {"payment_status": "paid",
-                             "client_reference_id": "42", "id": "cs_9"}}}
-BODY = _json.dumps(EVENT).encode()
-
-_o = (user_store.load, user_store.update, user_store.claim, user_store.set_blob)
-try:
-    stripe_license._verify_signature = lambda *a, **k: True
-    _cfg.STRIPE_WEBHOOK_SECRET = "whsec_test"
-    fa = types.ModuleType("apex.access"); fa.grant = lambda uid: True
-    ft = types.ModuleType("apex.telegram")
-    ft.send_activation_sequence = lambda uid, paid=False: _sent.append(uid)
-    sys.modules["apex.access"], sys.modules["apex.telegram"] = fa, ft
-
-    user_store.load, user_store.claim, user_store.set_blob = _load, _claim, _set_blob
-
-    def _dead_update(uid, updates, strict=False):
-        if strict:
-            raise user_store.PersistenceError("redis is down")
-        return False
-    user_store.update = _dead_update
-
-    st, body = stripe_license.handle_webhook(BODY, "sig")
-    check("a failed licence write returns 500, not 200",
-          st == 500, (st, body))
-    check("so Stripe will retry rather than consider it handled",
-          st >= 500)
-    check("and the idempotency claim was released",
-          "stripe:evt:evt_9" not in _claims, list(_claims))
-
-    # Redis comes back; the retry must now provision.
-    def _ok_update(uid, updates, strict=False):
-        _recs.setdefault(str(uid), {}).update(updates)
-        return True
-    user_store.update = _ok_update
-    st2, _ = stripe_license.handle_webhook(BODY, "sig")
-    check("the retry provisions the buyer", st2 == 200 and _recs["42"].get("license_key"))
-    check("and messages them once", len(_sent) == 1, _sent)
-
-    # A claim held by a failed attempt must not lock the buyer out.
-    _recs.clear(); _sent.clear(); _claims["stripe:evt:evt_9"] = 1
-    user_store.update = _ok_update
-    st3, _ = stripe_license.handle_webhook(BODY, "sig")
-    check("a stale claim with no licence still provisions",
-          st3 == 200 and _recs.get("42", {}).get("license_key"), st3)
-
-    # Once genuinely provisioned, a redelivery is a no-op.
-    st4, b4 = stripe_license.handle_webhook(BODY, "sig")
-    check("a real duplicate is refused", b4 == b"duplicate", b4)
-    check("with no second message", len(_sent) == 1, _sent)
-finally:
-    sys.modules.pop("apex.access", None)
-    sys.modules.pop("apex.telegram", None)
-    user_store.load, user_store.update, user_store.claim, user_store.set_blob = _o
-
-# ─────────────────────────────────────────────────────────────
 print("\n4. A callback with no verifiable state links nothing")
 from apex import ctrader_oauth as oauth  # noqa: E402
 

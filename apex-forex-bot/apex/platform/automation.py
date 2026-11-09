@@ -127,7 +127,7 @@ def _level_of(rec):
 def _plain(label):
     """An engine label without its icon.
 
-    `automation.LABEL` is written for Telegram, where a message is plain text
+    `automation.LABEL` is written for the platform, where a message is plain text
     and the emoji is the only way to make a line stand out. This platform has
     its own iconography and a chip to put the words in, so the icon is dropped
     HERE rather than in the browser: a frontend stripping characters out of a
@@ -274,7 +274,7 @@ def status(user_id, *, weekend_reader=None):
 
 def why(user_id, *, loop_reader=None, declines_reader=None,
         market_open=None, risk_reader=None):
-    """"Why isn't it trading?" — the answer the Telegram `/why` gave, for the web.
+    """"Why isn't it trading?" — the answer the platform `/why` gave, for the web.
 
     A waiting client reads silence as breakage. This says which of the real
     reasons applies, in order of how much each one explains:
@@ -691,7 +691,7 @@ def _allocation_balance(user_id):
         row = _br.account(user_id)
         if isinstance(row, dict) and row.get("status") == "ok":
             bal = row.get("balance")
-            if isinstance(bal, (int, float)) and not isinstance(bal, bool) \
+            if isinstance(bal, (int, float)) and not isinstance(bal, bool)\
                     and bal > 0:
                 return float(bal)
     except Exception:                                        # noqa: BLE001
@@ -702,7 +702,7 @@ def _allocation_balance(user_id):
         return None
     for key in ("paper_balance", "balance"):
         bal = rec.get(key)
-        if isinstance(bal, (int, float)) and not isinstance(bal, bool) \
+        if isinstance(bal, (int, float)) and not isinstance(bal, bool)\
                 and bal > 0:
             return float(bal)
     return None
@@ -807,7 +807,7 @@ def start(user_id, rule_doc_id, *, starter=None, now=None,
     if starter is None:
         starter = _engine_starter
     # NOTE WHAT IS ABSENT: `paper`. Exactly one place writes the live/demo
-    # flag — telegram._handle_paper, the writer that applies every activation
+    # flag — legacy._handle_paper, the writer that applies every activation
     # gate — and test_live_path_invariants.py enforces that there is only one.
     # Writing it here would have made this a second one, in the file with the
     # fewest of those gates.
@@ -1174,7 +1174,7 @@ def pause(user_id, *, stopper=None):
     # unsaid, and it is the one a client acts on: they pause with a position
     # open, believing it is still being managed to its target.
     #
-    # Telegram's equivalent screen has always said this plainly.
+    # the platform's equivalent screen has always said this plainly.
     _notify.notify(
         user_id, type=_notify.SYSTEM, title="Automation paused",
         body="No new positions will be opened until you resume. Anything "
@@ -1217,7 +1217,7 @@ def supervise(*, starter=None, mode_lister=None):
     the next deploy or instance recycle without being told.
 
     The engine has always had `start_all` and `start_watchdog` for this, and
-    both are called only from `apex/bot.py` — the Telegram entry point, which
+    both are called only from `apex/bot.py` — the platform entry point, which
     is not deployed. Nothing in production revived a platform loop.
 
     WHY THE REVIVAL IS HERE AND NOT IN THE SERVER
@@ -1246,7 +1246,7 @@ def supervise(*, starter=None, mode_lister=None):
         uid = str(uid)
         try:
             if not _link.is_platform_account(uid):
-                # The bot's account, not ours. This process has no Telegram
+                # The bot's account, not ours. This process has no the platform
                 # alert sink and no business starting loops for chats.
                 continue
         except Exception as e:                               # noqa: BLE001

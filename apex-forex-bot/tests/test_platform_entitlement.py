@@ -659,7 +659,7 @@ finally:
 # running and blind. Seen in production on 2026-10-02:
 #   initial balance read failed: invalid literal for int() with base 10: ''
 # Checked on the source, because the defect was a MISSING ARGUMENT and no
-# behavioural test of a healthy Telegram user could ever see it: their token is
+# behavioural test of a healthy the platform user could ever see it: their token is
 # in the record, so the branch that needs the id never runs for them.
 print("\n[12] no broker is built without the user it belongs to")
 import re as _re                                    # noqa: E402

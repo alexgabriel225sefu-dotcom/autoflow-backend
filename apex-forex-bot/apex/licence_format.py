@@ -3,7 +3,7 @@
 Deliberately dependency-free. Two generators mint licence keys (the licence
 server and this bot's own Stripe webhook) and three places consume them, so the
 format has to live somewhere every one of them can import without dragging in
-the Telegram layer — the first version of this put it in apex.telegram and
+the platform layer — the first version of this put it in apex.legacy and
 broke three tests that stub that module out, which is the same coupling problem
 seen from the test side.
 """

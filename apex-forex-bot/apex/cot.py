@@ -230,7 +230,7 @@ def _split(symbol):
 
 
 def describe(symbol):
-    """One line for logs / Telegram, age included."""
+    """One line for logs / the platform, age included."""
     b = pair_bias(symbol)
     if b is None:
         return f"{symbol}: no COT reading"

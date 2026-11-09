@@ -1,6 +1,6 @@
 """Button presses are untrusted input, and old buttons never go away.
 
-A Telegram inline keyboard is permanent. Every button this bot has ever sent is
+A platform inline keyboard is permanent. Every button this bot has ever sent is
 still sitting in somebody's chat history and is still pressable — months later,
 by a different person on the same account, twice in the same second because the
 network was slow and the client tapped again. `callback_data` also arrives
@@ -56,7 +56,7 @@ ACTION_NAMESPACES = {
     "voice",
 }
 
-# Telegram caps callback_data at 64 bytes; anything longer did not come from a
+# the platform caps callback_data at 64 bytes; anything longer did not come from a
 # keyboard this bot drew.
 MAX_LEN = 64
 _SHAPE = re.compile(r"^[A-Za-z0-9_:.\-]{1,64}$")

@@ -4,7 +4,7 @@
 - **Brand:** Apex Trading Suite, by AI Cash System
 - **Website:** https://aicashsystem.space
 - **Type:** Hosted AI trading bots, sold as a one-time license
-- **Tagline:** Fully-hosted AI trading bots, controlled from Telegram — nothing to install.
+- **Tagline:** Fully-hosted AI trading bots, controlled from the web app — nothing to install.
 - **Mission:** Give traders a 24/7 AI-powered bot that trades their own broker account for them, with zero setup friction.
 
 ## Products & Pricing
@@ -14,10 +14,10 @@
 | **Apex Forex Bot** | $497 one-time | AI-powered forex trading bot, hosted by us 24/7. Trades major/minor FX pairs + gold via cTrader. |
 
 ## How it works
-- Customer buys a license (via Stripe Checkout) → gets a license key + Telegram activation link by email.
-- Customer opens the bot in Telegram, connects their own cTrader account (any cTrader-compatible broker — IC Markets, Pepperstone, FxPro, etc.) with a single command (`/ctrader`), demo or live.
+- Customer buys a license (via Stripe Checkout) → gets a license key + the web app activation link by email.
+- Customer opens the bot in the web app, connects their own cTrader account (any cTrader-compatible broker — IC Markets, Pepperstone, FxPro, etc.) with a single command (`/ctrader`), demo or live.
 - The bot analyzes the market with AI (Claude/Groq) using multiple strategies (trend following, mean reversion, breakout) and trades automatically — no VPS, no computer left running, fully hosted on our servers.
-- Everything is controlled from Telegram: risk %, stop-loss/take-profit, strategy, pairs, on/off.
+- Everything is controlled from the web app: risk %, stop-loss/take-profit, strategy, pairs, on/off.
 
 ## What this is NOT
 - **Not source code delivered.** Customers do not receive or self-host any code — this is a hosted SaaS/license model.
@@ -46,7 +46,7 @@
 1. Fully hosted 24/7 — nothing to install, no VPS, no computer left running
 2. Connects to the customer's own cTrader broker account — never touches their funds (trade-only, no withdrawal access)
 3. AI-driven signals (Claude/Groq) combined with proven strategies (trend, mean-reversion, breakout)
-4. Controlled entirely from Telegram — simple commands, no dashboard login needed
+4. Controlled entirely from the web app — simple commands, no dashboard login needed
 5. One-time payment, no subscription
 6. Demo account first, switch to live whenever ready
 
@@ -63,7 +63,7 @@
 - **Runtime:** Node.js / Express (server.js) + one Python trading bot (forex)
 - **Database:** Supabase (PostgreSQL) + Redis (bot session state)
 - **AI:** Anthropic Claude (Haiku), Groq (Llama fallback)
-- **Payments:** Stripe is the ONLY processor (account acct_1TSAWQGpBbs5xtI5 / ApexTradingSuite). `/api/checkout/create-session` uses Stripe; with no Stripe key configured it returns "Payments are not configured" rather than falling back to anything. REMOVED, and not dormant: Dodo Payments (they rejected the business), Digistore24 (also rejected — its IPN handler, signature check and thank-you page are gone), and BOTH affiliate programs. There is no affiliate program of any kind now: the in-house one (13 /api/affiliates/* routes, signup + dashboard pages, Stripe Connect onboarding, payout requests, commission ledger) and the Endorsely integration (tracking script, referral metadata, payout tracker) were both removed on 2026-08-20 — they had been running side by side on the same signup page, which put one sale in two commission ledgers. `ref` survives in Checkout metadata as plain provenance and is attributed to nobody. CopeCart was abandoned mid-KYC. Stripe is NOT usable as a native in-Telegram payment provider (owner confirmed via BotFather), so Telegram checkout has to be a Stripe Checkout link opened in-browser.
+- **Payments:** Stripe is the ONLY processor (account acct_1TSAWQGpBbs5xtI5 / ApexTradingSuite). `/api/checkout/create-session` uses Stripe; with no Stripe key configured it returns "Payments are not configured" rather than falling back to anything. REMOVED, and not dormant: Dodo Payments (they rejected the business), Digistore24 (also rejected — its IPN handler, signature check and thank-you page are gone), and BOTH affiliate programs. There is no affiliate program of any kind now: the in-house one (13 /api/affiliates/* routes, signup + dashboard pages, Stripe Connect onboarding, payout requests, commission ledger) and the Endorsely integration (tracking script, referral metadata, payout tracker) were both removed on 2026-08-20 — they had been running side by side on the same signup page, which put one sale in two commission ledgers. `ref` survives in Checkout metadata as plain provenance and is attributed to nobody. CopeCart was abandoned mid-KYC. Stripe is NOT usable as a native in-the web app payment provider (owner confirmed via BotFather), so the web app checkout has to be a Stripe Checkout link opened in-browser.
 - **Email:** Brevo
 - **Broker integration:** cTrader Open API (both bots)
 - **Deployment:** Render (two services — main site, forex bot)

@@ -7,7 +7,7 @@ import { When } from "./table";
 /**
  * “Why isn't it trading?” — the question a waiting client actually asks.
  *
- * The Telegram bot answered it with /why. Without it, a bot that is working
+ * The the web app bot answered it with /why. Without it, a bot that is working
  * and refusing every candidate looks identical to one that is broken. The
  * reason and its sentence come from the server; this card only shows them.
  *

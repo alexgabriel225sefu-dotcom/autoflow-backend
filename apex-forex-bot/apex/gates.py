@@ -12,7 +12,7 @@ trade to invent a signal would be worse than the duplication it replaced. This
 is the financial safety layer underneath that decision:
 
     AUTOMATIC SIGNAL ┐
-    MANUAL TELEGRAM  ├─→ authorize_order() ─→ broker
+    MANUAL LEGACY  ├─→ authorize_order() ─→ broker
     AI REQUEST       │
     MCP CONTROLLED   ┘
 
@@ -83,7 +83,7 @@ def _platform_mode(user_id):
     THE HOLE THIS CLOSES, AND IT MADE EVERY LIVE GATE DECORATIVE
 
     `_live` reads the user record's `paper` flag. Nothing in apex/platform
-    writes that flag — only `telegram._handle_paper` does — so for every
+    writes that flag — only `legacy._handle_paper` does — so for every
     platform client `_live` returned False, whatever account they had
     selected at the broker. `live` being False is what skips the broker
     environment check, the ownership live lease, the ledger's fail-closed
@@ -120,7 +120,7 @@ def live_entitlement(user_id, user=None):
     on every redeploy when it falls back to local JSON, and a paying client
     must not lose live trading to that.
 
-    UNLESS the licence is in GRACE. `telegram._revalidate_license` sets
+    UNLESS the licence is in GRACE. `legacy._revalidate_license` sets
     `license_grace_since` when the verifier cannot answer: the client keeps
     their interface and their open positions keep being managed, but nobody
     can currently confirm they are still entitled — so no NEW live risk is
@@ -167,7 +167,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     #    answer it differently if left to themselves.
     #
     #    `_live` above is the LEGACY answer: the stored paper flag, which only
-    #    the Telegram path writes. For a platform client it is always False.
+    #    the platform path writes. For a platform client it is always False.
     #    See _platform_mode for what that cost.
     #
     #    THE DISTINCTION THAT MAKES THIS SAFE TO ASK AT ALL
@@ -176,7 +176,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     #    paper key", because `.get("paper", True)` collapses them. They are
     #    completely different statements:
     #
-    #      * stored True  — the Telegram path positively marked this order as
+    #      * stored True  — the platform path positively marked this order as
     #        simulated. There is no real money, whatever any other system
     #        thinks, and nothing needs asking.
     #      * key absent   — nobody has said anything. Every platform record
@@ -418,7 +418,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     #
     #     Only for live, and only for platform accounts. `guard_engine_order`
     #     returns None when the account has no platform connection, which is
-    #     every Telegram-bot user — they traded through this gate for a long
+    #     every platform-bot user — they traded through this gate for a long
     #     time before the platform existed and their path is unchanged.
     #     WHETHER THIS IS A PLATFORM ACCOUNT WAS ASKED IN STEP 0, AND
     #     SEPARATELY FROM IMPORTING ANY OF THIS.
@@ -429,7 +429,7 @@ def authorize_order(user_id, *, symbol, side, units, sl=None, tp=None,
     #     importing the live path to find out "this is not a platform
     #     account" raised SharedBackendRequired and denied the order.
     #
-    #     Every Telegram-bot live order went through that branch. The legacy
+    #     Every the platform-bot live order went through that branch. The legacy
     #     engine's own safety tests caught it, with the words
     #     "this would stop legitimate live trading", which is exactly what it
     #     did. Step 0 asks ctrader_link, which imports clean, so the cheap

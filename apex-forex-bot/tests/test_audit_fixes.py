@@ -48,7 +48,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-audit-")
 
 from apex import config as cfg, forex, user_loop, user_store  # noqa: E402
@@ -238,22 +238,20 @@ check("flash-spike threshold is read from config, not a build flag",
       user_loop.flash_spike_pct_for(_Cfg(), "EUR_USD") == 0.012
       and user_loop.flash_spike_pct_for(_Cfg(), "XAUUSD") == 0.012)
 
-TG = src("telegram.py")
-check("no asset-class branch survives in the instrument picker",
-      "asset_class" not in TG,
+check("no asset-class branch survives in the loop",
+      "asset_class" not in LSRC,
       "the crypto product is gone; there is nothing to choose between")
-check("the broker filter narrows the offered list",
-      "for label, code in syms if code in offered" in TG)
 
 # ── 5. Refusals are named honestly ────────────────────────────────────────
 print("\n5. A refused order says why it was refused")
 check("force_trade passes the gate's own reason up",
       '"error": _claim_why or "ORDER_REFUSED"' in LSRC,
       "reporting every refusal as a duplicate hides lapsed licences")
+NAMED = src("gates.py") + src("ledger.py") + LSRC
 for reason in ("NOT_ENTITLED", "RISK_HALTED", "NOT_OWNER",
                "ENTITLEMENT_UNKNOWN", "STORE_UNREACHABLE",
                "COORDINATION_UNAVAILABLE", "DUPLICATE_ORDER"):
-    check(f"{reason} has client-facing words", f'"{reason}":' in TG)
+    check(f"{reason} is a named gate decision", f'"{reason}"' in NAMED)
 
 # ── 6. The open-position snapshot is CAS-protected ────────────────────────
 print("\n6. Money-state is compare-and-set protected")
@@ -270,9 +268,8 @@ for sym in ("GBP_JPY", "EUR_GBP", "AUD_CHF", "EURJPY"):
           "no quote_usd_rate is ever passed, so the margin cap is 100x wrong")
 for sym in ("EUR_USD", "USD_JPY", "USD_CHF", "XAUUSD", "XAGUSD"):
     check(f"{sym} still accepted", forex.is_tradeable(sym) is True)
-check("no refused cross is offered on a quick-pick button",
-      "GBP_JPY" not in TG.split("_QUICK_SYMS_FX")[1].split("]")[0],
-      "offering one only produces a refusal a tap later")
+check("the quick-pick list is not in the engine",
+      "_QUICK_SYMS_FX" not in LSRC)
 
 print("\n" + "=" * 50)
 if failures:

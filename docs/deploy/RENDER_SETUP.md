@@ -90,7 +90,7 @@ New → Web Service → this repository.
 Three of those are worth more than a glance.
 
 **`python -u platform_server.py`, and never `main.py`.** `main.py` starts the
-Telegram bot: polling, the per-user trading loops, the operator dashboard.
+the web app bot: polling, the per-user trading loops, the operator dashboard.
 Pointing this service at it would start a *second* live trading bot beside the
 one already running. `platform_server.py` serves `/healthz`, `/readyz` and
 `/api/v1/*` and nothing else — it does not import the bot at all, which
@@ -240,7 +240,7 @@ document:
   cTrader to the web service produces a 404 at the end of a successful login.
 - **A trailing slash is a different URI.** cTrader compares the string.
 - **`/api/v1/ctrader/callback`, not `/api/ctrader/callback`.** The second one is
-  the *legacy Telegram bot's* callback. It exists, it will answer, and it will
+  the *legacy the web app bot's* callback. It exists, it will answer, and it will
   attach the account to the wrong product.
 
 If you attach a custom domain to the API later, register the new URI in the

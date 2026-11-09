@@ -9,10 +9,10 @@ The engine has three automation levels — signals, approval, full. In
   2. calls `alert_fn` with {"action": "SUGGEST", symbol, side, price, ...}
   3. and the caller then sets entry_ok = False, so nothing is placed
 
-Both halves of that only ever had one implementation: the Telegram bot's
+Both halves of that only ever had one implementation: the chat channel's
 alert, and the ✅ Approve button it draws. `automation.start` started the loop
 as `user_loop.start(user_id)` with NO alert function, and no platform client
-has a Telegram chat to be asked in. So approval on the platform meant a loop
+has a platform chat to be asked in. So approval on the platform meant a loop
 that found setups, wrote a proposal nobody could see, notified nobody, and
 placed nothing — indefinitely, with the dashboard saying Running. Commit
 6f984dfe9 removed that state by refusing to run at a level the platform could
@@ -21,7 +21,7 @@ not service; this module is the other half, the one that makes it serviceable.
 THERE IS NO SECOND EXECUTION PATH HERE
 
 `approve` hands the trade to `user_loop.force_trade`, the same controller the
-Telegram ✅ button, /buy, the assistant and `bridge` all converge on. It is the
+the platform ✅ button, /buy, the assistant and `bridge` all converge on. It is the
 function that performs, in order: ownership.may_trade, gates.authorize_order,
 gates.audit, ledger.claim/record, and only then broker.place_order. Writing
 those five steps again here would mean two places that must both stay correct
@@ -219,7 +219,7 @@ def _clear(user_id):
     """Drop the suggestion and the detail that described it.
 
     Through `user_loop.clear_suggestion` rather than a `user_store.update` of
-    our own, because that is the accessor the Telegram path already uses and
+    our own, because that is the accessor the platform path already uses and
     two writers of one field is one more than this needs.
     """
     from apex import user_loop
@@ -470,7 +470,7 @@ def approve(user_id, *, now=None, executor=None):
     # The clear below is what stops a double tap there, and the idempotency
     # claim inside the order controller is what stops two positions anywhere.
 
-    # BEFORE the order, exactly as the Telegram button does it: a second
+    # BEFORE the order, exactly as the platform button does it: a second
     # Approve on the same setup then finds nothing to approve.
     _clear(user_id)
 

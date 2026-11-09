@@ -15,7 +15,7 @@ So this works two ways, and the first one is the one that matters:
               are replaced wherever they appear. This catches a secret arriving
               through a path nobody anticipated, which is the whole problem.
 
-  BY SHAPE    strings that look like credentials — a Telegram bot token, a
+  BY SHAPE    strings that look like credentials — a chat channel token, a
               Bearer header, an sk- key, a JWT, a licence key — are replaced
               even when this process has never seen that particular value.
 
@@ -47,10 +47,10 @@ _SECRET_NAME_PARTS = (
 _MIN_SECRET_LEN = 8
 
 _SHAPES = (
-    # Telegram bot token: 8-10 digits, colon, 30+ URL-safe characters.
+    # chat channel token: 8-10 digits, colon, 30+ URL-safe characters.
     (re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{30,}"), MASK),
     # Authorization headers, whatever the scheme.
-    (re.compile(r"(?i)\b(authorization\s*[:=]\s*)(bearer|basic|telegram)?\s*\S+"),
+    (re.compile(r"(?i)\b(authorization\s*[:=]\s*)(bearer|basic)?\s*\S+"),
      r"\1" + MASK),
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{10,}"), "Bearer " + MASK),
     # OpenAI-style and Stripe-style keys.
@@ -66,7 +66,7 @@ _SHAPES = (
     (re.compile(r"\bgAAAAA[A-Za-z0-9_-]{20,}={0,2}"), MASK),
     # A JWT, three base64url segments.
     (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), MASK),
-    # Telegram initData always carries hash= and auth_date=; mask the lot
+    # the platform initData always carries hash= and auth_date=; mask the lot
     # rather than trying to keep the harmless fields.
     (re.compile(r"\b(?:query_id|user)=[^&\s]*&[^\s]*hash=[A-Fa-f0-9]{64}"), MASK),
     (re.compile(r"\bhash=[A-Fa-f0-9]{64}"), "hash=" + MASK),

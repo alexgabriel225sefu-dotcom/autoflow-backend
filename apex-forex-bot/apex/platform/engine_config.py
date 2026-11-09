@@ -91,7 +91,7 @@ LEVEL_FULL = "full"
 #
 # `approval` was absent for exactly that reason — the engine's approval step
 # proposes through `alert_fn` and then waits, and `automation.start` passed no
-# alert function while the only approve action in the codebase was a Telegram
+# alert function while the only approve action in the codebase was a platform
 # tap. Both halves exist now:
 #
 #   the ask      `automation._engine_starter` starts the loop with
@@ -316,7 +316,7 @@ def translate(doc):
     # `automation` is the engine's level: signals / approval / full. It was
     # not written here, so a platform client's record carried neither it nor
     # the legacy `copilot` boolean — and `automation.mode()` resolves THAT
-    # state to "approval", deliberately, because for a Telegram client it
+    # state to "approval", deliberately, because for a platform client it
     # means nobody had chosen and unattended trading is the wrong default.
     #
     # For a platform client it meant something else entirely. In approval
@@ -329,7 +329,7 @@ def translate(doc):
     #
     # Written as `full` because on this product pressing Start on a rule the
     # client wrote, validated, activated and then confirmed IS the
-    # instruction to trade it — and unlike Telegram there is no second
+    # instruction to trade it — and unlike the platform there is no second
     # channel to go back and ask on. The level a client can CHOOSE is the
     # next piece of work; what is fixed here is that the platform must never
     # leave it to a default it cannot service.

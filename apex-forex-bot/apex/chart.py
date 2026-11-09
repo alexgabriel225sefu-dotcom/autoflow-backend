@@ -1,4 +1,4 @@
-"""Candlestick chart rendering — the client's chart inside Telegram.
+"""Candlestick chart rendering — the client's chart inside the platform.
 
 Renders a dark-theme PNG of recent candles with EMA20/50 and, when a position
 is open, entry/SL/TP levels — sent via sendPhoto on entries and /chart."""

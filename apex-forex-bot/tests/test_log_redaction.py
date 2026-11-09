@@ -140,9 +140,8 @@ print("\n8. The entrypoint installs it before the bot is imported")
 main_src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              "main.py"), encoding="utf-8").read()
 check("main.py installs redaction", "redact.install()" in main_src)
-check("...before importing the bot",
-      main_src.index("redact.install()") < main_src.index("from apex.bot import main"),
-      "redaction is installed too late to cover import-time output")
+check("main.py does not start the retired Telegram bot",
+      "from apex.bot import main" not in main_src and "apex.telegram" not in main_src)
 
 print("\n9. End to end: a real process start does not print its own token")
 env = dict(os.environ)

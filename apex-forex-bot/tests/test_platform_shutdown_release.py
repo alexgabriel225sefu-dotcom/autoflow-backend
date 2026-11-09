@@ -6,7 +6,7 @@ refused to trade a user it did not own, retried every three minutes, and got the
 loop at minute 12. For those twelve minutes an open position had only the
 broker's stop and target and nobody managing it.
 
-`ownership.release_all()` existed and was called by the Telegram bot, which is
+`ownership.release_all()` existed and was called by the chat channel, which is
 not deployed. The platform server — the one that is — never called it.
 
 WHAT THESE TESTS WILL NOT ACCEPT

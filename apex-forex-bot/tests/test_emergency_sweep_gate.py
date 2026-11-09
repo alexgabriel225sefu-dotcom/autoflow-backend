@@ -41,7 +41,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-sweep-")
 
 from apex import gates, user_loop, user_store  # noqa: E402
@@ -128,7 +128,7 @@ print("\n5. Every EXTERNALLY-REQUESTED close passes the gate")
 #       there is no second requester to race with. Claiming an idempotency key
 #       on every stop-out would add churn and protect nothing.
 #
-#   from OUTSIDE          — force_close() (Telegram, AI, MCP) and the emergency
+#   from OUTSIDE          — force_close() (the platform, AI, MCP) and the emergency
 #       sweep. These arrive from an origin, can arrive twice, and can arrive
 #       from two containers at once. These are the ones the gate exists for.
 #

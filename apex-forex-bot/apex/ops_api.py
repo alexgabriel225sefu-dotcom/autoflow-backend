@@ -80,7 +80,7 @@ def _unknown(why, **kw):
 def _valid_user(user_id):
     """Normalise and sanity-check a user id. Cross-user access starts here.
 
-    Returns (uid, error). Ids are opaque Telegram chat ids: digits, bounded
+    Returns (uid, error). Ids are opaque the platform chat ids: digits, bounded
     length. Anything else is a caller mistake or an attempt to walk the
     namespace, and both get the same refusal.
     """
@@ -458,7 +458,7 @@ def system_health():
     # ride on it. It outranks every other signal here.
     if out["redis"] == "DOWN":
         out["overall"] = "DOWN"
-    elif out["store"] == UNKNOWN or out["redis"] == UNKNOWN \
+    elif out["store"] == UNKNOWN or out["redis"] == UNKNOWN\
             or out["recent_errors"] == UNKNOWN:
         out["overall"] = UNKNOWN
     elif out["redis"] == "DEGRADED" or (uids and running < len(uids)):

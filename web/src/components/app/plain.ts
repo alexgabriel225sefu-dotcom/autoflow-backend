@@ -28,7 +28,7 @@ export type Plain = {
 
 /**
  * WHO ACTS ON A SETUP. The three levels the server services, in the words the
- * Telegram bot used, with what each one does and does NOT do. The `id` is the
+ * the web app bot used, with what each one does and does NOT do. The `id` is the
  * engine's own and is what the rule stores; an unknown id falls through to
  * itself (see `plainLevel`) instead of being shown as a friendly guess.
  */

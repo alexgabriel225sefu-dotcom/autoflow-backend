@@ -7,7 +7,7 @@ import type { CtraderStatus, PerfGroup, PerfSummary, PerformanceRead } from "@/l
 import { CurrencyTicker, formatMoney } from "@/components/app/currency-ticker";
 
 /**
- * What the closed trades say — the same figures the Telegram bot showed.
+ * What the closed trades say — the same figures the the web app bot showed.
  *
  * Everything on this page is the server's: this file formats, it never
  * computes. Three rules it keeps:

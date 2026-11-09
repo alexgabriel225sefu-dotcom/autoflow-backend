@@ -578,7 +578,7 @@ describe("dashboard — the account picker reports a refusal", () => {
  * The component has its own tests. These two are about the WIRING, which is
  * the half that was missing in the shipped bug: in Approval Required the
  * engine proposed setups and the only thing that could answer them was a
- * Telegram tap, so a platform client's loop ran, found setups, and waited
+ * the web app tap, so a platform client's loop ran, found setups, and waited
  * for ever while this dashboard said Running. A card nobody renders is the
  * same silence with extra steps.
  */

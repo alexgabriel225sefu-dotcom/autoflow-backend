@@ -1,4 +1,4 @@
-"""Linking a cTrader account to an Apex4Traders account, with no Telegram.
+"""Linking a cTrader account to an Apex4Traders account, with no the platform.
 
 THE ATTACK THE SHAPE OF THIS FLOW IS AGAINST
 
@@ -91,7 +91,7 @@ def lister(access, *, accounts=None):
 
 
 def connect(user_id, *, accounts=None, token=None, now=None):
-    """The whole flow, end to end, with no network and no Telegram."""
+    """The whole flow, end to end, with no network and no the platform."""
     started = L.begin(user_id, now=now)
     state = started["authorizeUrl"].split("state=")[1].split("&")[0]
     L.handle_callback({"code": "auth-code-xyz", "state": state}, now=now,
@@ -362,7 +362,7 @@ try:
           not any(m.startswith("apex.telegram") for m in sys.modules))
     check("nor the deprecated Telegram-era OAuth module",
           "apex.ctrader_oauth" not in sys.modules)
-    # Not just this module: NOTHING in apex/platform may import Telegram.
+    # Not just this module: NOTHING in apex/platform may import the platform.
     # Checked across the whole package through the AST, because the one file
     # that reintroduces it will be a file nobody thought to test.
     import glob
@@ -393,7 +393,7 @@ try:
     check("state signing works with no bot token present",
           L.parse_state(L.make_state("n1", 1000), now=1000)[0] == "n1")
     # And the key must not merely work without a bot token — it must not
-    # DEPEND on one. If the old module's `TELEGRAM_BOT_TOKEN or ...` chain
+    # DEPEND on one. If the old module's `LEGACY_BOT_TOKEN or ...` chain
     # ever came back, setting a bot token would change the derived key and
     # states issued a moment earlier would stop verifying.
     signed_before = L.make_state("n2", 1000)

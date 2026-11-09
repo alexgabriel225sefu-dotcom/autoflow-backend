@@ -79,12 +79,12 @@ _TOOLS = [
     },
 ]
 
-_SYSTEM = """You are Apex, the assistant of a hosted forex execution platform, operated through Telegram.
+_SYSTEM = """You are Apex, the assistant of a hosted forex execution platform.
 
 You help users trade: analyze forex markets, execute trades, explain P&L, manage settings.
 
 RULES:
-- Be concise — Telegram messages, 2-4 sentences max unless analysis is requested
+- Be concise — 2-4 sentences max unless analysis is requested
 - LANGUAGE: ALWAYS reply in English, whatever language the user writes in.
   The platform's own messages (buttons, trade alerts, the daily summary) are all
   English, so mirroring the user's language made a single chat bilingual —
@@ -191,7 +191,7 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None) -> st
     string means "do not run this; hand the model that answer instead", which
     is how the voice channel holds a trade back for confirmation without this
     module needing to know a voice channel exists. Returning None runs the tool
-    exactly as before, so the Telegram path is unchanged.
+    exactly as before, so an unguarded call is unchanged.
     """
     from apex import user_loop, user_store, forex, indicators
     send_status = send_status or (lambda _: None)
@@ -265,8 +265,8 @@ def _run_tool(name: str, inp: dict, user_id: str, send_status, guard=None) -> st
     if name == "resume_trading":
         try:
             if not user_loop.is_running(user_id):
-                from apex.telegram import _user_alert
-                user_loop.start(user_id, alert_fn=_user_alert)
+                from apex import client_alerts
+                user_loop.start(user_id, alert_fn=client_alerts.alert)
             return json.dumps({"ok": True, "status": "active"})
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
@@ -497,7 +497,7 @@ def chat(user_id: str, message: str, send_fn, send_status=None, guard=None,
          prefer_tools=False, voice=False) -> None:
     """Route to the best available AI, execute tools, send reply.
 
-    `guard` is passed through to `_run_tool` — see there. Telegram passes
+    `guard` is passed through to `_run_tool` — see there. Callers pass
     nothing and behaves exactly as it always has.
 
     `prefer_tools` puts the tool-capable providers first. The chain is

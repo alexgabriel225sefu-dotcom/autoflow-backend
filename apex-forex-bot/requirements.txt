@@ -13,7 +13,7 @@
 # the Groq calls go out over plain `requests`.
 
 # The HTTP client for everything that is not the broker socket: the cTrader
-# OAuth token exchange, Telegram, the licence check, market and news feeds.
+# OAuth token exchange, the licence check, market and news feeds.
 # Every call site uses the plain module-level API — no Session, no
 # HTTPAdapter, no verify=, no proxies=, no custom auth — which is the most
 # stable part of the surface.

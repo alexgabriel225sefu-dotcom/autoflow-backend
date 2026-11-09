@@ -135,7 +135,7 @@ deliberately, and a push is therefore not a release.
 `/readyz` reports all checks `ok`, shared store Redis (not the memory
 fallback), live trading off.
 
-**The legacy Telegram bot service is untouched and must stay that way.** It
+**The legacy the web app bot service is untouched and must stay that way.** It
 deploys a different branch. The Fernet-token masking in `apex/redact.py`
 protects that bot's logs and is still not live, because it is on the wrong
 branch for the service that runs it — that has not changed.
@@ -234,7 +234,7 @@ re-litigates them is wasting the review.
 |---|---|
 | `protobuf` 3.20.1 → 3.20.2 | Decided **apply**, and it turned out **not implementable** — `ctrader-open-api==0.9.2` pins `protobuf==3.20.1`, so the bump makes `pip install -r requirements.txt` fail with ResolutionImpossible. Reverted, guarded by a test, and the only real route (vendor the `_pb2` stubs) is written up in `docs/DEPLOYMENT_READINESS.md` §6. **Back to Codex.** |
 | pyOpenSSL / cryptography | **Do not raise now.** Off our execution path; the 26 + newest-cryptography pairing is broken. |
-| Render topology | **Two separate services** for the platform. Do **not** merge the platform into the Telegram bot's service. |
+| Render topology | **Two separate services** for the platform. Do **not** merge the platform into the the web app bot's service. |
 | Git history rewrite for the scrubbed identifiers | **Not now.** |
 | `nova/config/nova.json5` `allowFrom` → env var | **Later**, as a separate change on the bot's branch. |
 | Empty health check path on the three existing services | **Fixed separately** on the legacy deployment, not from here. |
@@ -260,7 +260,7 @@ each found in production, each with the evidence that found it.
 
 | # | Defect | How it was found |
 |---|---|---|
-| 1 | **cTrader's authorization code expires in ONE MINUTE.** The flow parked it at the callback and exchanged it on a second, human-timed click. Rate-limited on that button, the owner waited for the window to roll and came back to a dead code — answered `ACCESS_DENIED`, which names credentials and means nothing of the kind. A day went into suspecting a correct client secret. | cTrader's own docs, after the guess-and-check had been exhausted. The deprecated Telegram module exchanges in its callback, which is why the legacy bot works on the same application and the same credentials. |
+| 1 | **cTrader's authorization code expires in ONE MINUTE.** The flow parked it at the callback and exchanged it on a second, human-timed click. Rate-limited on that button, the owner waited for the window to roll and came back to a dead code — answered `ACCESS_DENIED`, which names credentials and means nothing of the kind. A day went into suspecting a correct client secret. | cTrader's own docs, after the guess-and-check had been exhausted. The deprecated the web app module exchanges in its callback, which is why the legacy bot works on the same application and the same credentials. |
 | 2 | `RATE_LIMITED` reported the WINDOW LENGTH (a flat 60) whichever second of the minute it was, and the message said only "wait a moment". | Reading the limiter after the owner hit it twice. |
 | 3 | **The nonce was lost at login.** The middleware put only the pathname in `next=`, and cTrader opens in a new tab whose `sessionStorage` is empty — so `?n=` was the only record of the attempt. A lapsed session during the round trip lost it. Fixing it exposed a pre-existing **open redirect**: `next` went straight into `router.push`. | Reading the middleware while implementing observability. |
 | 4 | A finished connection still showed **"Step 1 — authorise"**, because the heading was chosen from `pending`, which is cleared on success. The owner pressed Connect again five seconds after succeeding. | **The server log.** First defect in this flow found without a photograph of a phone. |
@@ -599,7 +599,7 @@ file must be rewritten by that milestone, not deleted.
 ## 6b. Security concern with no fix yet: identifiers in the legacy bot
 
 A tree-wide scan on 2026-09-26 found the owner's own cTrader account number
-(`47765456`) and Telegram chat ids in tracked files. Protocol §9 forbids
+(`47765456`) and the web app chat ids in tracked files. Protocol §9 forbids
 committing account numbers, so this is recorded rather than passed over.
 
 | File | What |
@@ -612,7 +612,7 @@ committing account numbers, so this is recorded rather than passed over.
 | `apex-forex-bot/tests/test_access_gates_loop.py` | both ids as test fixtures |
 | `HANDOFF.md` (root) | chat id in prose |
 
-**Scope:** all of these are in the **legacy Telegram bot**, added between
+**Scope:** all of these are in the **legacy the web app bot**, added between
 2026-08-15 and 2026-09-03. The platform is clean — zero occurrences in
 `apex-forex-bot/apex/platform/` or `web/src/`, asserted by scan.
 

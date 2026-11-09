@@ -58,7 +58,7 @@ time.sleep(1.5)
 os.environ["REDIS_URL"] = f"redis://127.0.0.1:{PORT}/0"
 os.environ["APP_ENV"] = "production"
 os.environ["PRODUCT"] = "forex"
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-only-signing-secret")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test-only-signing-secret")
 os.environ.setdefault("DATA_DIR", tempfile.mkdtemp(prefix="apex-cp-"))
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY",
                       base64.urlsafe_b64encode(os.urandom(32)).decode())
@@ -183,33 +183,6 @@ check("no trades reads as unknown", a["kind"] == copilot.UNKNOWN, a["kind"])
 a = copilot.answer("999999", "what positions are open?")
 check("no positions is a fact, and says none", a["kind"] == copilot.FACT
       and "no open positions" in a["text"].lower())
-
-print("\n8. The route is scoped, bounded and read-only")
-BOT = open(os.path.join(ROOT, "apex", "bot.py"), encoding="utf-8").read()
-ROUTE = BOT[BOT.index('if self.path == "/api/app/ask"'):]
-ROUTE = ROUTE[:ROUTE.index('if self.path == "/api/app/automation" and self.command == "POST"')]
-CODE = "\n".join(l for l in ROUTE.splitlines() if not l.strip().startswith("#"))
-check("identity is checked before the question is answered",
-      CODE.index("_telegram_identity") < CODE.index("_k_cp.answer("),
-      "the import line naturally comes first; the CALL is what must come after")
-check("a denied caller is refused", "_telegram_denied" in CODE)
-check("the chat id comes from the signature", '_k_chat = str(_k_user["id"])' in CODE)
-check("only the question is read from the body",
-      '.get("q")' in CODE and '"user_id"' not in CODE and '"chat_id"' not in CODE)
-check("the question is length-bounded", "[:500]" in CODE and "> 4096" in CODE)
-check("the endpoint is rate limited", "http_security.MINIAPP.check" in CODE)
-check("...and shares the per-user AI budget", "_k_cm.allow(_k_chat)" in CODE,
-      "a flood here must not starve the trading loop of shared quota")
-RX = re.compile(r'^\s+([a-z][\w]*) = (?!=)', re.M)
-check("every route local is prefixed",
-      not {m.group(1) for m in RX.finditer(CODE)})
-
-print("\n9. The answer is escaped before it reaches the DOM")
-HTML = open(os.path.join(ROOT, "apex", "static", "terminal.html"), encoding="utf-8").read()
-check("the question is escaped when echoed", "esc(q)" in HTML)
-check("the answer text is escaped", "esc(d.text" in HTML)
-check("the kind is escaped too", "esc(kind)" in HTML)
-check("the kind is shown as a label", 'class="kind ' in HTML)
 
 print("\n" + "=" * 50)
 _redis.terminate()

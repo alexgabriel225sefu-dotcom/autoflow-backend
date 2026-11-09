@@ -21,7 +21,7 @@ The owner has now chosen the commercial shape: demo access stays free and the pa
 `apex/platform/licence.py::grant()` existed and had **no production caller**.
 A buyer paid and the platform learned nothing about it.
 
-There is also `apex/stripe_license.py`, a Telegram-era handler keyed by
+There is also `apex/stripe_license.py`, a the web app-era handler keyed by
 `chat_id`. It verifies signatures and claims event ids, and those two
 mechanisms were worth reusing. It is **not** wired to the platform licence
 store, and deliberately so: that store is keyed by the Supabase user id, and

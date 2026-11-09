@@ -6,7 +6,7 @@ from dotenv import find_dotenv, load_dotenv
 # Without this there is no way to answer "where did this credential come
 # from", and that question came up for real: the bot was trading on a Groq
 # key the account owner could not find in Render's environment variables or
-# in Telegram. A key of unknown origin is a key nobody can rotate, revoke, or
+# in the platform. A key of unknown origin is a key nobody can rotate, revoke, or
 # reason about — the provenance matters even when the value is fine.
 #
 # Render mounts Secret Files onto the filesystem, and they are listed in a
@@ -41,7 +41,7 @@ SUPPORTED_BROKERS = ["ctrader"]
 class UnsupportedBroker(RuntimeError):
     """BROKER names an execution path this build does not have.
 
-    SUPPORTED_BROKERS said ["ctrader"] and one Telegram command checked it, but
+    SUPPORTED_BROKERS said ["ctrader"] and one the platform command checked it, but
     nothing stopped the environment from setting BROKER=mt or BROKER=oanda —
     the engine simply took a different branch. That is the wrong shape for a
     trading system: an unsupported broker is not a degraded mode, it is a
@@ -151,9 +151,7 @@ AI_GATEWAY_MODEL = os.getenv("AI_GATEWAY_MODEL", "").strip() or "auto"
 AI_GATEWAY_TIMEOUT_S = float(os.getenv("AI_GATEWAY_TIMEOUT_S", "20"))
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-# ─── Telegram ───────────────────────────────────────────
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+# ─── Operator dashboard ─────────────────────────────────
 DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")
 
 # ─── Scalping mode ──────────────────────────────────────
@@ -204,10 +202,6 @@ BOT_NAME = os.getenv("BOT_NAME") or "Apex4Traders"
 # that actually receives mail; set SUPPORT_EMAIL the day an @apex4traders
 # one exists and every message follows.
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL") or "supportaicashsystem@gmail.com"
-# The bot's @username, used to build the deep link an ad click is redirected
-# into. Wrong value here sends every paid click to a bot that is not this one,
-# so it is configurable rather than guessed.
-TELEGRAM_BOT_USERNAME = (os.getenv("TELEGRAM_BOT_USERNAME") or "FOREX_APEX_BOT").lstrip("@")
 ASSET_EMOJI = os.getenv("ASSET_EMOJI") or "💱"
 ASSET_NOUN = os.getenv("ASSET_NOUN") or "forex"
 LICENSE_PRODUCT = os.getenv("LICENSE_PRODUCT") or "apex-forex"

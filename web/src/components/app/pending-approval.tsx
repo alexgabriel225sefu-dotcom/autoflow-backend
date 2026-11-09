@@ -6,7 +6,7 @@
  *
  * The engine has an automation level called Approval Required: it finds a
  * setup, proposes it, and places nothing until a person agrees. The only
- * place that proposal could ever be answered was a Telegram chat — so for a
+ * place that proposal could ever be answered was a the web app chat — so for a
  * client of this platform the level meant a loop that found setups, wrote a
  * proposal nobody could see, and waited forever while the dashboard said
  * Running. This card is the answer half. `GET approvals` is the question.

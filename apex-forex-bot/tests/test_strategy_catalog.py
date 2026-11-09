@@ -2,7 +2,7 @@
 
 WHAT WAS WRONG
 
-The engine ships fifteen strategies in a registry. A Telegram client picked
+The engine ships fifteen strategies in a registry. A platform client picked
 one off a menu. A platform client could not pick any: `engine_config.translate`
 writes `applied["strategy"] = RULE_STRATEGY_ID` for every rule, so the only
 way to trade here was to write a rule from scratch — and the owner's

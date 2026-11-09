@@ -1,10 +1,10 @@
-"""Every refused entry must be able to reach Telegram, without spamming it.
+"""Every refused entry must be able to reach the platform, without spamming it.
 
 _skip() wrote to the dashboard and nowhere else. Of the 25 places that refuse
 an entry, six ever alerted — and the HTF gate, which does most of the
 refusing, was not one of them. A client watching their phone saw the bot go
 quiet for a day with no explanation. Live proof: eight HTF refusals in one
-night, zero Telegram messages.
+night, zero the platform messages.
 
 Those six also shared one `last_warn_tick`, so a "market too quiet" notice at
 08:00 silenced a spread warning at 08:05 and an EV veto at 08:10 for three
@@ -142,7 +142,7 @@ check("and is three hours", user_loop._SKIP_ALERT_COOLDOWN_S == COOLDOWN,
 
 print("\n── the focus symbol must be persisted, not only shown ──")
 # Auto-Pilot rotated dash["symbol"] but never the stored user["symbol"].
-# Telegram reads the STORED one, so /status, /chart and a bare /buy all used
+# the platform reads the STORED one, so /status, /chart and a bare /buy all used
 # whatever pair the record was last left on — live, the dashboard said XAUUSD
 # while the record still said AUDUSD. A manual buy would have opened on an
 # instrument the bot had not looked at in hours.
@@ -155,7 +155,7 @@ user_store.update(UID, {"symbol": "AUDUSD"})
 def focus(sym, dash):
     """Mirrors the corrected _focus helper."""
     dash["symbol"] = sym
-    if (user_store.load(UID).get("symbol") or "").upper().replace("_", "") \
+    if (user_store.load(UID).get("symbol") or "").upper().replace("_", "")\
             != sym.upper().replace("_", ""):
         user_store.update(UID, {"symbol": sym})
 

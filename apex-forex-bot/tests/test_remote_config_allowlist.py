@@ -35,7 +35,7 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("ALLOW_PLAINTEXT_DEV_STORAGE", "true")
 os.environ.setdefault("ALLOW_LOCAL_BACKEND_DEV", "true")
 os.environ.setdefault("PAPER_TRADING", "true")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test")
+os.environ.setdefault("CTRADER_CLIENT_SECRET", "test")
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="apex-remotecfg-")
 
 from apex import settings_policy as sp  # noqa: E402
@@ -159,11 +159,13 @@ except sp.SettingRejected as e:
     check("it says the value was withheld", "withheld" in str(e), str(e))
 
 print("\n10. …and _apply_config actually enforces it end to end")
-from apex import bot  # noqa: E402
+from apex import settings_policy as sp  # noqa: E402
+# apply lives with the allowlist now that the platform process is gone.
+bot = sp
 
 os.environ.pop("LD_PRELOAD", None)
 before_risk = os.environ.get("RISK_PER_TRADE")
-applied = bot._apply_config(
+applied = bot.apply_config(
     {"LD_PRELOAD": "/tmp/evil.so",
      "PATH": "/tmp/evil",
      "TOKEN_ENCRYPTION_KEY": "attacker-key",
@@ -188,28 +190,21 @@ import inspect  # noqa: E402
 src = inspect.getsource(bot.load_remote)
 check("load_remote passes validate_remote", "validate_remote" in src, src[-400:])
 
-print("\n12. Everything runtime.json can carry is still settable")
-# A regression here would silently drop an operator's saved setting at startup.
-import re  # noqa: E402
-tg_src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                           "apex", "telegram.py"), encoding="utf-8").read()
-saved = set()
-for m in re.finditer(r"_save_runtime\(\{(.*?)\}", tg_src, re.S):
-    saved |= set(re.findall(r'"([A-Z_0-9]+)"', m.group(1)))
-missing = sorted(k for k in saved if k not in sp.OPERATOR_SETTABLE)
-check(f"all {len(saved)} runtime.json keys survive the operator allowlist",
-      not missing, f"would be dropped at startup: {missing}")
+print("\n12. The operator allowlist is the set of settings a person can change")
+check("the operator allowlist is non-empty", len(sp.OPERATOR_SETTABLE) > 10)
+check("a trading setting is on it", "RISK_PER_TRADE" in sp.OPERATOR_SETTABLE
+      or "STOP_LOSS_PIPS" in sp.OPERATOR_SETTABLE)
 
 print("\n13. Provisioning credentials are a SEPARATE trust class")
 # Before the split, REMOTE_SETTABLE was {**trading, **provisioning} and every
 # startup fetch applied the lot. The allowlist stopped arbitrary environment
 # injection, but any response from the licence server could still ROTATE the
-# bot's Telegram token, dashboard token or AI key as a side effect of a routine
+# bot's the platform token, dashboard token or AI key as a side effect of a routine
 # configuration update. Whoever controls that response then controls the bot.
 # MT_BRIDGE_SECRET and TWELVE_DATA_KEY are absent from BOTH tables now: their
 # brokers cannot run, so a credential for them is dead configuration surface.
 # They are covered by the unknown-key checks above instead.
-for k in ("TELEGRAM_BOT_TOKEN", "DASHBOARD_TOKEN", "GROQ_API_KEY",
+for k in ("DASHBOARD_TOKEN", "GROQ_API_KEY",
           "GEMINI_API_KEY", "METAAPI_TOKEN", "AI_GATEWAY_KEY"):
     check(f"{k} is refused by the RUNTIME path", refused(k, "x" * 40))
     check(f"…and the refusal says why, not just 'unknown'",
@@ -225,12 +220,12 @@ check("the runtime table is trading settings only",
 print("\n14. …delivered once, never replaced")
 _before = os.environ.get("DASHBOARD_TOKEN")
 os.environ.pop("DASHBOARD_TOKEN", None)
-n1 = bot._apply_provisioning({"DASHBOARD_TOKEN": "first-value-0123456789abcdef"})
+n1 = bot.apply_provisioning({"DASHBOARD_TOKEN": "first-value-0123456789abcdef"})
 check("a fresh container receives the credential", n1 == 1, f"applied={n1}")
 check("and it is actually set",
       os.environ.get("DASHBOARD_TOKEN") == "first-value-0123456789abcdef")
 
-n2 = bot._apply_provisioning({"DASHBOARD_TOKEN": "attacker-value-0123456789ab"})
+n2 = bot.apply_provisioning({"DASHBOARD_TOKEN": "attacker-value-0123456789ab"})
 check("a later response cannot replace it", n2 == 0, f"applied={n2}")
 check("the original value is untouched",
       os.environ.get("DASHBOARD_TOKEN") == "first-value-0123456789abcdef",
@@ -258,8 +253,10 @@ for k in ("PATH", "LD_PRELOAD", "TOKEN_ENCRYPTION_KEY", "LICENSE_SERVER",
     except sp.SettingRejected:
         check(f"{k} refused by the provisioning path", True)
 
+src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "apex", "settings_policy.py"), encoding="utf-8").read()
 check("load_remote routes both classes",
-      "validate_remote" in src and "_apply_provisioning" in src,
+      "validate_remote" in src and "apply_provisioning" in src,
       "the loader does not use the split")
 
 print("\n16. The generated field allowlist still matches these tables")

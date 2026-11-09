@@ -50,7 +50,7 @@ Neither store alone is enough, and they are the two that already exist.
                      history does not live here — a busy week of signals would
                      otherwise evict "your broker account was disconnected".
 
-Nothing here reaches Telegram, deliberately: see notifications.py.
+Nothing here reaches the platform, deliberately: see notifications.py.
 """
 
 import math

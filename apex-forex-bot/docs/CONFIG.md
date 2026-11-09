@@ -2,13 +2,13 @@
 
 Settings come from three places (highest priority first):
 
-1. **Telegram commands** — saved to `runtime.json`, survive restarts
+1. **the web app commands** — saved to `runtime.json`, survive restarts
 2. **Environment variables** — Railway Variables tab or `.env` file
 3. **Built-in defaults** — listed below
 
 ---
 
-## Telegram commands
+## the web app commands
 
 | Command | What it does |
 |---|---|
@@ -50,12 +50,12 @@ Settings come from three places (highest priority first):
 | `GROQ_API_KEY` | — | Free at [console.groq.com](https://console.groq.com). At least one AI key required. |
 | `ANTHROPIC_API_KEY` | — | Optional. Used first if set; Groq is the fallback. |
 
-## Telegram
+## the web app
 
 | Variable | Default | Description |
 |---|---|---|
-| `TELEGRAM_BOT_TOKEN` | — | From [@BotFather](https://t.me/BotFather) |
-| `TELEGRAM_CHAT_ID` | — | From [@userinfobot](https://t.me/userinfobot) |
+| `the retired bot token` | — | From [@BotFather](https://the-retired-chat/BotFather) |
+| `the retired chat id` | — | From [@userinfobot](https://the-retired-chat/userinfobot) |
 | `DASHBOARD_URL` | — | Public URL shown in alerts (optional) |
 
 ## Risk management

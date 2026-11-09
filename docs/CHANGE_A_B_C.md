@@ -29,7 +29,7 @@ was flagged, but worse than it looked.
 **Requirement:** the list is computed **lazily, inside the validation**, not at
 import.
 
-**Existing precedent in the code:** `telegram.py:3699` already does
+**Existing precedent in the code:** `the retired chat module:3699` already does
 `{sid: sid for sid in strategy_api.available()}` **inside**
 `_handle_strategy()`, at call time. Same pattern.
 
@@ -41,7 +41,7 @@ import.
 | `strategy_modules.py:48` | `signal()` | `self.stamp(verdict)` | ❌ |
 | `strategy_modules.py:58` | `advise_risk()` | `own.get(...)` | ❌ AttributeError |
 | `strategy_modules.py:81` | `exit()` | `verdict.get(...)` | ❌ AttributeError |
-| `telegram.py:3626,3635` | `_sim_strategy()` | `sx.get(...)` | ❌ AttributeError |
+| `the retired chat module:3626,3635` | `_sim_strategy()` | `sx.get(...)` | ❌ AttributeError |
 | `scanner.py:143` | `scan_symbol()` | `... or {}` inside `try` | ✅ safe |
 
 **Consequence:** "return `None`" is not the right shape — it would turn an
@@ -121,7 +121,7 @@ string. Plus `test_strategy_equivalence.py`, `test_client_experience.py`.
 
 **Modified:** `apex/ai.py:1053-1055` (`signal_for_mode`).
 **Plus, only in the C-exception variant:** `ai.py:217`,
-`strategy_modules.py:48/58/81`, `telegram.py:3626/3635`.
+`strategy_modules.py:48/58/81`, `the retired chat module:3626/3635`.
 
 **New test:** `tests/test_signal_for_mode_refuses.py`
 - unknown mode → refusal, never a mean-reversion verdict
@@ -156,7 +156,7 @@ three places.
 | `apex/user_loop.py` | | ✏️ | |
 | `apex/ai.py` | | | ✏️ |
 | `apex/strategy_modules.py` | | | ✏️ C-exception only |
-| `apex/telegram.py` | | | ✏️ C-exception only |
+| `the retired chat module` | | | ✏️ C-exception only |
 
 **New tests:** 4. **Existing tests to re-check:** 10.
 **Untouched, confirmed:** `gates.py`, `public/`, the environment settings.
