@@ -49,7 +49,7 @@ describe("BuyButton", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(screen.getByRole("button", { name: /buy founder access/i }));
     await waitFor(() => expect(navigate).toHaveBeenCalledTimes(1));
-    expect(api).toHaveBeenCalledWith("billing/checkout", { method: "POST", body: { acknowledgedTrial: true } });
+    expect(api).toHaveBeenCalledWith("billing/checkout", { method: "POST", body: { immediateAccessConsent: true } });
     expect(navigate.mock.calls[0][0]).toContain("client_reference_id=user-1");
   });
 
@@ -67,19 +67,27 @@ describe("BuyButton", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it("cannot be bought until the buyer confirms they tried the demo", () => {
+  it("cannot start until the withdrawal waiver is ticked", () => {
     api.mockReset();
     render(<BuyButton open navigate={vi.fn()} />);
+    const box = screen.getByRole("checkbox");
+    expect(box).toHaveProperty("checked", false);
     const buy = screen.getByRole("button", { name: /buy founder access/i });
     expect(buy).toHaveProperty("disabled", true);
     fireEvent.click(buy);
     expect(api).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(box);
     expect(buy).toHaveProperty("disabled", false);
+    fireEvent.click(box);
+    expect(box).toHaveProperty("checked", false);
+    expect(buy).toHaveProperty("disabled", true);
   });
 
-  it("keeps the buyer's statutory rights in the wording", () => {
+  it("uses the article 16(m) waiver, unticked, as the only checkbox", () => {
     render(<BuyButton open navigate={vi.fn()} />);
-    expect(screen.getByText(/refund right the law gives me stays/i)).toBeTruthy();
+    expect(screen.getByRole("checkbox", {
+      name: "I request immediate access to the licence and acknowledge that I lose my 14-day right of withdrawal once access is granted.",
+    })).toBeTruthy();
+    expect(screen.queryByText(/refund right the law gives me stays/i)).toBeNull();
   });
 });

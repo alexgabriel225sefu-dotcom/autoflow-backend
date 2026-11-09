@@ -145,6 +145,23 @@ describe("the statements the product must make", () => {
     expect(terms).toMatch(pattern);
   });
 
+  it("the refund rule is decided, not left as something still to confirm", () => {
+    const note = "Licence purchases are final and non-refundable once access is granted, except where required by law.";
+    const waiver = "I request immediate access to the licence and acknowledge that I lose my 14-day right of withdrawal once access is granted.";
+    const demo = "Demo conditions (fills, spreads, slippage) can differ from live trading.";
+    const copy = FILES.find((f) => f.path === "content/refund-policy.ts")!.body;
+    expect(copy).toContain(note);
+    expect(copy).toContain(waiver);
+    expect(copy).toContain(demo);
+    for (const path of ["app/terms/page.tsx", "app/refunds/page.tsx"]) {
+      const body = FILES.find((f) => f.path === path)!.body;
+      expect(body, path).toContain("refund-policy");
+      expect(body, path).not.toContain("TO BE CONFIRMED — refund");
+      expect(body, path).not.toContain("TO BE CONFIRMED — whether a customer may request a refund");
+      expect(body, path).not.toMatch(/refund policy is a draft/i);
+    }
+  });
+
   it("the terms, refund policy and tax notice are marked as unpublished drafts", () => {
     const shell = FILES.find((f) => f.path === "components/legal/draft-shell.tsx")!.body;
     for (const token of ["COMPANY_NAME", "REGISTRATION_NUMBER", "ADDRESS", "JURISDICTION", "VAT"]) {

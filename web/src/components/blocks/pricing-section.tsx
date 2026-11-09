@@ -24,6 +24,7 @@ import {
   type PublicOffer,
 } from "@/lib/api";
 import { PricingCards, type PricingPlan } from "@/components/ui/pricing-cards";
+import { RefundPolicyNote } from "@/components/legal/refund-policy-note";
 
 /** What the paid plan includes. Capability, never outcome. */
 const FOUNDER_FEATURES = [
@@ -144,6 +145,7 @@ export function PricingSection() {
           <p className="text-sm text-muted-foreground">Loading the current price&hellip;</p>
         </div>
       )}
+      <RefundPolicyNote className="mt-6 text-sm text-muted-foreground" />
     </section>
   );
 }

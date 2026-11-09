@@ -510,6 +510,21 @@ def _dispatch(method, route, headers, body, query=None):
             return _err(e.status, e.code, _safe_error(e), offer=offer)
         return _ok(started, offer=offer)
 
+    # The durable copy of the withdrawal waiver. Written before checkout
+    # and completed when access is granted. Authenticated: it names the
+    # account. It does not start a payment and does not change the gates.
+    if route == "billing/purchase-confirmation":
+        if method != "GET":
+            return _err(405, "METHOD_NOT_ALLOWED", f"{method} not allowed")
+        p = _authenticate(headers)
+        try:
+            return _ok(_billing.purchase_confirmation_public(p.user_id))
+        except Exception as exc:                             # noqa: BLE001
+            print(f"[API] purchase confirmation could not be read "
+                  f"({type(exc).__name__})")
+            return _err(503, "STORE_UNAVAILABLE",
+                        "the purchase confirmation could not be read")
+
     if route == "ctrader/callback" and method == "GET":
         return _ok(_link.handle_callback(query or {}), pendingOnly=True)
 

@@ -1,4 +1,6 @@
 "use client";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRead } from "@/lib/use-api";
 import {
   ErrorNotice, ExecutionBadge, LicencePill, PlanNotice, Spinner, TrialNotice,
@@ -7,8 +9,12 @@ import Link from "next/link";
 import { formatOfferPrice, type Me, type PublicOffer } from "@/lib/api";
 import { liveNotice } from "@/components/app/live-access";
 import { BuyButton } from "@/components/app/buy-button";
+import { PurchaseConfirmation } from "@/components/app/purchase-confirmation";
+import { RefundPolicyNote } from "@/components/legal/refund-policy-note";
 
-export default function LicensePage() {
+function LicensePageInner() {
+  const params = useSearchParams();
+  const justPaid = params.get("checkout") === "success";
   const me = useRead<Me>("me");
   // The price is read, never written here. This paragraph used to spell it
   // out, which made the page a second source of truth: billing.offer_drift()
@@ -100,9 +106,11 @@ export default function LicensePage() {
                 : "Live purchase is not yet open."}{" "}
               Live trading is not available in this release.
             </p>
+            <RefundPolicyNote className="muted" style={{ fontSize: ".85rem" }} />
             <div className="btn-row" style={{ marginTop: "var(--sp-3)" }}>
               <BuyButton open={purchaseOpen === true} />
             </div>
+            <PurchaseConfirmation justPaid={justPaid} />
           </div>
 
           {me.result.data.licence.state === "revoked" ? (
@@ -117,5 +125,17 @@ export default function LicensePage() {
         </section>
       ) : null}
     </main>
+  );
+}
+
+/**
+ * useSearchParams needs a Suspense boundary, the same as the sign-in page.
+ * Without one the licence screen cannot be prerendered.
+ */
+export default function LicensePage() {
+  return (
+    <Suspense fallback={<main><p className="muted" role="status">Loading…</p></main>}>
+      <LicensePageInner />
+    </Suspense>
   );
 }

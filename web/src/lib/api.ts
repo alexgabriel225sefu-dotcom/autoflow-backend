@@ -355,6 +355,20 @@ export type Me = {
   operator?: boolean;
 };
 
+/**
+ * The withdrawal-waiver record. `confirmation` is the receipt text the
+ * server stored: the statement, the account, the time and the policy version.
+ */
+export type PurchaseConfirmation = {
+  recorded: boolean;
+  userId?: string;
+  policyVersion?: string;
+  consentedAt?: number;
+  statement?: string;
+  accessGrantedAt?: number | null;
+  confirmation?: string;
+};
+
 export type CtAccount = { ctid: number | string; mode: "demo" | "live"; label?: string };
 export type CtraderStatus = {
   connected: boolean;

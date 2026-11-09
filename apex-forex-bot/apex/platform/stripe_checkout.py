@@ -24,7 +24,6 @@ the ``client_reference_id`` from the URL.
 import json
 import os
 import urllib.error
-import time
 import urllib.parse
 import urllib.request
 
@@ -203,12 +202,13 @@ def _session_url(raw):
 
 
 def create_checkout_session(user_id, *, email=None, transport=None,
-                            acknowledged_at=None):
+                            consent=None):
     """Create one Checkout Session. Raises CheckoutError. Does not grant."""
     if not session_configured():
         raise CheckoutError(
             "CHECKOUT_NOT_IMPLEMENTED", "Not on sale yet", status=501)
     from apex.platform import billing as billing
+    from apex.platform import refund_policy as rp
     uid = str(user_id or "").strip()
     if not uid:
         raise CheckoutError("NO_USER", "a signed-in user is required", status=401)
@@ -222,9 +222,12 @@ def create_checkout_session(user_id, *, email=None, transport=None,
         "line_items[0][quantity]": "1",
         f"metadata[{billing.USER_META_KEY}]": uid,
     }
-    if acknowledged_at is not None:
-        # When the buyer confirmed they had tried the demo, kept on the payment.
-        form["metadata[acknowledgedTrialAt]"] = str(int(acknowledged_at))
+    if isinstance(consent, dict):
+        # The waiver the buyer gave before this session was created. Stripe
+        # keeps it on the payment; the account record is the other copy.
+        form[f"metadata[{rp.META_AT}]"] = str(int(consent["consentedAt"]))
+        form[f"metadata[{rp.META_VERSION}]"] = str(consent["policyVersion"])
+        form[f"metadata[{rp.META_USER}]"] = str(consent["userId"])
     mail = str(email or "").strip()
     if mail:
         form["customer_email"] = mail
@@ -255,21 +258,38 @@ def start_checkout(principal, body=None, *, transport=None):
     if method not in ("", "auto", "payment_link", "session"):
         raise CheckoutError(
             "BAD_METHOD", "method must be payment_link or session", status=400)
-    # A buyer confirms they have tried the free demo and understand what they are
-    # paying for. Required only once a purchase could really start, so a
-    # deployment that is not on sale still answers "Not on sale yet".
-    acknowledged = isinstance(body, dict) and body.get("acknowledgedTrial") is True
-    if purchase_ready() and not acknowledged:
+    # Article 16(m): checkout cannot start until the buyer requests immediate
+    # access and acknowledges the loss of the 14-day withdrawal right. Only a
+    # literal true counts. Required only once a purchase could really start,
+    # so a deployment that is not on sale still answers "Not on sale yet".
+    # The checkout flags themselves are not changed here.
+    consented = (isinstance(body, dict)
+                 and body.get("immediateAccessConsent") is True)
+    if purchase_ready() and not consented:
         raise CheckoutError(
-            "ACKNOWLEDGEMENT_REQUIRED",
-            "confirm that you have tried the free demo and understand the "
-            "purchase before paying", status=400)
-    ack_at = time.time() if acknowledged else None
-    uid = str(getattr(principal, "user_id", "") or "")
+            "WITHDRAWAL_CONSENT_REQUIRED",
+            "checkout cannot start until you request immediate access and "
+            "acknowledge that you lose your 14-day right of withdrawal once "
+            "access is granted",
+            status=400)
+    uid = str(getattr(principal, "user_id", "") or "").strip()
     email = getattr(principal, "email", None)
+    consent = None
+    if purchase_ready() and consented:
+        if not uid:
+            raise CheckoutError(
+                "NO_USER", "a signed-in user is required", status=401)
+        from apex.platform import billing as billing
+        try:
+            consent = billing.record_withdrawal_consent(uid)
+        except Exception as exc:                             # noqa: BLE001
+            raise CheckoutError(
+                "CHECKOUT_FAILED",
+                "checkout could not be prepared — try again shortly",
+                status=503) from exc
     if method == "session" or (method in ("", "auto") and not payment_link_base()):
         url = create_checkout_session(uid, email=email, transport=transport,
-                                      acknowledged_at=ack_at)
+                                      consent=consent)
         return {"url": url, "kind": "checkout_session"}
     url = payment_link_for(uid, email)
     if not url:
@@ -280,7 +300,7 @@ def start_checkout(principal, body=None, *, transport=None):
     # the e-mail Stripe collects matches theirs (billing._trusted_user_of).
     from apex.platform import billing as billing
     try:
-        billing.record_link_intent(uid, email, acknowledged_at=ack_at)
+        billing.record_link_intent(uid, email, consent=consent)
     except Exception as exc:                                 # noqa: BLE001
         raise CheckoutError(
             "CHECKOUT_FAILED",

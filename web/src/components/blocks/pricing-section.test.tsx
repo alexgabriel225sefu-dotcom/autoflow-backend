@@ -111,6 +111,17 @@ describe("the call to action", () => {
     expect(screen.queryByRole("link", { name: /get founder access/i })).toBeNull();
   });
 
+  it("states the decided refund rule and that demo is not live", async () => {
+    publicApi.mockResolvedValue(answer({}));
+    render(<PricingSection />);
+    await screen.findByText("Free");
+    expect(screen.getByText(/You get a free 14-day demo to test Apex4Traders before buying/)).toBeTruthy();
+    expect(screen.getByText(/Licence purchases are final and non-refundable once access is granted, except where required by law/)).toBeTruthy();
+    expect(screen.getByText(/Demo conditions \(fills, spreads, slippage\) can differ from live trading/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Refund policy" }).getAttribute("href")).toBe("/refunds");
+    expect(document.body.textContent).not.toMatch(/identical to live/i);
+  });
+
   it("always offers the free demo, which needs no payment", async () => {
     publicApi.mockResolvedValue(answer({}));
     render(<PricingSection />);
