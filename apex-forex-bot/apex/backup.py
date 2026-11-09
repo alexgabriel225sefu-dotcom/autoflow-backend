@@ -52,7 +52,6 @@ Usage:
     python -m apex.backup verify < apex-backup-2026-08-15.json
 """
 import json
-import re
 import sys
 import time
 
@@ -303,6 +302,16 @@ def verify(snapshot):
             and not (snapshot.get("access") or snapshot.get("journals")):
         problems.append("snapshot is empty — no users and no platform state")
 
+    def _parse_unique_object(raw):
+        def pairs(items):
+            obj = {}
+            for name, value in items:
+                if name in obj:
+                    raise ValueError(f"duplicate JSON field {name!r}")
+                obj[name] = value
+            return obj
+        return json.loads(raw, object_pairs_hook=pairs)
+
     for key, raw in (plat.get("strings") or {}).items():
         if not isinstance(raw, str):
             problems.append(f"platform {key} is not a stored string")
@@ -311,10 +320,18 @@ def verify(snapshot):
         # user records above: a backup that decrypted on the way out is a
         # credential file.
         if ":ctrader:" in key:
+            try:
+                record = _parse_unique_object(raw)
+            except (TypeError, ValueError) as exc:
+                problems.append(f"platform {key}: invalid broker record ({exc})")
+                continue
             for field in ("accessToken", "refreshToken", "groq_key",
                           "gemini_key", "anthropic_key", "ctrader_accounts"):
-                m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', raw)
-                if m and m.group(1) and not m.group(1).startswith(user_store._ENC_PREFIX):
+                value = record.get(field)
+                if value in (None, [], {}, ""):
+                    continue
+                if not (isinstance(value, str) and
+                        value.startswith(user_store._ENC_PREFIX)):
                     problems.append(
                         f"platform {key}: {field} is NOT encrypted in this backup")
     return (not problems), problems

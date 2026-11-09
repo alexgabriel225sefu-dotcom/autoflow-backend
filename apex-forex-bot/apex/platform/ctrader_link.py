@@ -264,7 +264,7 @@ def _code_digest(code: str) -> str:
 
 def _callback_result(rec):
     """Return the callback hand-off without exposing the parked token."""
-    proof = user_store.decrypt_value(rec.get("finishToken") or "")
+    proof = user_store.decrypt_value(rec.get("finishToken") or "", fail_closed=True)
     out = {"nonce": rec.get("nonce")}
     if proof:
         out["finishToken"] = proof
@@ -527,7 +527,7 @@ def _complete(user_id, nonce, *, proof=None, now=None, lister=None, ctx=None):
         raise LinkError("STATE_EXPIRED",
                         "this connection attempt has expired — start again")
 
-    expected = user_store.decrypt_value(rec.get("finishToken") or "")
+    expected = user_store.decrypt_value(rec.get("finishToken") or "", fail_closed=True)
     # The public API requires proof before it calls this function. Keeping the
     # argument optional here preserves trusted in-process maintenance callers;
     # an external request can never reach this branch without the API check.
@@ -540,7 +540,7 @@ def _complete(user_id, nonce, *, proof=None, now=None, lister=None, ctx=None):
     # Already encrypted by the callback, and moved across without a decrypt
     # and re-encrypt round trip.
     access_enc = rec.get("accessToken") or ""
-    access = user_store.decrypt_value(access_enc)
+    access = user_store.decrypt_value(access_enc, fail_closed=True)
     if not access:
         raise LinkError("NO_TOKEN",
                         "the access token from the callback is missing")
@@ -938,10 +938,10 @@ def access_token_for(user_id, *, now=None, refresher=None, skew_s=120):
     exp = rec.get("expiresAt")
     fresh_enough = exp is None or float(exp) - now > skew_s
     if fresh_enough:
-        tokv = user_store.decrypt_value(rec.get("accessToken") or "")
+        tokv = user_store.decrypt_value(rec.get("accessToken") or "", fail_closed=True)
         if tokv:
             return tokv
-    refresh = user_store.decrypt_value(rec.get("refreshToken") or "")
+    refresh = user_store.decrypt_value(rec.get("refreshToken") or "", fail_closed=True)
     if not refresh:
         raise LinkError("REFRESH_UNAVAILABLE",
                         "the access token has expired and there is no refresh "

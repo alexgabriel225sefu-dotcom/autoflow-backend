@@ -246,6 +246,24 @@ try:
     check("and says which field",
           any("accessToken is NOT encrypted" in p for p in probs_leak),
           probs_leak)
+    leaked_platform_accounts = json.loads(json.dumps(snap_ct))
+    leaked_platform_accounts["platform"]["strings"][_pfx + f"ctrader:{OWNER}"] = json.dumps(
+        {"accessToken": user_store.encrypt_value("access-value"),
+         "refreshToken": user_store.encrypt_value("refresh-value"),
+         "ctrader_accounts": [{"ctid": 501, "live": False}]})
+    ok_list_leak, probs_list_leak = backup.verify(leaked_platform_accounts)
+    check("a plaintext platform account list is refused", not ok_list_leak)
+    check("and names the list field",
+          any("ctrader_accounts is NOT encrypted" in p for p in probs_list_leak),
+          probs_list_leak)
+    duplicate = json.loads(json.dumps(snap_ct))
+    duplicate["platform"]["strings"][_pfx + f"ctrader:{OWNER}"] = (
+        '{"accessToken":"enc:first","accessToken":"plaintext"}')
+    ok_duplicate, probs_duplicate = backup.verify(duplicate)
+    check("duplicate broker JSON fields are refused", not ok_duplicate)
+    check("and the duplicate is named", any("duplicate JSON field" in p
+                                              for p in probs_duplicate),
+          probs_duplicate)
     leaked_user = {"groq_key": "plain-ai-key",
                    "ctrader_accounts": [{"ctid": 47765456, "live": False}]}
     ok_user_leak, probs_user_leak = backup.verify(

@@ -203,6 +203,16 @@ check("a plaintext account list is absent in production",
       blocked.get("ctrader_accounts") is None)
 check("the refusal does not echo a token or account id",
       TOKEN not in blocked_output and "1000000002" not in blocked_output)
+old_is_production = us._is_production
+us._is_production = lambda: True
+try:
+    runtime_plain = us.decrypt_value(TOKEN, fail_closed=True)
+    runtime_compat = us.decrypt_value("legacy-not-a-broker-secret")
+finally:
+    us._is_production = old_is_production
+check("platform runtime token reads fail closed in production", runtime_plain == "")
+check("generic legacy values retain their explicit compatibility path",
+      runtime_compat == "legacy-not-a-broker-secret")
 
 # ── 4. a corrupted or unopenable value reads as ABSENT, never as itself ────
 # The requirement that matters for correctness: callers do

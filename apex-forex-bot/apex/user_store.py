@@ -188,13 +188,21 @@ def encrypt_value(value):
     return _ENC_PREFIX + _fernet.encrypt(value.encode()).decode()
 
 
-def decrypt_value(value):
-    """Inverse of encrypt_value. Plaintext (legacy, or no key) passes through.
+def decrypt_value(value, *, fail_closed=False):
+    """Inverse of encrypt_value.
+
+    ``fail_closed`` is for broker/runtime credentials. It lets non-sensitive
+    legacy values keep their compatibility path while production broker reads
+    refuse an unmigrated plaintext token.
 
     Returns "" for a value that IS encrypted but cannot be opened — a missing
     or rotated key must not hand a caller ciphertext to use as a credential.
     """
     if not isinstance(value, str) or not value.startswith(_ENC_PREFIX):
+        if fail_closed and value and _is_production():
+            print("[Store] ⛔ a legacy plaintext runtime secret was refused in "
+                  "production — run the sensitive-record migration")
+            return ""
         return value
     if not _fernet:
         print("[Store] ⛔ a runtime secret is encrypted but TOKEN_ENCRYPTION_KEY "
@@ -286,11 +294,12 @@ def _decrypt_sensitive(data: dict) -> dict:
     return data
 
 
-def _raw_user_record(user_id):
+def _raw_user_record(user_id, *, strict=False):
     """Read one record without decrypting it, for maintenance operations."""
     user_id = str(user_id)
     if _USE_REDIS:
-        raw = _redis_get(f"{_NS}:user:{user_id}")
+        getter = _redis_get_strict if strict else _redis_get
+        raw = getter(f"{_NS}:user:{user_id}")
         if not raw:
             return {}
         try:
@@ -329,13 +338,20 @@ def migrate_sensitive_record(user_id, *, strict=True):
     without a read racing a concurrent OAuth or account update.
     """
     user_id = str(user_id)
-    raw = _raw_user_record(user_id)
+    raw = _raw_user_record(user_id, strict=True)
     if not raw or not _has_plaintext_sensitive(raw):
         return False
     if not _fernet:
         raise EncryptionNotConfigured(
             "cannot migrate plaintext sensitive data without TOKEN_ENCRYPTION_KEY")
-    expected = int(raw.get("_v") or 0)
+    if _USE_REDIS:
+        version_raw = _redis_get_strict(_vkey(user_id))
+        try:
+            expected = int(version_raw)
+        except (TypeError, ValueError):
+            expected = 0
+    else:
+        expected = int(raw.get("_v") or 0)
     if not save(user_id, raw, strict=strict, expect_version=expected):
         return False
     return True
