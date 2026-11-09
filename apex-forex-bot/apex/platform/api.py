@@ -1214,10 +1214,23 @@ def _dispatch(method, route, headers, body, query=None):
 
 
 def _roadmap_analysis(route, payload, *, user_id=None):
-    """The read-only analysis routes. Pure computation over the posted
-    snapshot; none of them reaches a broker or an order path."""
+    """The read-only analysis routes.
+
+    Candle snapshots are supplied by the caller, but rule documents are
+    always resolved from that caller's store. This keeps the calculation
+    deterministic without trusting a browser copy of trading terms, and none
+    of these routes reaches an order or close path.
+    """
     if route == "backtest":
         from apex.platform import backtest as _backtest
+        # The browser may choose a rule id, but it must never be allowed to
+        # post an executable-looking rule document and have the server run
+        # that copy.  Backtest results are still account-scoped evidence, so
+        # resolve the active document from the caller's store just like the
+        # replay, forward and overfit routes do.
+        rule = _selected_rule(user_id, payload.get("ruleDocId"))
+        if rule is None:
+            return _err(409, "RULE_REQUIRED", "an active rule could not be read")
         return _ok(_backtest.run(
             payload.get("candles"), initial_balance=payload.get("initialBalance"),
             spread_pips=float(payload.get("spreadPips") or 0),
@@ -1225,7 +1238,7 @@ def _roadmap_analysis(route, payload, *, user_id=None):
             slippage_pips=float(payload.get("slippagePips") or 0),
             latency_bars=int(payload.get("latencyBars") or 0),
             symbol=payload.get("symbol"), timeframe=payload.get("timeframe"),
-            rule=payload.get("rule")))
+            rule=rule))
     if route == "replay":
         from apex.platform import replay as _replay
         rule = _selected_rule(user_id, payload.get("ruleDocId"))

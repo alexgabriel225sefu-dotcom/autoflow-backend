@@ -49,7 +49,7 @@ export function BacktestView() {
     if (!rule.result?.ok || candleData?.status !== "ok" || !candleData.candles?.length) return;
     setBusy(true);
     setResult(await api<BacktestResult>("backtest", { method: "POST", body: {
-      rule: rule.result.data.rule, candles: candleData.candles, symbol, timeframe,
+      ruleDocId: ruleId, candles: candleData.candles, symbol, timeframe,
       spreadPips: Number(spread), slippagePips: Number(slippage), commission: Number(commission),
     }}));
     setBusy(false);

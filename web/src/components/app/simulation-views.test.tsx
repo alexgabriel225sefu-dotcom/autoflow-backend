@@ -19,6 +19,7 @@ vi.mock("@/lib/api", async (orig) => {
 });
 
 import { ForwardView, OverfitView, RiskGuardView, RuleLayerView } from "./simulation-views";
+import { RuleLayerResultCard } from "./simulation-result-cards";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -63,6 +64,16 @@ describe("simulation screens", () => {
     render(<RuleLayerView />);
     fireEvent.click(screen.getByRole("button", { name: "Calculate" }));
     expect((await screen.findByRole("alert")).textContent).toContain("could not be read");
+    expect(screen.queryByText("0")).toBeNull();
+  });
+
+  it("shows a successful response with unavailable data as a failed read", () => {
+    render(<RuleLayerResultCard result={{
+      status: "unavailable", reason: "account data could not be read",
+    }} />);
+    expect(screen.getByRole("alert").textContent).toContain("could not be read");
+    expect(screen.getByRole("alert").textContent).toContain("No sizing");
+    expect(screen.queryByText("Units")).toBeNull();
     expect(screen.queryByText("0")).toBeNull();
   });
 });
