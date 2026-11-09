@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const push = vi.fn();
 const refresh = vi.fn();
 const signUp = vi.fn();
+const setSession = vi.fn();
 const resend = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -24,8 +25,11 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({
+  createImplicitClient: () => ({
     auth: { signUp: (body: unknown) => signUp(body), resend: (body: unknown) => resend(body) },
+  }),
+  createClient: () => ({
+    auth: { setSession: (session: unknown) => setSession(session), resend: (body: unknown) => resend(body) },
   }),
 }));
 
@@ -35,8 +39,10 @@ beforeEach(() => {
   push.mockReset();
   refresh.mockReset();
   signUp.mockReset();
+  setSession.mockReset();
   resend.mockReset();
   resend.mockResolvedValue({ error: null });
+  setSession.mockResolvedValue({ error: null });
 });
 
 async function submit() {
@@ -95,6 +101,7 @@ describe("sign up", () => {
     signUp.mockResolvedValue({ data: { session: { access_token: "t" }, user: {} }, error: null });
     await submit();
     await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
+    expect(setSession).toHaveBeenCalledWith({ access_token: "t" });
     expect(refresh).toHaveBeenCalled();
     expect(screen.queryByText(/check your email/i)).toBeNull();
   });

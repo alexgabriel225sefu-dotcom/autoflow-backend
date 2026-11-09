@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createImplicitClient } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/supabase/auth-error";
 import { authCallbackUrl } from "@/lib/supabase/redirect";
 
@@ -19,7 +19,7 @@ export type ResendOutcome = { ok: true; message: string } | { ok: false; message
  */
 export async function resendConfirmation(email: string): Promise<ResendOutcome> {
   try {
-    const { error } = await createClient().auth.resend({
+    const { error } = await createImplicitClient().auth.resend({
       type: "signup",
       email,
       options: { emailRedirectTo: authCallbackUrl(window.location.origin) },

@@ -900,3 +900,43 @@ Next: run CI on the pushed patch, then review the remaining production risk-map
 and rule-layer broker-read failures with real server logs before changing any
 fallback behavior. Keep unknown data failed/unknown and do not deploy from
 Codex.
+
+## New-client walkthrough repairs — 2026-11-08
+
+The production walkthrough found two concrete client-flow defects. A signup
+confirmation opened from Mailinator in a new tab showed Supabase's PKCE
+verifier error, even though the account could later sign in. The signup and
+resend paths now use an implicit confirmation redirect that works without the
+original tab's verifier; `/auth/callback` imports that one-time session into
+the normal cookie-backed client and keeps an expired/invalid link readable.
+Backtest now filters the selector to active rules, matching the API's
+server-owned rule boundary instead of offering draft or paused rules that
+would be refused.
+
+Files changed:
+
+- `web/src/lib/supabase/client.ts` — explicit implicit-flow client for email
+  confirmation only;
+- `web/src/app/signup/page.tsx` and
+  `web/src/components/auth/resend-confirmation.tsx` — use the cross-tab-safe
+  confirmation path;
+- `web/src/app/auth/callback/page.tsx` — import and clear implicit sessions;
+- `web/src/components/app/simulation-views.tsx` — active-only Backtest rules;
+- corresponding signup, callback and simulation regression tests.
+
+The walkthrough also reached cTrader's authorization page with one live and
+two demo accounts checked by default. No authorization was submitted and no
+live account was changed. A follow-up should make the pre-authorization
+warning and demo-first selection explicit without weakening live gates.
+
+Local verification after these changes: targeted web Vitest (24 tests),
+`npx tsc --noEmit`, `npx eslint .`, and `npx next build` passed. The five
+targeted Python platform suites passed. `tests/run_all.py` was attempted with
+UTF-8 but hung in the Windows subprocess harness and was interrupted; this is
+not a green full-suite claim. CI has not yet been run on the new commit. The
+security scan is still incomplete, and the legacy `server.js` dependency and
+provider-cost findings remain outside this branch's allowed files.
+
+No deploy, provider-dashboard change, environment/flag change, live action or
+order was performed. Next: push this repair, read all four CI jobs, then run a
+fresh confirmation walkthrough and a cTrader demo-only smoke check.
