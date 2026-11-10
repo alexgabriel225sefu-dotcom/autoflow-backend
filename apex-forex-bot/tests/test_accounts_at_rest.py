@@ -169,6 +169,51 @@ check("and the id is no longer in the file", "1000000002" not in raw9)
 check("and it still reads back correctly",
       us.load("1000000009").get("ctrader_accounts") == ACCOUNTS)
 
+print("\n[3b] the explicit migration rewrites legacy secrets before production reads")
+legacy_path2 = us._path("1000000010")
+with open(legacy_path2, "w", encoding="utf-8") as fh:
+    json.dump({"ctrader_access_token": TOKEN,
+               "ctrader_refresh_token": REFRESH,
+               "ctrader_accounts": list(ACCOUNTS),
+               "active": True}, fh)
+check("migration reports a legacy record", us.migrate_sensitive_record("1000000010"))
+raw10 = stored_bytes("1000000010")
+stored10 = json.loads(raw10)
+check("migration encrypts the access token",
+      stored10.get("ctrader_access_token", "").startswith(us._ENC_PREFIX))
+check("migration encrypts the refresh token",
+      stored10.get("ctrader_refresh_token", "").startswith(us._ENC_PREFIX))
+check("migration encrypts the account list",
+      stored10.get("ctrader_accounts", "").startswith(us._ENC_PREFIX))
+check("migration preserves the readable values",
+      us.load("1000000010").get("ctrader_access_token") == TOKEN
+      and us.load("1000000010").get("ctrader_accounts") == ACCOUNTS)
+
+print("\n    …and production refuses any legacy plaintext that was not migrated")
+old_is_production = us._is_production
+us._is_production = lambda: True
+try:
+    blocked, blocked_output = quiet(us._decrypt_sensitive,
+                                    {"ctrader_access_token": TOKEN,
+                                     "ctrader_accounts": list(ACCOUNTS)})
+finally:
+    us._is_production = old_is_production
+check("a plaintext token is absent in production", blocked.get("ctrader_access_token") == "")
+check("a plaintext account list is absent in production",
+      blocked.get("ctrader_accounts") is None)
+check("the refusal does not echo a token or account id",
+      TOKEN not in blocked_output and "1000000002" not in blocked_output)
+old_is_production = us._is_production
+us._is_production = lambda: True
+try:
+    runtime_plain = us.decrypt_value(TOKEN, fail_closed=True)
+    runtime_compat = us.decrypt_value("legacy-not-a-broker-secret")
+finally:
+    us._is_production = old_is_production
+check("platform runtime token reads fail closed in production", runtime_plain == "")
+check("generic legacy values retain their explicit compatibility path",
+      runtime_compat == "legacy-not-a-broker-secret")
+
 # ── 4. a corrupted or unopenable value reads as ABSENT, never as itself ────
 # The requirement that matters for correctness: callers do
 # `for a in (u.get("ctrader_accounts") or [])`. Handing them the ciphertext

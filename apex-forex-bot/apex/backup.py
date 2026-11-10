@@ -52,7 +52,6 @@ Usage:
     python -m apex.backup verify < apex-backup-2026-08-15.json
 """
 import json
-import re
 import sys
 import time
 
@@ -139,7 +138,14 @@ def dump():
                 raw = None
         if raw:
             try:
-                out["users"][uid] = json.loads(raw)   # still encrypted
+                record = json.loads(raw)
+                # A legacy record may still contain cleartext even though
+                # current writes are encrypted. Re-wrap it in the snapshot so
+                # a backup can never become a second plaintext credential store;
+                # the explicit migration still has to rewrite the live record.
+                if isinstance(record, dict) and user_store._has_plaintext_sensitive(record):
+                    record = user_store._encrypt_sensitive(record)
+                out["users"][uid] = record
             except ValueError:
                 print(f"[Backup] user {uid} is not valid JSON — skipped",
                       file=sys.stderr)
@@ -188,6 +194,26 @@ def dump():
             else:
                 raw = _pstore.read_raw(key)
                 if raw is not None:
+                    if ":ctrader:" in key:
+                        try:
+                            record = json.loads(raw)
+                            if isinstance(record, dict):
+                                for field in ("accessToken", "refreshToken"):
+                                    value = record.get(field)
+                                    if (isinstance(value, str) and value and
+                                            not value.startswith(user_store._ENC_PREFIX)):
+                                        record[field] = user_store.encrypt_value(value)
+                                accounts = record.get("ctrader_accounts")
+                                if accounts not in (None, [], {}, "") and not (
+                                    isinstance(accounts, str) and
+                                    accounts.startswith(user_store._ENC_PREFIX)
+                                ):
+                                    record["ctrader_accounts"] = user_store.encrypt_value(
+                                        json.dumps(accounts, separators=(",", ":"), sort_keys=True)
+                                    )
+                                raw = json.dumps(record, separators=(",", ":"))
+                        except (TypeError, ValueError):
+                            pass
                     out["platform"]["strings"][key] = raw
     except Exception as e:
         # Recorded, never swallowed. A dump that could not read the platform
@@ -227,9 +253,11 @@ def verify(snapshot):
             continue
         # A record whose credential fields were decrypted before being written
         # is a plaintext credential file. Catch it here, not in an incident.
-        for f in ("ctrader_access_token", "ctrader_refresh_token"):
+        for f in (*user_store._SENSITIVE_FIELDS, *user_store._SENSITIVE_JSON_FIELDS):
             v = rec.get(f)
-            if isinstance(v, str) and v and not v.startswith(user_store._ENC_PREFIX):
+            if v in (None, [], {}, ""):
+                continue
+            if not (isinstance(v, str) and v.startswith(user_store._ENC_PREFIX)):
                 problems.append(f"user {uid}: {f} is NOT encrypted in this backup")
     for uid, rows in (snapshot.get("journals") or {}).items():
         if not isinstance(rows, list):
@@ -274,6 +302,16 @@ def verify(snapshot):
             and not (snapshot.get("access") or snapshot.get("journals")):
         problems.append("snapshot is empty — no users and no platform state")
 
+    def _parse_unique_object(raw):
+        def pairs(items):
+            obj = {}
+            for name, value in items:
+                if name in obj:
+                    raise ValueError(f"duplicate JSON field {name!r}")
+                obj[name] = value
+            return obj
+        return json.loads(raw, object_pairs_hook=pairs)
+
     for key, raw in (plat.get("strings") or {}).items():
         if not isinstance(raw, str):
             problems.append(f"platform {key} is not a stored string")
@@ -282,10 +320,18 @@ def verify(snapshot):
         # user records above: a backup that decrypted on the way out is a
         # credential file.
         if ":ctrader:" in key:
-            for field in ("accessToken", "refreshToken"):
-                m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', raw)
-                if m and m.group(1) and not m.group(1).startswith(
-                        user_store._ENC_PREFIX):
+            try:
+                record = _parse_unique_object(raw)
+            except (TypeError, ValueError) as exc:
+                problems.append(f"platform {key}: invalid broker record ({exc})")
+                continue
+            for field in ("accessToken", "refreshToken", "groq_key",
+                          "gemini_key", "anthropic_key", "ctrader_accounts"):
+                value = record.get(field)
+                if value in (None, [], {}, ""):
+                    continue
+                if not (isinstance(value, str) and
+                        value.startswith(user_store._ENC_PREFIX)):
                     problems.append(
                         f"platform {key}: {field} is NOT encrypted in this backup")
     return (not problems), problems

@@ -188,13 +188,21 @@ def encrypt_value(value):
     return _ENC_PREFIX + _fernet.encrypt(value.encode()).decode()
 
 
-def decrypt_value(value):
-    """Inverse of encrypt_value. Plaintext (legacy, or no key) passes through.
+def decrypt_value(value, *, fail_closed=False):
+    """Inverse of encrypt_value.
+
+    ``fail_closed`` is for broker/runtime credentials. It lets non-sensitive
+    legacy values keep their compatibility path while production broker reads
+    refuse an unmigrated plaintext token.
 
     Returns "" for a value that IS encrypted but cannot be opened — a missing
     or rotated key must not hand a caller ciphertext to use as a credential.
     """
     if not isinstance(value, str) or not value.startswith(_ENC_PREFIX):
+        if fail_closed and value and _is_production():
+            print("[Store] ⛔ a legacy plaintext runtime secret was refused in "
+                  "production — run the sensitive-record migration")
+            return ""
         return value
     if not _fernet:
         print("[Store] ⛔ a runtime secret is encrypted but TOKEN_ENCRYPTION_KEY "
@@ -210,10 +218,20 @@ def decrypt_value(value):
 
 
 def _decrypt_sensitive(data: dict) -> dict:
-    """Decrypt sensitive fields in place. Values not in enc: form (legacy
-    plaintext, or no key configured) are left untouched."""
+    """Decrypt sensitive fields in place.
+
+    Legacy cleartext is tolerated only on an explicitly non-production store.
+    Production reads fail closed until the controlled migration has rewritten
+    the record under the active Fernet key.
+    """
     for field in _SENSITIVE_FIELDS:
         val = data.get(field)
+        if isinstance(val, str) and val and not val.startswith(_ENC_PREFIX):
+            if _is_production():
+                print(f"[Store] ⛔ {field} is legacy PLAINTEXT in production "
+                      "— refusing to return it; run the sensitive-record migration")
+                data[field] = ""
+                continue
         if isinstance(val, str) and val.startswith(_ENC_PREFIX):
             if not _fernet:
                 # Encrypted data and no key to open it. Returning the value
@@ -241,12 +259,14 @@ def _decrypt_sensitive(data: dict) -> dict:
 
     for field in _SENSITIVE_JSON_FIELDS:
         val = data.get(field)
-        # A legacy plaintext value — a real list or dict, written before this
-        # field was encrypted — is exactly what "not a str starting with enc:"
-        # means, and it passes through untouched. That is the backwards
-        # compatibility requirement, and it is the common case until every
-        # record has been rewritten once.
+        # Development keeps legacy values readable so the explicit migration
+        # can be tested without a production datastore. Production returns an
+        # absent value until migration completes.
         if not (isinstance(val, str) and val.startswith(_ENC_PREFIX)):
+            if val not in (None, [], {}, "") and _is_production():
+                print(f"[Store] ⛔ {field} is legacy PLAINTEXT in production "
+                      "— refusing to return it; run the sensitive-record migration")
+                data[field] = None
             continue
         if not _fernet:
             print(f"[Store] ⛔ {field} is ENCRYPTED but TOKEN_ENCRYPTION_KEY is "
@@ -272,6 +292,108 @@ def _decrypt_sensitive(data: dict) -> dict:
                   f"({type(e).__name__}) — treating as absent")
             data[field] = None
     return data
+
+
+def _raw_user_record(user_id, *, strict=False):
+    """Read one record without decrypting it, for maintenance operations."""
+    user_id = str(user_id)
+    if _USE_REDIS:
+        getter = _redis_get_strict if strict else _redis_get
+        raw = getter(f"{_NS}:user:{user_id}")
+        if not raw:
+            return {}
+        try:
+            value = json.loads(raw)
+        except (TypeError, ValueError):
+            return {}
+        return value if isinstance(value, dict) else {}
+    try:
+        with open(_path(user_id), encoding="utf-8") as fh:
+            value = json.load(fh)
+        return value if isinstance(value, dict) else {}
+    except (OSError, TypeError, ValueError):
+        return {}
+
+
+def _has_plaintext_sensitive(data):
+    """Return whether a raw record contains a non-empty legacy secret."""
+    for field in _SENSITIVE_FIELDS:
+        value = data.get(field)
+        if isinstance(value, str) and value and not value.startswith(_ENC_PREFIX):
+            return True
+    for field in _SENSITIVE_JSON_FIELDS:
+        value = data.get(field)
+        if value not in (None, [], {}, "") and not (
+            isinstance(value, str) and value.startswith(_ENC_PREFIX)
+        ):
+            return True
+    return False
+
+
+def migrate_sensitive_record(user_id, *, strict=True, attempts=5):
+    """Encrypt one legacy record with an optimistic-concurrency check.
+
+    This is intentionally explicit rather than hidden in ``load``: operators
+    can run it as a one-time maintenance job under the active Fernet key,
+    without a read racing a concurrent OAuth or account update.
+
+    A version conflict is retried. The other writer may have stored a newer
+    plaintext value, or may already have encrypted the record; the next read
+    follows whichever of those actually landed. A lost write raises, so the
+    caller counts it instead of treating the record as already clean. The
+    text of that error names the failure only.
+    """
+    user_id = str(user_id)
+    for _ in range(max(1, int(attempts))):
+        raw = _raw_user_record(user_id, strict=True)
+        if not raw or not _has_plaintext_sensitive(raw):
+            return False
+        if not _fernet:
+            raise EncryptionNotConfigured(
+                "cannot migrate plaintext sensitive data without TOKEN_ENCRYPTION_KEY")
+        if _USE_REDIS:
+            version_raw = _redis_get_strict(_vkey(user_id))
+            try:
+                expected = int(version_raw)
+            except (TypeError, ValueError):
+                expected = 0
+        else:
+            expected = int(raw.get("_v") or 0)
+        try:
+            wrote = save(user_id, raw, strict=strict, expect_version=expected)
+        except ConflictError:
+            continue
+        if wrote:
+            return True
+        raise PersistenceError("sensitive migration write did not land")
+    raise ConflictError("sensitive record changed during migration")
+
+
+def migrate_sensitive_records(*, limit=100000, strict=True):
+    """Migrate every user record, refusing to silently truncate a scan."""
+    if _USE_REDIS:
+        keys = scan_keys(f"{_NS}:user:*", limit=limit)
+        user_ids = [str(key)[len(f"{_NS}:user:"):] for key in keys]
+    else:
+        try:
+            names = os.listdir(_DIR)
+        except OSError as exc:
+            raise StoreUnavailable(f"could not list local user records: {exc}") from exc
+        user_ids = [name[:-5] for name in names if name.endswith(".json")]
+        if len(user_ids) > limit:
+            raise StoreUnavailable(f"more than {limit} local user records")
+
+    migrated = 0
+    failed = 0
+    for user_id in sorted(set(user_ids)):
+        try:
+            if migrate_sensitive_record(user_id, strict=strict):
+                migrated += 1
+        except Exception:
+            failed += 1
+            if strict:
+                raise
+    return {"scanned": len(set(user_ids)), "migrated": migrated, "failed": failed}
 
 # ─── Backend selection ───────────────────────────────────
 _REDIS_URL = os.getenv("REDIS_URL", "")
@@ -1034,10 +1156,8 @@ def load(user_id):
             except Exception:
                 pass
         return {}
-    try:
-        return _decrypt_sensitive(json.loads(open(_path(user_id)).read()))
-    except Exception:
-        return {}
+    raw = _raw_user_record(user_id)
+    return _decrypt_sensitive(raw) if raw else {}
 
 
 class PersistenceError(RuntimeError):
@@ -1085,7 +1205,7 @@ def _vkey(user_id):
 def version(user_id):
     """The record's current version, 0 when it has never been written."""
     if not _USE_REDIS:
-        return int((load(user_id) or {}).get("_v") or 0)
+        return int((_raw_user_record(user_id) or {}).get("_v") or 0)
     raw = _redis_get(_vkey(str(user_id)))
     try:
         return int(raw)
@@ -1140,12 +1260,12 @@ def save(user_id, data, strict=False, expect_version=None):
         return True
     try:
         if expect_version is not None:
-            cur = int((load(user_id) or {}).get("_v") or 0)
+            cur = int((_raw_user_record(user_id) or {}).get("_v") or 0)
             if cur != int(expect_version):
                 raise ConflictError(
                     f"user {user_id} changed since it was read "
                     f"(expected v{expect_version}, now v{cur})")
-        stored["_v"] = int((load(user_id) or {}).get("_v") or 0) + 1
+        stored["_v"] = int((_raw_user_record(user_id) or {}).get("_v") or 0) + 1
         with open(_path(user_id), "w") as f:
             json.dump(stored, f, indent=2)
         return True

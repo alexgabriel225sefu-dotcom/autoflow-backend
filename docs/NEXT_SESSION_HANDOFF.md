@@ -1,5 +1,52 @@
 # Apex4Traders — handoff
 
+## Current Codex security-fix session (2026-11-09)
+
+1. **Current branch:** `codex/security-findings-fix`, based on
+   `claude/apex4traders-platform-v1`.
+2. **Current commits:** `30f34407` (migration and backup rewrap) and
+   `cb0d3805` (fail-closed broker runtime reads and structural backup checks);
+   CI for this branch is not yet run.
+3. **Completed:** added explicit, optimistic-concurrency migration for legacy
+   plaintext user secrets; production reads now fail closed for unmigrated
+   user and platform broker values; backup dumps rewrap legacy plaintext and
+   verification rejects plaintext string/JSON sensitive fields; added
+   regression coverage and a maintenance script for both namespaces.
+4. **Changed files:** `apex-forex-bot/apex/user_store.py`,
+   `apex-forex-bot/apex/backup.py`,
+   `apex-forex-bot/apex/platform/ctrader_link.py`,
+   `apex-forex-bot/apex/platform/admin_audit.py`,
+   `apex-forex-bot/tests/test_accounts_at_rest.py`,
+   `apex-forex-bot/tests/test_backup_restore.py`,
+   `apex-forex-bot/scripts/migrate_sensitive_records.py`.
+5. **Tests:** `tests/test_accounts_at_rest.py`,
+   `tests/test_backup_restore.py`, `tests/test_platform_ctrader_link.py`,
+   and `tests/test_platform_admin_audit.py` passed; the migration script
+   `--help` also passed with UTF-8 output settings. A local UTF-8-compatible per-file sweep
+   passed `225/225` files with no failures or timeouts. The official
+   `tests/run_all.py` first hit the Windows child-output decoding bug in
+   `test_access_gates_loop.py`; the UTF-8 rerun was stopped after the long
+   suite remained in progress. Do not call the full gate green until CI
+   confirms it.
+6. **Failures:** the legacy Stripe webhook finding remains unpatched because
+   it is in `server.js`, the separate legacy bot/sales service that this
+   platform branch is forbidden to edit. The source finding is confirmed:
+   `checkout.session.completed` does not require paid status, exact amount,
+   currency, or a payment intent.
+7. **Unverified integrations:** no production migration was run; no provider
+   dashboard, Redis data, Stripe secret, or account token was read. Stripe
+   provider connectivity is not verified.
+8. **Security:** the platform-side plaintext exposure is fail-closed after an
+   explicit migration. The legacy Stripe finding and the old Telegram/sales
+   service remain owner/legacy-stream work; do not deploy this patch until CI
+   is green and the owner authorises it.
+9. **Next task:** commit/push this patch, run all four CI jobs, and open a PR;
+   separately route the `server.js` Stripe fix to its allowed legacy branch.
+10. **Blockers:** production migration requires the owner/operator to run the
+    new script with the existing Fernet key; the Stripe fix requires an
+    explicit exception/legacy branch because `server.js` is out of scope here.
+
+
 ## This branch merged origin/claude/apex4traders-platform-v1
 
 This branch merged `origin/claude/apex4traders-platform-v1`, which includes the live hard gate (PR #34, merge `f9daa69`) and the live rule guard (PR #35, `4931d53ef`). This merge does not change or loosen the live gate. Live trading is not available.

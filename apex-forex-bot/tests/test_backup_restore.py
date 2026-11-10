@@ -111,6 +111,19 @@ try:
     check("the journal came along", len(snap["journals"][UID]) == 2)
     check("counts are reported", snap["counts"]["users"] == 1)
 
+    legacy_uid = "7585109159"
+    with open(user_store._path(legacy_uid), "w", encoding="utf-8") as fh:
+        json.dump({"active": True,
+                   "ctrader_access_token": "legacy-backup-token",
+                   "ctrader_accounts": [{"ctid": 501, "live": False}]}, fh)
+    legacy_snap = backup.dump()
+    check("a legacy plaintext record is re-wrapped in the backup",
+          legacy_snap["users"][legacy_uid]["ctrader_access_token"].startswith("enc:")
+          and legacy_snap["users"][legacy_uid]["ctrader_accounts"].startswith("enc:"))
+    check("the legacy token never enters the backup",
+          "legacy-backup-token" not in json.dumps(legacy_snap))
+    os.remove(user_store._path(legacy_uid))
+
     print("\n3. verify() catches a backup that is not restorable")
     ok, problems = backup.verify(snap)
     check("a good snapshot verifies", ok, problems)
@@ -233,6 +246,35 @@ try:
     check("and says which field",
           any("accessToken is NOT encrypted" in p for p in probs_leak),
           probs_leak)
+    leaked_platform_accounts = json.loads(json.dumps(snap_ct))
+    leaked_platform_accounts["platform"]["strings"][_pfx + f"ctrader:{OWNER}"] = json.dumps(
+        {"accessToken": user_store.encrypt_value("access-value"),
+         "refreshToken": user_store.encrypt_value("refresh-value"),
+         "ctrader_accounts": [{"ctid": 501, "live": False}]})
+    ok_list_leak, probs_list_leak = backup.verify(leaked_platform_accounts)
+    check("a plaintext platform account list is refused", not ok_list_leak)
+    check("and names the list field",
+          any("ctrader_accounts is NOT encrypted" in p for p in probs_list_leak),
+          probs_list_leak)
+    duplicate = json.loads(json.dumps(snap_ct))
+    duplicate["platform"]["strings"][_pfx + f"ctrader:{OWNER}"] = (
+        '{"accessToken":"enc:first","accessToken":"plaintext"}')
+    ok_duplicate, probs_duplicate = backup.verify(duplicate)
+    check("duplicate broker JSON fields are refused", not ok_duplicate)
+    check("and the duplicate is named", any("duplicate JSON field" in p
+                                              for p in probs_duplicate),
+          probs_duplicate)
+    leaked_user = {"groq_key": "plain-ai-key",
+                   "ctrader_accounts": [{"ctid": 47765456, "live": False}]}
+    ok_user_leak, probs_user_leak = backup.verify(
+        {"format": 1, "users": {str(OWNER): leaked_user},
+         "journals": {}, "access": [], "audit": [],
+         "platform": {"strings": {}, "sets": {}}})
+    check("a snapshot with a DECRYPTED AI key or account list is refused",
+          not ok_user_leak)
+    check("and names the plaintext sensitive field",
+          any("groq_key is NOT encrypted" in p for p in probs_user_leak),
+          probs_user_leak)
 
     print("\n5d2. A platform-only deployment is a real deployment")
     # What the drill actually met on production, 2026-10-05:

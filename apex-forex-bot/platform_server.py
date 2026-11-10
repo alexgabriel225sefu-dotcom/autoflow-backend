@@ -589,6 +589,26 @@ def _release_for_shutdown(budget_s=5.0):
     return result
 
 
+def _migrate_legacy_secrets():
+    """Encrypt legacy plaintext broker secrets before anything can read them.
+
+    Production reads fail closed, and this process revives trading loops
+    before it accepts traffic. A loop revived against a still-plaintext token
+    would treat that account as disconnected. The rewrite is idempotent and
+    compare-and-swap. A failure must not take the API down: the next boot
+    tries the leftover records again. The only line this emits is counts.
+    """
+    try:
+        scripts = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
+        if scripts not in sys.path:
+            sys.path.insert(0, scripts)
+        import migrate_sensitive_records as migration
+        migration.run_startup()
+    except Exception as exc:                                 # noqa: BLE001
+        print(f"[API] sensitive-record migration did not finish "
+              f"({type(exc).__name__}) — continuing")
+
+
 def main():
     origins = allowed_origins()
     print(f"[API] Apex4Traders platform API starting on :{PORT}")
@@ -603,6 +623,9 @@ def main():
     from apex.platform import entitlement as _ent
     print(f"[API] live execution enabled: {_ent.live_execution_enabled()}")
 
+    # Before the probe, the supervisor, and the socket. Each of those can
+    # cause a broker-token read, and a legacy plaintext value is refused.
+    _migrate_legacy_secrets()
     _start_broker_probe()
     _supervise_platform_loops()
     _start_forward_watcher()

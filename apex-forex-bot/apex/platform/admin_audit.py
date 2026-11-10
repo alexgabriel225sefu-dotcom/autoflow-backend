@@ -115,7 +115,7 @@ def _load_connections():
 def _remember(rec, secrets):
     for field in ("accessToken", "refreshToken"):
         try:
-            raw = user_store.decrypt_value(rec.get(field) or "")
+            raw = user_store.decrypt_value(rec.get(field) or "", fail_closed=True)
         except Exception:                                    # noqa: BLE001
             raw = ""
         if isinstance(raw, str) and len(raw) >= 8 and raw not in secrets:
