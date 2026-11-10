@@ -1119,3 +1119,39 @@ jobs. If CI is green and the owner explicitly requests deploy, deploy only the
 API service and verify its live state, `/healthz`, public pages, and post-deploy
 logs. Keep live trading, checkout, provider settings, and environment values
 unchanged.
+
+## Landing hero video — 2026-11-10
+
+Branch: `codex/landing-hero-video`, based on
+`claude/apex4traders-platform-v1` at `f5ed49044027bb1bbbeef16a036c06a079010cfe`.
+
+The generated Apex4Traders intro is now a local, muted, looping hero video at
+`web/public/video/apex4traders-hero.mp4`. The opening visual uses the same
+graphite, lilac and orchid family as the dashboard, keeps the existing product
+preview and all product, platform, pricing and FAQ sections, and hides the
+secondary screenshot on narrow screens to keep the first view clear at 390px.
+The hero pill no longer uses a blur filter. Reduced-motion users receive the
+static branded card instead of autoplaying video.
+
+Files changed:
+
+- `web/src/components/marketing/hero-intro-video.tsx`;
+- `web/src/components/marketing/hero-intro-video.module.css`;
+- `web/src/components/marketing/hero-stage.tsx`;
+- `web/src/components/marketing/hero-stage.module.css`;
+- `web/src/app/landing.test.tsx`;
+- `web/public/video/apex4traders-hero.mp4` (2,314,465 bytes).
+
+Local checks: `npx tsc --noEmit` passed; `npx eslint .` passed with three
+pre-existing warnings and zero errors; targeted Vitest passed 7/7 tests;
+`npx next build` passed (47 routes). Full Vitest was attempted but the local
+Windows process did not finish cleanly; the targeted landing suites passed.
+`python -X utf8 tests/run_all.py` remains blocked by the repository's existing
+Windows subprocess/encoding failure (`UnicodeDecodeError` and a `None` stderr
+path); no full Python green claim is made. CI is still required before this
+commit is considered complete.
+
+No provider settings, environment values, payment paths, live gates, orders or
+deploys were changed in this web-only pass. Next: commit, pull/rebase before
+push, open the PR into the Claude base, read all four CI jobs, then deploy only
+the web service if the owner still wants this landing change live.
