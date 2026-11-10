@@ -1159,7 +1159,15 @@ the web service if the owner still wants this landing change live.
 The first live smoke check found that `/video/apex4traders-hero.mp4` was being
 intercepted by the auth middleware and returning HTML. The follow-up fix adds
 `mp4` and `webm` to the static-asset matcher exclusion and covers that path in
-`web/src/app/seo.test.ts`. Follow-up local checks passed: TypeScript, ESLint
-(0 errors; 3 existing warnings), targeted Vitest 13/13, and Next build (47
-routes). The follow-up commit still needs its own CI run before the web deploy
-is considered valid.
+`web/src/app/seo.test.ts`. Follow-up commit `21464f81` was pushed as PR #173,
+squash-merged into the platform branch as `b2b144ec`, and passed all four CI
+jobs (python, node, web, config-drift). Follow-up local checks passed:
+TypeScript, ESLint (0 errors; 3 existing warnings), targeted Vitest 13/13,
+and Next build (47 routes).
+
+Render web deploy `dep-dbphbaon74is73dve7f0` reached `live` on
+`b2b144ec`. Production checks returned 200 for the homepage and signup page;
+the hero asset returned `video/mp4`, 2,314,465 bytes, with an MP4 header; the
+Render web URL returned 200; and no error-level app logs appeared after the
+deploy started. No provider settings, environment values, payment paths, live
+gates or orders changed.
