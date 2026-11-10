@@ -330,31 +330,43 @@ def _has_plaintext_sensitive(data):
     return False
 
 
-def migrate_sensitive_record(user_id, *, strict=True):
+def migrate_sensitive_record(user_id, *, strict=True, attempts=5):
     """Encrypt one legacy record with an optimistic-concurrency check.
 
     This is intentionally explicit rather than hidden in ``load``: operators
     can run it as a one-time maintenance job under the active Fernet key,
     without a read racing a concurrent OAuth or account update.
+
+    A version conflict is retried. The other writer may have stored a newer
+    plaintext value, or may already have encrypted the record; the next read
+    follows whichever of those actually landed. A lost write raises, so the
+    caller counts it instead of treating the record as already clean. The
+    text of that error names the failure only.
     """
     user_id = str(user_id)
-    raw = _raw_user_record(user_id, strict=True)
-    if not raw or not _has_plaintext_sensitive(raw):
-        return False
-    if not _fernet:
-        raise EncryptionNotConfigured(
-            "cannot migrate plaintext sensitive data without TOKEN_ENCRYPTION_KEY")
-    if _USE_REDIS:
-        version_raw = _redis_get_strict(_vkey(user_id))
+    for _ in range(max(1, int(attempts))):
+        raw = _raw_user_record(user_id, strict=True)
+        if not raw or not _has_plaintext_sensitive(raw):
+            return False
+        if not _fernet:
+            raise EncryptionNotConfigured(
+                "cannot migrate plaintext sensitive data without TOKEN_ENCRYPTION_KEY")
+        if _USE_REDIS:
+            version_raw = _redis_get_strict(_vkey(user_id))
+            try:
+                expected = int(version_raw)
+            except (TypeError, ValueError):
+                expected = 0
+        else:
+            expected = int(raw.get("_v") or 0)
         try:
-            expected = int(version_raw)
-        except (TypeError, ValueError):
-            expected = 0
-    else:
-        expected = int(raw.get("_v") or 0)
-    if not save(user_id, raw, strict=strict, expect_version=expected):
-        return False
-    return True
+            wrote = save(user_id, raw, strict=strict, expect_version=expected)
+        except ConflictError:
+            continue
+        if wrote:
+            return True
+        raise PersistenceError("sensitive migration write did not land")
+    raise ConflictError("sensitive record changed during migration")
 
 
 def migrate_sensitive_records(*, limit=100000, strict=True):

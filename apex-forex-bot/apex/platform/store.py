@@ -249,6 +249,51 @@ def write_raw(key, raw):
         f.write(raw)
 
 
+# Replace the stored string only when it is still the value we read. A blind
+# SET during migration would overwrite a token refresh that landed between the
+# read and the write. Returns "written", "conflict", "missing", or
+# "unavailable". The arguments are the raw stored strings; this function does
+# not log them.
+_LUA_REPLACE_IF_UNCHANGED = """
+local cur = redis.call('GET', KEYS[1])
+if cur == false then
+  return 0
+end
+if cur ~= ARGV[1] then
+  return -1
+end
+redis.call('SET', KEYS[1], ARGV[2])
+return 1
+"""
+
+
+def replace_if_unchanged(key, expected_raw, new_raw):
+    """Write ``new_raw`` only if ``key`` still holds ``expected_raw``."""
+    if not isinstance(expected_raw, str) or not isinstance(new_raw, str):
+        raise TypeError("stored records are strings")
+    if user_store._USE_REDIS:
+        res = user_store._eval(
+            _LUA_REPLACE_IF_UNCHANGED, [key], [expected_raw, new_raw])
+        if res is None:
+            return "unavailable"
+        try:
+            code = int(res)
+        except (TypeError, ValueError):
+            return "unavailable"
+        if code == 1:
+            return "written"
+        if code == 0:
+            return "missing"
+        return "conflict"
+    current = read_raw(key)
+    if current is None:
+        return "missing"
+    if current != expected_raw:
+        return "conflict"
+    write_raw(key, new_raw)
+    return "written"
+
+
 def is_set(key):
     """True if `key` holds a set rather than a string.
 
