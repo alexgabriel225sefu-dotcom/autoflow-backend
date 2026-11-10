@@ -211,9 +211,9 @@ def ok_start(*a, **k):
     return {}
 
 
-def refuse(code):
+def refuse(code, detail="detail with Bearer abcdefghijklmnop1234"):
     def f(*a, **k):
-        raise AUTO.AutomationRefused(code, "detail with Bearer abcdefghijklmnop1234")
+        raise AUTO.AutomationRefused(code, detail)
     return f
 
 
@@ -249,6 +249,15 @@ for quiet in ("STOPPED_MEANWHILE",):
         run(refuse(quiet))
     A.drain() if hasattr(A, "drain") else None
     check(f"{quiet} (the client's own stop) does not alert", not sent, str(sent))
+
+with redirect_stdout(io.StringIO()):
+    fresh()
+    sent.clear()
+    run(refuse("ENGINE_REFUSED",
+               "the trading engine refused to start this loop "
+               "(another instance already owns this loop)"))
+A.drain() if hasattr(A, "drain") else None
+check("a cross-instance handoff refusal does not alert", not sent, str(sent))
 
 with redirect_stdout(io.StringIO()):
     fresh()
