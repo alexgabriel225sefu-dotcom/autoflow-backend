@@ -1082,3 +1082,40 @@ web URL all returned HTTP 200. Web logs had no errors. API startup logged one
 instance was still active; the service remained healthy and no further error
 was observed. Live execution remained disabled and no order or environment
 setting was changed.
+
+## Supabase and Render handoff follow-up — 2026-11-10
+
+Branch: `codex/render-lease-shutdown-fix`, based on
+`claude/apex4traders-platform-v1` at `b5e1dbb058b36cb71508efb1187f9c30c1ab6ac7`.
+
+Supabase was checked read-only. The project reports healthy; the site URL is
+`https://www.apex4traders.com`; the allowlist contains the production web
+origins; email confirmation is enabled; and custom SMTP through Brevo is
+enabled. No dashboard setting, secret, environment variable, or provider
+configuration was changed.
+
+Render API deployment of `b5e1dbb` was live and `/healthz` returned 200. The
+single startup `ENGINE_REFUSED` record was the expected overlap while the old
+instance still owned the durable automation lease. This patch keeps that
+cross-instance handoff refusal retry-safe but prevents it from creating an
+error alert; other engine refusals remain actionable.
+
+Files changed:
+
+- `apex-forex-bot/apex/platform/automation.py` — classify only the explicit
+  “another instance already owns this loop” refusal as a quiet handoff state;
+- `apex-forex-bot/tests/test_ops_alerts.py` — regression coverage for that
+  refusal and safe redaction.
+
+Targeted local verification passed: `test_ops_alerts.py`,
+`test_supervisor_revive_stale_lease.py`, and `test_platform_shutdown_release.py`.
+The repository runner was also started with UTF-8; the stock Windows runner
+hit its existing subprocess/encoding and shutdown-harness limitations, so no
+full-suite green claim is made until CI runs. No deploy was made for this
+branch.
+
+Next: rebase before push, open a PR into the Claude base, and read all four CI
+jobs. If CI is green and the owner explicitly requests deploy, deploy only the
+API service and verify its live state, `/healthz`, public pages, and post-deploy
+logs. Keep live trading, checkout, provider settings, and environment values
+unchanged.

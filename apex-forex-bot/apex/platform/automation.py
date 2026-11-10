@@ -81,6 +81,21 @@ _revive_failures = {}
 _QUIET_REFUSALS = ("STOPPED_MEANWHILE",)
 
 
+def _quiet_revival_refusal(code, detail):
+    """Return whether a supervisor refusal is an expected handoff state.
+
+    During a zero-downtime Render rollout the incoming instance can observe
+    the durable RUNNING record before the retiring instance has released its
+    cross-process lease.  The engine must refuse that second owner, but this
+    is not an application fault and should not create an error alert on every
+    supervisor tick.  Other ENGINE_REFUSED causes remain actionable.
+    """
+    if code in _QUIET_REFUSALS:
+        return True
+    return (code == "ENGINE_REFUSED"
+            and "another instance" in str(detail or "").lower())
+
+
 class AutomationRefused(RuntimeError):
     def __init__(self, code, detail):
         self.code, self.detail = code, detail
@@ -1298,8 +1313,10 @@ def supervise(*, starter=None, mode_lister=None):
             # the broker cannot confirm the mode. Say which, and leave the
             # record alone so the client still sees what they asked for.
             print(f"[Automation] not reviving {uid}: {e.code} — {e.detail}")
-            if e.code not in _QUIET_REFUSALS:
+            if not _quiet_revival_refusal(e.code, e.detail):
                 _revival_failed(uid, f"revival_refused:{e.code}")
+            else:
+                _revive_failures.pop(uid, None)
         except (_ent.NotEntitled, _emerg.Halted):
             # A lapsed or withdrawn licence, or a halt the operator ordered:
             # the system doing what it should. Not a page.
