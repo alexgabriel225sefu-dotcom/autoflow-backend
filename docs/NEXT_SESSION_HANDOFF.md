@@ -1155,3 +1155,11 @@ No provider settings, environment values, payment paths, live gates, orders or
 deploys were changed in this web-only pass. Next: commit, pull/rebase before
 push, open the PR into the Claude base, read all four CI jobs, then deploy only
 the web service if the owner still wants this landing change live.
+
+The first live smoke check found that `/video/apex4traders-hero.mp4` was being
+intercepted by the auth middleware and returning HTML. The follow-up fix adds
+`mp4` and `webm` to the static-asset matcher exclusion and covers that path in
+`web/src/app/seo.test.ts`. Follow-up local checks passed: TypeScript, ESLint
+(0 errors; 3 existing warnings), targeted Vitest 13/13, and Next build (47
+routes). The follow-up commit still needs its own CI run before the web deploy
+is considered valid.
