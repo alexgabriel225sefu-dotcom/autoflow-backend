@@ -36,6 +36,16 @@ describe("landing page", () => {
     expect(screen.queryByText("Read-only preview")).toBeNull();
   });
 
+  it("opens with the Apex4Traders hero introduction video", () => {
+    const { container } = render(<Landing />);
+    const video = container.querySelector("video");
+    expect(video).toBeTruthy();
+    expect(video?.querySelector("source")?.getAttribute("src")).toBe("/video/apex4traders-hero.mp4");
+    expect(video).toHaveProperty("muted", true);
+    expect(video?.getAttribute("autoplay")).not.toBeNull();
+    expect(video?.getAttribute("playsinline")).not.toBeNull();
+  });
+
   it("says demo-only and makes no profit claim", () => {
     const { container } = render(<Landing />);
     const text = container.textContent ?? "";
