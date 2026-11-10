@@ -1952,7 +1952,8 @@ app.get('/api/order-status', _codeLimiter, async (req, res) => {
 // Shared fulfillment: licence generation and the licence email. `provider` only
 // controls the log/alert prefix, so a second processor can reuse this without a
 // second copy of the fulfillment logic.
-async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref }) {
+async function _fulfillOrder({ provider, piRef, product, email, buyerName, amountCents, ref,
+                                reservedLicenseKey = null }) {
   // Money has already changed hands here, so an unknown product must not be
   // silently fulfilled as the retired crypto bot — that delivers a key for
   // something that does not exist. Refuse loudly and alert the operator.
@@ -1965,12 +1966,12 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
     );
     return;
   }
-  let licenseKey;
-  if (supabase) {
+  let licenseKey = reservedLicenseKey;
+  if (!licenseKey && supabase) {
     const { data: existing } = await supabase.from('licenses').select('key').eq('payment_intent_id', piRef).maybeSingle();
     if (existing?.key) licenseKey = existing.key;
   }
-  const isNew = !licenseKey;
+  const isNew = Boolean(reservedLicenseKey || !licenseKey);
   if (!licenseKey) licenseKey = generateForexKey();
 
   if (supabase) {
@@ -2003,6 +2004,179 @@ async function _fulfillOrder({ provider, piRef, product, email, buyerName, amoun
 }
 const _fulfillStripeOrder = (args) => _fulfillOrder({ provider: 'Stripe', ...args });
 
+// A Stripe retry must not mint or email another licence.  The local cache is
+// only a fast path; when Supabase is configured the unique payment_intent_id
+// index on licenses is the durable claim record. The payment is fully verified
+// before the claim is atomically marked active, so a retry cannot re-run
+// fulfilment even if the process stops during email delivery.
+const _stripeClaims = new Map();
+const _STRIPE_CLAIM_CACHE_LIMIT = 10000;
+
+function _rememberStripeClaim(key, value) {
+  _stripeClaims.set(key, value);
+  while (_stripeClaims.size > _STRIPE_CLAIM_CACHE_LIMIT) {
+    const oldest = _stripeClaims.keys().next().value;
+    _stripeClaims.delete(oldest);
+  }
+}
+
+async function _activateStripeClaim({ claimKey, piRef, licenseKey }) {
+  if (!supabase) {
+    _rememberStripeClaim(claimKey, { licenseKey, state: 'in_progress' });
+    return { duplicate: false, licenseKey, claimKey };
+  }
+  const { data: claimed, error } = await supabase.from('licenses')
+    .update({ active: true, activated_at: new Date().toISOString() })
+    .eq('payment_intent_id', piRef).eq('active', false).select('key');
+  if (error) throw error;
+  if (!claimed?.length) {
+    _rememberStripeClaim(claimKey, { licenseKey, state: 'completed' });
+    return { duplicate: true, licenseKey, claimKey };
+  }
+  _rememberStripeClaim(claimKey, { licenseKey, state: 'in_progress' });
+  return { duplicate: false, licenseKey, claimKey };
+}
+
+async function _claimStripeFulfillment({ sessionId, piRef, product, email, buyerName }) {
+  const claimKey = `${sessionId}:${piRef}`;
+  const cached = _stripeClaims.get(claimKey);
+  if (cached) return { duplicate: true, licenseKey: cached.licenseKey, claimKey };
+
+  if (supabase) {
+    const { data: existing, error: lookupError } = await supabase
+      .from('licenses').select('key,active').eq('payment_intent_id', piRef).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (existing?.key) {
+      if (existing.active !== false) {
+        _rememberStripeClaim(claimKey, { licenseKey: existing.key, state: 'completed' });
+        return { duplicate: true, licenseKey: existing.key, claimKey };
+      }
+      return _activateStripeClaim({ claimKey, piRef, licenseKey: existing.key });
+    }
+  }
+
+  const licenseKey = generateForexKey();
+  if (supabase) {
+    const { error: insertError } = await supabase.from('licenses').insert([{
+      key: licenseKey,
+      active: false,
+      email: email || '',
+      name: buyerName || 'there',
+      product,
+      payment_intent_id: piRef
+    }]);
+    if (insertError) {
+      // A concurrent webhook may have won the unique payment_intent claim.
+      const { data: concurrent, error: retryError } = await supabase
+        .from('licenses').select('key,active').eq('payment_intent_id', piRef).maybeSingle();
+      if (retryError || !concurrent?.key) throw insertError;
+      if (concurrent.active !== false) {
+        _rememberStripeClaim(claimKey, { licenseKey: concurrent.key, state: 'completed' });
+        return { duplicate: true, licenseKey: concurrent.key, claimKey };
+      }
+      return _activateStripeClaim({ claimKey, piRef, licenseKey: concurrent.key });
+    }
+  }
+  if (supabase) {
+    // The id is persisted with active=false before the atomic claim update.
+    return _activateStripeClaim({ claimKey, piRef, licenseKey });
+  }
+  _rememberStripeClaim(claimKey, { licenseKey, state: 'in_progress' });
+  return { duplicate: false, licenseKey, claimKey };
+}
+
+function _stripeReject(reason, eventId) {
+  addLog(`[Stripe] payment rejected (${reason})${eventId ? ` event=${eventId}` : ''}`, 'payment', 'warn');
+  return { accepted: false, reason };
+}
+
+async function _processStripeEvent(event, {
+  stripeClient = stripe,
+  claim = _claimStripeFulfillment,
+  fulfill = _fulfillStripeOrder,
+} = {}) {
+  if (!event || event.type !== 'checkout.session.completed') {
+    // Refund/dispute handling remains below in the route; every other event is
+    // intentionally ignored without a lookup, claim or fulfilment side effect.
+    return { accepted: false, ignored: true };
+  }
+
+  const session = event.data?.object || {};
+  const eventId = typeof event.id === 'string' ? event.id : '';
+  const sessionId = typeof session.id === 'string' ? session.id : '';
+  const product = session.metadata?.product || '';
+  const expectedAmount = STRIPE_PRODUCT_AMOUNTS_CENTS[product];
+  if (!sessionId || product !== 'apex-forex' || expectedAmount !== 49700) {
+    return _stripeReject('unknown_product_or_session', eventId);
+  }
+  if (session.payment_status !== 'paid' || session.status !== 'complete') {
+    return _stripeReject('checkout_not_paid', eventId);
+  }
+  if (session.amount_total !== 49700 || session.currency !== 'usd') {
+    return _stripeReject('checkout_amount_or_currency_mismatch', eventId);
+  }
+
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent.trim() : '';
+  if (!paymentIntentId) return _stripeReject('missing_payment_intent', eventId);
+  if (!stripeClient?.paymentIntents?.retrieve) {
+    throw new Error('Stripe payment-intent retrieval is unavailable');
+  }
+
+  let paymentIntent;
+  try {
+    paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentId);
+  } catch (_) {
+    return _stripeReject('payment_intent_lookup_failed', eventId);
+  }
+  if (!paymentIntent || paymentIntent.status !== 'succeeded' ||
+      paymentIntent.amount !== 49700 ||
+      paymentIntent.currency !== 'usd') {
+    return _stripeReject('payment_intent_not_succeeded_or_mismatched', eventId);
+  }
+
+  const piRef = `stripe_${paymentIntentId}`;
+  const claimResult = await claim({
+    sessionId,
+    piRef,
+    product,
+    email: session.customer_details?.email || '',
+    buyerName: session.customer_details?.name || 'there'
+  });
+  if (claimResult?.duplicate) {
+    addLog(`[Stripe] duplicate payment ignored event=${eventId || 'unknown'}`, 'payment', 'info');
+    return { accepted: false, duplicate: true };
+  }
+  if (!claimResult?.licenseKey) {
+    throw new Error('Stripe fulfilment claim did not return a licence key');
+  }
+
+  try {
+    await fulfill({
+      piRef,
+      product,
+      email: session.customer_details?.email || '',
+      buyerName: session.customer_details?.name || 'there',
+      amountCents: 49700,
+      ref: String(session.metadata?.ref || '').slice(0, 40),
+      reservedLicenseKey: claimResult.licenseKey
+    });
+  } catch (error) {
+    // Leave the durable inactive claim in place, but allow a later signed
+    // delivery to resume it. The id is still reserved, so a concurrent retry
+    // in this process cannot create a second licence.
+    if (claimResult.claimKey) _stripeClaims.delete(claimResult.claimKey);
+    throw error;
+  }
+  if (claimResult.claimKey) {
+    _rememberStripeClaim(claimResult.claimKey, {
+      licenseKey: claimResult.licenseKey,
+      state: 'completed'
+    });
+  }
+  return { accepted: true };
+}
+
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripe) return res.status(500).send('Stripe not configured');
   const sig = req.headers['stripe-signature'];
@@ -2012,27 +2186,13 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, whSecret);
   } catch (e) {
-    addLog(`[Stripe] Webhook signature verification failed: ${e.message}`, 'payment', 'error');
-    return res.status(400).send(`Webhook Error: ${e.message}`);
+    addLog('[Stripe] Webhook signature verification failed', 'payment', 'error');
+    return res.status(400).send('Webhook signature verification failed');
   }
 
   try {
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const product = session.metadata?.product || '';
-      const ref = session.metadata?.ref || '';
-      if (STRIPE_PRICE_IDS[product]) {
-        if (!session.payment_intent) {
-          addLog(`[Stripe] session=${session.id} has no payment_intent — refund revocation will not match`, 'payment', 'warn');
-        }
-        const piRef = `stripe_${session.payment_intent || session.id}`;
-        const email = session.customer_details?.email || '';
-        const buyerName = session.customer_details?.name || 'there';
-        const amountCents = Number(session.amount_total || 0);
-        await _fulfillStripeOrder({ piRef, product, email, buyerName, amountCents, ref });
-      } else {
-        addLog(`[Stripe] checkout.session.completed for unmapped product="${product}" session=${session.id}`, 'payment', 'warn');
-      }
+      await _processStripeEvent(event);
     } else if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
       const obj = event.data.object;
       const paymentIntentId = obj.payment_intent || '';
@@ -2046,7 +2206,7 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
     }
     res.json({ received: true });
   } catch (e) {
-    console.error('[Stripe] Webhook error:', e);
+    console.error('[Stripe] Webhook processing failed', event?.id ? `event=${event.id}` : '');
     res.status(500).send('Internal error');
   }
 });
@@ -3490,6 +3650,10 @@ module.exports = {
     _ownerSecretOk, _ownerSecretPresentInUrl,
     _maskLicence, _maskEmail,
     _filterBotConfig, _BOT_CONFIG_FIELDS,
+    _stripe: stripe,
+    _processStripeEvent,
+    _claimStripeFulfillment,
+    _resetStripeClaims: () => _stripeClaims.clear(),
     SCOPE_READ, SCOPE_WRITE,
     BOT_SESSION_TTL_MS,
   },
