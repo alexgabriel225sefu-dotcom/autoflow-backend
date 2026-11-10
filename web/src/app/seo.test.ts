@@ -18,6 +18,7 @@ describe("search engines can read the site", () => {
     // read what it may index.
     expect(runsFor("/robots.txt")).toBe(false);
     expect(runsFor("/sitemap.xml")).toBe(false);
+    expect(runsFor("/video/apex4traders-hero.mp4")).toBe(false);
     // The matcher still guards the app and the landing page.
     expect(runsFor("/dashboard")).toBe(true);
     expect(runsFor("/")).toBe(true);

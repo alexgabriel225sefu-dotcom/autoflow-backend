@@ -24,5 +24,5 @@ export const config = {
   // robots.txt and sitemap.xml are for crawlers, which have no session. Left in
   // the matcher they were answered with a redirect to /login, so a search engine
   // could not read what it may index.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|webp|mp4|webm)$).*)"],
 };
