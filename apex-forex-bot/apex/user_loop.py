@@ -375,6 +375,24 @@ def recovery_verdict(live_position, got_answer):
     return CONFIRMED_CLOSED
 
 
+def _resume_configured_symbol(configured_symbol, current_symbol,
+                              open_position, watchlist):
+    """Return to the configured market after a recovered position closes.
+
+    Restart recovery temporarily moves the loop's focus to the instrument of
+    the still-open position so that position remains managed.  That focus is
+    not the rule configuration.  Once the recovered position is gone, a
+    single-instrument loop must resume the configured instrument instead of
+    evaluating and opening another trade on the recovered instrument.
+
+    Basket mode owns its own focus rotation, so it is deliberately left
+    unchanged here.
+    """
+    if open_position or watchlist or not configured_symbol:
+        return current_symbol
+    return configured_symbol
+
+
 def _risk_from_snapshot(entry_price, initial_stop):
     """abs(entry - stop) from a persisted snapshot, or None if either value is
     missing/unusable. The snapshot is external state (Redis/disk) that can be
@@ -2468,6 +2486,16 @@ def _loop(user_id, alert_fn, gen=None):
             # streak has to be re-checked here rather than only at startup.
             if _clear_stale_streak():
                 _persist_risk_state()
+
+            # Restart recovery may have moved `symbol` to a still-open
+            # position on another market.  That is required while the
+            # position exists, but it must not become the next entry market
+            # after the position closes.  The configured rule symbol remains
+            # in cfg.SYMBOL for the lifetime of this loop.
+            _next_symbol = _resume_configured_symbol(
+                cfg.SYMBOL, symbol, open_pos, watchlist)
+            if _nrm(_next_symbol) != _nrm(symbol):
+                _focus(_next_symbol)
 
             # ── MULTI-POSITION: how many concurrent trades, and total-risk cap.
             # Live-only (paper stays single). Total exposure is bounded by
