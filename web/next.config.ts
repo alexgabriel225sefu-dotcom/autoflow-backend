@@ -122,6 +122,10 @@ const PERMISSIONS_POLICY = [
 ].join(", ");
 
 const nextConfig: NextConfig = {
+  // Next adds `x-powered-by: Next.js` to every response unless told not to.
+  // It tells a scanner which framework to try advisories against and tells a
+  // client nothing it needs.
+  poweredByHeader: false,
   turbopack: {
     root: path.resolve(__dirname),
   },
