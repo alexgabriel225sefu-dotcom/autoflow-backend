@@ -1,20 +1,38 @@
 "use client";
 import { BrandLockup } from "@/components/brand/logo";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type ConfirmState = "checking" | "confirmed" | "signed-out" | "pending";
 
 /**
  * A signed-in check of whether Supabase has confirmed the address.
- * The confirmation email itself lands on /auth/callback, not here.
+ * The confirmation email itself lands on /auth/callback, not here; a
+ * token_hash link that does arrive here is forwarded to it.
  */
 export default function ConfirmPage() {
+  const router = useRouter();
   const [state, setState] = useState<ConfirmState>("checking");
   const [email, setEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // An email template of the form /auth/confirm?token_hash=…&type=… is the
+    // Supabase-documented link format. /auth/callback verifies it (and owns
+    // the new-password form), so the link is handed over rather than checked
+    // here. Only the token, its type and `next` travel on.
+    const query = new URLSearchParams(window.location.search);
+    const tokenHash = query.get("token_hash");
+    if (tokenHash) {
+      const forward = new URLSearchParams({ token_hash: tokenHash });
+      for (const name of ["type", "next"]) {
+        const value = query.get(name);
+        if (value) forward.set(name, value);
+      }
+      router.replace(`/auth/callback?${forward.toString()}`);
+      return;
+    }
     createClient().auth.getUser().then(({ data, error: userError }) => {
       if (userError) {
         setError(userError.message);
@@ -28,7 +46,7 @@ export default function ConfirmPage() {
       setEmail(data.user.email ?? null);
       setState(data.user.email_confirmed_at ? "confirmed" : "pending");
     });
-  }, []);
+  }, [router]);
 
   return (
     <main className="a4t">

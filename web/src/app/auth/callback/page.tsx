@@ -1,78 +1,152 @@
 "use client";
 import { BrandLockup } from "@/components/brand/logo";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient, createImplicitClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/supabase/middleware";
 
+type BrowserClient = ReturnType<typeof createClient>;
+
+interface EmailLink {
+  /** `?token_hash=` — verified by Supabase directly, from any browser. */
+  tokenHash: string | null;
+  type: string | null;
+  /** `?code=` — PKCE; only the browser that started the flow can finish it. */
+  code: string | null;
+  /** `#access_token=` — a session in the fragment, from any browser. */
+  implicit: boolean;
+}
+
+const OTP_TYPES: readonly EmailOtpType[] = [
+  "recovery", "signup", "email", "invite", "magiclink", "email_change",
+];
+
+function isOtpType(value: string | null): value is EmailOtpType {
+  return OTP_TYPES.includes(value as EmailOtpType);
+}
+
 /**
- * Supabase email confirmation and password recovery land here with `?code=`
- * (PKCE). The code has to be exchanged for a session before getSession or
- * updateUser can succeed. A query error is shown; it is never a silent hop
- * to /login.
+ * Turns whatever the emailed link carried into a session on the cookie-backed
+ * client. Resolves to null on success, or to the reason it failed.
+ */
+async function establishSession(supabase: BrowserClient, link: EmailLink): Promise<string | null> {
+  if (link.implicit) {
+    // The PKCE client refuses a fragment session, so a second, implicit
+    // client reads it and the result is imported into the cookie-backed one.
+    const { data, error } = await createImplicitClient().auth.getSession();
+    if (error || !data.session) {
+      return error?.message || "This confirmation link did not contain a valid session.";
+    }
+    const { error: sessionError } = await supabase.auth.setSession(data.session);
+    return sessionError ? sessionError.message : null;
+  }
+  if (link.tokenHash) {
+    if (!isOtpType(link.type)) return "This link is not valid.";
+    const { error } = await supabase.auth.verifyOtp({ token_hash: link.tokenHash, type: link.type });
+    return error ? error.message : null;
+  }
+  if (link.code) {
+    // The browser client exchanges `?code=` by itself while it starts up, and
+    // deletes the PKCE verifier when it does. Exchanging the same code again
+    // then fails with "code verifier not found" although the visitor is
+    // signed in. So: wait for startup, and exchange only a code it left alone.
+    const { error: startupError } = await supabase.auth.initialize();
+    const remaining = new URL(window.location.href).searchParams.get("code");
+    if (!remaining) return null;
+    if (startupError) return startupError.message;
+    const { error } = await supabase.auth.exchangeCodeForSession(remaining);
+    return error ? error.message : null;
+  }
+  return null;
+}
+
+/**
+ * One attempt per link. Every one of these tokens is single-use, and React
+ * runs an effect twice in development: the second run has to wait for the
+ * first attempt instead of spending the token again and reporting a failure.
+ */
+let attempt: { key: string; result: Promise<string | null> } | null = null;
+
+function establishSessionOnce(supabase: BrowserClient, link: EmailLink) {
+  const key = link.implicit ? `fragment:${window.location.hash}`
+    : link.tokenHash ? `token:${link.tokenHash}`
+    : link.code ? `code:${link.code}` : null;
+  if (!key) return Promise.resolve(null);
+  if (attempt?.key !== key) attempt = { key, result: establishSession(supabase, link) };
+  return attempt.result;
+}
+
+/** Single-use credentials do not stay in the address bar or the history. */
+function removeCredentialsFromUrl(recovery: boolean) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("code");
+  url.searchParams.delete("token_hash");
+  // The fragment is dropped, and it may be what said this is a recovery.
+  if (recovery) url.searchParams.set("mode", "recovery");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+}
+
+function recoveryFailure(message: string) {
+  if (/code verifier/i.test(message)) {
+    return "This reset link was opened in a different browser from the one that requested it. "
+      + "Request a new link: new links open in any browser.";
+  }
+  return `This link did not sign you in. ${message}`;
+}
+
+/**
+ * Every emailed auth link lands here: confirmation, password recovery, and
+ * the return from a social sign-in. Three link formats are accepted:
+ * `?token_hash=&type=` and `#access_token=` work in any browser, `?code=`
+ * (PKCE) only in the one that started the flow. A password reset must not
+ * depend on the last one, because the email is usually opened elsewhere.
+ * An error is shown; it is never a silent hop to /login.
  */
 function CallbackPageInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const recovery = params.get("mode") === "recovery";
+  const fragment = new URLSearchParams(
+    typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "",
+  );
   const code = params.get("code");
-  const hasImplicitSession = typeof window !== "undefined"
-    && window.location.hash.includes("access_token=");
-  const queryError = params.get("error_description") || params.get("error");
+  const tokenHash = params.get("token_hash");
+  const type = params.get("type");
+  const hasImplicitSession = fragment.has("access_token");
+  const recovery = params.get("mode") === "recovery" || type === "recovery"
+    || fragment.get("type") === "recovery";
+  // Supabase reports an expired or reused link in the query, the fragment, or both.
+  const queryError = params.get("error_description") || params.get("error")
+    || fragment.get("error_description") || fragment.get("error");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(queryError);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const linkFailed = useRef(false);
 
   useEffect(() => {
+    // A link that failed stays failed. Removing its credentials from the URL
+    // can re-run this effect, and a second pass would find neither a link nor
+    // a session and replace the real reason with a hop to /login.
+    if (linkFailed.current) return;
     let cancelled = false;
     (async () => {
       const supabase = createClient();
       if (queryError) {
         if (!cancelled) setError(queryError);
-      }
-      if (hasImplicitSession) {
-        // Confirmation links opened from another tab/device carry an implicit
-        // session instead of the PKCE code that belongs to the original tab.
-        // Import it into the cookie-backed client before routing to the app.
-        const implicit = createImplicitClient();
-        const { data: implicitData, error: implicitError } = await implicit.auth.getSession();
-        if (implicitError || !implicitData.session) {
-          if (!cancelled) {
-            setError(implicitError?.message || "This confirmation link did not contain a valid session.");
-            setHasSession(false);
-            setReady(true);
-          }
-          return;
+      } else if (hasImplicitSession || tokenHash || code) {
+        const failure = await establishSessionOnce(
+          supabase, { tokenHash, type, code, implicit: hasImplicitSession });
+        if (cancelled) return;
+        if (failure) {
+          linkFailed.current = true;
+          setError(recovery ? recoveryFailure(failure) : failure);
+          setHasSession(false);
+          setReady(true);
         }
-        const { error: sessionError } = await supabase.auth.setSession(implicitData.session);
-        if (sessionError) {
-          if (!cancelled) {
-            setError(sessionError.message);
-            setHasSession(false);
-            setReady(true);
-          }
-          return;
-        }
-        const url = new URL(window.location.href);
-        url.hash = "";
-        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
-      } else if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        const url = new URL(window.location.href);
-        url.searchParams.delete("code");
-        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-        if (exchangeError) {
-          if (!cancelled) {
-            setError(recovery
-              ? `This link did not sign you in. ${exchangeError.message}`
-              : exchangeError.message);
-            setHasSession(false);
-            setReady(true);
-          }
-          return;
-        }
+        removeCredentialsFromUrl(recovery);
+        if (failure) return;
       }
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (cancelled) return;
@@ -96,7 +170,7 @@ function CallbackPageInner() {
       else router.replace("/login");
     })();
     return () => { cancelled = true; };
-  }, [code, hasImplicitSession, queryError, recovery, router, params]);
+  }, [code, tokenHash, type, hasImplicitSession, queryError, recovery, router, params]);
 
   async function setNewPassword(e: React.FormEvent) {
     e.preventDefault();

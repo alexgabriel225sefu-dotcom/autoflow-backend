@@ -2,7 +2,7 @@
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthSubmit } from "@/components/auth/auth-submit";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createImplicitClient } from "@/lib/supabase/client";
 import { authCallbackUrl } from "@/lib/supabase/redirect";
 import { authErrorMessage } from "@/lib/supabase/auth-error";
 
@@ -16,7 +16,11 @@ export default function ResetPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error } = await createClient().auth.resetPasswordForEmail(email, {
+    // Not the PKCE client: its link can only be finished by the browser that
+    // holds the code verifier, and a reset email is usually opened somewhere
+    // else. The implicit client's link carries the recovery session itself,
+    // which /auth/callback imports in whichever browser opens it.
+    const { error } = await createImplicitClient().auth.resetPasswordForEmail(email, {
       redirectTo: authCallbackUrl(window.location.origin, { recovery: true }),
     });
     setBusy(false);

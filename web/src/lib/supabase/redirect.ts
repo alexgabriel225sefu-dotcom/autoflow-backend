@@ -5,9 +5,13 @@
  * Two kinds of origin keep their own address instead of being rewritten:
  * local development, and the product's own hosts. The sign-in uses PKCE, and
  * the code verifier lives in a cookie on the host that STARTED the flow. A
- * reset or Google sign-in begun on the onrender address and sent back to www
- * arrives without its verifier and fails, so only an origin nobody owns (a
- * preview deployment) is rewritten to the public one.
+ * Google sign-in begun on the onrender address and sent back to www arrives
+ * without its verifier and fails, so only an origin nobody owns (a preview
+ * deployment) is rewritten to the public one.
+ *
+ * Emailed links (sign-up confirmation, password reset) are requested through
+ * the implicit client and need no verifier, because the inbox is usually
+ * opened in another browser than the one that asked.
  */
 export const CANONICAL_WEB_ORIGIN = "https://www.apex4traders.com";
 
