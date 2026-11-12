@@ -583,9 +583,10 @@ status, body, _log = _call(
 check("an unknown account is not an empty summary",
       status == 404 and body["error"]["code"] == "NOT_FOUND", str(body)[:200])
 
-check("the audit is metered with the other broker reads",
-      RL.classify("GET", "admin/audit/accounts") == "candles"
-      and RL.classify("GET", f"admin/audit/accounts/{CTID}/deals") == "candles")
+check("the audit is metered in its own bucket, as tightly as a broker read",
+      RL.classify("GET", "admin/audit/accounts") == "admin"
+      and RL.classify("GET", f"admin/audit/accounts/{CTID}/deals") == "admin"
+      and RL.LIMITERS["admin"].limit <= RL.LIMITERS["candles"].limit)
 
 print()
 if _fails:

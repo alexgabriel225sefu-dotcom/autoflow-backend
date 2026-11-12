@@ -17,6 +17,7 @@ import type { ApiError, Execution, ReadState } from "@/lib/api";
 // cTrader account is connected" for a status that also means "linked
 // but nothing selected".
 import { plainErrorTitle, plainRead } from "./plain";
+import { BusyNotice } from "./busy-notice";
 
 export function StatusPill({
   mode, accountId,
@@ -55,6 +56,8 @@ export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () 
   // a calm notice instead of a red error. The server's own sentence (with the
   // wait it asks for) is kept as the body.
   if (error.code === "RATE_LIMITED") {
+    // The read has a retry scheduled (see `useRead`): say so and count down.
+    if (error.retryAt) return <BusyNotice retryAt={error.retryAt} />;
     return (
       <div className="notice notice-info" role="status">
         <div className="notice-head">

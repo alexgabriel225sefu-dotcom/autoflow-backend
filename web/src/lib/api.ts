@@ -31,6 +31,14 @@ export type ApiError = {
   /** Present on RATE_LIMITED, so a retry can wait rather than hammer. */
   retryAfterSec?: number;
   /**
+   * When the read that got this RATE_LIMITED answer will ask again by itself,
+   * as a clock time in milliseconds. Set by `useRead`, never by the server,
+   * and only when the retry is really scheduled, so a screen may count down
+   * to it ("Busy, retrying in N s") without promising something that will
+   * not happen.
+   */
+  retryAt?: number;
+  /**
    * A keyed reference to one broker-link attempt, safe to display and to
    * quote. It identifies the attempt in the server logs and reveals neither
    * the nonce it derives from nor who made it — which is the point: the

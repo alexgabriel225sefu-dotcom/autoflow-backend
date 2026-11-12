@@ -147,6 +147,27 @@ def _start_trial_if_new(principal):
 # Supabase-lookup budget in `_authenticate` can see it without threading an
 # argument through every route below.
 _CLIENT_KEY = contextvars.ContextVar("a4t_client_key", default=None)
+# The rate-limit key of the request being handled, for `_spend_broker_read`.
+_RL_KEY = contextvars.ContextVar("a4t_rl_key", default=None)
+
+
+def _spend_broker_read(user_id):
+    """Spend the broker-data budget, but only when there is a broker to ask.
+
+    `trades`, `symbols` and `trade/min-lot` reach cTrader only for a client who
+    has linked an account. With nothing linked they answer from the platform's
+    own store, and charging them the 30-a-minute broker budget made an
+    unlinked client's ordinary page loads the thing that exhausted it. A store
+    that cannot say whether an account is linked is not a "no": it is charged.
+    Raises `ratelimit.Limited`, which `_handle_limited` turns into the 429.
+    """
+    try:
+        linked = _link.is_platform_account(user_id)
+    except Exception:                                   # noqa: BLE001
+        linked = True
+    key = _RL_KEY.get()
+    if linked and key:
+        _rl.charge("candles", key)
 
 
 def _authenticate(headers, *, fresh=False, start_trial=True):
@@ -304,14 +325,15 @@ def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
     # the endpoints worth protecting — candles against the broker's shared
     # historical budget, preview against the evaluator — are exactly the ones
     # a loop would reach.
+    auth_header = ((headers or {}).get("Authorization")
+                   or (headers or {}).get("authorization"))
     allowed, bucket, retry_after = _rl.check(
-        method, route, client_key=client_key,
-        auth_header=(headers or {}).get("Authorization")
-        or (headers or {}).get("authorization"))
+        method, route, client_key=client_key, auth_header=auth_header)
     if not allowed:
         return _rl.refusal(bucket, retry_after)
     method = (method or "GET").upper()
     ctx_token = _CLIENT_KEY.set(client_key)
+    rl_token = _RL_KEY.set(_rl.key_for(client_key, auth_header))
     try:
         return _dispatch(method, route, headers or {}, body,
                          _query(path))
@@ -417,6 +439,7 @@ def _handle_limited(method, path, headers=None, body=None, *, client_key=None):
         return _err(400, "BAD_REQUEST", _safe_error(e))
     finally:
         _CLIENT_KEY.reset(ctx_token)
+        _RL_KEY.reset(rl_token)
 
 
 def _dispatch(method, route, headers, body, query=None):
@@ -820,12 +843,14 @@ def _dispatch(method, route, headers, body, query=None):
         # Everything the selected account's broker lists, classified by what
         # the engine can trade today. Read-only, like positions and orders.
         p = _authenticate(headers)
+        _spend_broker_read(p.user_id)
         return _ok(_read.symbols(p.user_id))
 
     if route == "trade/min-lot" and method == "GET":
         # Whether the broker's minimum order size would risk more than the
         # client chose, as an estimate. Read-only, like the rest of _read.
         p = _authenticate(headers)
+        _spend_broker_read(p.user_id)
         q = query or {}
         return _ok(_read.min_lot(
             p.user_id, symbol=q.get("symbol"), timeframe=q.get("timeframe"),
@@ -1034,6 +1059,7 @@ def _dispatch(method, route, headers, body, query=None):
     # ── trades (closed, one row each, with the curve they make) ─────────
     if route == "trades" and method == "GET":
         p = _authenticate(headers)
+        _spend_broker_read(p.user_id)
         q = query or {}
         return _ok(_tradesread.read(p.user_id, days=q.get("days", 30),
                                     mode=q.get("mode") or "demo",
