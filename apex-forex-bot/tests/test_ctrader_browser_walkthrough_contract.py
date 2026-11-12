@@ -125,7 +125,7 @@ def test_connected_ctrader_ui_exposes_the_manual_walkthrough_states():
     assert_all(
         journal,
         [
-            "Every evaluation",
+            "Closed trades",
             "No order placed",
             "automation_paused",
             "automation_stopped",

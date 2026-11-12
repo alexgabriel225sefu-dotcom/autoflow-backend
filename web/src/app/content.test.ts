@@ -365,4 +365,16 @@ describe("the UI and the backend refuse live trading in the same words", () => {
         .toBe(false);
     }
   });
+  it("does not promise a journal entry for every decision or evaluation", () => {
+    // The platform journal records when automation starts, pauses and stops,
+    // and the signals it reports. The engine that places demo orders does not
+    // write each check, order or close into it, so "every decision" and
+    // "every evaluation" were claims the product could not keep. Wire the
+    // engine to the journal first, then change this test.
+    const promise = /every\s+(decision|evaluation)/i;
+    for (const f of FILES) {
+      expect(promise.test(f.body), `${f.path} promises a journal of every decision or evaluation`)
+        .toBe(false);
+    }
+  });
 });

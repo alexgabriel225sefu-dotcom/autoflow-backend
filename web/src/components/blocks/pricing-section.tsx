@@ -32,7 +32,7 @@ const FOUNDER_FEATURES = [
   "Build rules from indicators and price levels",
   "Preview a rule against real candles before it runs",
   "Start, pause and stop automation yourself",
-  "Full journal of every decision and why",
+  "Journal of starts, stops, pauses and signals",
   "Risk limits you set, enforced server-side",
   "Email support",
 ];

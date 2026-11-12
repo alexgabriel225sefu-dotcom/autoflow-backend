@@ -61,7 +61,7 @@ export function journeySteps({ auto, rules, mode = null, liveOpen = false, hasDe
   const raw: Array<[JourneyStep["id"], string, string, string, boolean | null]> = [
     ["choose", "Choose a strategy", "Pick an instrument and a ready-made strategy.", "/trade", hasRule],
     startStep(mode, liveOpen, hasDemo, started),
-    ["watch", "Watch it work", running ? "Running. Every decision is in your journal." : "Every decision lands in your journal.", "/journal", null],
+    ["watch", "Watch it work", running ? "Running. Starts, stops and signals are in your journal; trades are in Positions." : "Starts, stops and signals land in your journal.", "/journal", null],
   ];
 
   let currentTaken = false;

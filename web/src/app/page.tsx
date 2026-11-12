@@ -31,7 +31,7 @@ const steps = [
 ] as const;
 
 const features = [
-  { icon: ShieldCheck, title: "Keep a decision journal", body: "Every evaluation records what the rule saw, what it decided and why, including the times it decided to wait. Review it whenever you like.", wide: true, shot: true },
+  { icon: ShieldCheck, title: "Keep a journal", body: "The journal records when automation starts, pauses and stops, and any signal found at the Signals Only level. Orders and closed trades are listed in Positions and Closed trades.", wide: true, shot: true },
   { icon: GaugeCircle, title: "Set your limits", body: "Risk per trade, stop distance, target and the number of open positions stay next to the rule you are testing." },
   { icon: Link2, title: "Connect your own account", body: "You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password." },
   { icon: ListChecks, title: "Build rules from conditions", body: "Combine moving averages, RSI, MACD, sessions and more, then read the rule back in plain language before you test it.", wide: true },
@@ -72,7 +72,7 @@ export default function Landing() {
         <section id="tour" className="mkt-section" aria-labelledby="tour-title">
           <span className="mkt-eyebrow">The platform</span>
           <h2 id="tour-title">See it before you sign up.</h2>
-          <p>Real screens from a demo account, from the first setup step to the journal of every decision.</p>
+          <p>Real screens from a demo account, from the first setup step to the journal of what it did.</p>
           <ProductShowcase />
         </section>
 

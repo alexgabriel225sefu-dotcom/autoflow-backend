@@ -13,7 +13,7 @@ export function HeroProduct() {
     <div
       className={styles.stage}
       role="img"
-      aria-label="Apex4Traders on a laptop and on a phone: automation running on a demo account, with the journal of every decision"
+      aria-label="Apex4Traders on a laptop and on a phone: automation running on a demo account, with the journal of what it did"
     >
       <div className={styles.float}>
         <ProductWindow src="/product/journal.webp" alt="" ratio="16 / 10" priority />
