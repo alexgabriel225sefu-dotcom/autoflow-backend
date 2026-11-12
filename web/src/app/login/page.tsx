@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/auth/password-field";
 import { AuthSubmit } from "@/components/auth/auth-submit";
 import { authErrorMessage } from "@/lib/supabase/auth-error";
-import { GoogleButton } from "@/components/auth/google-button";
+import { GoogleOption } from "@/components/auth/google-option";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -41,10 +41,7 @@ function LoginPageInner() {
       lead="Sign in to your control panel."
       footer={<><a href="/auth/reset">Forgot your password?</a><a href="/signup">Create an account</a></>}
     >
-      <div className="auth-alt">
-        <GoogleButton next={params.get("next")} onError={(m) => setError(m || null)} />
-        <p className="auth-or"><span>or</span></p>
-      </div>
+      <GoogleOption next={params.get("next")} onError={(m) => setError(m || null)} />
       <form onSubmit={onSubmit} className="card">
         <label className="field">
           <span>Email</span>
