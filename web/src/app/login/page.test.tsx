@@ -36,12 +36,25 @@ async function submit() {
 }
 
 describe("login", () => {
-  it("renders the form, the Google option and the way to sign up or reset", async () => {
+  it("renders the form and the way to sign up or reset, without Google while the provider is off", async () => {
     render(<LoginPage />);
     expect(await screen.findByRole("heading", { name: /welcome back/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /google/i })).toBeTruthy();
+    // The provider is not enabled at Supabase by default, and the button then
+    // only produces "Unsupported provider". It must not be offered.
+    expect(screen.queryByRole("button", { name: /google/i })).toBeNull();
+    expect(screen.queryByText(/^or$/i)).toBeNull();
     expect(screen.getByRole("link", { name: /forgot your password/i }).getAttribute("href")).toBe("/auth/reset");
     expect(screen.getByRole("link", { name: /create an account/i }).getAttribute("href")).toBe("/signup");
+  });
+
+  it("offers Google once the deployment says the provider is configured", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_SIGN_IN", "true");
+    try {
+      render(<LoginPage />);
+      expect(await screen.findByRole("button", { name: /google/i })).toBeTruthy();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("signs in and opens the dashboard by default", async () => {

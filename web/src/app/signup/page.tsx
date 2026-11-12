@@ -8,7 +8,7 @@ import { PasswordField } from "@/components/auth/password-field";
 import { AuthSubmit } from "@/components/auth/auth-submit";
 import { authCallbackUrl } from "@/lib/supabase/redirect";
 import { authErrorMessage } from "@/lib/supabase/auth-error";
-import { GoogleButton } from "@/components/auth/google-button";
+import { GoogleOption } from "@/components/auth/google-option";
 import { inboxLink } from "@/lib/inbox-link";
 import { ResendConfirmation } from "@/components/auth/resend-confirmation";
 
@@ -102,10 +102,7 @@ export default function SignUpPage() {
       {/* Before the form, not after it. Somebody entering an email address
           is entitled to know whether it will end in a payment screen. */}
       <p className="muted" style={{ fontSize: ".84rem", marginTop: "1rem" }}>{PLAN_NOTICE}</p>
-      <div className="auth-alt">
-        <GoogleButton label="Sign up with Google" onError={(m) => setError(m || null)} />
-        <p className="auth-or"><span>or</span></p>
-      </div>
+      <GoogleOption label="Sign up with Google" onError={(m) => setError(m || null)} />
       <form onSubmit={onSubmit} className="card" noValidate>
         <label className="field">
           <span>Email</span>
