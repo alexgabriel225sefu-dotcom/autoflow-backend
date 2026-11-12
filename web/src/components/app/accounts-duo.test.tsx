@@ -26,6 +26,22 @@ describe("AccountsDuo", () => {
     expect(container.textContent).not.toMatch(/cleared|automating/i);
   });
 
+  it("says the balance is being read, not unknown, while the read is on its way", () => {
+    const { container, rerender } = render(<AccountsDuo accounts={accounts} selected={{ ctid: 111, mode: "demo" }} execution={closed} running={null} figuresLoading />);
+    expect(container.textContent).toMatch(/Reading balance and equity/);
+    expect(container.textContent).not.toMatch(/Balance unknown/);
+    // Once the read has answered with nothing for this account, it is unknown.
+    rerender(<AccountsDuo accounts={accounts} selected={{ ctid: 111, mode: "demo" }} execution={closed} running={null} figures={[]} />);
+    expect(container.textContent).toMatch(/Balance unknown/);
+  });
+
+  it("does not offer to start a demo that is already running", () => {
+    const { container } = render(<AccountsDuo accounts={accounts} selected={{ ctid: 111, mode: "demo" }} execution={closed} running={running} />);
+    const demo = container.querySelector('[data-kind="demo"]');
+    expect(demo?.textContent).toMatch(/Manage automation/);
+    expect(demo?.textContent).not.toMatch(/Start on demo/);
+  });
+
   it("marks only the account that is actually running", () => {
     const { container } = render(<AccountsDuo accounts={accounts} selected={{ ctid: 111, mode: "demo" }} execution={closed} running={running} />);
     expect(container.querySelector('[data-kind="demo"]')?.getAttribute("data-active")).toBe("true");

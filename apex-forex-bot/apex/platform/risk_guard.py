@@ -59,13 +59,50 @@ def evaluate(state: dict[str, Any], limits: GuardLimits | None = None) -> dict[s
             "readOnly": True}
 
 
+def symbol_exposure_fraction(positions: Any, balance: Any) -> float | None:
+    """The largest share of the balance at risk to stop in one symbol.
+
+    ``positions`` is the response of ``broker_read.positions``. The value is
+    the sum of ``riskToStop`` per symbol, divided by the balance, for the
+    symbol where that is largest; no open position is 0. It is None, which
+    the guard blocks on, when the read failed, the balance is not a positive
+    number, or any open position has no readable stop risk: an unprotected
+    position has no bounded exposure to report.
+    """
+    if not isinstance(positions, dict) or positions.get("status") != "ok":
+        return None
+    rows = positions.get("positions")
+    if not isinstance(rows, list):
+        return None
+    bal = _number(balance)
+    if bal is None or bal <= 0:
+        return None
+    per_symbol: dict[str, float] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            return None
+        risk = _number(row.get("riskToStop"))
+        symbol = row.get("symbol")
+        if risk is None or risk < 0 or not symbol or row.get("hasStop") is False:
+            return None
+        per_symbol[str(symbol)] = per_symbol.get(str(symbol), 0.0) + risk
+    if not per_symbol:
+        return 0.0
+    return max(per_symbol.values()) / bal
+
+
 def state_from_trades(read_result: dict[str, Any], account: dict[str, Any] | None = None,
-                      *, now: float | None = None) -> dict[str, Any]:
+                      *, positions: Any = None,
+                      now: float | None = None) -> dict[str, Any]:
     """Derive guard inputs from the real closed-trade read.
 
     ``read_result`` must be the response from ``trades_read.read``.  A failed
     response leaves all measured values unknown.  Balance is required for the
     loss fractions; no guessed currency or initial balance is introduced.
+
+    ``positions`` is the response of ``broker_read.positions`` for the same
+    account. Without it symbol exposure stays unknown and the guard blocks,
+    which is what every caller got before one of them supplied it.
     """
     if not isinstance(read_result, dict) or read_result.get("status") != "ok":
         return {"source": "closed trades and account read", "readable": False,
@@ -73,6 +110,7 @@ def state_from_trades(read_result: dict[str, Any], account: dict[str, Any] | Non
                 if isinstance(read_result, dict) else "trades could not be read",
                 "weeklyLossFraction": None, "drawdownFraction": None,
                 "consecutiveLosses": None, "tradesToday": None,
+                "symbolExposureFraction": None,
                 "slippagePips": None}
     rows = [r for r in (read_result.get("trades") or []) if isinstance(r, dict)]
     balance = _number((account or {}).get("balance"))
@@ -82,6 +120,7 @@ def state_from_trades(read_result: dict[str, Any], account: dict[str, Any] | Non
                 "weeklyLossFraction": None, "drawdownFraction": None,
                 "consecutiveLosses": _consecutive_losses(rows),
                 "tradesToday": _trades_today(rows, now=now),
+                "symbolExposureFraction": None,
                 "slippagePips": None}
     now_ts = time.time() if now is None else float(now)
     weekly = [r for r in rows if _number(r.get("closedAt")) is not None
@@ -103,6 +142,7 @@ def state_from_trades(read_result: dict[str, Any], account: dict[str, Any] | Non
             "drawdownFraction": max_dd,
             "consecutiveLosses": _consecutive_losses(rows),
             "tradesToday": _trades_today(rows, now=now),
+            "symbolExposureFraction": symbol_exposure_fraction(positions, balance),
             "slippagePips": None}
 
 

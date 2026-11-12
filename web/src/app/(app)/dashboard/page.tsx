@@ -246,6 +246,7 @@ export default function Dashboard() {
         accounts={account?.accounts ?? null} selected={selected}
         execution={execution} running={running}
         figures={reads.result?.ok ? reads.result.data.accounts : null}
+        figuresLoading={reads.loading && !reads.result}
       />
       {reads.result && !reads.result.ok ? (
         <ErrorNotice error={reads.result} onRetry={reads.reload} />
