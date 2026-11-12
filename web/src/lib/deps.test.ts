@@ -15,7 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { contentSecurityPolicy } from "../../next.config";
+import nextConfig, { contentSecurityPolicy } from "../../next.config";
 
 const WEB = join(__dirname, "..", "..");
 const pkg = JSON.parse(readFileSync(join(WEB, "package.json"), "utf8")) as {
@@ -147,6 +147,13 @@ describe("responses carry a browser security policy", () => {
     expect(config).toContain("frame-ancestors 'none'");
   });
 
+  it("does not advertise the framework in x-powered-by", () => {
+    // Next sends `x-powered-by: Next.js` by default. The option is read from
+    // the loaded config, not from the source text, so a commented-out line
+    // does not pass.
+    expect(nextConfig.poweredByHeader).toBe(false);
+  });
+
   it("allows Supabase and Stripe and does not open framing", () => {
     // Supabase is a fetch and a websocket. Stripe checkout is a navigation
     // to one of these two hosts. Framing the app is refused twice: the CSP
@@ -194,6 +201,9 @@ describe("known dependency holes stay closed", () => {
    *   vite 8.3.0–8.3.2       launch-editor and server.fs advisories
    *   source-map-js < 1.2.2  event-loop DoS via source-map offsets
    *   vitest < 5.0.3         @vitest/mocker code injection and path traversal
+   *
+   * minimatch is checked separately below: only >=7.0.0 <11.0.1 is affected,
+   * and the 3.x copy eslint itself uses must stay where it is.
    */
   const lock = JSON.parse(readFileSync(join(WEB, "package-lock.json"), "utf8")) as {
     packages: Record<string, { version?: string }>;
@@ -223,6 +233,22 @@ describe("known dependency holes stay closed", () => {
       expect(
         atLeast(spec, floor),
         `${name}@${spec} is below ${floor.join(".")}`,
+      ).toBe(true);
+    }
+  });
+
+  it("no minimatch in the tree is in the range GHSA-g3hv-75wg-m249 covers", () => {
+    // >=7.0.0 <11.0.1: denial of service via globparts amplification. It
+    // arrives through @typescript-eslint/typescript-estree (lint tooling, not
+    // the runtime bundle), which asks for ^10.2.2 and has no release asking
+    // for anything newer, so an override scoped to that package is the floor.
+    const found = versions("minimatch");
+    expect(found.length, "minimatch is not in the lockfile").toBeGreaterThan(0);
+    for (const spec of found) {
+      const [major] = exact(spec);
+      expect(
+        major < 7 || atLeast(spec, [11, 0, 1]),
+        `minimatch@${spec} is inside >=7.0.0 <11.0.1`,
       ).toBe(true);
     }
   });
