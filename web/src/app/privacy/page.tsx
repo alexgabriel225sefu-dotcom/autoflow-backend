@@ -3,6 +3,9 @@ import Link from "next/link";
 import { BrandLockup } from "@/components/brand/logo";
 import { LegalSection, LegalSections } from "@/components/legal/legal-section";
 import { ReadingProgress } from "@/components/legal/reading-progress";
+import { ApprovedDate } from "@/components/legal/draft-shell";
+import { Pending } from "@/components/legal/pending";
+import { LEGAL_FACTS, hasFact } from "@/lib/legal-facts";
 
 export const metadata: Metadata = { title: "Privacy Policy — Apex4Traders" };
 
@@ -12,8 +15,9 @@ export const metadata: Metadata = { title: "Privacy Policy — Apex4Traders" };
  * What is described below is what the code actually does — the processors are
  * named because they are in the dependency list, and the broker token
  * handling is described because apex/platform/ctrader_link.py behaves that
- * way. What is left as `[TO BE CONFIRMED]` is the controller's identity,
- * jurisdiction, retention periods and contact, which are the owner's.
+ * way. The controller's identity, jurisdiction, retention periods and
+ * contact are the owner's. They come from lib/legal-facts.ts, and an unset
+ * one is stated as missing.
  *
  * The previous version described collecting a name and email "when you make a
  * purchase" to "deliver your product", and gave a support address at a
@@ -27,6 +31,12 @@ export const metadata: Metadata = { title: "Privacy Policy — Apex4Traders" };
  * only reader who has given us something before they have anything back.
  */
 export default function PrivacyPage() {
+  const facts = LEGAL_FACTS;
+  const retention: [string, string | null][] = [
+    ["Account data", facts.retentionAccountData],
+    ["Journal entries", facts.retentionJournal],
+    ["Disconnected broker links", facts.retentionBrokerLinks],
+  ];
   return (
     <main className="a4t">
       <ReadingProgress />
@@ -37,13 +47,12 @@ export default function PrivacyPage() {
 
         <h1>Privacy Policy</h1>
         <p className="dim" style={{ fontSize: ".8rem" }}>
-          Last updated: [TO BE CONFIRMED — date of the owner-approved version]
+          <ApprovedDate />
         </p>
 
         <div className="legacy-flag" style={{ marginTop: "var(--sp-4)" }}>
-          This document is not final. The items marked
-          &ldquo;[TO BE CONFIRMED]&rdquo; require the operator&rsquo;s decision
-          and are listed in the project&rsquo;s legal launch blockers.
+          This document is not final. Where a section needs a detail the
+          operator has not supplied, the section says so.
         </div>
 
         <LegalSections>
@@ -79,10 +88,19 @@ export default function PrivacyPage() {
             We will use the address to send you one email when early access
             opens. There is no newsletter, the list is not shared or sold, and
             the email carries no tracking pixel and no click tracking. Ask us
-            and we will take your address off the list.
-            <strong> [TO BE CONFIRMED — the email provider that will deliver
-            that message, and the address to write to in order to be removed.]
-            </strong>
+            and we will take your address off the list.{" "}
+            {hasFact(facts.privacyEmail) ? (
+              <>
+                Write to{" "}
+                <a href={`mailto:${facts.privacyEmail}`}>{facts.privacyEmail}</a>{" "}
+                to be removed.
+              </>
+            ) : (
+              <Pending fact="privacyEmail">
+                The address to write to in order to be removed is not
+                published yet.
+              </Pending>
+            )}
           </p>
         </LegalSection>
 
@@ -112,15 +130,39 @@ export default function PrivacyPage() {
         <LegalSection>
           <h2>5. Processors</h2>
           <p>
-            Authentication and account storage are provided by Supabase. Market
-            data and order execution go through cTrader and the broker you
-            chose. If and when paid access is enabled, payments are processed
-            by Stripe and card details are never stored on our servers. The
-            early-access email, when it is sent, will be delivered by an email
-            provider, which will see the address it is sent to.
-            <strong> [TO BE CONFIRMED — hosting provider, data region, the
-            email provider, and the full list of sub-processors with their
-            locations.]</strong>
+            {hasFact(facts.authProvider)
+              ? `Authentication and account storage are provided by ${facts.authProvider}. `
+              : null}
+            Market data and order execution go through cTrader and the broker
+            you chose.{" "}
+            {hasFact(facts.paymentProvider)
+              ? `If and when paid access is enabled, payments are processed by ${facts.paymentProvider} and card details are never stored on our servers. `
+              : null}
+            {hasFact(facts.hostingProvider)
+              ? `The application is hosted on ${facts.hostingProvider}. `
+              : null}
+            The early-access email, when it is sent, will be delivered by{" "}
+            {hasFact(facts.emailProvider) ? facts.emailProvider : "an email provider"},
+            which will see the address it is sent to.
+          </p>
+          <p>
+            {hasFact(facts.dataRegion) ? (
+              <>Data region: {facts.dataRegion}. </>
+            ) : null}
+            {hasFact(facts.subProcessorList) ? (
+              <>Sub-processors and their locations: {facts.subProcessorList}.</>
+            ) : null}
+            {hasFact(facts.dataRegion) && hasFact(facts.subProcessorList) ? null : (
+              <Pending fact={["dataRegion", "subProcessorList"]}>
+                {hasFact(facts.dataRegion) ? "" : "The data region "}
+                {hasFact(facts.dataRegion) || hasFact(facts.subProcessorList) ? "" : "and "}
+                {hasFact(facts.subProcessorList)
+                  ? ""
+                  : "the complete list of sub-processors with their locations "}
+                {hasFact(facts.dataRegion) || hasFact(facts.subProcessorList) ? "is" : "are"}{" "}
+                not published yet.
+              </Pending>
+            )}
           </p>
         </LegalSection>
 
@@ -137,8 +179,25 @@ export default function PrivacyPage() {
         <LegalSection>
           <h2>7. How long</h2>
           <p>
-            <strong>[TO BE CONFIRMED — retention periods for account data,
-            journal entries and disconnected broker links.]</strong>
+            {retention
+              .filter(([, value]) => hasFact(value))
+              .map(([label, value]) => (
+                <span key={label}>
+                  {label}: {value}.{" "}
+                </span>
+              ))}
+            {retention.every(([, value]) => hasFact(value)) ? null : (
+              <Pending
+                fact={["retentionAccountData", "retentionJournal", "retentionBrokerLinks"]}
+              >
+                Retention periods for{" "}
+                {retention
+                  .filter(([, value]) => !hasFact(value))
+                  .map(([label]) => label.toLowerCase())
+                  .join(", ")}{" "}
+                have not been set yet, so none is stated here.
+              </Pending>
+            )}
           </p>
         </LegalSection>
 
@@ -146,10 +205,17 @@ export default function PrivacyPage() {
           <h2>8. Your rights</h2>
           <p>
             You can disconnect your broker account at any time, and you can ask
-            to be taken off the early-access list. For access, correction,
-            export or deletion of your data,
-            <strong> [TO BE CONFIRMED — the rights that apply under the
-            governing jurisdiction, and how to exercise them.]</strong>
+            to be taken off the early-access list.{" "}
+            {hasFact(facts.dataSubjectRights) ? (
+              facts.dataSubjectRights
+            ) : (
+              <Pending fact="dataSubjectRights">
+                The rights that apply to access, correction, export or
+                deletion of your data, and how to exercise them, are not
+                stated yet. They depend on the governing law, which is not
+                published yet.
+              </Pending>
+            )}
           </p>
         </LegalSection>
 
@@ -164,8 +230,28 @@ export default function PrivacyPage() {
         <LegalSection>
           <h2>10. Who is responsible, and how to reach us</h2>
           <p>
-            <strong>[TO BE CONFIRMED — data controller name, registered
-            address, and a contact address for privacy requests.]</strong>
+            {hasFact(facts.companyName) && hasFact(facts.registeredAddress) ? (
+              <>
+                The data controller is {facts.companyName},{" "}
+                {facts.registeredAddress}.{" "}
+              </>
+            ) : (
+              <Pending fact={["companyName", "registeredAddress"]}>
+                The data controller&rsquo;s name and registered address are
+                not published yet. They will be published here before any
+                paid licence is sold.{" "}
+              </Pending>
+            )}
+            {hasFact(facts.privacyEmail) ? (
+              <>
+                For privacy requests write to{" "}
+                <a href={`mailto:${facts.privacyEmail}`}>{facts.privacyEmail}</a>.
+              </>
+            ) : (
+              <Pending fact="privacyEmail">
+                A contact address for privacy requests is not published yet.
+              </Pending>
+            )}
           </p>
         </LegalSection>
 </LegalSections>

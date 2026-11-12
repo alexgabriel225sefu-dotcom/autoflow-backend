@@ -47,7 +47,8 @@ describe("the server and the pages use one refund rule", () => {
     expect(html).not.toContain("TO BE CONFIRMED — whether a customer may request a refund");
     expect(html).not.toMatch(/refund policy is a draft/i);
     // Company identity is still unfinished. That is not the refund rule.
-    expect(html).toContain("TO BE CONFIRMED");
+    expect(html).toContain("data-legal-pending=");
+    expect(html).not.toContain("TO BE CONFIRMED");
     expect(html).toContain("not final");
   });
 });

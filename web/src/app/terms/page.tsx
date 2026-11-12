@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CompanyBlock, DraftShell } from "@/components/legal/draft-shell";
+import { Pending } from "@/components/legal/pending";
+import { LEGAL_FACTS, hasFact } from "@/lib/legal-facts";
+import { HELP_PATH } from "@/lib/support";
 import { LegalSection, LegalSections } from "@/components/legal/legal-section";
 import {
   DEMO_CONDITIONS_NOTE,
@@ -21,18 +24,19 @@ export const dynamic = "force-dynamic";
  * Terms of Service and risk disclosure, version 2026-10-24.
  *
  * DRAFT - requires legal review. Unpublished unless A4T_LEGAL_PUBLISH is
- * exactly this version. Company facts stay as {{COMPANY_NAME}} and the
- * other tokens until the owner fills them in. Nothing here promises a
+ * exactly this version. Company facts come from lib/legal-facts.ts. An
+ * unset fact is stated as missing; it is never printed as a token. Nothing here promises a
  * return.
  */
 export default function TermsPage() {
+  const facts = LEGAL_FACTS;
   return (
     <DraftShell title="Terms of Service">
       <div className="legacy-flag" style={{ marginTop: "var(--sp-4)" }}>
-        DRAFT - requires legal review. This document is not final. Items
-        marked &ldquo;[TO BE CONFIRMED]&rdquo; are company and contact
-        details still to supply. Until those are filled in, these terms
-        should not be relied on as a complete contract. The refund rule in
+        DRAFT - requires legal review. This document is not final. Where a
+        section needs a company or contact detail the operator has not
+        supplied, the section says so. Until every such detail is published,
+        these terms should not be relied on as a complete contract. The refund rule in
         section 12 is decided.
       </div>
 
@@ -158,18 +162,37 @@ export default function TermsPage() {
         <h2>10. Who provides this service, and under which law</h2>
         <CompanyBlock />
         <p>
-          <strong>[TO BE CONFIRMED — legal entity name, registered address,
-          company registration number, and the governing law and jurisdiction
-          for these terms.]</strong> No company is registered for this
-          product yet. These terms do not create a contract with an unnamed
-          entity.
+          {hasFact(facts.governingLaw) && hasFact(facts.disputeForum) ? (
+            <>
+              Governing law for these terms: {facts.governingLaw}. Forum for
+              a dispute under these terms: {facts.disputeForum}.
+            </>
+          ) : (
+            <Pending fact={["governingLaw", "disputeForum"]}>
+              The governing law and the forum for a dispute under these terms
+              are not stated yet.
+            </Pending>
+          )}
+          {hasFact(facts.companyName)
+            ? null
+            : " No company is registered for this product yet. These terms do not create a contract with an unnamed entity."}
         </p>
       </LegalSection>
 
       <LegalSection>
         <h2>11. Contact</h2>
         <p>
-          <strong>[TO BE CONFIRMED — support contact address.]</strong>
+          {hasFact(facts.supportEmail) ? (
+            <>
+              Write to{" "}
+              <a href={`mailto:${facts.supportEmail}`}>{facts.supportEmail}</a>.
+            </>
+          ) : (
+            <Pending fact="supportEmail">
+              A support contact address is not published yet. Signed-in
+              clients can use the <Link href={HELP_PATH}>Help page</Link>.
+            </Pending>
+          )}
         </p>
       </LegalSection>
 

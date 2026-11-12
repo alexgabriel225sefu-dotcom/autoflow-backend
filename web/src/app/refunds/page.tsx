@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CompanyBlock, DraftShell } from "@/components/legal/draft-shell";
+import { Pending } from "@/components/legal/pending";
+import { LEGAL_FACTS, hasFact } from "@/lib/legal-facts";
 import { LegalSection, LegalSections } from "@/components/legal/legal-section";
 import {
   DEMO_CONDITIONS_NOTE,
@@ -23,6 +25,7 @@ export const dynamic = "force-dynamic";
  * is about that, not about whether a refund can be requested.
  */
 export default function RefundsPage() {
+  const facts = LEGAL_FACTS;
   return (
     <DraftShell title="Refund policy">
       <div className="legacy-flag" style={{ marginTop: "var(--sp-4)" }}>
@@ -89,10 +92,18 @@ export default function RefundsPage() {
         <h2>4. Who to write to</h2>
         <CompanyBlock />
         <p>
-          <strong>[TO BE CONFIRMED — support contact address.]</strong> There
-          is no registered company and no support address on this page yet.
-          A message about a right the law still gives you has nowhere listed
-          to go until that address is published.
+          {hasFact(facts.supportEmail) ? (
+            <>
+              Write to{" "}
+              <a href={`mailto:${facts.supportEmail}`}>{facts.supportEmail}</a>.
+            </>
+          ) : (
+            <Pending fact="supportEmail">
+              No support address is published on this page yet. A message
+              about a right the law still gives you has nowhere listed to go
+              until that address is published.
+            </Pending>
+          )}
         </p>
       </LegalSection>
 
