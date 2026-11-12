@@ -23,6 +23,21 @@ def bar_seconds(timeframe: str | None) -> int:
     return _BAR_SECONDS.get(str(timeframe or "1h").strip().lower(), 3600)
 
 
+def bar_close(open_stamp, timeframe: str | None):
+    """When the bar that OPENED at `open_stamp` closed, or None.
+
+    The broker read stamps each candle with the time its bar opened and
+    returns closed bars only. Freshness is about how long ago the last bar
+    closed. Measured from the open, an hourly bar was already an hour old
+    the moment it arrived, so the data check failed for all but the first
+    two minutes of every hour.
+    """
+    try:
+        return float(open_stamp) + bar_seconds(timeframe)
+    except (TypeError, ValueError):
+        return None
+
+
 def candle_freshness(stamp, *, now: float, timeframe: str | None,
                      market_open: bool):
     """True, False, 'market_closed', or None.
@@ -130,7 +145,8 @@ def assemble(*, connected, market_open, session_valid, rule_valid,
             data = None
         else:
             data = candle_freshness(
-                candle_stamp, now=now, timeframe=timeframe, market_open=True)
+                bar_close(candle_stamp, timeframe), now=now,
+                timeframe=timeframe, market_open=True)
         quotes = quote_safety(positions_status, positions, market_open=True)
         risk = risk_guard_ready(guard)
     return score({

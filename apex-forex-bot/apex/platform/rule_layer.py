@@ -72,3 +72,50 @@ def risk_units(*, balance: float, risk_fraction: float, stop_pips: float,
                           "contractSize": spec.contract_size, "digits": spec.digits,
                           "minimumStopDistancePips": spec.min_stop_distance_pips,
                           "sources": spec.sources}}
+
+
+def _num(value):
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if out == out and abs(out) != float("inf") else None
+
+
+def inputs_from_rule(rule, payload=None):
+    """Stop distance (pips) and risk fraction for a saved rule.
+
+    Returns ``(stop_pips, risk_fraction, missing)``. ``missing`` names, in
+    plain words, what the rule does not carry; it is empty when both values
+    were read.
+
+    A rule keeps its stop under ``stopLoss`` and its risk under ``sizing``.
+    The route used to look for ``limits.stopPips`` and
+    ``limits.riskFraction``, which no rule has, so every real rule was
+    refused as unreadable. A value in the request still wins, and nothing is
+    guessed: an ATR stop or a fixed-volume rule has no pips or percentage to
+    convert.
+    """
+    payload = payload if isinstance(payload, dict) else {}
+    rule = rule if isinstance(rule, dict) else {}
+    limits = rule.get("limits") if isinstance(rule.get("limits"), dict) else {}
+    stop = rule.get("stopLoss") if isinstance(rule.get("stopLoss"), dict) else {}
+    sizing = rule.get("sizing") if isinstance(rule.get("sizing"), dict) else {}
+
+    stop_pips = _num(payload.get("stopPips")) or _num(limits.get("stopPips"))
+    if stop_pips is None and stop.get("mode") == "pips":
+        stop_pips = _num(stop.get("pips"))
+    risk_fraction = (_num(payload.get("riskFraction"))
+                     or _num(limits.get("riskFraction")))
+    if risk_fraction is None and sizing.get("mode") == "risk_percent":
+        percent = _num(sizing.get("riskPercent"))
+        risk_fraction = percent / 100.0 if percent is not None else None
+
+    missing = []
+    if stop_pips is None or stop_pips <= 0:
+        stop_pips = None
+        missing.append("a fixed stop distance in pips")
+    if risk_fraction is None or risk_fraction <= 0:
+        risk_fraction = None
+        missing.append("a risk percentage per trade")
+    return stop_pips, risk_fraction, missing

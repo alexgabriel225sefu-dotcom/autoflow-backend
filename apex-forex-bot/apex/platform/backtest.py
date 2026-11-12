@@ -35,6 +35,11 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
     if len(candles) > max_bars:
         raise ValueError("candle limit exceeded")
     starting_balance = float(initial_balance) if initial_balance is not None else None
+    if rule is not None:
+        return _run_rule(candles, signal, rule=rule, symbol=symbol,
+                         starting_balance=starting_balance, cost_pips=cost_pips,
+                         commission=commission, spread_pips=spread_pips,
+                         slippage_pips=slippage_pips, latency_bars=latency_bars)
     balance = starting_balance
     trades: list[dict[str, Any]] = []
     skipped = 0
@@ -72,6 +77,120 @@ def run(candles: list[dict[str, Any]], *, signal: Callable[[dict[str, Any]], dic
             **metrics,
             "assumptions": {"spreadPips": spread_pips, "commission": commission,
                             "slippagePips": slippage_pips, "latencyBars": latency_bars},
+            "unit": "price points per unit",
+            "notModelled": _not_modelled(latency_bars)}
+
+
+def _usable(candle) -> bool:
+    return isinstance(candle, dict) and all(
+        k in candle and candle[k] is not None for k in ("open", "high", "low", "close"))
+
+
+def _pips_of(block) -> float | None:
+    """A fixed distance in pips from a rule's stopLoss/takeProfit block."""
+    if not isinstance(block, dict) or block.get("mode") != "pips":
+        return None
+    try:
+        value = float(block.get("pips"))
+    except (TypeError, ValueError):
+        return None
+    return value if value == value and value > 0 else None
+
+
+def _run_rule(candles, signal, *, rule, symbol, starting_balance, cost_pips,
+              commission, spread_pips, slippage_pips, latency_bars):
+    """A saved rule over candles, without reading the future.
+
+    A rule decides on a bar's CLOSE, so the earliest it can be filled is the
+    NEXT bar's open. This used to book the trade from the signal bar's own
+    open to its own close: the move that produced the signal was counted as
+    the profit, and a breakout rule won every trade with no drawdown.
+
+    Exits use the rule's own fixed stop and target where it has them. A bar
+    that reaches both counts as the stop. A bar that opens beyond the stop
+    exits at that open. Without a fixed stop or target the trade is held for
+    the fill bar only. One position at a time, as the live loop holds one per
+    symbol. The signal function still sees every bar, so its indicators are
+    the same as with no position open.
+    """
+    sym = str(symbol).replace("_", "").upper()
+    stop_pips = _pips_of(rule.get("stopLoss"))
+    target_pips = _pips_of(rule.get("takeProfit"))
+    trades: list[dict[str, Any]] = []
+    skipped = 0
+    balance = starting_balance
+    pending = None          # a decision waiting for the next bar's open
+    position = None         # the open hypothetical trade
+
+    def close(index, candle, price, reason):
+        nonlocal balance, position
+        pnl = (float(price) - position["entry"]) * position["direction"]
+        if cost_pips:
+            pnl -= forex.from_pips(cost_pips, sym, position["entry"])
+        pnl -= abs(float(commission))
+        trades.append({
+            "index": position["index"], "signalIndex": position["signalIndex"],
+            "exitIndex": index,
+            "timestamp": position["timestamp"],
+            "exitTimestamp": candle.get("time", candle.get("timestamp")),
+            "pnl": round(pnl, 8),
+            "side": "BUY" if position["direction"] == 1 else "SELL",
+            "entry": position["entry"], "exit": float(price),
+            "exitReason": reason, "hypothetical": True,
+            "latencyBars": max(0, int(latency_bars))})
+        if balance is not None:
+            balance += pnl
+        position = None
+
+    last_usable = None
+    for index, candle in enumerate(candles):
+        if not _usable(candle):
+            skipped += 1
+            # The evaluator is not shown a bar it cannot read.
+            continue
+        last_usable = (index, candle)
+        o, h, low, c = (float(candle[k]) for k in ("open", "high", "low", "close"))
+        if pending is not None and position is None:
+            direction = 1 if pending["side"] == "BUY" else -1
+            position = {"index": index, "signalIndex": pending["index"],
+                        "timestamp": candle.get("time", candle.get("timestamp")),
+                        "entry": o, "direction": direction,
+                        "stop": (o - direction * forex.from_pips(stop_pips, sym, o)
+                                 if stop_pips else None),
+                        "target": (o + direction * forex.from_pips(target_pips, sym, o)
+                                   if target_pips else None)}
+        pending = None
+        if position is not None:
+            d, stop, target = position["direction"], position["stop"], position["target"]
+            hit_stop = stop is not None and (low <= stop if d == 1 else h >= stop)
+            hit_target = target is not None and (h >= target if d == 1 else low <= target)
+            if hit_stop:
+                gapped = (o <= stop) if d == 1 else (o >= stop)
+                close(index, candle, o if gapped and index != position["index"] else stop,
+                      "stop")
+            elif hit_target:
+                close(index, candle, target, "target")
+            elif stop is None and target is None:
+                close(index, candle, c, "one bar held: the rule has no fixed stop or target")
+        decision = signal(candle) if signal else None
+        if decision and position is None and str(decision.get("side", "")).upper() in ("BUY", "SELL"):
+            pending = {"side": str(decision["side"]).upper(), "index": index}
+    if position is not None and last_usable is not None:
+        close(last_usable[0], last_usable[1], float(last_usable[1]["close"]),
+              "still open at the end of the data")
+
+    total = sum(t["pnl"] for t in trades)
+    metrics = _metrics(trades, initial_balance=starting_balance)
+    return {"status": "ok", "hypothetical": True, "trades": trades,
+            "tradeCount": len(trades), "skippedCandles": skipped,
+            "totalPnl": round(total, 8), "endingBalance": balance,
+            **metrics,
+            "assumptions": {"spreadPips": spread_pips, "commission": commission,
+                            "slippagePips": slippage_pips, "latencyBars": latency_bars,
+                            "entry": "the open of the bar after the signal",
+                            "stopPips": stop_pips, "targetPips": target_pips,
+                            "sameBarStopAndTarget": "counted as the stop",
+                            "positions": "one at a time"},
             "unit": "price points per unit",
             "notModelled": _not_modelled(latency_bars)}
 

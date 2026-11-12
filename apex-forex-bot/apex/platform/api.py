@@ -630,7 +630,10 @@ def _dispatch(method, route, headers, body, query=None):
                                       mode=payload.get("mode") or "demo",
                                       ctid=payload.get("accountId") or None)
             account = _read.account(p.user_id, ctid=payload.get("accountId") or None)
-            state = _risk_guard.state_from_trades(trades, account)
+            open_positions = _read.positions(
+                p.user_id, ctid=payload.get("accountId") or None)
+            state = _risk_guard.state_from_trades(
+                trades, account, positions=open_positions)
             return _ok(_risk_guard.evaluate(state, _risk_guard.GuardLimits(**clean)))
         except (TypeError, ValueError) as e:
             return _err(400, "BAD_REQUEST", str(e))
@@ -718,6 +721,7 @@ def _dispatch(method, route, headers, body, query=None):
             if candle_status == _read.OK and got.get("candles"):
                 last = got["candles"][-1]
                 candle_stamp = last.get("time", last.get("timestamp"))
+        got_pos = None
         if connected and market_open and selected.get("ctid"):
             got_pos = _read.positions(p.user_id, ctid=selected.get("ctid"))
             positions_status = got_pos.get("status")
@@ -732,8 +736,15 @@ def _dispatch(method, route, headers, body, query=None):
                     p.user_id, ctid=selected.get("ctid") or None)
                 balance = ({"balance": account.get("balance")}
                            if account.get("status") == _read.OK else {})
+                # The guard's symbol exposure comes from the open positions.
+                # A closed market did not read them above; the guard still
+                # needs them, and an unread book stays unknown.
+                if got_pos is None:
+                    got_pos = _read.positions(
+                        p.user_id, ctid=selected.get("ctid") or None)
                 guard = _risk_guard.evaluate(
-                    _risk_guard.state_from_trades(trades, balance, now=now))
+                    _risk_guard.state_from_trades(
+                        trades, balance, positions=got_pos, now=now))
             except Exception:
                 guard = None
         score = _health_score.assemble(
@@ -1378,12 +1389,16 @@ def _roadmap_analysis(route, payload, *, user_id=None):
                         "metadata": {"symbol": symbol, "readable": False}})
         balance = _number(account.get("balance"))
         price = _number(payload.get("price"))
-        limits = (rule or {}).get("limits") or {}
-        stop_pips = _number(payload.get("stopPips")) or _number(limits.get("stopPips"))
-        risk_fraction = _number(payload.get("riskFraction")) or _number(limits.get("riskFraction"))
-        if balance is None or price is None or stop_pips is None or risk_fraction is None:
+        stop_pips, risk_fraction, missing = _rules.inputs_from_rule(rule, payload)
+        if missing:
+            # The rule is readable; it simply sizes or stops another way (an
+            # ATR stop, a fixed volume). That is a state, not a bad request.
+            return _ok({"status": "unavailable",
+                        "reason": "this rule does not set " + " or ".join(missing),
+                        "metadata": {"symbol": symbol, "readable": True}})
+        if balance is None or price is None:
             return _err(400, "UNREADABLE_INPUT",
-                        "balance, price, risk fraction and stop distance could not be read")
+                        "balance and price could not be read")
         return _ok(_rules.risk_units(balance=balance, risk_fraction=risk_fraction,
                                      stop_pips=stop_pips, symbol=symbol, price=price,
                                      leverage=_number(account.get("leverage")) or 30))

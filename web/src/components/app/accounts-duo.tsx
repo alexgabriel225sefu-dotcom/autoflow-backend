@@ -31,6 +31,8 @@ type Props = {
   execution: Execution | null;
   running: AutomationState | null;
   figures?: AccountFigure[] | null;
+  /** The balance read is still on its way. Not the same as an unknown balance. */
+  figuresLoading?: boolean;
 };
 
 function money(value: number | null | undefined): string {
@@ -43,8 +45,11 @@ function count(status: string | undefined, value: number | null | undefined): st
   return String(value);
 }
 
-function ReadLines({ figure }: { figure: AccountFigure | null }) {
-  if (!figure) return <p>Balance unknown · Equity unknown</p>;
+function ReadLines({ figure, loading }: { figure: AccountFigure | null; loading: boolean }) {
+  // The broker read takes a few seconds. Until it answers the figures are not
+  // "unknown": saying so told a client with a healthy account that its balance
+  // could not be read.
+  if (!figure) return <p>{loading ? "Reading balance and equity…" : "Balance unknown · Equity unknown"}</p>;
   const failed = figure.account.status !== "ok" ? figure.account
     : figure.positions.status !== "ok" ? figure.positions
     : figure.orders.status !== "ok" ? figure.orders : null;
@@ -68,7 +73,7 @@ function ReadLines({ figure }: { figure: AccountFigure | null }) {
   );
 }
 
-export function AccountsDuo({ accounts, selected, execution, running, figures = null }: Props) {
+export function AccountsDuo({ accounts, selected, execution, running, figures = null, figuresLoading = false }: Props) {
   const demo = accounts?.find((a) => a.mode === "demo") ?? null;
   const live = accounts?.find((a) => a.mode === "live") ?? null;
   const figureFor = (account: CtAccount | null) =>
@@ -87,8 +92,8 @@ export function AccountsDuo({ accounts, selected, execution, running, figures = 
           <em data-tone={demoActive ? "on" : "idle"}>{demoActive ? "Automating" : demo ? "Ready" : "Not chosen"}</em>
         </header>
         <strong>{demo ? `#${demo.ctid}` : "No demo account yet"}</strong>
-        {demo ? <ReadLines figure={figureFor(demo)} /> : <p>Free for 14 days. Test a rule with no real money.</p>}
-        <Link href={demo ? "/trade" : "/accounts"}>{demo ? "Start on demo" : "Choose a demo account"}</Link>
+        {demo ? <ReadLines figure={figureFor(demo)} loading={figuresLoading} /> : <p>Free for 14 days. Test a rule with no real money.</p>}
+        <Link href={demo ? "/trade" : "/accounts"}>{demoActive ? "Manage automation" : demo ? "Start on demo" : "Choose a demo account"}</Link>
       </article>
 
       <article className="duo-card" data-active={liveActive ? "true" : undefined} data-kind="live">
@@ -99,7 +104,7 @@ export function AccountsDuo({ accounts, selected, execution, running, figures = 
           </em>
         </header>
         <strong>{live ? `#${live.ctid}` : "Real money, same rules"}</strong>
-        {live ? <ReadLines figure={figureFor(live)} /> : null}
+        {live ? <ReadLines figure={figureFor(live)} loading={figuresLoading} /> : null}
         <p>{cleared ? notice.lead : "Live trading is not enabled. This account is shown so you can read it. No order is sent."}</p>
         <Link href="/live">{cleared ? "Open live" : "Not enabled — see why"}</Link>
       </article>

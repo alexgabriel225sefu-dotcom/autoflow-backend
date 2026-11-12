@@ -400,6 +400,22 @@ def _enrich_positions(broker):
 
         entry = row.get("entryPrice")
         units = row.get("units")
+        # What the position loses if its stop is hit, in the same estimate
+        # currency as pnlAccount. The risk map and the risk guard read this
+        # field; nothing produced it, so every real position was counted as
+        # "unknown stop risk" even with a stop attached. It depends on the
+        # entry and the stop only, so a stale quote does not make it unknown.
+        # A stop already past the entry on the winning side risks nothing.
+        row["riskToStop"] = None
+        if (stop is not None and entry is not None and units is not None
+                and side in ("BUY", "SELL")):
+            try:
+                loss = -forex.pnl_usd(side, float(entry), float(stop),
+                                      abs(float(units)), symbol)
+                if loss == loss and abs(loss) != float("inf"):
+                    row["riskToStop"] = round(max(0.0, loss), 2)
+            except (TypeError, ValueError, ZeroDivisionError):
+                row["riskToStop"] = None
         if (current is not None and not row["quoteStale"] and entry is not None
                 and units is not None and side in ("BUY", "SELL")):
             direction = 1 if side == "BUY" else -1
