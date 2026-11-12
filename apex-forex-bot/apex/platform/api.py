@@ -1389,12 +1389,16 @@ def _roadmap_analysis(route, payload, *, user_id=None):
                         "metadata": {"symbol": symbol, "readable": False}})
         balance = _number(account.get("balance"))
         price = _number(payload.get("price"))
-        limits = (rule or {}).get("limits") or {}
-        stop_pips = _number(payload.get("stopPips")) or _number(limits.get("stopPips"))
-        risk_fraction = _number(payload.get("riskFraction")) or _number(limits.get("riskFraction"))
-        if balance is None or price is None or stop_pips is None or risk_fraction is None:
+        stop_pips, risk_fraction, missing = _rules.inputs_from_rule(rule, payload)
+        if missing:
+            # The rule is readable; it simply sizes or stops another way (an
+            # ATR stop, a fixed volume). That is a state, not a bad request.
+            return _ok({"status": "unavailable",
+                        "reason": "this rule does not set " + " or ".join(missing),
+                        "metadata": {"symbol": symbol, "readable": True}})
+        if balance is None or price is None:
             return _err(400, "UNREADABLE_INPUT",
-                        "balance, price, risk fraction and stop distance could not be read")
+                        "balance and price could not be read")
         return _ok(_rules.risk_units(balance=balance, risk_fraction=risk_fraction,
                                      stop_pips=stop_pips, symbol=symbol, price=price,
                                      leverage=_number(account.get("leverage")) or 30))
