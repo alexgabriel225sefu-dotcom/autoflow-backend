@@ -113,16 +113,20 @@ check("the draft mark is the one the pages show",
       LC.DRAFT_MARK == "DRAFT - requires legal review")
 check("the document ids are the live gate's",
       LC.DOCUMENTS == LG.DOCUMENTS, str(LC.DOCUMENTS))
+# The company facts are fields in one web module. No page prints a token.
+facts = open(os.path.join(
+    REPO, "web", "src", "lib", "legal-facts.ts"), encoding="utf-8").read()
 shell = open(os.path.join(
-    REPO, "web", "src", "components", "legal", "draft-shell.tsx"),
+    REPO, "web", "src", "components", "legal", "pending.tsx"),
     encoding="utf-8").read()
 for token in LC.PLACEHOLDERS:
-    check(f"the company block keeps {token}", "{{" + token + "}}" in shell)
+    check(f"the legal facts keep a field for {token}", f"  {token}: \"" in facts)
+    check(f"the company block does not print {token}", "{{" + token + "}}" not in shell)
 for page in ("terms/page.tsx", "refunds/page.tsx", "tax/page.tsx"):
     body = open(os.path.join(REPO, "web", "src", "app", page), encoding="utf-8").read()
     check(f"{page} is marked as a draft",
           "DRAFT - requires legal review" in body and "not final" in body)
-    check(f"{page} renders the company placeholders", "CompanyBlock" in body)
+    check(f"{page} renders the company block", "CompanyBlock" in body)
 check("import does not publish",
       LC.published_version() is None and LC.status()["published"] is False)
 check("the live gate has no published versions",

@@ -1,11 +1,12 @@
 # Legal launch blockers
 
 Values the operator has to supply before the public pages can be described as
-complete. Each one appears in the product as a literal `[TO BE CONFIRMED]`
-marker, so they are greppable:
+complete. Each one is a field in `web/src/lib/legal-facts.ts`. A field that is
+`null` is not supplied yet, and the page states that in one plain sentence. No
+page prints a marker or a template token to a visitor. To list what is open:
 
 ```
-grep -rn "TO BE CONFIRMED" web/src
+grep -n ": null" web/src/lib/legal-facts.ts
 ```
 
 **The site must not be described as legally ready until this list is empty.**
@@ -19,9 +20,9 @@ checkout. L4 is the remaining lawyer review, not an open commercial question.
 
 The terms, refund policy and tax notice are drafts at version `2026-10-24`.
 Each page is marked `DRAFT - requires legal review`. Company name,
-registration number, address, jurisdiction and VAT are the tokens
-`{{COMPANY_NAME}}`, `{{REGISTRATION_NUMBER}}`, `{{ADDRESS}}`,
-`{{JURISDICTION}}` and `{{VAT}}`. They are not filled in.
+registration number, address, jurisdiction and VAT are the fields
+`companyName`, `registrationNumber`, `registeredAddress`, `jurisdiction` and
+`vatNumber` in that file. They are not filled in.
 
 Those pages stay unpublished unless `A4T_LEGAL_PUBLISH` is set to exactly
 `2026-10-24`. `true`, `1` and any other value do not publish. After that

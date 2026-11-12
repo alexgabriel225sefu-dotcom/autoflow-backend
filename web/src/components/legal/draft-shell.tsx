@@ -2,11 +2,26 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLockup } from "@/components/brand/logo";
 import { ReadingProgress } from "./reading-progress";
+import { LEGAL_FACTS, hasFact, missingLegalFacts } from "@/lib/legal-facts";
+import { Pending } from "./pending";
 import {
   DRAFT_NOTICE,
   LEGAL_VERSION,
   legalPublished,
 } from "@/content/legal-publication";
+
+/** The approval date of this version, or a plain statement that there is none. */
+export function ApprovedDate() {
+  const date = LEGAL_FACTS.approvedVersionDate;
+  return hasFact(date) ? (
+    <>Last updated: {date}</>
+  ) : (
+    <Pending fact="approvedVersionDate">
+      The operator has not approved this version yet, so it carries no
+      approval date.
+    </Pending>
+  );
+}
 
 /**
  * Chrome for a public legal draft.
@@ -32,13 +47,14 @@ export function DraftShell({
         </div>
         <h1>{title}</h1>
         <p className="dim" style={{ fontSize: ".8rem" }}>
-          Version {LEGAL_VERSION}. Last updated: [TO BE CONFIRMED — date of the
-          owner-approved version]
+          Version {LEGAL_VERSION}. <ApprovedDate />
         </p>
         {published ? (
           <p className="dim" style={{ fontSize: ".8rem" }}>
-            Published version {LEGAL_VERSION}. Placeholders in braces are still
-            unfilled until the owner replaces them.
+            Published version {LEGAL_VERSION}.
+            {missingLegalFacts().length > 0
+              ? " Details the operator has not supplied yet are stated as missing in the sections below."
+              : null}
           </p>
         ) : (
           <div className="legacy-flag" style={{ marginTop: "var(--sp-4)" }} role="status">
@@ -62,16 +78,4 @@ export function DraftShell({
   );
 }
 
-/** The company facts the owner has not supplied. Rendered as tokens. */
-export function CompanyBlock() {
-  return (
-    <p>
-      <strong>[TO BE CONFIRMED — </strong>
-      provider {"{{COMPANY_NAME}}"}, registration number{" "}
-      {"{{REGISTRATION_NUMBER}}"}, address {"{{ADDRESS}}"}, jurisdiction{" "}
-      {"{{JURISDICTION}}"}, VAT {"{{VAT}}"}.
-      <strong>]</strong> These tokens are placeholders. They are not a
-      company, a registration, or a tax number.
-    </p>
-  );
-}
+export { CompanyBlock } from "./pending";

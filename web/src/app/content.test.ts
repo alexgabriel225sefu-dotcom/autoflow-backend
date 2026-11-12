@@ -13,6 +13,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
+import { missingLegalFacts } from "@/lib/legal-facts";
 
 const SRC = join(__dirname, "..");
 
@@ -163,15 +164,16 @@ describe("the statements the product must make", () => {
   });
 
   it("the terms, refund policy and tax notice are marked as unpublished drafts", () => {
-    const shell = FILES.find((f) => f.path === "components/legal/draft-shell.tsx")!.body;
+    // The company facts are fields in one module now, not tokens on a page.
+    const facts = FILES.find((f) => f.path === "lib/legal-facts.ts")!.body;
     for (const token of ["COMPANY_NAME", "REGISTRATION_NUMBER", "ADDRESS", "JURISDICTION", "VAT"]) {
-      expect(shell, `missing {{${token}}}`).toContain(`{{${token}}}`);
+      expect(facts, `no field for ${token}`).toMatch(new RegExp(`\\b${token}: "\\w+"`));
     }
     for (const path of ["app/terms/page.tsx", "app/refunds/page.tsx", "app/tax/page.tsx"]) {
       const body = FILES.find((f) => f.path === path)!.body;
       expect(body, path).toContain("DRAFT - requires legal review");
       expect(body, path).toContain("not final");
-      expect(body, `${path} does not render the company placeholders`).toContain("CompanyBlock");
+      expect(body, `${path} does not render the company block`).toContain("CompanyBlock");
     }
   });
 
@@ -229,10 +231,18 @@ describe("unfinished legal values are visibly unfinished", () => {
     || f.path === "app/tax/page.tsx"
     || f.path === "app/privacy/page.tsx");
 
-  it("every placeholder is marked, so it can be found by grep", () => {
+  /**
+   * An unset fact is a `null` in lib/legal-facts.ts and a <Pending> sentence
+   * on the page. It used to be a bracket marker printed to the visitor.
+   * Both are findable by grep; only one of them is readable.
+   */
+  it("every page reads the owner's facts and marks what is unset", () => {
     for (const f of legal) {
-      expect(f.body, `${f.path} has no placeholders — has it been finalised?`)
-        .toContain("TO BE CONFIRMED");
+      expect(f.body, `${f.path} does not read lib/legal-facts`).toContain("LEGAL_FACTS");
+      expect(f.body, `${f.path} has no pending notice — has it been finalised?`)
+        .toContain("<Pending");
+      expect(f.body, `${f.path} prints a marker to the visitor`)
+        .not.toContain("TO BE CONFIRMED");
     }
   });
 
@@ -247,13 +257,13 @@ describe("unfinished legal values are visibly unfinished", () => {
    * This test is meant to be deleted.
    *
    * When the owner supplies the values in docs/LEGAL_LAUNCH_BLOCKERS.md, the
-   * placeholders go and this whole block goes with them. Until then it is the
+   * pending notices go and this whole block goes with them. Until then it is the
    * thing that stops "we'll fill that in later" from becoming "we shipped".
    */
   it("the blockers document exists and lists them", () => {
     const doc = readFileSync(
       join(__dirname, "..", "..", "..", "docs", "LEGAL_LAUNCH_BLOCKERS.md"), "utf8");
-    expect(doc).toContain("TO BE CONFIRMED");
+    expect(doc).toContain("web/src/lib/legal-facts.ts");
     for (const id of ["L1", "L2", "L3", "L4"]) expect(doc).toContain(id);
   });
 
@@ -267,7 +277,7 @@ describe("unfinished legal values are visibly unfinished", () => {
    * closed without being answered.
    *
    * It is not enough that the section exists: a blocker points at something
-   * still unfilled, so the section it names must still carry a placeholder.
+   * still unfilled, so the section it names must still read an unset fact.
    */
   it("each Privacy section a blocker points at exists and is still open", () => {
     const doc = readFileSync(
@@ -280,6 +290,7 @@ describe("unfinished legal values are visibly unfinished", () => {
     for (let i = 0; i < parts.length; i += 2) sections.set(parts[i], parts[i + 1]);
     expect(sections.size, "no numbered sections were parsed").toBeGreaterThan(5);
 
+    const unset = new Set<string>(missingLegalFacts());
     const cited = new Set(
       [...doc.matchAll(/Privacy §(\d+)/g)].map((m) => m[1]));
     expect(cited.size, "the document cites no Privacy section").toBeGreaterThan(0);
@@ -287,10 +298,14 @@ describe("unfinished legal values are visibly unfinished", () => {
     for (const n of cited) {
       expect(sections.has(n), `a blocker cites Privacy §${n}, which does not exist`)
         .toBe(true);
+      const read = [...sections.get(n)!.matchAll(/"(\w+)"/g)].map((m) => m[1]);
       expect(sections.get(n),
              `a blocker cites Privacy §${n}, but that section has nothing left `
              + `to confirm — the pointer has drifted, or the blocker is stale`)
-        .toContain("TO BE CONFIRMED");
+        .toContain("<Pending");
+      expect(read.some((key) => unset.has(key)),
+             `Privacy §${n} is cited by a blocker but every fact it reads is set`)
+        .toBe(true);
     }
   });
 });

@@ -76,7 +76,7 @@ for page in ("terms/page.tsx", "refunds/page.tsx"):
           and "TO BE CONFIRMED — whether a customer may request a refund" not in body
           and "refund policy is a draft" not in body.lower())
     check(f"{page} still names the company block as unfinished",
-          "CompanyBlock" in body and "TO BE CONFIRMED" in body
+          "CompanyBlock" in body and "TO BE CONFIRMED" not in body
           and "not final" in body)
 
 
