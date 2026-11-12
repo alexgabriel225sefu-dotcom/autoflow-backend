@@ -59,8 +59,14 @@ _BUCKETS = {
     # Starting an OAuth flow or completing one. Tight: both are rare, and
     # both are the interesting ones to guess at.
     "oauth": ("RL_A4T_OAUTH_PER_MIN", 10, 60),
-    # Broker reads that cost the shared historical budget.
+    # Broker reads that cost the shared historical budget: candles, and the
+    # closed-trade, symbol and minimum-size reads once a broker is linked
+    # (spent from the handler through `charge`; see `classify`).
     "candles": ("RL_A4T_CANDLES_PER_MIN", 30, 60),
+    # The operator audit of connected accounts. Its own bucket, at the limit
+    # it had while it was counted as "candles": an operator route answering
+    # `bucket: candles` described a request nobody had made.
+    "admin": ("RL_A4T_ADMIN_PER_MIN", 30, 60),
     # Evaluator runs.
     "preview": ("RL_A4T_PREVIEW_PER_MIN", 20, 60),
     # Anything that changes whether money can move.
@@ -173,13 +179,23 @@ def classify(method, route):
         # select and disconnect: they change which account automation would
         # act on, which is exactly what the control bucket is for.
         return "control"
-    if _CANDLES_RE.match(route) or route in ("symbols", "trade/min-lot", "trades"):
-        # Both are market-data reads that go to cTrader, whose limits are
-        # shared across every client on a connection, so they share a budget.
+    if _CANDLES_RE.match(route):
+        # A market-data read that goes to cTrader, whose limits are shared
+        # across every client on a connection. The path names the linked
+        # account, so it is a broker read whoever asks.
+        #
+        # `trades`, `symbols` and `trade/min-lot` are NOT here any more. They
+        # reach the broker only for a client who has linked one, and this
+        # function runs before the session is known: charged here, a client
+        # with nothing connected spent the broker-data budget on reads that
+        # never left the platform. They are ordinary reads at this point, and
+        # the handler spends "candles" through `charge` once it knows there is
+        # a broker to ask (api._spend_broker_read), from this same counter.
         return "candles"
     if route == "admin" or (route or "").startswith("admin/"):
-        # The operator audit reads the same broker, including deal history.
-        return "candles"
+        # The operator audit reads the broker with its own client. Metered as
+        # tightly as before, under a name that says what it is.
+        return "admin"
     if _PREVIEW_RE.match(route):
         return "preview"
     if _ACTIVATE_RE.match(route):
@@ -279,20 +295,54 @@ def check(method, route, *, client_key=None, auth_header=None):
                     aok = lim.check(akey)
                 if not aok:
                     return False, name, _seconds_until_reset(lim.window_s)
-        ok = None
-        if _MODE != "memory":
-            ok = _shared_check(key, limiter.limit, limiter.window_s)
-        if ok is None:
-            # No shared backend, or it could not answer. Counting in one
-            # process is weaker than counting across all of them, and it is
-            # far better than not counting. /readyz reports the degradation.
-            ok = limiter.check(key)
+        ok = _count(bucket if bucket in LIMITERS else "default", key)
     except Exception:
         if _fails_closed(method, bucket):
             return False, UNAVAILABLE, 5
         # A bug in the limiter must not become an outage of the platform.
         return True, bucket, 0
     return bool(ok), bucket, (0 if ok else _seconds_until_reset(limiter.window_s))
+
+
+def _count(bucket, key):
+    """Count one request for `key` in `bucket`; True while inside the limit.
+
+    THE BUCKET IS PART OF THE SHARED KEY. It was not: the shared counter was
+    keyed on the caller alone, so with a shared backend — production — every
+    per-minute bucket incremented ONE counter per session, and each compared
+    that same number with its own limit. The 31st request of any kind in a
+    minute made every "candles" route refuse and the 11th did the same to
+    "oauth". Walking the app's pages was enough: seen as 429 on /trades for a
+    client with no broker linked. The in-memory limiter below has always kept
+    one window per bucket, which is why no memory-mode test caught it.
+    """
+    lim = LIMITERS[bucket]
+    ok = None
+    if _MODE != "memory":
+        ok = _shared_check(f"b:{bucket}:{key}", lim.limit, lim.window_s)
+    if ok is None:
+        # No shared backend, or it could not answer. Counting in one
+        # process is weaker than counting across all of them, and it is
+        # far better than not counting. /readyz reports the degradation.
+        ok = lim.check(key)
+    return bool(ok)
+
+
+def charge(bucket, key):
+    """Spend one unit of `bucket` for the caller `key`, or raise `Limited`.
+
+    For a cost a route only learns about after authentication: whether a read
+    will reach the broker depends on whether this client has linked one. `key`
+    is the one `key_for` gave the request, so the unit comes out of the same
+    counter `check` uses for that bucket. A limiter failure allows, as it does
+    for every read.
+    """
+    try:
+        ok = _count(bucket, key)
+    except Exception:
+        return
+    if not ok:
+        raise Limited(bucket, _seconds_until_reset(LIMITERS[bucket].window_s))
 
 
 def _seconds_until_reset(window_s):

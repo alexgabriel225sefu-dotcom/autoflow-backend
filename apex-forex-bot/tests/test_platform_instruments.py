@@ -130,10 +130,12 @@ src = open(os.path.join(ROOT, "apex", "platform", "instruments.py"), encoding="u
 for banned in ("place_order", "close_position", "amend_sltp", "force_trade",
                "authorize_order", "bridge", "live_execution"):
     check(f"instruments.py names no `{banned}`", banned not in src)
-check("`symbols` is metered with the other broker market-data reads",
-      RL.classify("GET", "symbols") == "candles", RL.classify("GET", "symbols"))
+check("`symbols` is an ordinary read until a broker is known to be linked",
+      RL.classify("GET", "symbols") == "default", RL.classify("GET", "symbols"))
 api_src = open(os.path.join(ROOT, "apex", "platform", "api.py"), encoding="utf-8").read()
 block = api_src[api_src.index('if route == "symbols"'):][:400]
+check("and is metered with the other broker market-data reads when one is",
+      "_spend_broker_read(p.user_id)" in block)
 check("the route authenticates before it reads", "_authenticate(headers)" in block, block)
 
 print("\n[7] the rules list says which rules are the client's own methods")

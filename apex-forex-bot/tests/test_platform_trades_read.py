@@ -286,10 +286,16 @@ for banned in ("place_order", "close_position", "amend_sltp", "force_trade",
                "approvals", "gates"):
     check(f"trades_read imports nothing named `{banned}`",
           banned not in names and not any(banned in (m or "") for m in imported))
-check("`trades` shares the broker market-data budget",
-      RL.classify("GET", "trades") == "candles", RL.classify("GET", "trades"))
+# Before the session is known it is an ordinary read: a client with no broker
+# linked never reaches cTrader, and must not spend the broker budget asking.
+# The handler spends it once it knows there is a broker (see
+# test_rate_limit_browsing.py for the behaviour).
+check("`trades` is an ordinary read until a broker is known to be linked",
+      RL.classify("GET", "trades") == "default", RL.classify("GET", "trades"))
 api_src = open(os.path.join(ROOT, "apex", "platform", "api.py"), encoding="utf-8").read()
 block = api_src[api_src.index('route == "trades"'):][:420]
+check("and the handler spends the broker market-data budget when one is",
+      "_spend_broker_read(p.user_id)" in block)
 check("the route authenticates before it reads", "_authenticate(headers)" in block, block)
 check("and is GET only", 'method == "GET"' in block)
 

@@ -146,10 +146,12 @@ for label, kw in [("an unknown timeframe", dict(symbol="XAUUSD", timeframe="7h",
 check("and none of them opened a broker", opened == [], str(opened))
 
 print("\n[6] it is a read, wired like one")
-check("`trade/min-lot` is metered with the other broker market-data reads",
-      RL.classify("GET", "trade/min-lot") == "candles", RL.classify("GET", "trade/min-lot"))
+check("`trade/min-lot` is an ordinary read until a broker is known to be linked",
+      RL.classify("GET", "trade/min-lot") == "default", RL.classify("GET", "trade/min-lot"))
 api_src = open(os.path.join(ROOT, "apex", "platform", "api.py"), encoding="utf-8").read()
 block = api_src[api_src.index('if route == "trade/min-lot"'):][:600]
+check("and is metered with the other broker market-data reads when one is",
+      "_spend_broker_read(p.user_id)" in block)
 check("the route authenticates before it reads", "_authenticate(headers)" in block, block)
 src = open(os.path.join(ROOT, "apex", "platform", "broker_read.py"), encoding="utf-8").read()
 fn = src[src.index("def estimate_min_lot"):src.index("def _shape")]

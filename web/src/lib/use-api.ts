@@ -36,6 +36,19 @@ export const MIN_POLL_GAP_MS = 8_000;
 const lastAttempt = new Map<string, number>();
 const pathPauseUntil = new Map<string, number>();
 const pauseRetry = new Map<string, number>();
+/**
+ * The longest wait a refused read will sit out and then retry by itself. The
+ * per-minute budgets every page read spends reopen within sixty seconds; an
+ * hourly one is not something to count down to on a screen.
+ */
+export const MAX_AUTO_RETRY_S = 120;
+/**
+ * The retry goes out this long after the stated wait. Reads that were queued
+ * behind the same refusal are released exactly when it ends, and they go
+ * first: if the retry itself is refused again it pauses that shared budget,
+ * and it must not take the queued reads down with it.
+ */
+export const RETRY_PAD_MS = 250;
 
 /**
  * Paths that spend the server's historical-data bucket (30/min). The limit
@@ -173,6 +186,11 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
   const pauseUntil = useRef(0);
   /** The request this mounted reader is waiting on, so unmount can drop it. */
   const held = useRef<Flight | null>(null);
+  /** The one automatic retry after a RATE_LIMITED answer, and whether it has
+   * been spent. Spent stays true until a read succeeds or the reader reloads:
+   * a second refusal must not start a loop of retries. */
+  const retryTimer = useRef<number | null>(null);
+  const retrySpent = useRef(false);
   /** The retry timer calls this, not `load` directly: the timer is scheduled
    * from inside `load`, and the hook linter rejects that self-reference. */
   const loadRef = useRef<(
@@ -235,6 +253,12 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
       }
       historicalLastAttempt = now;
     }
+    // A read is going out now, so a retry still waiting would be a duplicate.
+    if (retryTimer.current !== null) {
+      window.clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+    if (force) retrySpent.current = false;
     lastAttempt.set(path, Date.now());
     const mine = ++seq.current;
     setLoading(true);
@@ -250,8 +274,7 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
     // is the one whose answer counts. An aborted flight is the same thing —
     // its answer, if it arrives, belongs to a request we gave up on.
     if (mine !== seq.current || flight.controller.signal.aborted) return undefined;
-    setResult(r);
-    setLoading(false);
+    let shown = r;
     if (!r.ok && r.code === "RATE_LIMITED"
         && typeof r.retryAfterSec === "number" && r.retryAfterSec > 0) {
       const until = Date.now() + r.retryAfterSec * 1000;
@@ -259,16 +282,32 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
       const bucket = pauseKey(path);
       const prev = pathPauseUntil.get(bucket) ?? 0;
       pathPauseUntil.set(bucket, Math.max(prev, until));
+      // ASK AGAIN ONCE, WHEN THE SERVER SAID IT MAY. A refused read used to
+      // stay refused until its own interval came round, and a read with no
+      // interval stayed refused until the reader found the reload button:
+      // seen as /trades showing nothing after a 429. `retryAt` goes out with
+      // the answer so the screen can say "Busy, retrying in N s" and mean it.
+      if (!retrySpent.current && r.retryAfterSec <= MAX_AUTO_RETRY_S) {
+        retrySpent.current = true;
+        retryTimer.current = window.setTimeout(() => {
+          retryTimer.current = null;
+          void loadRef.current(false, "mount");
+        }, until - Date.now() + RETRY_PAD_MS);
+        shown = { ...r, retryAt: until };
+      }
     } else if (r.ok) {
       pauseUntil.current = 0;
+      retrySpent.current = false;
     }
+    setResult(shown);
+    setLoading(false);
     // Stamped only on an answer we actually received — including a refusal.
     // Leaving it untouched on failure would show a fresh time over stale data.
     setLastSync(Date.now());
     // Returned so a caller that has just changed something can check the
     // answer it gets back against what it expected, instead of trusting the
     // screen to have caught up.
-    return r;
+    return shown;
   }, [path, intervalMs]);
 
   useEffect(() => {
@@ -314,6 +353,10 @@ export function useRead<T>(path: string | null, intervalMs = 0) {
       const flight = held.current;
       held.current = null;
       if (path && flight) releaseFlight(path, flight);
+      // Nobody is left to show the answer, so the retry is not owed either.
+      if (retryTimer.current !== null) window.clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+      retrySpent.current = false;
     };
   }, [path]);
 
