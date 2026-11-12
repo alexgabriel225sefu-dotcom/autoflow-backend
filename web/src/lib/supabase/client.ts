@@ -28,8 +28,9 @@ export function createClient() {
  * Email confirmation links must also work when the inbox opens them in a new
  * tab or on a different device. The SSR browser client deliberately uses
  * PKCE, whose verifier only exists on the browser that started the request.
- * For signup confirmation we use Supabase's implicit redirect once, then the
- * callback exchanges that session into the normal cookie-backed client.
+ * For signup confirmation and password reset we use Supabase's implicit
+ * redirect once, then the callback exchanges that session into the normal
+ * cookie-backed client.
  */
 export function createImplicitClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
