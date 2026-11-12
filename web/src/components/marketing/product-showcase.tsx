@@ -21,8 +21,8 @@ const tabs = [
   },
   {
     id: "review", label: "Review",
-    title: "Every decision, with the reason.",
-    body: "Including the ones that decided to do nothing. Each entry says what the rule saw and why it acted or waited.",
+    title: "What happened, and when.",
+    body: "Each entry says when automation started, paused or stopped, or what signal was found. Orders and closed trades are in Positions and Closed trades.",
     src: "/product/journal.webp", ratio: "16 / 9.6",
     alt: "The journal: a buy decision and two hold decisions, each with its reason.",
   },

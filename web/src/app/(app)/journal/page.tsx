@@ -16,8 +16,7 @@ const STATUSES = [
   "automation_started", "automation_paused", "automation_stopped",
   // A setup found at the Signals Only level: reported to the client, never
   // placed. It belongs in this list and not on a page of its own, because
-  // this screen is already "every evaluation, including the ones that decided
-  // to do nothing" — and because a signal needs the symbol and date filters
+  // this screen already lists what automation did — and because a signal needs the symbol and date filters
   // next to it far more than it needs its own navigation entry.
   "signal",
 ];
@@ -64,7 +63,7 @@ function JournalScope({ account }: {
             <h2>{account.mode === "live" ? "Live account" : "Demo account"} <span className="mono">#{account.ctid}</span></h2>
           ) : <h1>Journal</h1>}
           <span className="sub">
-            Every evaluation, including the ones that decided to do nothing.
+            When automation started, paused or stopped, and the signals it found. Orders and closed trades are in Positions and Closed trades.
             {account ? " Scoped to this account and environment." : ""}
           </span>
         </div>

@@ -47,8 +47,8 @@ const items: BentoItem[] = [
   },
   {
     eyebrow: "Journal",
-    title: "Every decision has a trail",
-    body: "The journal records what the rule saw, decided and left unchanged.",
+    title: "A record of what happened",
+    body: "The journal records when automation starts, pauses and stops, and the signals it reports.",
     icon: NotebookTabs,
     className: styles.journal,
   },

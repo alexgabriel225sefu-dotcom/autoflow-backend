@@ -10,7 +10,7 @@ describe("ProductShowcase", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Review" }));
     expect(screen.getByRole("tab", { name: "Review" }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("heading", { level: 3 }).textContent).toBe("Every decision, with the reason.");
+    expect(screen.getByRole("heading", { level: 3 }).textContent).toBe("What happened, and when.");
     expect(screen.getByAltText(/journal/i).getAttribute("src")).toBe("/product/journal.webp");
   });
 

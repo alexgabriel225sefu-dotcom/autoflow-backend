@@ -45,8 +45,9 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
   {
     question: "What does the journal record?",
     answer:
-      "Every evaluation: what the rule saw, what it decided and why, including the times it decided to wait. " +
-      "You can review the journal whenever you like to understand each decision.",
+      "When automation starts, pauses and stops, and any signal found at the Signals Only level. " +
+      "Orders and closed trades are listed in Positions and Closed trades. " +
+      "The journal does not yet list each check where the rule decided to wait.",
   },
   {
     question: "Is checkout or live trading open?",

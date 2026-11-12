@@ -30,9 +30,9 @@ const steps: Step[] = [
     ],
   },
   {
-    id: "review", n: "3", title: "See every decision and why",
-    body: "The journal records each check, including the ones that decided to do nothing. You always see what the rule looked at and the reason.",
-    points: ["Nothing happens in the dark", "Export it any time"],
+    id: "review", n: "3", title: "See what happened, and when",
+    body: "The journal records when automation starts, pauses and stops, and any signal found at the Signals Only level. Orders and closed trades are listed in Positions and Closed trades.",
+    points: ["Every start and stop is recorded", "Export it any time"],
     src: "/product/journal.webp", alt: "The journal with a buy decision and its reason.", ratio: "16 / 10",
     spots: [
       { x: 20, y: 40.9, w: 78, h: 22, label: "A decision, with its reason", side: "bottom" },

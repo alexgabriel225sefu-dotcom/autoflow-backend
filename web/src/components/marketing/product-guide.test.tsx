@@ -8,7 +8,7 @@ describe("ProductGuide", () => {
     expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       "Choose how you want to trade",
       "Start on a demo account",
-      "See every decision and why",
+      "See what happened, and when",
     ]);
     const imgs = screen.getAllByRole("img");
     expect(imgs).toHaveLength(3);
