@@ -193,7 +193,26 @@ check("repeated recovery reaches the same verdict", v == user_loop.ADOPT)
 check("and does not disturb the stored snapshot",
       user_store.load(UID).get("open_position_snapshot") == before)
 
-print("\n8. A close during the outage is booked once, not twice")
+print("\n8. Recovery focus returns to the rule after the position closes")
+check("an open recovered position keeps its own symbol in focus",
+      user_loop._resume_configured_symbol(
+          "XAUUSD", "AUDUSD", LIVE_POS, []) == "AUDUSD")
+check("after it closes, a single-symbol rule resumes its configured symbol",
+      user_loop._resume_configured_symbol(
+          "XAUUSD", "AUDUSD", None, []) == "XAUUSD")
+check("basket mode keeps control of its own rotating focus",
+      user_loop._resume_configured_symbol(
+          "XAUUSD", "AUDUSD", None, ["AUDUSD", "EURUSD"]) == "AUDUSD")
+
+# Mutation guard: proving the helper alone is not enough.  The running loop
+# must call it before it reads positions and evaluates the next entry.
+_loop_source = open(user_loop.__file__, encoding="utf-8").read()
+_call = _loop_source.index("_next_symbol = _resume_configured_symbol(")
+_next_entry_cycle = _loop_source.index("# ── MULTI-POSITION", _call)
+check("the loop restores focus before the next entry cycle",
+      _call < _next_entry_cycle)
+
+print("\n9. A close during the outage is booked once, not twice")
 c1, _, _ = ledger.claim(UID, "CLOSE:54669878", "CLOSE", 0, None, None,
                         fail_closed=True)
 c2, why2, _ = ledger.claim(UID, "CLOSE:54669878", "CLOSE", 0, None, None,

@@ -1171,3 +1171,38 @@ the hero asset returned `video/mp4`, 2,314,465 bytes, with an MP4 header; the
 Render web URL returned 200; and no error-level app logs appeared after the
 deploy started. No provider settings, environment values, payment paths, live
 gates or orders changed.
+
+## Recovered-position symbol correction — 2026-11-11
+
+Branch: `codex/fix-recovered-rule-symbol`, rebased onto
+`claude/apex4traders-platform-v1` at `874a800c`.
+
+The engine correctly adopted an already-open position on a different
+instrument so it remained managed, but after that position closed it continued
+evaluating the adopted instrument instead of returning to the running rule's
+configured instrument. A single-instrument loop now keeps the recovered
+instrument only while the position exists, then restores `cfg.SYMBOL` before
+the next entry cycle. Basket rotation remains unchanged.
+
+Files changed:
+
+- `apex-forex-bot/apex/user_loop.py` — restore the configured focus after a
+  recovered position closes;
+- `apex-forex-bot/tests/test_live_recovery_chain.py` — cover the open, closed
+  and basket cases and assert that the running loop calls the restoration
+  before its next entry cycle.
+
+Verification:
+
+- targeted recovery chain: 28 checks passed;
+- mutation check: removing the loop integration made the recovery test fail;
+- complete backend suite: all 249 test files passed.
+
+No account state, position, order, environment variable, provider setting,
+live gate, checkout path or deployment was changed. The real connected account
+was inspected only through redacted API logs. CI remains required before this
+fix is considered complete.
+
+Next: require all four PR CI jobs to pass, then deploy only with explicit owner
+approval and verify that a recovered non-rule position no longer changes the
+next entry instrument.
