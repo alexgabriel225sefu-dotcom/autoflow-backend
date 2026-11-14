@@ -106,7 +106,7 @@ never the risk.
 ## Realistic expectations
 
 Each win at default settings is roughly **+2–4% of balance** (2% risk × 1:2
-R:R, more with a runner), each loss −2%. Forex moves slower than crypto:
+R:R, more with a runner), each loss −2%. Forex moves at macro pace:
 0–3 trades per day is normal, and quiet days with zero trades are part of
 the system. A good month on a $1,000 paper account looks like **+5–15%**,
 with losing weeks in between. Anyone promising more from a 5-minute bot

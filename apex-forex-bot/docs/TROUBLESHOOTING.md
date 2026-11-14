@@ -40,11 +40,11 @@ like EUR_USD. Each broker offers a different instrument list.
 
 ---
 
-## Telegram
+## the web app
 
 ### Bot doesn't reply
-1. `TELEGRAM_BOT_TOKEN` must match BotFather's token exactly (no spaces)
-2. `TELEGRAM_CHAT_ID` must be **your** ID from @userinfobot
+1. `the retired bot token` must match BotFather's token exactly (no spaces)
+2. `the retired chat id` must be **your** ID from @userinfobot
 3. Message the bot first — bots can't initiate chats
 4. Restart the deployment after changing variables
 
@@ -63,7 +63,7 @@ Check the logs — every HOLD prints its reason. The full entry checklist:
 5. **Loss cooldown** — 15 min without entries after a loss (`⏸️` in logs).
 6. **Not against strong Livermore + Turtle structure** (`⚡ Signal filtered`).
 
-Forex pairs move slower than crypto — expect 0–3 trades per day, sometimes
+Forex pairs move at macro pace — expect 0–3 trades per day, sometimes
 zero on quiet days. If it holds for **days** during active sessions, lower the
 bar: `MIN_CONFIDENCE=58`, `MIN_CRITERIA=2`.
 

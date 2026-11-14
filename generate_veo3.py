@@ -4,12 +4,30 @@ AI Cash Systems - Veo 3 UGC Video Generator
 Generates realistic talking-head TikTok videos via Google Veo 3 API.
 """
 
-import os, time, requests
+import os, time
 from pathlib import Path
+
+def require_google_api_key():
+    """The key lives in the environment, never in this file.
+
+    GOOGLE_API_KEY is the name to set. GOOGLE_AI_API_KEY is accepted because
+    existing deploy config already uses it. The value is not printed.
+    Checked before the SDK import so a missing key fails with this message
+    rather than a missing-module error.
+    """
+    key = (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_AI_API_KEY") or "").strip()
+    if not key:
+        raise SystemExit(
+            "GOOGLE_API_KEY is not set. Export GOOGLE_API_KEY or "
+            "GOOGLE_AI_API_KEY and run this script again."
+        )
+    return key
+
+API_KEY = require_google_api_key()
+
 from google import genai
 from google.genai import types
 
-API_KEY = os.environ.get("GOOGLE_AI_API_KEY", "AIzaSyDmRhfKfQ8e9t6ACH9XXJWNkjA1lzhFVPU")
 client = genai.Client(api_key=API_KEY)
 
 OUTPUT_DIR = Path("outputs/tiktok-videos")
@@ -109,7 +127,6 @@ def generate_video(script):
 
 if __name__ == "__main__":
     print("=== AI Cash Systems — Veo 3 UGC Generator ===")
-    print(f"API Key: {API_KEY[:20]}...")
     print(f"Output: {OUTPUT_DIR.resolve()}")
 
     results = []

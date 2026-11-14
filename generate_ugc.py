@@ -1,7 +1,21 @@
 #!/usr/bin/env python3
 import os, json, time, requests, base64, datetime
 
-API_KEY = os.environ.get("GOOGLE_AI_API_KEY", "")
+def require_google_api_key():
+    """The key lives in the environment, never in this file.
+
+    GOOGLE_API_KEY is the name to set. GOOGLE_AI_API_KEY is accepted because
+    existing deploy config already uses it. The value is not printed.
+    """
+    key = (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_AI_API_KEY") or "").strip()
+    if not key:
+        raise SystemExit(
+            "GOOGLE_API_KEY is not set. Export GOOGLE_API_KEY or "
+            "GOOGLE_AI_API_KEY and run this script again."
+        )
+    return key
+
+API_KEY = require_google_api_key()
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 MODEL = "veo-3.1-generate-preview"
 OUTPUT_DIR = "outputs/ugc-ads"
@@ -25,7 +39,7 @@ os.makedirs("logs", exist_ok=True)
 
 
 def start_generation(variation_num):
-    url = f"{BASE_URL}/models/{MODEL}:predictLongRunning?key={API_KEY}"
+    url = f"{BASE_URL}/models/{MODEL}:predictLongRunning"
     body = {
         "instances": [{"prompt": PROMPT}],
         "parameters": {
@@ -35,7 +49,8 @@ def start_generation(variation_num):
             "personGeneration": "allow_adult",
         },
     }
-    resp = requests.post(url, json=body, timeout=60)
+    # Header, not a query parameter: a failed request's URL must not carry the key.
+    resp = requests.post(url, json=body, headers={"x-goog-api-key": API_KEY}, timeout=60)
     resp.raise_for_status()
     op = resp.json()
     op_name = op.get("name", "")
@@ -44,11 +59,11 @@ def start_generation(variation_num):
 
 
 def poll_operation(op_name, variation_num, max_wait=300):
-    url = f"{BASE_URL}/{op_name}?key={API_KEY}"
+    url = f"{BASE_URL}/{op_name}"
     start = time.time()
     interval = 10
     while time.time() - start < max_wait:
-        resp = requests.get(url, timeout=30)
+        resp = requests.get(url, headers={"x-goog-api-key": API_KEY}, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         if data.get("done"):
@@ -80,7 +95,7 @@ def save_video(result, variation_num):
         print(f"[V{variation_num}] Saved: {filename}")
         return filename
     elif video_uri:
-        video_resp = requests.get(video_uri, timeout=60)
+        video_resp = requests.get(video_uri, headers={"x-goog-api-key": API_KEY}, timeout=60)
         video_resp.raise_for_status()
         with open(filename, "wb") as f:
             f.write(video_resp.content)

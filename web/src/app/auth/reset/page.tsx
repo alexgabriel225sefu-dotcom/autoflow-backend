@@ -1,0 +1,57 @@
+"use client";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthSubmit } from "@/components/auth/auth-submit";
+import { useState } from "react";
+import { createImplicitClient } from "@/lib/supabase/client";
+import { authCallbackUrl } from "@/lib/supabase/redirect";
+import { authErrorMessage } from "@/lib/supabase/auth-error";
+
+export default function ResetPage() {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    // Not the PKCE client: its link can only be finished by the browser that
+    // holds the code verifier, and a reset email is usually opened somewhere
+    // else. The implicit client's link carries the recovery session itself,
+    // which /auth/callback imports in whichever browser opens it.
+    const { error } = await createImplicitClient().auth.resetPasswordForEmail(email, {
+      redirectTo: authCallbackUrl(window.location.origin, { recovery: true }),
+    });
+    setBusy(false);
+    if (error) return setError(authErrorMessage(error.message, "reset"));
+    setSent(true);
+  }
+
+  return (
+    <AuthShell
+      title="Reset your password."
+      lead="We will email you a link to choose a new one."
+      footer={<a href="/login">Back to sign in</a>}
+    >
+      {sent ? (
+        <div className="card">
+          {/* Deliberately the same message whether or not the address is
+              registered: a different one would tell a stranger which email
+              addresses have accounts here. */}
+          <p className="auth-lead">If that address has an account, a reset link is on its way.</p>
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} className="card">
+          <label className="field">
+            <span>Email</span>
+            <input type="email" required value={email} autoComplete="email"
+                   onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
+          <AuthSubmit busy={busy} idle="Send reset link" busyLabel="Sending…" />
+        </form>
+      )}
+    </AuthShell>
+  );
+}

@@ -10,18 +10,32 @@ services:
     startCommand: python -u main.py
     plan: starter
     autoDeploy: true
-    # Scope auto-deploy to this folder only. This repo also holds
-    # apex-crypto-bot/ and ruflo-mcp/ — without this filter, a commit to
-    # either of THOSE also restarts this live trading loop for no reason,
-    # which is exactly the kind of unnecessary restart that can silently
-    # orphan an open position mid-trade (see user_loop.py's startup
-    # recovery comment).
+    # The service builds and runs from INSIDE this folder. Without it the
+    # blueprint cannot recreate the running service: `pip install -r
+    # requirements.txt` and `python -u main.py` both resolve from the
+    # repository root, where neither file exists — this is a monorepo and the
+    # bot lives in apex-forex-bot/. The live service was created by hand with
+    # this set, so the running deployment is fine and the BLUEPRINT was the
+    # thing that could not reproduce it. That only shows up the day someone
+    # rebuilds from it, which is the day it matters most.
+    rootDir: apex-forex-bot
+    # Scope auto-deploy to this folder only. This repo also holds ruflo-mcp/
+    # and the website — without this filter, a commit to either of THOSE also
+    # restarts this live trading loop for no reason, which is exactly the kind
+    # of unnecessary restart that can silently orphan an open position
+    # mid-trade (see user_loop.py's startup recovery comment).
+    #
+    # NOTE: buildFilter paths are relative to the REPOSITORY ROOT, not to
+    # rootDir. So this stays `apex-forex-bot/**` and must NOT be shortened to
+    # `**` to "match" rootDir above — that would match every commit in the
+    # monorepo and restart the trading loop for changes to the website.
     buildFilter:
       paths:
         - apex-forex-bot/**
     envVars:
-      # Product identity — MUST be set; the bot refuses to start without it
-      # to prevent cross-product Redis namespace contamination.
+      # Product identity — MUST be "forex". config.py refuses to start on any
+      # other value: it namespaces Redis keys, and a wrong value would read
+      # another deployment's state.
       - key: PRODUCT
         value: forex
       # Unbuffered Python output — without this, print() is buffered and the
@@ -39,4 +53,15 @@ services:
         sync: false
       # Optional license — leave empty to run open (access via Telegram).
       - key: LICENSE_KEY
+        sync: false
+      # Monetization gate: true = new contacts must /purchase (Stripe) before
+      # getting access. false = free-growth phase, first message grants access.
+      # NOTE: this only affects the render.yaml Blueprint default — this
+      # service was renamed off-Blueprint, so also set it directly in the
+      # Render dashboard for it to take effect on the live service.
+      - key: REQUIRE_LICENSE
+        value: "true"
+      # Encrypts broker tokens + user AI keys at rest in Redis/Upstash.
+      # Fernet key — generate with: python3 -c "import os,base64;print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+      - key: TOKEN_ENCRYPTION_KEY
         sync: false
