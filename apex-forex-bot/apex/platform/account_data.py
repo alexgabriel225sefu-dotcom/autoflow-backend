@@ -65,7 +65,8 @@ _A4T_CATEGORY = {
     "ctrader": "ctraderLink", "ctlink": "ctraderLink",
     "automation": "automation", "autolock": "automation",
     "suggestion": "approvals", "suggclaim": "approvals",
-    "audit": "audit", "referral": "referral", "livegate": "liveAccess",
+    "audit": "audit", "liveaudit": "audit", "referral": "referral",
+    "livegate": "liveAccess",
     "billing": "billing", "rl": "caches", "orderrate": "caches",
 }
 # Segment after "<ns>:" for the engine's own per-user keys.
