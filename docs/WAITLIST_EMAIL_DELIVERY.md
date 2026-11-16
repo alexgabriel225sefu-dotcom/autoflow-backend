@@ -6,7 +6,9 @@ is best-effort and never turns a successful sign-up into a browser error.
 
 ## Provider choice
 
-Provider: Resend transactional email over HTTPS.
+Provider: Resend or Brevo transactional email over HTTPS. Brevo is used when
+`BREVO_API_KEY` is set (also when `RESEND_API_KEY` is set), otherwise Resend.
+Both are a single JSON `POST`, with no SDK.
 
 Why this provider for launch:
 
@@ -27,8 +29,9 @@ is the product contract.
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `RESEND_API_KEY` | only for waitlist email delivery | Server-side provider API key. Never log it and never expose it to the browser. |
-| `A4T_WAITLIST_FROM_EMAIL` | only for waitlist email delivery | Verified Resend sender, for example `Apex4Traders <waitlist@example.com>`. |
+| `BREVO_API_KEY` | one of the two keys | Brevo API key (`api-key` header, `POST https://api.brevo.com/v3/smtp/email`). Takes precedence over Resend. Never log it and never expose it to the browser. |
+| `RESEND_API_KEY` | one of the two keys | Resend API key. Used only when `BREVO_API_KEY` is not set. |
+| `A4T_WAITLIST_FROM_EMAIL` | only for waitlist email delivery | Verified sender at the provider, for example `Apex4Traders <waitlist@example.com>`. With Brevo the sender's domain must be authenticated in Brevo (apex4traders.com is). |
 | `A4T_WAITLIST_REPLY_TO` | optional | Reply-to mailbox, if the owner wants replies somewhere else. |
 
 If none of these are configured, sign-ups still succeed and `/readyz` reports

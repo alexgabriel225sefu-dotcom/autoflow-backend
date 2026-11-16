@@ -39,6 +39,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+from email.utils import parseaddr
 
 from apex import user_store
 from apex.platform import store as _store
@@ -75,8 +76,10 @@ PLATFORMS = ("ctrader", "mt4", "mt5", "other")
 MAX_BROKER = 60
 
 # A single HTTPS call is enough; no SDK dependency for a launch-list email.
-EMAIL_PROVIDER = "resend"
+EMAIL_PROVIDER = "resend"            # the default, when no key is set at all
+BREVO_PROVIDER = "brevo"
 RESEND_ENDPOINT = "https://api.resend.com/emails"
+BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 EMAIL_TIMEOUT_SEC = 3
 DELIVERY_SENT = "sent"
 DELIVERY_FAILED = "failed"
@@ -160,6 +163,18 @@ def _broker(value):
     return v or None
 
 
+def _provider():
+    """Which provider will send. Brevo when its key is set, otherwise Resend.
+
+    Both keys set is allowed and means Brevo: the owner moved to it on purpose,
+    and a leftover Resend key must not quietly win. With neither key the name
+    reported is the default, which only matters for the readiness line.
+    """
+    if (os.getenv("BREVO_API_KEY") or "").strip():
+        return BREVO_PROVIDER
+    return EMAIL_PROVIDER
+
+
 def email_config_status():
     """Readiness-safe status for waitlist email delivery.
 
@@ -167,18 +182,20 @@ def email_config_status():
     absent provider is acceptable during development and beta preparation, but
     a partial configuration is a real operator error.
     """
-    key = bool((os.getenv("RESEND_API_KEY") or "").strip())
+    provider = _provider()
+    key = bool((os.getenv("BREVO_API_KEY") or "").strip()
+               or (os.getenv("RESEND_API_KEY") or "").strip())
     sender = bool((os.getenv("A4T_WAITLIST_FROM_EMAIL") or "").strip())
     reply_to = bool((os.getenv("A4T_WAITLIST_REPLY_TO") or "").strip())
     missing = []
     if not key:
-        missing.append("RESEND_API_KEY")
+        missing.append("BREVO_API_KEY or RESEND_API_KEY")
     if not sender:
         missing.append("A4T_WAITLIST_FROM_EMAIL")
     configured = not missing
     partial = bool(key or sender or reply_to) and not configured
     return {
-        "provider": EMAIL_PROVIDER,
+        "provider": provider,
         "configured": configured,
         "partial": partial,
         "missing": missing,
@@ -186,7 +203,7 @@ def email_config_status():
 
 
 def _delivery(status, *, now=None, reason=None):
-    out = {"provider": EMAIL_PROVIDER, "status": status}
+    out = {"provider": _provider(), "status": status}
     if now is not None:
         out["attemptedAt"] = int(now)
     if reason:
@@ -232,6 +249,46 @@ def _post_resend(payload):
         return provider_id
 
 
+def _brevo_payload(payload):
+    """The same message in Brevo's shape.
+
+    The caller builds one provider-neutral payload; only this function knows
+    that Brevo wants the sender as a name and an address, the recipients as
+    objects, and the body under another key.
+    """
+    name, addr = parseaddr(payload.get("from") or "")
+    out = {
+        "sender": {"email": addr, **({"name": name} if name else {})},
+        "to": [{"email": a} for a in payload.get("to") or []],
+        "subject": payload.get("subject"),
+        "textContent": payload.get("text"),
+    }
+    reply_to = (payload.get("reply_to") or "").strip()
+    if reply_to:
+        out["replyTo"] = {"email": parseaddr(reply_to)[1] or reply_to}
+    return out
+
+
+def _post_brevo(payload):
+    key = (os.getenv("BREVO_API_KEY") or "").strip()
+    data = json.dumps(_brevo_payload(payload)).encode("utf-8")
+    req = urllib.request.Request(
+        BREVO_ENDPOINT, data=data, method="POST",
+        headers={
+            "api-key": key,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "apex4traders-waitlist/1.0",
+        })
+    with urllib.request.urlopen(req, timeout=EMAIL_TIMEOUT_SEC) as resp:  # nosec B310 - fixed HTTPS endpoint
+        body = resp.read(1024 * 64).decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            parsed = {}
+        return parsed.get("messageId") if isinstance(parsed, dict) else None
+
+
 def send_waitlist_email(address, *, now=None, post=None):
     """Best-effort transactional email. Never raises with an address in it."""
     stamp = int(now if now is not None else time.time())
@@ -239,7 +296,8 @@ def send_waitlist_email(address, *, now=None, post=None):
     if not cfg["configured"]:
         return _delivery(DELIVERY_NOT_CONFIGURED)
     try:
-        provider_id = (post or _post_resend)(_placeholder_email(address))
+        poster = _post_brevo if _provider() == BREVO_PROVIDER else _post_resend
+        provider_id = (post or poster)(_placeholder_email(address))
     except urllib.error.HTTPError as exc:
         return _delivery(DELIVERY_FAILED, now=stamp, reason=f"HTTP_{exc.code}")
     except Exception as exc:
