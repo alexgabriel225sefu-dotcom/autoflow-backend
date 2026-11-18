@@ -42,7 +42,7 @@ function sample(p: number): Pose {
 }
 
 function Traveller({ model, narrow }: { model: string; narrow: boolean }) {
-  const gltf = useGLTF(model, false);
+  const gltf = useGLTF(model, false, false);
   const group = useRef<THREE.Group>(null);
   const cur = useRef<Pose>(sample(0));
 

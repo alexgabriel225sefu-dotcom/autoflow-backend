@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { SceneGuard } from "./scene-guard";
 import styles from "./limit-stage.module.css";
 
 const StopPathScene = dynamic(() => import("./stop-path-scene").then((m) => m.StopPathScene), {
@@ -32,7 +33,9 @@ export function LimitStage() {
       role="img"
       aria-label="A price path drawn in chrome comes down onto a pink line, the rule's stop, and stops there"
     >
-      <StopPathScene fallback={<Flat />} />
+      <SceneGuard fallback={<Flat />}>
+        <StopPathScene fallback={<Flat />} />
+      </SceneGuard>
     </div>
   );
 }

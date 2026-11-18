@@ -23,7 +23,7 @@ import * as THREE from "three";
 function Mark({ model, scale, reduced }: { model: string; scale: number; reduced: boolean }) {
   // Draco is switched off: the file uses meshopt, and the Draco decoder would
   // be downloaded from a third-party host.
-  const gltf = useGLTF(model, false);
+  const gltf = useGLTF(model, false, false);
   const group = useRef<THREE.Group>(null);
   const pointer = useRef({ x: 0, y: 0 });
 

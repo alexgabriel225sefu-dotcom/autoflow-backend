@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { SceneGuard } from "./scene-guard";
 import styles from "./scroll-backdrop.module.css";
 
 // Loaded after the page and never on the server: the first paint is the copy.
@@ -12,7 +13,9 @@ const Scene = dynamic(() => import("./scroll-backdrop-scene").then((m) => m.Scro
 export function ScrollBackdrop() {
   return (
     <div className={styles.layer} aria-hidden="true" data-testid="scroll-backdrop">
-      <Scene model="/models/a4-mark.glb" />
+      <SceneGuard fallback={null}>
+        <Scene model="/models/a4-mark.glb" />
+      </SceneGuard>
     </div>
   );
 }
