@@ -12,8 +12,6 @@ import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { HeroStage } from "@/components/marketing/hero-stage";
-import { LimitStage } from "@/components/marketing/limit-stage";
-import { ScrollBackdrop } from "@/components/marketing/scroll-backdrop";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { ProductGuide } from "@/components/marketing/product-guide";
 import { JsonLd } from "@/components/marketing/json-ld";
@@ -69,15 +67,7 @@ export default function Landing() {
           </span>
         </nav>
 
-        <ScrollBackdrop />
         <HeroStage />
-
-        <section id="limit" className="mkt-section" aria-labelledby="limit-title">
-          <span className="mkt-eyebrow">Your limit</span>
-          <h2 id="limit-title">A rule without a stop cannot start.</h2>
-          <p>Every rule carries its own stop, and your risk limits are enforced on the server. When price reaches the stop, the rule ends there.</p>
-          <LimitStage />
-        </section>
 
         <section id="tour" className="mkt-section" aria-labelledby="tour-title">
           <span className="mkt-eyebrow">The platform</span>

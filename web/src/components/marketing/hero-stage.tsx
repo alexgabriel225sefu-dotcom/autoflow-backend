@@ -1,5 +1,4 @@
 import { ArrowRight } from "lucide-react";
-import { A4MarkStage } from "./a4-mark-stage";
 import { HeroProduct } from "./hero-product";
 import styles from "./hero-stage.module.css";
 
@@ -12,14 +11,13 @@ import styles from "./hero-stage.module.css";
 export function HeroStage() {
   return (
     <section className={styles.section} id="product">
-      <div className={styles.glow} aria-hidden="true" />
       <div className={styles.copy}>
         <p className={`${styles.pill} ${styles.rise}`} style={{ ["--d" as string]: "0ms" }}>
           cTrader works today. More platforms are on the roadmap.
         </p>
         <p className={`mkt-kicker ${styles.rise}`} style={{ ["--d" as string]: "40ms" }}>RULES YOU CAN READ</p>
         <h1 className={styles.rise} style={{ ["--d" as string]: "90ms" }}>
-          Trade by rules <span className={styles.shine}>you can read.</span>
+          Trade by rules <span className={styles.accent}>you can read.</span>
         </h1>
         <p className={`mkt-lede ${styles.rise}`} style={{ ["--d" as string]: "200ms" }}>
           Write your trading plan in plain words, test it on a demo account
@@ -39,7 +37,6 @@ export function HeroStage() {
         </p>
       </div>
       <div className={`${styles.visual} ${styles.rise}`} style={{ ["--d" as string]: "250ms" }}>
-        <A4MarkStage />
         <div className={styles.productPreview}>
           <HeroProduct />
         </div>

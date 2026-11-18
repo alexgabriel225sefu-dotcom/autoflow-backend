@@ -41,11 +41,6 @@ describe("landing page", () => {
     expect(container.querySelector("video")).toBeNull();
   });
 
-  it("explains the stop in plain words next to a drawn price path", () => {
-    render(<Landing />);
-    expect(screen.getByRole("heading", { name: /a rule without a stop cannot start/i })).toBeTruthy();
-    expect(screen.getByRole("img", { name: /price path.*pink line.*stop/i })).toBeTruthy();
-  });
 
   it("says demo-only and makes no profit claim", () => {
     const { container } = render(<Landing />);
