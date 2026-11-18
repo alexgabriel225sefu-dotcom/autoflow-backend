@@ -168,7 +168,7 @@
   --color-border: var(--a4t-line);
   --color-input: var(--a4t-surface-2);
   --color-ring: var(--a4t-accent);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -308,7 +308,7 @@ html { scroll-behavior: smooth; color-scheme: dark; }
 body {
   background: var(--a4t-bg);
   color: var(--a4t-text);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-poppins), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   /* Tabular figures everywhere: a price column that shifts as digits change
@@ -1215,7 +1215,7 @@ body {
 .auth-main { display: flex; flex-direction: column; padding: clamp(1.4rem, 3.5vw, 2.6rem) clamp(1.2rem, 5vw, 4.5rem); }
 .auth-logo { display: inline-flex; align-self: flex-start; }
 .auth-block { width: 100%; max-width: 420px; margin: auto; padding: 2.4rem 0 2rem; }
-.auth-block h1 { font-size: clamp(2.1rem, 4.4vw, 3rem); line-height: 1.02; letter-spacing: -.045em; font-weight: 800; }
+.auth-block h1 { font-size: clamp(2.1rem, 4.4vw, 3rem); line-height: 1.02; letter-spacing: -.025em; font-weight: 800; }
 .auth-lead { margin-top: .85rem; color: var(--a4t-muted); font-size: 1.02rem; line-height: 1.55; }
 .auth-block > form.card, .auth-block > .card { margin-top: 1.8rem; border: 0; background: transparent; box-shadow: none; padding: 0; }
 .auth-block .field { margin-bottom: 1.05rem; }
@@ -1238,7 +1238,7 @@ body {
 @keyframes aside-breathe { from { opacity: .55; transform: scale(.96); } to { opacity: 1; transform: scale(1.04); } }
 .aside-copy { position: absolute; left: clamp(2rem, 4.5vw, 4rem); right: clamp(2rem, 4.5vw, 4rem); top: clamp(2.4rem, 7vh, 4.6rem); }
 .aside-kicker { font-size: .74rem; font-weight: 800; letter-spacing: .18em; color: #d93a2b; margin-bottom: 1.1rem; }
-.aside-head { font-size: clamp(2.8rem, 5.2vw, 4.9rem); line-height: .94; letter-spacing: -.055em; font-weight: 800; max-width: 11ch; }
+.aside-head { font-size: clamp(2.8rem, 5.2vw, 4.9rem); line-height: .94; letter-spacing: -.025em; font-weight: 800; max-width: 11ch; }
 .aside-sub { margin-top: 1.3rem; max-width: 30rem; color: #b9b7b0; font-size: 1.05rem; line-height: 1.6; }
 .aside-card {
   position: absolute; left: clamp(2rem, 4.5vw, 4rem); bottom: clamp(5.2rem, 12vh, 7.5rem); width: min(30rem, 78%);
@@ -1433,7 +1433,7 @@ body {
      copy column at the widest layout. It was 4.4rem, which wrapped it onto a
      fourth line and made the deliberate break read as an accident. */
   font-size: clamp(2.1rem, 4.6vw, 3.15rem);
-  line-height: 1.0; letter-spacing: -0.04em; font-weight: 700;
+  line-height: 1.0; letter-spacing: -.025em; font-weight: 700;
   margin: 0;
 }
 .mkt-hero h1 em { font-style: normal; color: var(--mkt-accent-text); }
@@ -1633,7 +1633,7 @@ body {
 .mkt-rulecard .rc-bar { display: flex; align-items: center; gap: .45rem; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #56544e; margin-bottom: .9rem; }
 .mkt-rulecard .rc-bar i { width: 9px; height: 9px; border-radius: 50%; background: #d93a2b; } .mkt-rulecard .rc-bar i:nth-child(2) { opacity: .45; } .mkt-rulecard .rc-bar i:nth-child(3) { opacity: .22; }
 .mkt-rulecard .rc-bar span { margin-left: .3rem; }
-.mkt-rulecard h3 { font-size: 1.9rem; font-weight: 800; letter-spacing: -.04em; margin-bottom: .5rem; color: #111113; }
+.mkt-rulecard h3 { font-size: 1.9rem; font-weight: 800; letter-spacing: -.025em; margin-bottom: .5rem; color: #111113; }
 .mkt-rulecard .rc-row { display: flex; align-items: center; gap: .5rem; font-size: 1rem; padding: .7rem 0; border-top: 1.5px solid #ebe8e0; color: #111113; }
 .mkt-rulecard .rc-row em { font-style: normal; color: #726f67; }
 .mkt-rulecard .rc-row u { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; background: #1a7f4b; position: relative; flex: none; }
@@ -2146,7 +2146,7 @@ body {
 .auth-hero-glow { position: absolute; right: -20%; top: -40%; width: 80%; height: 140%; background: radial-gradient(closest-side, rgba(217, 58, 43, .34), rgba(217, 58, 43, 0) 72%); pointer-events: none; }
 .auth-hero .mark { position: relative; display: block; margin-bottom: 1rem; }
 .auth-hero-kicker { position: relative; font-size: .68rem; font-weight: 800; letter-spacing: .18em; color: #ff9484; margin-bottom: .5rem; }
-.auth-hero-head { position: relative; font-size: 1.7rem; line-height: 1; letter-spacing: -.045em; font-weight: 800; max-width: 11ch; }
+.auth-hero-head { position: relative; font-size: 1.7rem; line-height: 1; letter-spacing: -.025em; font-weight: 800; max-width: 11ch; }
 .aside-copy .mark { display: block; margin-bottom: 1.6rem; }
 
 /* ── Trade: the front door ─────────────────────────────────────────────
@@ -2398,10 +2398,9 @@ body {
 @media (min-width: 640px) { .mkt-lens-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1000px) { .mkt-lens-grid { grid-template-columns: repeat(3, 1fr); gap: 1.1rem; } }
 
-/* The landing page's typeface (Familjen Grotesk, loaded in layout.tsx). It
-   replaces Geist here only; weights are lighter and tracking looser than the
-   template default of 800 at -.055em. */
-.mkt { font-family: var(--font-mkt), var(--font-geist-sans), system-ui, sans-serif; }
+/* The landing page uses the same typeface as the platform (Poppins, loaded in
+   layout.tsx). Weights are 500-600 and tracking is light. */
+.mkt { font-family: var(--font-poppins), system-ui, -apple-system, "Segoe UI", sans-serif; }
 .mkt h2 { font-weight: 600; letter-spacing: -.025em; }
 .mkt h3 { font-weight: 600; letter-spacing: -.015em; }
 .mkt-kicker { font-weight: 600; letter-spacing: .14em; }
