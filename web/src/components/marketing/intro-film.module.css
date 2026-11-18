@@ -1,0 +1,167 @@
+/* The intro film. Timeline, in seconds:
+
+     0.6  eyebrow in
+     1.0  line 1 types      2.5  line 2 types      3.4  line 3 types
+     4.0  the stop line is drawn
+     4.4  the price path is drawn, and comes down onto the stop
+     5.9  the stop holds (a dot)
+     6.1  rule and chart out, the wordmark in
+     7.0  the whole film fades out, 7.6 it is hidden
+
+   All of it is CSS timing. With scripting off the film still ends by itself:
+   the last keyframe leaves it `visibility: hidden`, so it can never cover the
+   page. intro-film.tsx also removes it from the tree at 7.6 s. */
+
+:global(html.a4t-intro-lock) { overflow: hidden; }
+
+.film {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: #08080a;
+  color: var(--mkt-text, #f7f6f2);
+  animation: filmOut 7.6s linear forwards;
+}
+
+@keyframes filmOut {
+  0%, 92% { opacity: 1; visibility: visible; }
+  99.9% { opacity: 0; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+.skip {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  z-index: 2;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--mkt-line, #2a2a31);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mkt-muted, #a9a7a0);
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.skip:hover { color: var(--mkt-text, #f7f6f2); border-color: var(--mkt-accent-line, rgba(255, 79, 163, .3)); }
+.skip:focus-visible { outline: 2px solid var(--mkt-accent, #ff4fa3); outline-offset: 2px; }
+
+.stage {
+  position: relative;
+  width: min(44rem, calc(100vw - 2.5rem));
+  min-height: 22rem;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 1.25rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: .72rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--mkt-dim, #8d8b84);
+  opacity: 0;
+  animation: fadeIn .4s ease .6s forwards, groupOut .5s ease 6.1s forwards;
+}
+
+.code {
+  display: grid;
+  gap: .35rem;
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-size: clamp(1rem, 3.4vw, 1.5rem);
+  line-height: 1.35;
+  animation: groupOut .5s ease 6.1s forwards;
+}
+
+.line {
+  display: block;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid var(--mkt-accent, #ff4fa3);
+  color: var(--mkt-accent-text, #ff6fb4);
+}
+
+/* Each line types over its own window with a steps() timing equal to its
+   character count, so the type moves one glyph at a time. */
+.l1 { animation: type1 1.4s steps(34, end) 1s forwards, caret 1.4s step-end 1s forwards; }
+.l2 { animation: type2 .8s steps(19, end) 2.5s forwards, caret .8s step-end 2.5s forwards; color: var(--mkt-text, #f7f6f2); }
+.l3 { animation: type3 .5s steps(12, end) 3.4s forwards, caret .5s step-end 3.4s forwards; color: var(--mkt-text, #f7f6f2); }
+
+@keyframes type1 { from { width: 0; } to { width: calc(34ch + 8px); } }
+@keyframes type2 { from { width: 0; } to { width: calc(19ch + 8px); } }
+@keyframes type3 { from { width: 0; } to { width: calc(12ch + 8px); } }
+@keyframes caret {
+  0%, 99% { border-right-color: var(--mkt-accent, #ff4fa3); }
+  100% { border-right-color: transparent; }
+}
+
+.chart {
+  width: 100%;
+  height: clamp(7rem, 22vw, 11rem);
+  overflow: visible;
+  animation: groupOut .5s ease 6.1s forwards;
+}
+
+.stopLine {
+  stroke: var(--mkt-accent, #ff4fa3);
+  stroke-width: 1.5;
+  stroke-dasharray: 560;
+  stroke-dashoffset: 560;
+  animation: draw .6s ease-out 4s forwards;
+}
+
+.path {
+  stroke: var(--mkt-text, #f7f6f2);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 700;
+  stroke-dashoffset: 700;
+  animation: draw 1.5s cubic-bezier(.4, 0, .2, 1) 4.4s forwards;
+}
+
+.entry, .hit { fill: var(--mkt-accent, #ff4fa3); opacity: 0; }
+.entry { animation: fadeIn .3s ease 4.9s forwards; }
+.hit { animation: fadeIn .3s ease 5.9s forwards; }
+
+.stopLabel {
+  fill: var(--mkt-accent-text, #ff6fb4);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  opacity: 0;
+  animation: fadeIn .4s ease 4.6s forwards;
+}
+
+.brand {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: .9rem;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: brandIn .8s cubic-bezier(.2, .7, .2, 1) 6.2s forwards;
+}
+
+.tagline {
+  margin: 0;
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  color: var(--mkt-muted, #a9a7a0);
+  letter-spacing: -.01em;
+}
+
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes groupOut { to { opacity: 0; } }
+@keyframes brandIn { to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .film { display: none; }
+}

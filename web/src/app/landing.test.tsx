@@ -36,14 +36,15 @@ describe("landing page", () => {
     expect(screen.queryByText("Read-only preview")).toBeNull();
   });
 
-  it("opens with the Apex4Traders hero introduction video", () => {
+  it("does not open with a looping video card", () => {
     const { container } = render(<Landing />);
-    const video = container.querySelector("video");
-    expect(video).toBeTruthy();
-    expect(video?.querySelector("source")?.getAttribute("src")).toBe("/video/apex4traders-hero.mp4");
-    expect(video).toHaveProperty("muted", true);
-    expect(video?.getAttribute("autoplay")).not.toBeNull();
-    expect(video?.getAttribute("playsinline")).not.toBeNull();
+    expect(container.querySelector("video")).toBeNull();
+  });
+
+  it("explains the stop in plain words next to a drawn price path", () => {
+    render(<Landing />);
+    expect(screen.getByRole("heading", { name: /a rule without a stop cannot start/i })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /price path.*pink line.*stop/i })).toBeTruthy();
   });
 
   it("says demo-only and makes no profit claim", () => {

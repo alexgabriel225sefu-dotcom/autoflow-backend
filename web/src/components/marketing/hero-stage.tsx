@@ -1,6 +1,6 @@
 import { ArrowRight } from "lucide-react";
+import { A4MarkStage } from "./a4-mark-stage";
 import { HeroProduct } from "./hero-product";
-import { HeroIntroVideo } from "./hero-intro-video";
 import styles from "./hero-stage.module.css";
 
 /**
@@ -15,7 +15,6 @@ export function HeroStage() {
       <div className={styles.glow} aria-hidden="true" />
       <div className={styles.copy}>
         <p className={`${styles.pill} ${styles.rise}`} style={{ ["--d" as string]: "0ms" }}>
-          <i className={styles.pulse} aria-hidden="true" />
           cTrader works today. More platforms are on the roadmap.
         </p>
         <p className={`mkt-kicker ${styles.rise}`} style={{ ["--d" as string]: "40ms" }}>RULES YOU CAN READ</p>
@@ -40,7 +39,7 @@ export function HeroStage() {
         </p>
       </div>
       <div className={`${styles.visual} ${styles.rise}`} style={{ ["--d" as string]: "250ms" }}>
-        <HeroIntroVideo />
+        <A4MarkStage />
         <div className={styles.productPreview}>
           <HeroProduct />
         </div>
