@@ -6,10 +6,11 @@ import { Environment, Lightformer, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
 /**
- * The brand monogram as a real 3D object.
+ * A product object as polished chrome, in 3D.
  *
- * The mesh was reconstructed from the logo by Higgsfield (Meshy 7) and then
- * stripped to geometry and compressed (206 KB). The surface is not the baked
+ * The meshes were generated with Higgsfield (the A4 monogram from the logo with
+ * Meshy 7, the others from a text prompt with Tripo), then stripped to geometry,
+ * simplified and meshopt-compressed (150-270 KB each). The surface is not the baked
  * texture: it is a physical chrome material lit by an environment made of
  * three light panels (a soft white top, a pink strip on the left, a thin white
  * strip on the right), so the pink in the reflections is the brand pink and
@@ -19,12 +20,10 @@ import * as THREE from "three";
  * the scroll. With reduced motion it is drawn once and stays still.
  */
 
-const MODEL = "/models/a4-mark.glb";
-
-function Mark({ reduced }: { reduced: boolean }) {
+function Mark({ model, scale, reduced }: { model: string; scale: number; reduced: boolean }) {
   // Draco is switched off: the file uses meshopt, and the Draco decoder would
   // be downloaded from a third-party host.
-  const gltf = useGLTF(MODEL, false);
+  const gltf = useGLTF(model, false);
   const group = useRef<THREE.Group>(null);
   const pointer = useRef({ x: 0, y: 0 });
 
@@ -71,7 +70,7 @@ function Mark({ reduced }: { reduced: boolean }) {
   });
 
   return (
-    <group ref={group} scale={1.05}>
+    <group ref={group} scale={scale}>
       <primitive object={scene} />
     </group>
   );
@@ -109,7 +108,15 @@ function webglAvailable(): boolean {
   }
 }
 
-export function A4Mark3D({ fallback }: { fallback: React.ReactNode }) {
+export function ChromeScene({
+  model,
+  scale = 1.05,
+  fallback,
+}: {
+  model: string;
+  scale?: number;
+  fallback: React.ReactNode;
+}) {
   // This component is only ever rendered in a browser (it is loaded with
   // ssr: false), so the capability checks can run once, up front, and there is
   // no server markup for them to disagree with.
@@ -132,7 +139,7 @@ export function A4Mark3D({ fallback }: { fallback: React.ReactNode }) {
     >
       <Suspense fallback={null}>
         <Studio />
-        <Mark reduced={reduced} />
+        <Mark model={model} scale={scale} reduced={reduced} />
       </Suspense>
     </Canvas>
   );
