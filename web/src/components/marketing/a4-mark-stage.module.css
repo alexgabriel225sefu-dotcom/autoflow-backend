@@ -1,6 +1,0 @@
-.stage { position: relative; width: 100%; height: clamp(18rem, 46vw, 32rem); isolation: isolate; }
-.stage canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
-/* A single soft pink pool on the floor under the mark: the only glow, and it
-   is a reflection of the light the mark is lit by, not decoration. */
-.floor { position: absolute; z-index: -1; left: 14%; right: 14%; bottom: 4%; height: 22%; background: radial-gradient(50% 100% at 50% 100%, rgba(255, 79, 163, .22), transparent 70%); filter: blur(18px); }
-.fallback { position: absolute; inset: 0; display: grid; place-items: center; }
