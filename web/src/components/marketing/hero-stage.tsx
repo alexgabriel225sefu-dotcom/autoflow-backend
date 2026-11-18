@@ -15,7 +15,6 @@ export function HeroStage() {
       <div className={styles.glow} aria-hidden="true" />
       <div className={styles.copy}>
         <p className={`${styles.pill} ${styles.rise}`} style={{ ["--d" as string]: "0ms" }}>
-          <i className={styles.pulse} aria-hidden="true" />
           cTrader works today. More platforms are on the roadmap.
         </p>
         <p className={`mkt-kicker ${styles.rise}`} style={{ ["--d" as string]: "40ms" }}>RULES YOU CAN READ</p>
