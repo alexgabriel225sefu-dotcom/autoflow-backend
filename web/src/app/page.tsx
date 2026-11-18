@@ -14,6 +14,7 @@ import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { HeroStage } from "@/components/marketing/hero-stage";
 import { IntroFilm } from "@/components/marketing/intro-film";
 import { LimitStage } from "@/components/marketing/limit-stage";
+import { ScrollBackdrop } from "@/components/marketing/scroll-backdrop";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { ProductGuide } from "@/components/marketing/product-guide";
 import { JsonLd } from "@/components/marketing/json-ld";
@@ -70,6 +71,7 @@ export default function Landing() {
           </span>
         </nav>
 
+        <ScrollBackdrop />
         <HeroStage />
 
         <section id="limit" className="mkt-section" aria-labelledby="limit-title">
