@@ -33,7 +33,7 @@ from apex.platform import api as _API                   # noqa: E402
 from apex.platform import store as _store               # noqa: E402
 from apex.platform import waitlist as W                 # noqa: E402
 
-for _var in ("RESEND_API_KEY", "A4T_WAITLIST_FROM_EMAIL",
+for _var in ("RESEND_API_KEY", "BREVO_API_KEY", "A4T_WAITLIST_FROM_EMAIL",
              "A4T_WAITLIST_REPLY_TO"):
     os.environ.pop(_var, None)
 
@@ -135,6 +135,56 @@ try:
           json.dumps(failed_rec.get("emailDelivery")))
 finally:
     W.send_waitlist_email = _real_send
+
+
+print("\n[2c] Brevo is an alternative provider, chosen by its key")
+for _v in ("RESEND_API_KEY", "BREVO_API_KEY", "A4T_WAITLIST_FROM_EMAIL",
+           "A4T_WAITLIST_REPLY_TO"):
+    os.environ.pop(_v, None)
+none = W.email_config_status()
+check("with nothing set the provider is the default and not configured",
+      none["provider"] == "resend" and not none["configured"]
+      and not none["partial"], json.dumps(none))
+os.environ["BREVO_API_KEY"] = "brevo-test-key-not-real"
+only_key = W.email_config_status()
+check("a Brevo key alone is partial and names the sender",
+      only_key["provider"] == "brevo" and only_key["partial"]
+      and only_key["missing"] == ["A4T_WAITLIST_FROM_EMAIL"],
+      json.dumps(only_key))
+os.environ["A4T_WAITLIST_FROM_EMAIL"] = "Apex4Traders <waitlist@example.com>"
+os.environ["A4T_WAITLIST_REPLY_TO"] = "Support <support@example.com>"
+full = W.email_config_status()
+check("key plus sender is configured as Brevo",
+      full["provider"] == "brevo" and full["configured"]
+      and not full["partial"] and not full["missing"], json.dumps(full))
+os.environ["RESEND_API_KEY"] = "resend-test-key-not-real"
+check("both keys set means Brevo, a leftover Resend key does not win",
+      W.email_config_status()["provider"] == "brevo")
+os.environ.pop("RESEND_API_KEY", None)
+shaped = W._brevo_payload(W._placeholder_email("customer@example.com"))
+check("the message is reshaped for Brevo",
+      shaped["sender"] == {"email": "waitlist@example.com", "name": "Apex4Traders"}
+      and shaped["to"] == [{"email": "customer@example.com"}]
+      and shaped["replyTo"] == {"email": "support@example.com"}
+      and shaped["subject"] and shaped["textContent"], json.dumps(shaped))
+check("and carries no Resend-only keys",
+      not ({"from", "text", "reply_to"} & set(shaped)), json.dumps(shaped))
+seen = []
+sent = W.send_waitlist_email("customer@example.com", now=105,
+                             post=lambda p: seen.append(p) or "<msg-id-1>")
+check("a successful send is recorded as Brevo with the provider id",
+      sent["status"] == W.DELIVERY_SENT and sent["provider"] == "brevo"
+      and sent.get("providerId") == "<msg-id-1>", json.dumps(sent))
+leak = W.send_waitlist_email(
+    "private-leak-test@example.com", now=106,
+    post=lambda p: (_ for _ in ()).throw(
+        RuntimeError("brevo said no to private-leak-test@example.com")))
+check("a Brevo failure is sanitised like any other",
+      leak["status"] == W.DELIVERY_FAILED
+      and "private-leak-test@example.com" not in json.dumps(leak),
+      json.dumps(leak))
+for _v in ("BREVO_API_KEY", "A4T_WAITLIST_FROM_EMAIL", "A4T_WAITLIST_REPLY_TO"):
+    os.environ.pop(_v, None)
 
 os.environ["RESEND_API_KEY"] = "test-key-not-real"
 os.environ["A4T_WAITLIST_FROM_EMAIL"] = "Apex4Traders <waitlist@example.com>"
