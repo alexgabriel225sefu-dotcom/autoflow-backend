@@ -1,6 +1,6 @@
 import { ArrowRight } from "lucide-react";
+import { A4MarkStage } from "./a4-mark-stage";
 import { HeroProduct } from "./hero-product";
-import { HeroIntroVideo } from "./hero-intro-video";
 import styles from "./hero-stage.module.css";
 
 /**
@@ -40,7 +40,7 @@ export function HeroStage() {
         </p>
       </div>
       <div className={`${styles.visual} ${styles.rise}`} style={{ ["--d" as string]: "250ms" }}>
-        <HeroIntroVideo />
+        <A4MarkStage />
         <div className={styles.productPreview}>
           <HeroProduct />
         </div>
