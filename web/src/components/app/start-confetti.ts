@@ -12,7 +12,7 @@
  * blob: worker, which the site's Content-Security-Policy refuses: with the
  * default, nothing is drawn at all and nothing says why.
  */
-const COLOURS = ["#F7F6F2", "#FF4FA3", "#FF7AB6", "#3DDC84"];
+const COLOURS = ["#F7F6F2", "#FF9484", "#D93A2B", "#18A35C"];
 const SHOOT_MS = 1400;
 const SETTLE_MS = 3200;
 

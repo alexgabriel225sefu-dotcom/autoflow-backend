@@ -14,7 +14,7 @@
   --lp-card: rgba(255, 255, 255, .03);
 }
 .mkt h1, .mkt h2, .mkt h3 { font-family: var(--font-mkt), var(--font-geist-sans), system-ui, sans-serif; }
-.mkt a:focus-visible, .mkt summary:focus-visible, .mkt button:focus-visible { outline: 2px solid var(--mkt-accent-text); outline-offset: 2px; }
+.mkt a:focus-visible, .mkt summary:focus-visible, .mkt button:focus-visible { outline: 2px solid var(--mkt-text); outline-offset: 2px; }
 
 /* ── nav ─────────────────────────────────────────────────────────────── */
 .lp-nav {
@@ -45,7 +45,7 @@
   display: inline-flex; align-items: center; height: 28px; margin: 0 0 24px; padding: 0 12px;
   border: 1px solid var(--lp-hair-strong); border-radius: 999px;
   font: 500 .75rem/1 var(--font-geist-mono), ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--mkt-accent-text);
+  color: var(--mkt-muted);
 }
 .lp-hero h1 {
   margin: 0; font-size: 36px; line-height: 40px; font-weight: 600; letter-spacing: -.025em;
@@ -100,7 +100,7 @@
 .lp-head { max-width: 720px; margin: 0 0 32px; }
 @media (min-width: 900px) { .lp-head { margin-bottom: 48px; } }
 .lp-head-center { margin-inline: auto; text-align: center; }
-.lp-head .lp-eyebrow, .lp-eyebrow { margin: 0 0 12px; font: 500 .75rem/16px var(--font-geist-mono), ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--mkt-accent-text); }
+.lp-head .lp-eyebrow, .lp-eyebrow { margin: 0 0 12px; font: 500 .75rem/16px var(--font-geist-mono), ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--mkt-muted); }
 .lp-head h2, .lp-final h2 { margin: 0; font-size: 30px; line-height: 34px; font-weight: 600; letter-spacing: -.02em; color: var(--mkt-text); text-wrap: balance; }
 .lp-head p { margin: 16px 0 0; max-width: 52ch; font-size: 1rem; line-height: 26px; color: var(--mkt-muted); text-wrap: pretty; }
 .lp-head-center p { margin-inline: auto; }

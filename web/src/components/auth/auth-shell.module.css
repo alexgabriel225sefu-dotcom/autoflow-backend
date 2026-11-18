@@ -100,7 +100,7 @@
 /* ── Brand panel (wide screens) ─────────────────────────────────────── */
 .brand { display: none; position: relative; overflow: hidden; background: #0b0b0e; color: #f7f6f2; border-left: 1px solid rgba(247, 246, 242, .08); }
 @media (min-width: 960px) { .brand { display: block; } }
-.brandGlow { position: absolute; inset: -10% -10% 0; background: radial-gradient(55% 50% at 70% 25%, rgba(255, 79, 163, .22), transparent 70%); animation: brandDrift 16s ease-in-out infinite alternate; }
+.brandGlow { position: absolute; inset: -10% -10% 0; background: radial-gradient(55% 50% at 70% 25%, rgba(255, 148, 132, .22), transparent 70%), radial-gradient(45% 45% at 15% 80%, rgba(120, 140, 255, .14), transparent 70%); animation: brandDrift 16s ease-in-out infinite alternate; }
 @keyframes brandDrift { from { transform: translate3d(-2%, 0, 0) scale(1); } to { transform: translate3d(3%, 3%, 0) scale(1.06); } }
 .brandInner { position: relative; display: flex; flex-direction: column; gap: 1.1rem; height: 100%; padding: clamp(2.2rem, 5vh, 3.6rem) clamp(2rem, 4.5vw, 4rem); }
 .brandLogo { align-self: flex-start; max-width: 100%; height: auto; animation: rise .7s cubic-bezier(.2, .7, .2, 1) both; }
