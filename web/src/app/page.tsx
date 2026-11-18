@@ -12,6 +12,7 @@ import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
 import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
 import { HeroStage } from "@/components/marketing/hero-stage";
+import { IntroFilm } from "@/components/marketing/intro-film";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { ProductGuide } from "@/components/marketing/product-guide";
 import { JsonLd } from "@/components/marketing/json-ld";
@@ -49,6 +50,7 @@ const faqs = [
 export default function Landing() {
   return (
     <main className="mkt">
+      <IntroFilm />
       <JsonLd data={ORGANIZATION_LD} />
       <JsonLd data={WEBSITE_LD} />
       <div className="mkt-wrap">

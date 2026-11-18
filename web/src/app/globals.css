@@ -55,12 +55,12 @@
      Black is the action. White on it is 18.86:1, which is the highest
      contrast anything in the product has, and that is right for the one
      control a screen is steering towards. */
-  --a4t-accent:        #F7F6F2;   /* the action is a cream pill on black */
-  --a4t-accent-strong: #FFFFFF;
-  --a4t-accent-dim:    #3A3A41;   /* the disabled step, not a dark red */
-  --a4t-accent-wash:   rgba(247, 246, 242, 0.08);
-  --a4t-on-accent:     #111113;
-  --a4t-mark-bar:      #111113;   /* a graphic on the cream fill */
+  --a4t-accent:        #FF4FA3;   /* the action is a pink pill on black: 6.57:1 on the page */
+  --a4t-accent-strong: #FF7AB6;
+  --a4t-accent-dim:    #5A1C3C;   /* the disabled step: a dark pink, not grey */
+  --a4t-accent-wash:   rgba(255, 79, 163, 0.10);
+  --a4t-on-accent:     #08080A;   /* black on pink: 6.57:1; cream on pink is only 2.81:1 */
+  --a4t-mark-bar:      #08080A;   /* a graphic on the pink fill */
 
   /* The red that is left. One job: the brand dot. It is 4.19:1 on cream,
      which is enough for a 10px graphic and NOT enough for text, so it is
@@ -79,8 +79,8 @@
      These were a mint and a coral, which are legible on near-black and
      wash out on cream. Both are now readable AS TEXT on the page, because
      a P&L figure is text before it is a colour. */
-  --a4t-long:    #18A35C;   /* 4.60:1 */
-  --a4t-short:   #FF9484;   /* 6.45:1 — a first pass used #C2321F, which is
+  --a4t-long:    #3DDC84;   /* 11.2:1 on the page, 1.59:1 from the short colour */
+  --a4t-short:   #FF6A4D;   /* 6.45:1 — a first pass used #C2321F, which is
                                readable on the page and only 1.11:1 from the
                                green. Two P&L figures that clear AA against
                                the background and not against EACH OTHER are
@@ -90,8 +90,8 @@
                                lifts the danger button off its own wash from
                                4.41:1 to 5.99:1. */
   --a4t-neutral: #A9A7A0;   /* 6.94:1 */
-  --a4t-long-wash:  rgba(24, 163, 92, 0.18);
-  --a4t-short-wash: rgba(255, 148, 132, 0.14);
+  --a4t-long-wash:  rgba(61, 220, 132, 0.16);
+  --a4t-short-wash: rgba(255, 106, 77, 0.14);
 
   /* Demo and live stay aliases of the two above, so "which mode am I in"
      and "is this up or down" can never drift into different greens. */
@@ -1340,15 +1340,16 @@ body {
      a cream page does not have that problem — it is the text colour — but the
      two tokens stay separate anyway, because the thing they protect against
      is somebody later changing the fill to a colour that cannot be read. */
-  --mkt-accent:      #F7F6F2;
-  --mkt-accent-deep: #FFFFFF;
-  --mkt-on-accent:   #111113;
-  --mkt-accent-text: #FF9484;   /* the brand red used AS TEXT — 6.45:1, and
-                                   the same value as --a4t-short so a tick in
-                                   the feature list and a losing position are
-                                   not two different reds */
-  --mkt-accent-wash: rgba(247, 246, 242, 0.07);
-  --mkt-accent-line: rgba(247, 246, 242, 0.16);
+  --mkt-accent:      #FF4FA3;
+  --mkt-accent-deep: #FF7AB6;
+  --mkt-on-accent:   #08080A;
+  --mkt-accent-text: #FF6FB4;   /* the brand pink used AS TEXT — a touch lighter than
+                                   the fill so the two tokens stay separate; it is
+                                   not the short colour (--a4t-short is a red-orange),
+                                   so a tick in the feature list can never read as
+                                   a losing position */
+  --mkt-accent-wash: rgba(255, 79, 163, 0.10);
+  --mkt-accent-line: rgba(255, 79, 163, 0.30);
 
   /* The brand lockup draws itself from --a4t-accent so that one file works
      on every surface. Redefining those four here lets it wear the marketing
@@ -2594,8 +2595,8 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
 @media (prefers-reduced-motion: no-preference) {
   .mkt-feature, .mkt-audience-card, .mkt-flow-step, .mkt-partner { transition: transform .25s cubic-bezier(.2, .7, .2, 1), border-color .25s, background .25s; }
   .mkt-feature:hover, .mkt-audience-card:hover, .mkt-flow-step:hover { transform: translateY(-4px); border-color: #3a3a44; }
-  .mkt-btn:not(.mkt-btn-outline) { box-shadow: 0 0 0 0 rgba(255, 148, 132, 0); animation: mkt-halo 3.4s ease-out 2s infinite; }
-  @keyframes mkt-halo { 0% { box-shadow: 0 0 0 0 rgba(255, 148, 132, .35); } 70%, 100% { box-shadow: 0 0 0 16px rgba(255, 148, 132, 0); } }
+  .mkt-btn:not(.mkt-btn-outline) { box-shadow: 0 0 0 0 rgba(255, 79, 163, 0); animation: mkt-halo 3.4s ease-out 2s infinite; }
+  @keyframes mkt-halo { 0% { box-shadow: 0 0 0 0 rgba(255, 79, 163, .35); } 70%, 100% { box-shadow: 0 0 0 16px rgba(255, 79, 163, 0); } }
 }
 
 /* ── the three-step strip and the live tiles ───────────────────────── */
