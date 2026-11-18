@@ -1368,7 +1368,9 @@ body {
   min-height: 100%;
 }
 
-.mkt-wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2rem); }
+.mkt-wrap { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+@media (min-width: 640px) { .mkt-wrap { padding: 0 24px; } }
+@media (min-width: 1024px) { .mkt-wrap { padding: 0 32px; } }
 
 /* ── nav ─────────────────────────────────────────────────────────────── */
 .mkt-nav {
@@ -1380,32 +1382,25 @@ body {
 
 /* ── controls ────────────────────────────────────────────────────────── */
 .mkt-btn {
-  display: inline-flex; align-items: center; gap: .45rem;
-  padding: .62rem 1.15rem; border-radius: 999px;
-  font-size: .875rem; font-weight: 700; letter-spacing: -0.01em;
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: 40px; padding: 0 16px; border-radius: 8px;
+  font-size: .875rem; font-weight: 600; line-height: 1;
   background: var(--mkt-accent); color: var(--mkt-on-accent);
-  border: 1px solid transparent; text-decoration: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 14px 30px -18px rgba(247, 246, 242, .45);
-  transition: background .18s ease, transform .18s ease;
+  border: 1px solid transparent; text-decoration: none; cursor: pointer;
+  transition: background-color .15s cubic-bezier(.4, 0, .2, 1), border-color .15s cubic-bezier(.4, 0, .2, 1), color .15s cubic-bezier(.4, 0, .2, 1);
 }
-.mkt-btn:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); transform: translateY(-1px); }
-.mkt-btn:active { transform: translateY(1px); }
-.mkt-btn-ghost {
-  background: transparent; color: var(--mkt-text);
-  border-color: var(--mkt-line);
-}
+.mkt-btn:hover { background: var(--mkt-accent-deep); color: var(--mkt-on-accent); }
+.mkt-btn:active { background: #F0408F; }
+.mkt-btn:focus-visible { outline: 2px solid var(--mkt-text); outline-offset: 2px; }
+.mkt-btn-ghost { background: transparent; color: var(--mkt-text); border-color: var(--mkt-line); }
 .mkt-btn-ghost:hover { background: var(--mkt-surface-2); color: var(--mkt-text); }
-.mkt-btn-lg { padding: .75rem .8rem .75rem 1.6rem; font-size: 1rem; gap: .8rem; }
-.mkt-btn-lg .mkt-ico { box-sizing: content-box; padding: .5rem; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: var(--mkt-on-accent); color: var(--mkt-accent); transition: transform .18s; }
-.mkt-btn-lg:hover .mkt-ico { transform: translate(2px, -2px); }
-.mkt-btn-outline.mkt-btn-lg { padding: .75rem 1.6rem; }
-/* The second call to action. White on the cream page with a real border, so
-   it reads as the quieter of the two without becoming a link. */
-.mkt-btn-outline {
-  background: transparent; color: var(--mkt-text);
-  border-color: rgba(247, 246, 242, .28); box-shadow: none;
-}
-.mkt-btn-outline:hover { background: rgba(247, 246, 242, .08); color: var(--mkt-text); border-color: rgba(247, 246, 242, .5); }
+.mkt-btn-lg { min-height: 48px; padding: 0 20px; font-size: .9375rem; }
+/* The second call to action: same height and radius, a hairline instead of a fill. */
+.mkt-btn-outline { background: transparent; color: var(--mkt-text); border-color: rgba(255, 255, 255, .24); }
+.mkt-btn-outline:hover { background: rgba(255, 255, 255, .06); color: var(--mkt-text); border-color: rgba(255, 255, 255, .4); }
+.mkt-btn-outline:active { background: rgba(255, 255, 255, .1); }
+.mkt-btn-outline:focus-visible { outline-color: var(--mkt-accent-text); }
+@media (max-width: 899px) { .mkt-btn { min-height: 44px; } .mkt-btn-lg { min-height: 48px; } }
 .mkt-ico { width: 1em; height: 1em; flex: none; }
 
 /* The plain text link in the nav bar, beside the filled button. */
@@ -2579,24 +2574,10 @@ a, button, [role="button"], summary, label, select, input, .chip, .btn {
   .mkt-partner-soon + .mkt-partner-soon { border-left: 1px solid var(--mkt-line); }
 }
 
-/* Landing motion. Sections ease in as they scroll into view (browsers without
-   scroll-driven animations simply show them), cards lift on hover, and all of
-   it stops for anyone who asked their system for less motion. */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .mkt-section, .mkt-partners, .mkt-feature, .mkt-audience-card, .mkt-flow-step {
-      animation: mkt-reveal linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 38%;
-    }
-    @keyframes mkt-reveal { from { opacity: 0; transform: translateY(34px); } to { opacity: 1; transform: none; } }
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .mkt-feature, .mkt-audience-card, .mkt-flow-step, .mkt-partner { transition: transform .25s cubic-bezier(.2, .7, .2, 1), border-color .25s, background .25s; }
-  .mkt-feature:hover, .mkt-audience-card:hover, .mkt-flow-step:hover { transform: translateY(-4px); border-color: #3a3a44; }
-  .mkt-btn:not(.mkt-btn-outline) { box-shadow: 0 0 0 0 rgba(255, 79, 163, 0); animation: mkt-halo 3.4s ease-out 2s infinite; }
-  @keyframes mkt-halo { 0% { box-shadow: 0 0 0 0 rgba(255, 79, 163, .35); } 70%, 100% { box-shadow: 0 0 0 16px rgba(255, 79, 163, 0); } }
+/* Landing motion: colour and border transitions only (150-200ms). Nothing
+   lifts, pulses or slides in. */
+@media (prefers-reduced-motion: reduce) {
+  .mkt *, .mkt *::before, .mkt *::after { animation: none !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
 /* ── the three-step strip and the live tiles ───────────────────────── */

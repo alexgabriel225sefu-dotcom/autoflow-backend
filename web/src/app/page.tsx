@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import {
-  ArrowUpRight,
   Eye,
   GaugeCircle,
   Link2,
@@ -10,13 +9,14 @@ import {
 } from "lucide-react";
 import { PLAN_NOTICE } from "@/lib/api";
 import { BrandLockup } from "@/components/brand/logo";
-import { SpotlightGrid } from "@/components/marketing/spotlight-grid";
+import { LandingNav } from "@/components/marketing/landing-nav";
 import { HeroStage } from "@/components/marketing/hero-stage";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { ProductGuide } from "@/components/marketing/product-guide";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { ORGANIZATION_LD, WEBSITE_LD } from "@/lib/json-ld";
 import { PricingSection } from "@/components/blocks/pricing-section";
+import "./landing.css";
 
 export const metadata: Metadata = {
   title: "Apex4Traders: clear rules for your trading",
@@ -24,19 +24,13 @@ export const metadata: Metadata = {
     "Connect your cTrader account, choose a rule and test it on demo before you automate it.",
 };
 
-const steps = [
-  ["01", "Connect your account", "Choose your cTrader account and see its state before you continue."],
-  ["02", "Choose a rule", "Start with a clear method or build conditions that match your plan."],
-  ["03", "Test on demo", "Review what the rule would do with demo data before automation."],
-] as const;
-
 const features = [
-  { icon: ShieldCheck, title: "Keep a journal", body: "The journal records when automation starts, pauses and stops, and any signal found at the Signals Only level. Orders and closed trades are listed in Positions and Closed trades.", wide: true, shot: true },
+  { icon: ShieldCheck, title: "Keep a journal", body: "The journal records when automation starts, pauses and stops, and any signal found at the Signals Only level. Orders and closed trades are listed in Positions and Closed trades." },
   { icon: GaugeCircle, title: "Set your limits", body: "Risk per trade, stop distance, target and the number of open positions stay next to the rule you are testing." },
   { icon: Link2, title: "Connect your own account", body: "You authorise your cTrader account yourself and can disconnect it at any time. We never ask for your broker password." },
-  { icon: ListChecks, title: "Build rules from conditions", body: "Combine moving averages, RSI, MACD, sessions and more, then read the rule back in plain language before you test it.", wide: true },
+  { icon: ListChecks, title: "Build rules from conditions", body: "Combine moving averages, RSI, MACD, sessions and more, then read the rule back in plain language before you test it." },
   { icon: Eye, title: "Review before it runs", body: "See which conditions passed, which failed and what the rule would decide. A preview never places an order." },
-  { icon: PlayCircle, title: "Start, pause or stop", body: "One panel shows the current state. If something cannot be read, it says so instead of guessing.", wide: true },
+  { icon: PlayCircle, title: "Start, pause or stop", body: "One panel shows the current state. If something cannot be read, it says so instead of guessing." },
 ] as const;
 
 const faqs = [
@@ -51,119 +45,99 @@ export default function Landing() {
     <main className="mkt">
       <JsonLd data={ORGANIZATION_LD} />
       <JsonLd data={WEBSITE_LD} />
+      <LandingNav />
+
       <div className="mkt-wrap">
-        <nav className="mkt-nav">
-          <BrandLockup size={24} />
-          <span className="mkt-nav-mid">
-            <a href="#product">Product</a>
-            <a href="#how-it-works">How it works</a>
-            <a href="#platforms">Platforms</a>
-            <a href="/pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
-          </span>
-          <span className="mkt-nav-links">
-            <a className="mkt-navlink" href="/login">Log in</a>
-            <a className="mkt-btn" href="/signup">Try free for 14 days</a>
-          </span>
-        </nav>
-
         <HeroStage />
+      </div>
 
-        <section id="tour" className="mkt-section" aria-labelledby="tour-title">
-          <span className="mkt-eyebrow">The platform</span>
-          <h2 id="tour-title">See it before you sign up.</h2>
-          <p>Real screens from a demo account, from the first setup step to the journal of what it did.</p>
-          <ProductShowcase />
-        </section>
-
-        <section id="guide" className="mkt-section" aria-labelledby="guide-title">
-          <span className="mkt-eyebrow">How it works</span>
-          <h2 id="guide-title">Three steps. Everything explained on screen.</h2>
-          <p>Real screens from the platform. The highlights show where to look.</p>
-          <ProductGuide />
-        </section>
-
-        <section id="how-it-works" className="mkt-section mkt-flow" aria-labelledby="how-title">
-          <div>
-            <span className="mkt-eyebrow">How it works</span>
-            <h2 id="how-title">A simple path from idea to demo.</h2>
-            <p>Each step shows you what is connected, what the rule checks and what happens next.</p>
+      <section id="platforms" className="lp-strip" aria-labelledby="platforms-title">
+        <div className="mkt-wrap lp-strip-in">
+          <h2 id="platforms-title">Works with</h2>
+          <div className="lp-strip-row">
+            <div className="lp-plat lp-plat-live">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/ctrader-logo-light.svg" alt="cTrader" height={28} />
+              <span className="lp-plat-status">Available now</span>
+            </div>
+            <div className="lp-plat lp-plat-soon">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/metatrader-4-light.png" alt="MetaTrader 4" height={28} />
+              <span className="lp-plat-status">Coming soon</span>
+            </div>
+            <div className="lp-plat lp-plat-soon">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/metatrader-5-light.png" alt="MetaTrader 5" height={28} />
+              <span className="lp-plat-status">Coming soon</span>
+            </div>
           </div>
-          <div className="mkt-flow-steps">
-            {steps.map(([number, title, body]) => (
-              <div className="mkt-flow-step" key={number}>
-                <span>{number}</span>
-                <strong>{title}</strong>
+          <p className="lp-strip-note">cTrader works today. More platforms are on the roadmap. No install path promised yet for MetaTrader.</p>
+        </div>
+      </section>
+
+      <section id="tour" className="lp-sec" aria-labelledby="tour-title">
+        <div className="mkt-wrap">
+          <div className="lp-head">
+            <p className="lp-eyebrow">The platform</p>
+            <h2 id="tour-title">See it before you sign up.</h2>
+            <p>Real screens from a demo account, from the first setup step to the journal of what it did.</p>
+          </div>
+          <ProductShowcase />
+        </div>
+      </section>
+
+      <section id="how-it-works" className="lp-sec" aria-labelledby="guide-title">
+        <div className="mkt-wrap">
+          <div className="lp-head">
+            <p className="lp-eyebrow">How it works</p>
+            <h2 id="guide-title">Three steps. Everything explained on screen.</h2>
+            <p>Real screens from the platform. The highlights show where to look.</p>
+          </div>
+          <ProductGuide />
+        </div>
+      </section>
+
+      <section id="features" className="lp-sec" aria-labelledby="features-title">
+        <div className="mkt-wrap">
+          <div className="lp-head">
+            <p className="lp-eyebrow">Features</p>
+            <h2 id="features-title">Everything you need to test a rule.</h2>
+            <p>One workspace to connect your account, review the rule and keep your limits in view.</p>
+          </div>
+          <div className="lp-grid lp-grid-3">
+            {features.map(({ icon: Icon, title, body }) => (
+              <article className="lp-card" key={title}>
+                <span className="lp-card-icon"><Icon size={18} aria-hidden /></span>
+                <h3>{title}</h3>
                 <p>{body}</p>
-              </div>
+              </article>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section id="platforms" className="mkt-partners" aria-labelledby="platforms-title">
-          <div className="mkt-section-heading">
-            <span className="mkt-eyebrow">Platforms</span>
-            <h2 id="platforms-title">Connect the platform you use.</h2>
-            <p>cTrader is available today. MetaTrader connections are on the roadmap.</p>
+      <section className="lp-sec" aria-labelledby="audience-title">
+        <div className="mkt-wrap">
+          <div className="lp-head">
+            <p className="lp-eyebrow">Who it is for</p>
+            <h2 id="audience-title">A calmer starting point for two kinds of trader.</h2>
           </div>
-          <SpotlightGrid className="mkt-partner-grid">
-            <div className="mkt-partner mkt-partner-live" data-spot>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/ctrader-logo-light.svg" alt="cTrader" height={34} />
-              <span className="mkt-partner-status">Available now</span>
-              <a href="/signup">Connect cTrader <ArrowUpRight size={15} aria-hidden /></a>
-            </div>
-            <div className="mkt-partner mkt-partner-soon" data-spot>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/metatrader-4-light.png" alt="MetaTrader 4" height={34} />
-              <span className="mkt-partner-status">Coming soon</span>
-            </div>
-            <div className="mkt-partner mkt-partner-soon" data-spot>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/metatrader-5-light.png" alt="MetaTrader 5" height={34} />
-              <span className="mkt-partner-status">Coming soon</span>
-            </div>
-          </SpotlightGrid>
-          <p className="mkt-partner-note">No install path promised yet for MetaTrader.</p>
-        </section>
-
-        <section id="features" className="mkt-section">
-          <span className="mkt-eyebrow">Features</span>
-          <h2>Everything you need to test a rule.</h2>
-          <p>One workspace to connect your account, review the rule and keep your limits in view.</p>
-          <div className="mkt-feature-grid">
-            {features.map((f) => {
-              const { icon: Icon, title, body } = f;
-              const wide = "wide" in f && f.wide;
-              const shot = "shot" in f && f.shot;
-              return (
-                <article className={wide ? "mkt-feature mkt-feature-wide" : "mkt-feature"} key={title}>
-                  <span className="mkt-feature-icon"><Icon size={18} aria-hidden /></span>
-                  <h3>{title}</h3>
-                  <p>{body}</p>
-                  {shot ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="mkt-feature-shot" src="/product/journal.webp" alt="The journal: a buy decision and two hold decisions, each with its reason." width={1280} height={768} loading="lazy" decoding="async" />
-                  ) : null}
-                </article>
-              );
-            })}
+          <div className="lp-grid">
+            <article className="lp-card lp-card-plain"><h3>Starting out</h3><p>Learn what each setting means, test a simple rule on demo and build confidence in the process.</p></article>
+            <article className="lp-card lp-card-plain"><h3>Already trading</h3><p>Turn an existing plan into named conditions, review the edge cases and keep account context nearby.</p></article>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="mkt-section" aria-labelledby="audience-title">
-          <span className="mkt-eyebrow">Who it is for</span>
-          <h2 id="audience-title">A calmer starting point for two kinds of trader.</h2>
-          <div className="mkt-audience-grid">
-            <article className="mkt-audience-card"><h3>Starting out</h3><p>Learn what each setting means, test a simple rule on demo and build confidence in the process.</p></article>
-            <article className="mkt-audience-card"><h3>Already trading</h3><p>Turn an existing plan into named conditions, review the edge cases and keep account context nearby.</p></article>
+      <section id="pricing" className="lp-sec"><div className="mkt-wrap"><PricingSection /></div></section>
+
+      <section id="faq" className="lp-sec" aria-labelledby="faq-title">
+        <div className="mkt-wrap">
+          <div className="lp-head">
+            <p className="lp-eyebrow">Questions</p>
+            <h2 id="faq-title">Questions, answered plainly.</h2>
           </div>
-        </section>
-
-        <section id="faq" className="mkt-section mkt-faq" aria-labelledby="faq-title">
-          <span className="mkt-eyebrow">Questions</span>
-          <h2 id="faq-title">Questions, answered plainly.</h2>
-          <div className="mkt-faq-list">
+          <div className="lp-faq">
             {faqs.map(([question, answer]) => (
               <details key={question}>
                 <summary>{question}</summary>
@@ -171,33 +145,88 @@ export default function Landing() {
               </details>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section id="pricing" className="mkt-section"><PricingSection /></section>
-
-        <section className="mkt-section">
-          <h2>Built for rules, not predictions.</h2>
-          <p className="mkt-plain" style={{ marginTop: ".9rem" }}>
-            Apex4Traders is software that executes rules you configure. It is
-            not financial advice, does not manage money for you and does not
-            supply signals. We do not take custody of your funds.
-          </p>
-          <div className="mkt-risk">
-            <strong style={{ color: "var(--mkt-text)" }}>Risk warning.</strong>{" "}
-            Leveraged trading carries a high risk of loss. Past results do not
-            guarantee future results. You are responsible for the rules you run.
-          </div>
-          <div className="mkt-risk">
-            <strong style={{ color: "var(--mkt-text)" }}>Demo accounts first.</strong>{" "}
-            Live trading is not available in this release. {PLAN_NOTICE}
-          </div>
-        </section>
-
-        <footer className="mkt-foot">
-          <span>© Apex4Traders</span>
-          <span><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/login">Sign in</a></span>
-        </footer>
+      <div className="lp-final-wrap">
+        <div className="mkt-wrap">
+          <section className="lp-final" aria-labelledby="final-title">
+            <h2 id="final-title">Start on a demo account.</h2>
+            <p>Write the rule in plain words, read it back, and test it for 14 days. No card needed.</p>
+            <div className="lp-cta">
+              <a className="mkt-btn mkt-btn-lg" href="/signup">Try free for 14 days</a>
+              <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#tour">See the platform</a>
+            </div>
+          </section>
+        </div>
       </div>
+
+      <section className="lp-disclosure" aria-labelledby="disclosure-title">
+        <div className="mkt-wrap lp-disclosure-in">
+          <div>
+            <h2 id="disclosure-title">Built for rules, not predictions.</h2>
+            <p>
+              Apex4Traders is software that executes rules you configure. It is
+              not financial advice, does not manage money for you and does not
+              supply signals. We do not take custody of your funds.
+            </p>
+          </div>
+          <div>
+            <p>
+              <strong>Risk warning.</strong>{" "}
+              Leveraged trading carries a high risk of loss. Past results do not
+              guarantee future results. You are responsible for the rules you run.
+            </p>
+            <p>
+              <strong>Demo accounts first.</strong>{" "}
+              Live trading is not available in this release. {PLAN_NOTICE}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer className="lp-foot">
+        <div className="mkt-wrap">
+          <div className="lp-foot-grid">
+            <div className="lp-foot-brand">
+              <BrandLockup size={24} />
+              <p>Clear rules for your trading.</p>
+            </div>
+            <div>
+              <h3>Product</h3>
+              <ul>
+                <li><a href="#tour">Platform</a></li>
+                <li><a href="#how-it-works">How it works</a></li>
+                <li><a href="#features">Features</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3>Resources</h3>
+              <ul>
+                <li><a href="/guide/test-a-rule-on-demo">Test a rule on demo</a></li>
+                <li><a href="/faq">FAQ</a></li>
+                <li><a href="/pricing">Pricing</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3>Legal</h3>
+              <ul>
+                <li><a href="/terms">Terms</a></li>
+                <li><a href="/privacy">Privacy</a></li>
+                <li><a href="/refunds">Refunds</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3>Account</h3>
+              <ul>
+                <li><a href="/login">Log in</a></li>
+                <li><a href="/signup">Sign up</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="lp-foot-bar">© Apex4Traders</div>
+        </div>
+      </footer>
     </main>
   );
 }
