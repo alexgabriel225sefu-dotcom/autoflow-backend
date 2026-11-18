@@ -170,3 +170,7 @@
 /* The sections that already carried their own spacing (tour, how it works)
    sit inside .lp-sec now, so they must not add a second set. */
 .lp-sec > .mkt-wrap > :where(div, section) { margin-top: 0; }
+
+/* ── Trustpilot widget: drawn by Trustpilot, only placed and spaced here ── */
+.lp-trust { margin: 20px auto 0; max-width: 320px; min-height: 24px; }
+.lp-trust a { color: var(--mkt-muted); font-size: .875rem; text-decoration: none; }

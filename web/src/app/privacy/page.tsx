@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trustpilotConfig } from "@/lib/trustpilot";
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand/logo";
 import { LegalSection, LegalSections } from "@/components/legal/legal-section";
@@ -224,6 +225,9 @@ export default function PrivacyPage() {
           <p>
             Session cookies are used to keep you signed in. There are no
             advertising or tracking cookies.
+            {trustpilotConfig()
+              ? " The one exception is the Trustpilot rating on the public landing page: your browser loads it from Trustpilot, which may set its own cookies under its own privacy policy. It is not loaded anywhere in the signed-in platform."
+              : null}
           </p>
         </LegalSection>
 
