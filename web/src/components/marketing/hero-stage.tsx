@@ -1,46 +1,33 @@
-import { ArrowRight } from "lucide-react";
-import { HeroProduct } from "./hero-product";
-import styles from "./hero-stage.module.css";
+import { ProductFrame } from "./product-frame";
 
 /**
- * The hero says what the product is, and shows it: the real journal on a
- * laptop-sized window and the dashboard on a phone, both captured from the
- * live app on a demo account. Nothing here is a mock-up and nothing promises
- * a result.
+ * The hero says what the product is, once, and shows it: the real dashboard
+ * from a demo account, directly under the buttons so the first scroll reveals
+ * the interface. Nothing here is a mock-up and nothing promises a result.
  */
 export function HeroStage() {
   return (
-    <section className={styles.section} id="product">
-      <div className={styles.copy}>
-        <p className={`${styles.pill} ${styles.rise}`} style={{ ["--d" as string]: "0ms" }}>
-          cTrader works today. More platforms are on the roadmap.
+    <section className="lp-hero" id="product" aria-labelledby="hero-title">
+      <div className="lp-hero-copy">
+        <p className="lp-chip">Rules you can read</p>
+        <h1 id="hero-title">Trade by rules you can read.</h1>
+        <p className="lp-lead">
+          Write your trading plan in plain words, test it on a demo account for
+          14 days, and keep a stop button within reach. You connect your own
+          cTrader account.
         </p>
-        <p className={`mkt-kicker ${styles.rise}`} style={{ ["--d" as string]: "40ms" }}>RULES YOU CAN READ</p>
-        <h1 className={styles.rise} style={{ ["--d" as string]: "90ms" }}>
-          Trade by rules <span className={styles.accent}>you can read.</span>
-        </h1>
-        <p className={`mkt-lede ${styles.rise}`} style={{ ["--d" as string]: "200ms" }}>
-          Write your trading plan in plain words, test it on a demo account
-          for 14 days, and keep a stop button within reach. You connect your
-          own cTrader account.
-        </p>
-        <div className={`mkt-hero-cta ${styles.rise}`} style={{ ["--d" as string]: "310ms" }}>
-          <a className="mkt-btn mkt-btn-lg" href="/signup">
-            Try free for 14 days <ArrowRight className="mkt-ico" aria-hidden />
-          </a>
-          <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#tour">
-            See the platform
-          </a>
+        <div className="lp-cta">
+          <a className="mkt-btn mkt-btn-lg" href="/signup">Try free for 14 days</a>
+          <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#tour">See the platform</a>
         </div>
-        <p className={`${styles.fine} ${styles.rise}`} style={{ ["--d" as string]: "400ms" }}>
-          No card needed. Demo accounts only in this release.
-        </p>
+        <p className="lp-caption">No card needed. Demo accounts only in this release.</p>
       </div>
-      <div className={`${styles.visual} ${styles.rise}`} style={{ ["--d" as string]: "250ms" }}>
-        <div className={styles.productPreview}>
-          <HeroProduct />
-        </div>
-      </div>
+      <ProductFrame
+        src="/product/dash.webp"
+        alt="The Apex4Traders dashboard on a demo account: automation running, Risk Guard active, cTrader linked."
+        caption="Demo account screens."
+        priority
+      />
     </section>
   );
 }
