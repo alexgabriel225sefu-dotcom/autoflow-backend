@@ -15,4 +15,4 @@
 @media (max-width: 420px) { :global(.mkt-hero-cta) { flex-direction: column; align-items: stretch; } :global(.mkt-hero-cta .mkt-btn) { justify-content: center; width: 100%; } }
 @media (min-width: 1000px) { .section { grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr); align-items: center; gap: clamp(2rem, 4vw, 4rem); } .copy h1 { font-size: clamp(3rem, 5.2vw, 4.8rem); } }
 @media (max-width: 740px) { .productPreview { display: none; } }
-@media (prefers-reduced-motion: reduce) { .rise { opacity: 1; transform: none; animation: none; } .glow, .shine, 
+@media (prefers-reduced-motion: reduce) { .rise { opacity: 1; transform: none; animation: none; } .glow, .shine { animation: none; } .shine { color: inherit; background: none; } }

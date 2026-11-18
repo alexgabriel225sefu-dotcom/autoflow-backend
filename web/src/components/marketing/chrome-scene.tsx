@@ -76,7 +76,7 @@ function Mark({ model, scale, reduced }: { model: string; scale: number; reduced
   );
 }
 
-function Studio() {
+export function Studio() {
   return (
     <Environment resolution={256} frames={1}>
       {/* A dim grey room, so polished metal reflects something other than
@@ -99,7 +99,7 @@ function Studio() {
   );
 }
 
-function webglAvailable(): boolean {
+export function webglAvailable(): boolean {
   try {
     const c = document.createElement("canvas");
     return !!(c.getContext("webgl2") || c.getContext("webgl"));
