@@ -26,19 +26,32 @@ export type TrustpilotConfig = {
 
 const ID = /^[a-z0-9]{8,40}$/i;
 
+function domainOf(env: Record<string, string | undefined>): string {
+  return (env.NEXT_PUBLIC_TRUSTPILOT_DOMAIN?.trim() || "apex4traders.com")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "");
+}
+
+/**
+ * The two public Trustpilot pages for the domain. They need no id, no plan and
+ * no script: a plain link. "profileUrl" is where people read the reviews,
+ * "reviewUrl" is where a customer writes one.
+ */
+export function trustpilotLinks(
+  env: Record<string, string | undefined> = process.env,
+): { profileUrl: string; reviewUrl: string } {
+  const domain = domainOf(env);
+  return {
+    profileUrl: `https://www.trustpilot.com/review/${domain}`,
+    reviewUrl: `https://www.trustpilot.com/evaluate/${domain}`,
+  };
+}
+
 export function trustpilotConfig(
   env: Record<string, string | undefined> = process.env,
 ): TrustpilotConfig | null {
   const businessUnitId = env.NEXT_PUBLIC_TRUSTPILOT_BUSINESSUNIT_ID?.trim() ?? "";
   const templateId = env.NEXT_PUBLIC_TRUSTPILOT_TEMPLATE_ID?.trim() ?? "";
   if (!ID.test(businessUnitId) || !ID.test(templateId)) return null;
-  const domain = (env.NEXT_PUBLIC_TRUSTPILOT_DOMAIN?.trim() || "apex4traders.com")
-    .replace(/^https?:\/\//, "")
-    .replace(/\/.*$/, "");
-  return {
-    businessUnitId,
-    templateId,
-    profileUrl: `https://www.trustpilot.com/review/${domain}`,
-    reviewUrl: `https://www.trustpilot.com/evaluate/${domain}`,
-  };
+  return { businessUnitId, templateId, ...trustpilotLinks(env) };
 }

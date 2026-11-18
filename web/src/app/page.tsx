@@ -16,6 +16,7 @@ import { ProductGuide } from "@/components/marketing/product-guide";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { ORGANIZATION_LD, WEBSITE_LD } from "@/lib/json-ld";
 import { PricingSection } from "@/components/blocks/pricing-section";
+import { trustpilotLinks } from "@/lib/trustpilot";
 import "./landing.css";
 
 export const metadata: Metadata = {
@@ -206,6 +207,7 @@ export default function Landing() {
                 <li><a href="/guide/test-a-rule-on-demo">Test a rule on demo</a></li>
                 <li><a href="/faq">FAQ</a></li>
                 <li><a href="/pricing">Pricing</a></li>
+                <li><a href={trustpilotLinks().reviewUrl} target="_blank" rel="noopener noreferrer">Review us on Trustpilot</a></li>
               </ul>
             </div>
             <div>

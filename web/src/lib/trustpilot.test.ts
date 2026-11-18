@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { contentSecurityPolicy } from "../../next.config";
-import { trustpilotConfig } from "./trustpilot";
+import { trustpilotConfig, trustpilotLinks } from "./trustpilot";
 
 const KEYS = [
   "NEXT_PUBLIC_TRUSTPILOT_BUSINESSUNIT_ID",
@@ -42,6 +42,15 @@ describe("trustpilotConfig", () => {
       NEXT_PUBLIC_TRUSTPILOT_DOMAIN: "https://www.example.test/some/path",
     });
     expect(c?.profileUrl).toBe("https://www.trustpilot.com/review/www.example.test");
+  });
+});
+
+describe("trustpilotLinks", () => {
+  it("gives the profile and write-a-review links with no ids, no script and no plan", () => {
+    expect(trustpilotLinks({})).toEqual({
+      profileUrl: "https://www.trustpilot.com/review/apex4traders.com",
+      reviewUrl: "https://www.trustpilot.com/evaluate/apex4traders.com",
+    });
   });
 });
 
