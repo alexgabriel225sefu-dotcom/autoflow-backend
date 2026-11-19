@@ -7,13 +7,13 @@
    ────────────────────────────────────────────────────────────────────────── */
 
 .mkt {
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-poppins), system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 16px; line-height: 1.5;
   --lp-hair: rgba(255, 255, 255, .08);
   --lp-hair-strong: rgba(255, 255, 255, .24);
   --lp-card: rgba(255, 255, 255, .03);
 }
-.mkt h1, .mkt h2, .mkt h3 { font-family: var(--font-mkt), var(--font-geist-sans), system-ui, sans-serif; }
+.mkt h1, .mkt h2, .mkt h3 { font-family: inherit; }
 .mkt a:focus-visible, .mkt summary:focus-visible, .mkt button:focus-visible { outline: 2px solid var(--mkt-text); outline-offset: 2px; }
 
 /* ── nav ─────────────────────────────────────────────────────────────── */
