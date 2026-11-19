@@ -170,3 +170,32 @@
 /* The sections that already carried their own spacing (tour, how it works)
    sit inside .lp-sec now, so they must not add a second set. */
 .lp-sec > .mkt-wrap > :where(div, section) { margin-top: 0; }
+
+/* ── Trustpilot widget: drawn by Trustpilot, only placed and spaced here ── */
+.lp-trust { margin: 20px auto 0; max-width: 320px; min-height: 24px; }
+.lp-trust a { color: var(--mkt-muted); font-size: .875rem; text-decoration: none; }
+
+/* Review cards (hover-testimonial-card) */
+.lp-rev { max-width: 860px; margin: 0 auto; display: grid; gap: 20px; user-select: none; }
+.lp-rev-card { position: relative; overflow: hidden; border: 1px solid var(--mkt-line); border-radius: 16px; background: var(--mkt-surface); transition: border-color .3s; }
+.lp-rev-card:hover { border-color: var(--mkt-accent-line); }
+.lp-rev-click { cursor: pointer; }
+.lp-rev-dots { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .4s; background-image: radial-gradient(circle, rgba(255,255,255,.12) 1px, transparent 1px); background-size: 20px 20px; }
+.lp-rev-glow { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.lp-rev-card:hover .lp-rev-dots { opacity: .3; }
+.lp-rev-card:hover .lp-rev-glow { opacity: 1; }
+.lp-rev-body { position: relative; z-index: 1; min-height: 280px; padding: 40px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; }
+.lp-rev-quote { display: block; font-size: clamp(1.25rem, 2.4vw, 1.875rem); font-weight: 500; line-height: 1.5; color: var(--mkt-text); transition: opacity .4s, transform .4s, filter .4s; }
+.lp-rev-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; transition: opacity .4s, transform .4s, filter .4s; }
+.is-out { opacity: 0; transform: translateY(12px); filter: blur(4px); }
+.lp-rev-who { display: flex; align-items: center; gap: 12px; }
+.lp-rev-av { display: inline-flex; width: 48px; height: 48px; align-items: center; justify-content: center; border: 1px solid var(--mkt-line); border-radius: 8px; background: var(--mkt-bg); color: var(--mkt-muted); font-size: .875rem; font-weight: 600; }
+.lp-rev-name { color: var(--mkt-text); font-weight: 600; }
+.lp-rev-title { color: var(--mkt-muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+.lp-rev-src { color: var(--mkt-muted); font-size: .875rem; text-underline-offset: 4px; }
+.lp-rev-src:hover { color: var(--mkt-text); text-decoration: underline; }
+.lp-rev-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.lp-rev-tab { width: 40px; height: 40px; border: 1px solid var(--mkt-line); border-radius: 8px; background: transparent; color: var(--mkt-muted); font: inherit; font-size: .75rem; font-weight: 500; cursor: pointer; transition: border-color .2s, background .2s, color .2s; }
+.lp-rev-tab.is-on { border-color: var(--mkt-accent-line); background: var(--mkt-accent-wash); color: var(--mkt-text); }
+@media (max-width: 640px) { .lp-rev-body { padding: 24px; min-height: 240px; } }
+@media (prefers-reduced-motion: reduce) { .lp-rev-quote, .lp-rev-foot { transition: none; } }

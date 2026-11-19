@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { TRUSTPILOT_SCRIPT_HOST, trustpilotConfig } from "./src/lib/trustpilot";
 
 /**
  * WHY `turbopack.root` IS SET EXPLICITLY
@@ -91,14 +92,27 @@ export function contentSecurityPolicy(): string {
   const script = ["'self'", "'unsafe-inline'"];
   if (process.env.NODE_ENV !== "production") script.push("'unsafe-eval'");
 
+  // The Trustpilot TrustBox is the one third-party widget on the public landing
+  // page. Its hosts are named only when the ids are configured, so a deployment
+  // without them keeps frame-src 'none' and a script-src with no external host.
+  const trustpilot = Boolean(trustpilotConfig());
+  const images = ["'self'", "data:", "blob:"];
+  const frames = ["'none'"];
+  if (trustpilot) {
+    script.push(TRUSTPILOT_SCRIPT_HOST);
+    images.push("https://*.trustpilot.com");
+    connect.add("https://*.trustpilot.com");
+    frames.splice(0, 1, "https://widget.trustpilot.com", "https://*.trustpilot.com");
+  }
+
   const directives = [
     "default-src 'self'",
     `script-src ${script.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    `img-src ${images.join(" ")}`,
     "font-src 'self'",
     `connect-src ${[...connect].join(" ")}`,
-    "frame-src 'none'",
+    `frame-src ${frames.join(" ")}`,
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self' https://buy.stripe.com https://checkout.stripe.com",
