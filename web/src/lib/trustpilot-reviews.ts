@@ -7,7 +7,10 @@ import { trustpilotLinks } from "@/lib/trustpilot";
  * ones is what Trustpilot's rules and consumer law forbid. Never write, shorten or
  * "fix" a review. The section stays hidden while this list is empty.
  */
-export const TRUSTPILOT_REVIEWS: readonly Pick<Testimonial, "id" | "quote" | "author">[] = [];
+export const TRUSTPILOT_REVIEWS: readonly Pick<Testimonial, "id" | "quote" | "author">[] = [
+  { id: "paul-varga", quote: "Awesome.It s very helpfull", author: { name: "Paul Varga" } },
+  { id: "karla-laszlo", quote: "Awesome nice platform!!", author: { name: "Karla Laszlo" } },
+];
 
 export function trustpilotTestimonials(): Testimonial[] {
   const source = { name: "Read on Trustpilot", href: trustpilotLinks().profileUrl };

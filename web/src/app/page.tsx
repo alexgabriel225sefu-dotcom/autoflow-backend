@@ -140,7 +140,7 @@ export default function Landing() {
           <div className="mkt-wrap">
             <div className="lp-head">
               <p className="lp-eyebrow">Reviews</p>
-              <h2 id="reviews-title">What clients wrote on Trustpilot.</h2>
+              <h2 id="reviews-title">What users wrote on Trustpilot.</h2>
             </div>
             <TestimonialShowcase testimonials={reviews} />
           </div>

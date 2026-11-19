@@ -52,7 +52,7 @@ export function TestimonialShowcase({ testimonials, className, autoPlayInterval 
 
   useEffect(() => {
     if (!many || isHovered) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     if (reduce) return;
     const timer = window.setInterval(() => {
       setIsAnimating(true);
