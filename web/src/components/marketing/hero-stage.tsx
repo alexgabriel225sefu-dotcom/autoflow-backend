@@ -1,4 +1,5 @@
 import { ProductFrame } from "./product-frame";
+import { TrustpilotWidget } from "./trustpilot-widget";
 
 /**
  * The hero says what the product is, once, and shows it: the real dashboard
@@ -21,6 +22,7 @@ export function HeroStage() {
           <a className="mkt-btn mkt-btn-outline mkt-btn-lg" href="#tour">See the platform</a>
         </div>
         <p className="lp-caption">No card needed. Demo accounts only in this release.</p>
+        <TrustpilotWidget />
       </div>
       <ProductFrame
         src="/product/dash.webp"
