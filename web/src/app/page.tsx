@@ -17,8 +17,6 @@ import { JsonLd } from "@/components/marketing/json-ld";
 import { ORGANIZATION_LD, WEBSITE_LD } from "@/lib/json-ld";
 import { PricingSection } from "@/components/blocks/pricing-section";
 import { trustpilotLinks } from "@/lib/trustpilot";
-import { trustpilotTestimonials } from "@/lib/trustpilot-reviews";
-import { TestimonialShowcase } from "@/components/ui/hover-testimonial-card";
 import "./landing.css";
 
 export const metadata: Metadata = {
@@ -44,7 +42,6 @@ const faqs = [
 ] as const;
 
 export default function Landing() {
-  const reviews = trustpilotTestimonials();
   return (
     <main className="mkt">
       <JsonLd data={ORGANIZATION_LD} />
@@ -134,18 +131,6 @@ export default function Landing() {
       </section>
 
       <section id="pricing" className="lp-sec"><div className="mkt-wrap"><PricingSection /></div></section>
-
-      {reviews.length > 0 && (
-        <section id="reviews" className="lp-sec" aria-labelledby="reviews-title">
-          <div className="mkt-wrap">
-            <div className="lp-head">
-              <p className="lp-eyebrow">Reviews</p>
-              <h2 id="reviews-title">What users wrote on Trustpilot.</h2>
-            </div>
-            <TestimonialShowcase testimonials={reviews} />
-          </div>
-        </section>
-      )}
 
       <section id="faq" className="lp-sec" aria-labelledby="faq-title">
         <div className="mkt-wrap">
