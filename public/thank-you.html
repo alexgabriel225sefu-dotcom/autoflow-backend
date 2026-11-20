@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Order Confirmed — Apex Trading Suite</title>
+<title>Order Confirmed — Apex4Traders</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
@@ -75,7 +75,7 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
 <div class="aurora-bg"></div>
 
 <div class="wrap">
-  <p class="eyebrow">Apex Trading Suite &nbsp;&bull;&nbsp; Order Confirmation</p>
+  <p class="eyebrow">Apex4Traders &nbsp;&bull;&nbsp; Order Confirmation</p>
   <div class="card-shell">
     <div class="card-inner">
       <div class="accent-line"></div>
@@ -91,26 +91,26 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
         <div class="state" id="stateReady">
           <span class="chip">&#10003; Payment confirmed</span>
           <h1 id="readyTitle">Your bot is ready.</h1>
-          <p class="sub" id="readySub">Tap the button below — Telegram opens and your bot activates automatically. No setup required.</p>
-          <a class="cta" id="tgBtn" href="#" target="_blank" rel="noopener">&#128640; Open your Bot on Telegram &rarr;</a>
+          <p class="sub" id="readySub">Your licence is ready. Sign in to Apex4Traders with the email from your receipt and connect cTrader from there.</p>
+          <a class="cta" id="tgBtn" href="/forex.html">Open Apex4Traders</a>
           <p class="copyhint">We also emailed you the same link in case you need it later.</p>
 
           <div class="steps">
             <div class="steps-label">How it works</div>
-            <div class="step"><div class="stepn">1</div><div class="stepbody">Press the button above &mdash; the bot sends you a <b>welcome message</b> instantly.</div></div>
-            <div class="step"><div class="stepn">2</div><div class="stepbody">Send <b>/ctrader</b> to connect your cTrader account via cTID credentials.</div></div>
-            <div class="step"><div class="stepn">3</div><div class="stepbody">Send <b>/start</b> to go live on your connected cTrader account.</div></div>
+            <div class="step"><div class="stepn">1</div><div class="stepbody">Check the email from checkout for your licence key.</div></div>
+            <div class="step"><div class="stepn">2</div><div class="stepbody">Sign in to Apex4Traders and connect your cTrader account.</div></div>
+            <div class="step"><div class="stepn">3</div><div class="stepbody">Start automation on a demo account. Live trading stays off until you turn it on.</div></div>
           </div>
-          <p class="email-note">Check your inbox for the setup email with the same Telegram link.</p>
+          <p class="email-note">Check your inbox for the setup email with the same the web app link.</p>
         </div>
 
         <div class="state" id="stateError">
-          <span class="chip" style="background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--gold)">&#9888; Almost there</span>
-          <h1>Your order is being processed.</h1>
-          <p class="err">Payment was received &mdash; your license key and setup email will arrive in your inbox within 1-2 minutes. If you don't see it, check your spam folder.</p>
+          <span class="chip">&#10003; Payment confirmed</span>
+          <h1>Your license is on its way.</h1>
+          <p class="err">We've received your payment and your license is being finalized on our end. You'll get an email at the address you used at checkout with your license key and the web app activation link &mdash; usually within a couple of minutes, occasionally a little longer at peak times.</p>
           <button class="retry" onclick="location.reload()">&#x21bb; Check again</button>
           <div class="support-box">
-            <p>Didn't receive it? Contact us and we'll sort it out right away:</p>
+            <p>Nothing after 10 minutes? We'll sort it out right away &mdash; just reach out:</p>
             <a href="mailto:supportaicashsystem@gmail.com">supportaicashsystem@gmail.com</a>
           </div>
         </div>
@@ -118,7 +118,7 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
       </div>
     </div>
   </div>
-  <a class="back-link" href="/">&larr; Back to Apex Trading Suite</a>
+  <a class="back-link" href="/">&larr; Back to Apex4Traders</a>
 </div>
 
 <script>
@@ -163,11 +163,9 @@ h1{font:700 clamp(26px,5vw,34px)/1.15 var(--sans);letter-spacing:-.03em;color:#f
         if (d.ready && d.licenseKey) {
           progressEl.style.width = '100%';
           progressTextEl.textContent = 'Done!';
-          var botUsername = isForex ? 'FOREX_APEX_BOT' : 'ApexTradeBot_official_bot';
-          var tgLink = 'https://t.me/' + botUsername + '?start=' + encodeURIComponent(d.licenseKey);
-          document.getElementById('readyTitle').textContent = isForex ? 'Your Forex bot is ready.' : 'Your Crypto bot is ready.';
-          document.getElementById('readySub').textContent = 'Tap the button below — Telegram opens and your ' + (isForex ? 'Forex' : 'Crypto') + ' bot activates automatically. No setup required.';
-          document.getElementById('tgBtn').href = tgLink;
+          document.getElementById('readyTitle').textContent = 'Your Apex4Traders licence is ready.';
+          document.getElementById('readySub').textContent = 'Sign in with the email from your receipt and connect cTrader from there. Your licence key is ' + d.licenseKey + '.';
+          document.getElementById('tgBtn').href = '/forex.html';
           setTimeout(function(){ show('stateReady'); }, 400);
           return;
         }

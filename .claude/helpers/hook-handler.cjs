@@ -73,6 +73,18 @@ function runWithTimeout(fn, label) {
 // Get the command from argv
 const [,, command, ...args] = process.argv;
 
+// Tool events (pre/post edit and bash, and any command this file does not
+// know) are consumed by the agent runner, not shown to a person. Claude Code
+// tolerates plain text on stdout, but other runners (Cursor cloud agents among
+// them) parse it as JSON and reject the whole edit or command when it is not.
+// So on success these print one valid JSON object and nothing else.
+// `route` and `session-restore` are different on purpose: their stdout is
+// context handed to the model, and stays text.
+const TOOL_EVENTS = new Set(['pre-bash', 'pre-edit', 'post-edit', 'post-bash']);
+function allow() {
+  console.log(JSON.stringify({ continue: true }));
+}
+
 // Read stdin with timeout — Claude Code sends hook data as JSON via stdin.
 // Timeout prevents hanging when stdin is not properly closed (common on Windows).
 async function readStdin() {
@@ -153,7 +165,13 @@ const handlers = {
         process.exit(1);
       }
     }
-    console.log('[OK] Command validated');
+    allow();
+  },
+
+  'pre-edit': () => {
+    // Nothing to veto on an edit. Handled explicitly so it is a known command
+    // with a defined answer rather than whatever the fallback happens to print.
+    allow();
   },
 
   'post-edit': () => {
@@ -169,7 +187,7 @@ const handlers = {
         intelligence.recordEdit(file);
       } catch (e) { /* non-fatal */ }
     }
-    console.log('[OK] Edit recorded');
+    allow();
   },
 
   'session-restore': async () => {
@@ -257,12 +275,15 @@ const handlers = {
     try {
       await Promise.resolve(handlers[command]());
     } catch (e) {
-      // Hooks should never crash Claude Code - fail silently
-      console.log(`[WARN] Hook ${command} encountered an error: ${e.message}`);
+      // Hooks should never crash the agent - fail soft. The warning goes to
+      // stderr so a tool event's stdout stays a single JSON object.
+      process.stderr.write(`[WARN] Hook ${command} encountered an error: ${e.message}\n`);
+      if (TOOL_EVENTS.has(command)) allow();
     }
   } else if (command) {
-    // Unknown command - pass through without error
-    console.log(`[OK] Hook: ${command}`);
+    // Unknown command - pass through without error, and without text that a
+    // JSON-parsing runner would reject.
+    allow();
   } else {
     console.log('Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|stats>');
   }
@@ -272,7 +293,7 @@ const handlers = {
 // and skips all subsequent hooks for the event.
 process.exitCode = 0;
 main().catch((e) => {
-  try { console.log(`[WARN] Hook handler error: ${e.message}`); } catch (_) {}
+  try { process.stderr.write(`[WARN] Hook handler error: ${e.message}\n`); } catch (_) {}
 }).finally(() => {
   process.exit(0);
 });

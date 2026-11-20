@@ -2,7 +2,7 @@
 """Apex Trade Bot — cinematic animated product demo (9:16, local, no paid API).
 
 Real frame-by-frame animation: an animated candlestick chart that draws itself,
-a live profit counter ticking up, a Telegram phone mockup with chat bubbles
+a live profit counter ticking up, a Apex4Traders phone mockup with chat bubbles
 sliding in, and a 3-step deploy sequence with checkmarks. Software-company grade.
 
 Run:
@@ -283,12 +283,12 @@ def scene_dashboard(t, dur):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# SCENE 3 — Telegram control (phone mockup + chat bubbles)
+# SCENE 3 — In-app control (phone mockup + chat bubbles)
 # ═══════════════════════════════════════════════════════════════════════════
-def scene_telegram(t, dur):
+def scene_app(t, dur):
     img = new_frame()
     d = ImageDraw.Draw(img, "RGBA")
-    text_c(d, (W // 2, 150), "Control it from Telegram", font(52), T0)
+    text_c(d, (W // 2, 150), "Control it from Apex4Traders", font(52), T0)
 
     # phone frame
     pw, ph = 760, 1380
@@ -437,7 +437,7 @@ def scene_cta(t, dur):
 SCENES = [
     (scene_intro, 3.2),
     (scene_dashboard, 6.5),
-    (scene_telegram, 6.0),
+    (scene_app, 6.0),
     (scene_deploy, 6.0),
     (scene_cta, 3.6),
 ]

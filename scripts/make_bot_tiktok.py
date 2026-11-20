@@ -45,12 +45,12 @@ VIDEOS = [
         "beats": [
             {"text": "I let an AI bot\ntrade crypto for me", "size": 84, "accent": True},
             {"text": "It runs 24/7 on my own\nBinance account.", "size": 64},
-            {"text": "I control everything\nfrom Telegram.", "size": 66},
+            {"text": "I control everything\nfrom Apex4Traders.", "size": 66},
             {"text": "Not a subscription.\nI own the bot.", "size": 70, "accent": True},
             {"text": "Apex Trade Bot — $297\nLink in bio.", "size": 64, "accent": True},
         ],
         "vo": "I let an AI bot trade crypto for me. It runs twenty four seven on my own "
-              "Binance account. I control everything from Telegram. It's not a subscription "
+              "Binance account. I control everything from Apex4Traders. It's not a subscription "
               "— I own the bot. Apex Trade Bot, two hundred ninety seven dollars. Link in bio.",
     },
     {

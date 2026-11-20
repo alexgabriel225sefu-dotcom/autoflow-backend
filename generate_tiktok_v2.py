@@ -8,7 +8,21 @@ Each clip 8s (Veo 3 max). Stack in CapCut for 30s+ TikToks.
 import os, time, requests
 from pathlib import Path
 
-API_KEY = os.environ.get("GOOGLE_AI_API_KEY", "AIzaSyAEk3AtQMQMq6gqV1hWr_ezW2LfVQMNMVU")
+def require_google_api_key():
+    """The key lives in the environment, never in this file.
+
+    GOOGLE_API_KEY is the name to set. GOOGLE_AI_API_KEY is accepted because
+    existing deploy config already uses it. The value is not printed.
+    """
+    key = (os.environ.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_AI_API_KEY") or "").strip()
+    if not key:
+        raise SystemExit(
+            "GOOGLE_API_KEY is not set. Export GOOGLE_API_KEY or "
+            "GOOGLE_AI_API_KEY and run this script again."
+        )
+    return key
+
+API_KEY = require_google_api_key()
 OUTPUT_DIR = Path("outputs/tiktok-v2")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -103,23 +117,24 @@ def generate_video(v):
     vid_id = v["id"]
     print(f"\n[{vid_id}] '{v['title']}'")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001:predictLongRunning?key={API_KEY}"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001:predictLongRunning"
     body = {
         "instances": [{"prompt": v["prompt"]}],
         "parameters": {"aspectRatio": "9:16", "durationSeconds": 8},
     }
 
-    r = requests.post(url, json=body, timeout=60)
+    # Header, not a query parameter: a failed request's URL must not carry the key.
+    r = requests.post(url, json=body, headers={"x-goog-api-key": API_KEY}, timeout=60)
     if r.status_code != 200:
         return ("ERR", vid_id, f"API {r.status_code}: {r.text[:200]}")
 
     op_name = r.json().get("name")
     print(f"[{vid_id}] Generating... (2-4 min)")
-    poll_url = f"https://generativelanguage.googleapis.com/v1beta/{op_name}?key={API_KEY}"
+    poll_url = f"https://generativelanguage.googleapis.com/v1beta/{op_name}"
 
     for i in range(60):
         time.sleep(15)
-        data = requests.get(poll_url, timeout=30).json()
+        data = requests.get(poll_url, headers={"x-goog-api-key": API_KEY}, timeout=30).json()
         if data.get("done"):
             break
         print(f"[{vid_id}] {(i+1)*15}s elapsed...")
@@ -129,7 +144,7 @@ def generate_video(v):
     try:
         samples = data["response"]["generateVideoResponse"]["generatedSamples"]
         dl_url = samples[0]["video"]["uri"]
-        video_bytes = requests.get(f"{dl_url}&key={API_KEY}", timeout=120).content
+        video_bytes = requests.get(dl_url, headers={"x-goog-api-key": API_KEY}, timeout=120).content
         out = OUTPUT_DIR / f"{vid_id}.mp4"
         out.write_bytes(video_bytes)
         print(f"[{vid_id}] Saved {len(video_bytes)/1024/1024:.1f}MB → {out}")

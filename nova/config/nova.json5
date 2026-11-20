@@ -1,0 +1,84 @@
+// NOVA — seed configuration.
+//
+// Copied onto the persistent disk on FIRST BOOT ONLY (see render.yaml). After
+// that the live file at /data/.openclaw/openclaw.json is authoritative and
+// OpenClaw rewrites it as you change settings; this file stops being read.
+// To reset to these defaults, delete the live file and redeploy.
+//
+// JSON5: comments and trailing commas are allowed.
+//
+// NO SECRETS HERE. Tokens and API keys arrive from Render's environment.
+{
+  agents: {
+    entries: {
+      nova: {
+        name: "NOVA",
+        identity: {
+          name: "NOVA",
+          emoji: "🌐",
+          // Persona. Deliberately describes a manner, not a character: the
+          // brief asked for a modern personal assistant, not roleplay.
+          theme: "A personal assistant: intelligent, calm and fast. Concise " +
+                 "for simple requests, thorough for research. Says plainly " +
+                 "when it does not know or cannot do something, and never " +
+                 "invents a capability. Proactive only when it has a concrete " +
+                 "reason. No performance, no filler.",
+        },
+      },
+    },
+  },
+
+  // ── Tool policy ────────────────────────────────────────────────────────
+  //
+  // Mapped onto the five permission levels in the brief. `profile: "minimal"`
+  // is the baseline (session_status only); everything NOVA may do is then
+  // named explicitly. Starting from "minimal" and adding is the safe
+  // direction — starting from "full" and subtracting means every tool added
+  // by a future OpenClaw release is enabled by default.
+  //
+  // Deny always beats allow.
+  tools: {
+    profile: "minimal",
+
+    // LEVEL 0 — read-only: web research, memory recall, session state.
+    // LEVEL 2 — user action: messaging (this is how NOVA answers on Telegram).
+    allow: [
+      "group:web",        // web_search, x_search, web_fetch
+      "group:memory",     // memory_search, memory_get
+      "group:sessions",
+      "group:messaging",
+    ],
+
+    // LEVEL 3 and LEVEL 4 — denied outright.
+    //
+    // `write` and `apply_patch` are BOTH named on purpose: the OpenClaw docs
+    // state that `deny: ["write"]` does NOT deny patching. Denying only the
+    // obvious one would leave a file-writing path open while looking closed.
+    deny: [
+      "group:runtime",    // exec, process, code_execution — LEVEL 4
+      "exec", "process", "code_execution",
+      "group:fs",         // read, write, edit, apply_patch — LEVEL 3
+      "write", "edit", "apply_patch",
+      "terminal",         // shell access
+      "browser",          // full browser automation; web_fetch is enough
+      "gateway",          // must not reconfigure itself
+      "cron",             // no unattended scheduled actions until asked for
+    ],
+  },
+
+  // ── Telegram ───────────────────────────────────────────────────────────
+  //
+  // The bot token comes from the TELEGRAM_BOT_TOKEN environment variable.
+  // Long polling by default, so no public webhook is exposed.
+  channels: {
+    telegram: {
+      // "allowlist" is stricter than the "pairing" default: a stranger cannot
+      // even begin a pairing handshake. This ships enabled so the gateway is
+      // never briefly open between first boot and a manual configuration step.
+      dmPolicy: "allowlist",
+      // Numeric Telegram user ids. Replace or extend with your own; get an id
+      // from @userinfobot. The `telegram:` / `tg:` prefixes are also accepted.
+      allowFrom: ["7585109158"],
+    },
+  },
+}

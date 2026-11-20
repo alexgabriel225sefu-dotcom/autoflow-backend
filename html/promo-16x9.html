@@ -183,7 +183,7 @@ canvas{position:fixed;inset:0;z-index:0}
       </div>
     </div>
     <div class="solution-text">
-      <h2>Control everything<br>from <em>Telegram</em></h2>
+      <h2>Control everything<br>from <em>the web app</em></h2>
       <div class="feat-list" id="featList">
         <div class="feat-item"><span class="icon gold">📱</span> No computer needed — just your phone</div>
         <div class="feat-item"><span class="icon gold">🔄</span> Runs 24/7 on autopilot</div>
@@ -215,7 +215,7 @@ canvas{position:fixed;inset:0;z-index:0}
         <div class="perk"><span class="ck">✓</span> Fully hosted — nothing to install</div>
         <div class="perk"><span class="ck">✓</span> Lifetime updates</div>
         <div class="perk"><span class="ck">✓</span> No subscriptions ever</div>
-        <div class="perk"><span class="ck">✓</span> Telegram setup support</div>
+        <div class="perk"><span class="ck">✓</span> the web app setup support</div>
       </div>
     </div>
   </div>
@@ -266,7 +266,7 @@ animBg();
 const scenes=['s1','s2','s3','s4','s5'];
 const narration=[
   "What if your phone could <span class='highlight'>make money</span> while you sleep?",
-  "Meet Apex Trade Bot — runs <span class='highlight'>24/7 on autopilot</span> from Telegram. No computer needed.",
+  "Meet Apex Trade Bot — runs <span class='highlight'>24/7 on autopilot</span> from the web app. No computer needed.",
   "Our users see up to <span class='highlight'>78% win rates</span> and consistent daily profits.",
   "The crypto bot is just <span class='highlight'>$297</span> — one-time. No subscriptions. No hidden fees.",
   "Visit <span class='highlight'>aicashsystem.space</span> and start your passive income journey today."
@@ -287,12 +287,12 @@ function showScene(i){
   });
   narrator.innerHTML=narration[i];narrator.classList.add('visible');
   currentScene=i;
-  if(i===1)animTelegram();
+  if(i===1)animthe web app();
   if(i===2)animStats();
   if(i===3)animPricing();
 }
 
-function animTelegram(){
+function animthe web app(){
   const msgs=document.querySelectorAll('#tgMsgs .tg-msg');
   msgs.forEach((m,i)=>{setTimeout(()=>{
     m.style.animation=`fadeInItem .4s ${i*.35}s cubic-bezier(.22,.68,0,1) forwards`;

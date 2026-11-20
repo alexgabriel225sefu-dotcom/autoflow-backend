@@ -24,7 +24,7 @@ by a shared secret.
 
 ### 1. Tell the bot to use MetaTrader
 
-In Telegram:
+In the web app:
 
 ```
 /broker mt
@@ -56,7 +56,7 @@ has to match in the EA.)
    - `Timeframe` — keep `M5` (must match the bot's `TIMEFRAME`)
 3. Enable the **Algo Trading** toolbar button
 
-Within ~10 seconds `/status` in Telegram shows the bridge connected and the
+Within ~10 seconds `/status` in the web app shows the bridge connected and the
 bot starts analyzing your broker's prices.
 
 ---
@@ -85,7 +85,7 @@ WebRequest for listed URL* → add the **exact** URL from `BotURL`.
 Secret mismatch. Re-check `/setkeys MT_BRIDGE_SECRET=...` vs the EA's
 `Secret` input.
 
-### Telegram says "MT bridge offline"
+### the web app says "MT bridge offline"
 MetaTrader is closed, Algo Trading is off, or the EA was removed from the
 chart. The bot resumes automatically when the EA reconnects.
 

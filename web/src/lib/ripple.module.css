@@ -1,0 +1,20 @@
+/* Clipped to the button's own shape; colour is the button's text colour. */
+.host {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden;
+  border-radius: inherit; pointer-events: none;
+}
+.dot {
+  position: absolute; left: var(--ripple-x); top: var(--ripple-y);
+  width: var(--ripple-size); height: var(--ripple-size);
+  margin: calc(var(--ripple-size) / -2) 0 0 calc(var(--ripple-size) / -2);
+  border-radius: 50%; background: currentColor; opacity: .2;
+  transform: scale(0);
+  /* Grows while the press is held, then fades once it is let go (N3). */
+  animation: ripple .5s linear forwards;
+  transition: opacity .32s cubic-bezier(.23, 1, .32, 1);
+}
+.host[data-released] .dot { opacity: 0; }
+@keyframes ripple { to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .host { display: none; }
+}

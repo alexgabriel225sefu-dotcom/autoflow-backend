@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Forex Bot Configurator — Apex Forex Bot</title>
+<title>Configurator — Apex4Traders</title>
 <meta name="robots" content="noindex,nofollow">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -190,7 +190,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <input id="gk" class="gi" type="text" placeholder="APEX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
     <button id="gBtn" class="gb">Verify License →</button>
     <div id="gErr" class="ge"></div>
-    <div class="gl">No license yet? <a href="/apex-bot">Purchase Apex Forex Bot →</a></div>
+    <div class="gl">No licence yet? <a href="/forex">Get Apex4Traders →</a></div>
   </div>
 </div>
 
@@ -298,7 +298,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
       <!-- 5 · Connections -->
       <div class="sec">
-        <div class="sh"><div class="sn">5</div><strong>Connections</strong><em>broker · AI · Telegram</em></div>
+        <div class="sh"><div class="sn">5</div><strong>Connections</strong><em>broker · AI</em></div>
         <div class="sb">
           <div id="oandaFields">
             <div class="ilbl" style="margin-top:0">OANDA API Credentials</div>
@@ -319,10 +319,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </div>
           <input id="aiKey" class="inp" type="text" placeholder="Groq API key — console.groq.com" autocomplete="off" spellcheck="false">
           <p class="hn" style="margin-top:5px">Groq is free and fast — ideal for starting. Get a key at <b>console.groq.com</b>.</p>
-          <div class="ilbl">Telegram <span style="color:var(--t2);font-weight:400">(optional — highly recommended)</span></div>
-          <input id="tgTok" class="inp" type="text" placeholder="Bot Token — from @BotFather" autocomplete="off" spellcheck="false">
-          <input id="tgCid" class="inp" type="text" placeholder="Chat ID — from @userinfobot" autocomplete="off" spellcheck="false">
-          <p class="hn" style="margin-top:5px">Get trade alerts + control via /stop, /pause, /status.</p>
           <div class="ilbl">Dashboard Token <span style="color:var(--t2);font-weight:400">(optional)</span></div>
           <input id="dtok" class="inp" type="text" placeholder="Password to protect your dashboard URL" autocomplete="off" spellcheck="false">
           <div class="ilbl">Your License Key</div>
@@ -485,8 +481,6 @@ function buildConfig(){
   const oaAcc=(document.getElementById('oaAcc').value||document.getElementById('oaAcc2').value).trim();
   const oaTok=(document.getElementById('oaTok').value||document.getElementById('oaTok2').value).trim();
   const aiKv=document.getElementById('aiKey').value.trim();
-  const tgT=document.getElementById('tgTok').value.trim();
-  const tgC=document.getElementById('tgCid').value.trim();
   const dt=document.getElementById('dtok').value.trim();
   const cfg={
     BROKER:S.broker==='MT5'?'mt':'oanda',
@@ -505,8 +499,6 @@ function buildConfig(){
   if(oaAcc)cfg.OANDA_ACCOUNT_ID=oaAcc;
   if(oaTok)cfg.OANDA_API_TOKEN=oaTok;
   if(aiKv){if(S.ai==='GROQ')cfg.GROQ_API_KEY=aiKv;else cfg.ANTHROPIC_API_KEY=aiKv;}
-  if(tgT)cfg.TELEGRAM_BOT_TOKEN=tgT;
-  if(tgC)cfg.TELEGRAM_CHAT_ID=tgC;
   if(dt)cfg.DASHBOARD_TOKEN=dt;
   if(S.broker==='MT5'&&dt)cfg.MT_BRIDGE_SECRET=dt; // EA's BRIDGE_SECRET must match
   return cfg;
@@ -521,7 +513,21 @@ document.getElementById('genBtn').addEventListener('click',async()=>{
   btn.disabled=true;btn.textContent='Saving…';
   document.getElementById('savingMsg').style.display='block';
   try{
-    const r=await fetch('/api/save-bot-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:lk,config:buildConfig()})});
+    // Two steps. The licence key is presented ONCE, to the session endpoint,
+    // and exchanged for a token that expires in ten minutes and carries only
+    // bot:config:write. It used to be sent as the authorisation on every save,
+    // which made a never-expiring credential the thing that could rewrite the
+    // trading configuration.
+    const sr=await fetch('/api/bot-session',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({licenseKey:lk,scope:'bot:config:write'})});
+    if(!sr.ok){
+      const e=await sr.json().catch(()=>({}));
+      throw new Error(e.error||'Could not verify that licence key.');
+    }
+    const {token}=await sr.json();
+    const r=await fetch('/api/save-bot-config',{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({config:buildConfig()})});
     const data=await r.json();
     document.getElementById('savingMsg').style.display='none';
     if(data.success){
@@ -548,7 +554,7 @@ document.getElementById('genBtn').addEventListener('click',async()=>{
 // Manual .env fallback if the server save fails
 function showManual(lk){
   const cfg=buildConfig();
-  let env=`# Apex Forex Bot — Railway Environment Variables\n# Generated: ${new Date().toISOString().slice(0,10)}\n\nLICENSE_KEY=${lk}\n`;
+  let env=`# Apex4Traders — Environment Variables\n# Generated: ${new Date().toISOString().slice(0,10)}\n\nLICENSE_KEY=${lk}\n`;
   for(const[k,v] of Object.entries(cfg))env+=`${k}=${v}\n`;
   if(S.broker==='MT5')env+=`\n# MT5 Bridge: set BRIDGE_SECRET on your EA to match MT_BRIDGE_SECRET above.`;
   document.getElementById('etxt').value=env;
