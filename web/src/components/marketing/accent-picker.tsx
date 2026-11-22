@@ -50,19 +50,7 @@ export function AccentPicker() {
         ))}
         <span className="lp-accent-name">{ACCENTS[active].name}</span>
       </div>
-      <div className="lp-accent-card" aria-hidden>
-        <div className="lp-accent-side">
-          <span data-on>Dashboard</span><span>Rules</span><span>Journal</span>
-        </div>
-        <div className="lp-accent-main">
-          <p className="lp-accent-chip"><i /> Automation running</p>
-          <div className="lp-accent-bar"><b /></div>
-          <div className="lp-accent-btns">
-            <span className="mkt-btn">Start</span>
-            <span className="mkt-btn mkt-btn-outline">Pause</span>
-          </div>
-        </div>
-      </div>
+      <a className="mkt-btn mkt-btn-lg" href="/signup">Try free for 14 days</a>
       <p className="lp-accent-note">
         The accent colours buttons, the menu and the logo. Gains and losses keep their own colours.
       </p>
