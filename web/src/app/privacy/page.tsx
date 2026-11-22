@@ -88,8 +88,14 @@ export default function PrivacyPage() {
           <p>
             We will use the address to send you one email when early access
             opens. There is no newsletter, the list is not shared or sold, and
-            the email carries no tracking pixel and no click tracking. Ask us
-            and we will take your address off the list.{" "}
+            the email carries no tracking pixel and no click tracking. It does
+            show our logo, one image served from our own site. It is the same
+            file for everyone and carries nothing about you, so it cannot tell
+            us who opened the email. Like any image on a web page, loading it
+            appears in our server&rsquo;s ordinary request logs, and we do not
+            use those logs to find out who opened the email. If your mail app
+            blocks images, the email reads the same without it. Ask us and we
+            will take your address off the list.{" "}
             {hasFact(facts.privacyEmail) ? (
               <>
                 Write to{" "}

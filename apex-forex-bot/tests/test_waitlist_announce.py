@@ -37,6 +37,9 @@ from apex.platform import waitlist_announce as A        # noqa: E402
 for _var in ("RESEND_API_KEY", "A4T_WAITLIST_FROM_EMAIL", "A4T_WAITLIST_REPLY_TO"):
     os.environ.pop(_var, None)
 
+# Joining must not touch the network in a test, and neither does the logo check.
+A._logo_reachable = lambda: True
+
 # Joining must not touch the network in a test.
 W.send_waitlist_email = lambda address, **kw: {"status": "not_configured"}
 
@@ -141,7 +144,7 @@ configure()
 p = A.build_payload("someone@example.com", SUBJECT, GOOD_BODY, CONTACT)
 check("sent from the configured sender", p["from"].endswith("<hello@example.com>"))
 check("to exactly one recipient", p["to"] == ["someone@example.com"])
-check("plain text only, no HTML part", "html" not in p and "text" in p)
+check("a text part and an HTML part", "html" in p and "text" in p)
 check("carries no tags, tracking or attachments",
       not ({"tags", "attachments", "scheduled_at"} & set(p)))
 check("the body is what the owner wrote", GOOD_BODY in p["text"])
@@ -162,6 +165,53 @@ os.environ.pop("A4T_WAITLIST_REPLY_TO")
 check("an address is masked, never printed whole",
       A.mask("alice@example.com") == "a***@e***.com"
       and "alice" not in A.mask("alice@example.com"))
+
+# ---------------------------------------------------------------------------
+print("\n[2b] the HTML part: logo on top, nothing about the recipient")
+import re as _re                                         # noqa: E402
+
+ha = A.build_payload("alice@example.com", SUBJECT, GOOD_BODY, CONTACT)["html"]
+hb = A.build_payload("bob@example.org", SUBJECT, GOOD_BODY, CONTACT)["html"]
+check("byte-identical for every recipient", ha == hb)
+check("neither part contains the recipient's address",
+      "alice@example.com" not in ha
+      and "alice@example.com" not in A.build_payload(
+          "alice@example.com", SUBJECT, GOOD_BODY, CONTACT)["text"])
+imgs = _re.findall(r"<img\b[^>]*>", ha)
+check("exactly one image, the logo, with alt text and a width",
+      len(imgs) == 1 and 'alt="Apex4Traders"' in imgs[0]
+      and f'width="{A.LOGO_WIDTH}"' in imgs[0], str(imgs))
+check("the logo URL is the product's own, with no query string or token",
+      A.LOGO_URL.startswith("https://www.apex4traders.com/")
+      and "?" not in A.LOGO_URL and "#" not in A.LOGO_URL
+      and f'src="{A.LOGO_URL}"' in imgs[0])
+check("no script, iframe, form, style tag or remote stylesheet",
+      not _re.search(r"<(script|iframe|form|link|style|object|embed)\b", ha, _re.I))
+check("no tracking parameter anywhere", not _re.search(r"utm_|[?&]id=|\btrack", ha, _re.I))
+check("the owner's words are all there", "Early access to Apex4Traders is opening" in ha)
+check("the removal line is in the HTML too", CONTACT in ha and "removed" in ha)
+
+link_body = ("See the platform at https://www.apex4traders.com/signup.\n\n"
+             "- Connect a demo account\n- Write a rule\n\nThanks.")
+hl = A.build_payload("a@b.com", SUBJECT, link_body, CONTACT)["html"]
+hrefs = _re.findall(r'href="([^"]+)"', hl)
+check("a link goes to exactly the URL the owner wrote, unwrapped",
+      hrefs == ["https://www.apex4traders.com/signup"], str(hrefs))
+check("and the full stop after it stays outside the link",
+      ">https://www.apex4traders.com/signup</a>." in hl)
+check("a '- ' paragraph becomes a list", "<ul" in hl and hl.count("<li") == 2)
+hi = A.build_payload("a@b.com", SUBJECT, "What you can do today:\n- One\n- Two\n- Three",
+                     CONTACT)["html"]
+check("an intro line followed by '- ' lines becomes a paragraph and a list",
+      "What you can do today:</p>" in hi and hi.count("<li") == 3, hi[-400:])
+check("the dashes are not left in the text of a list item", "<li" in hi and "- One" not in hi)
+
+evil = "<script>alert(1)</script> <b>x</b> & \"quoted\""
+he = A.build_payload("a@b.com", SUBJECT, evil, CONTACT)["html"]
+check("the owner's text is escaped, never trusted as markup",
+      "<script>alert" not in he and "&lt;script&gt;" in he and "&amp;" in he)
+check("--text-only sends no HTML part and no image",
+      "html" not in A.build_payload("a@b.com", SUBJECT, GOOD_BODY, CONTACT, html=False))
 
 # ---------------------------------------------------------------------------
 print("\n[3] a dry run changes nothing")
@@ -331,6 +381,25 @@ check("a bad address is refused",
       raises("EMAIL_INVALID", A.send_test, "nope", SUBJECT, GOOD_BODY, CONTACT, post=m))
 
 # ---------------------------------------------------------------------------
+print("\n[9b] the logo has to be reachable before anybody gets the email")
+fresh_list(2)
+m = Mailer()
+r = run(post=m, logo_check=lambda: False)
+check("a dry run reports it and carries on", r["logoReachable"] is False and r["planned"] == 2)
+check("a real send is refused when the logo does not answer",
+      raises("LOGO_UNREACHABLE", run, send=True, confirm="SEND launch-1 TO 2",
+             post=m, logo_check=lambda: False))
+check("nothing went out", m.sent == [])
+r = run(send=True, confirm="SEND launch-1 TO 2", post=m, text_only=True,
+        logo_check=lambda: False)
+check("--text-only needs no logo and sends text only",
+      r["sent"] == 2 and all("html" not in x for x in m.sent) and r["format"] == "text")
+fresh_list(2)
+m = Mailer()
+run(send=True, confirm="SEND launch-1 TO 2", post=m)
+check("by default both parts go out", all("html" in x and "text" in x for x in m.sent))
+
+# ---------------------------------------------------------------------------
 print("\n[10] two runs at once")
 fresh_list(2)
 real_claim = A._claim_run
@@ -396,6 +465,12 @@ code, out, err = cli("--campaign", "launch-1", "--subject", SUBJECT,
                      "--body-file", _body, "--no-lock")
 check("a missing removal contact is refused, even on a dry run",
       code == 2 and "NO_REMOVE_CONTACT" in err, err)
+code, out, err = cli(*base, "--text-only")
+check("a dry run says which format it will send", code == 0 and "html+text" not in out
+      and "format         : text" in out, out)
+code, out, err = cli(*base)
+check("and by default, that it is text plus HTML with the logo reachable",
+      "html+text" in out and "logo reachable: yes" in out, out)
 code, out, err = cli(*base, "--test-to", "owner@example.com")
 check("--test-to without --send sends nothing", code == 0 and len(mailer.sent) == 3)
 code, out, err = cli(*base, "--test-to", "owner@example.com", "--send")

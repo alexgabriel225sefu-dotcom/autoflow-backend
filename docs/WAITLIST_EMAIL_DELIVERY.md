@@ -62,7 +62,7 @@ in a text file, and the owner approves it first.
    exact phrase a real send needs. Changes nothing.
 2. **Test send.** `--test-to you@example.com --send` sends one real copy to one
    address, marked `[TEST]`, and touches nothing on the list.
-3. **Send in daily batches.** `--limit 100 --send --confirm "SEND <campaign> TO <n>"`.
+3. **Send in daily batches.** (add `--text-only` for no logo) `--limit 100 --send --confirm "SEND <campaign> TO <n>"`.
    The phrase names the campaign and the exact number about to go; if the list
    changed since the dry run it no longer matches. 100 a day stays inside the
    provider's free daily limit.
@@ -82,6 +82,19 @@ What it refuses, by design:
 - **Two runs at once.** A lease per campaign; on a deployment with no shared
   backend it asks you to confirm nothing else is running (`--no-lock`).
 - **A provider that is down.** Three failures in a row stop the run.
+
+- **A broken logo.** The message is a text part plus an HTML part with the logo
+  (`web/public/email/logo.png`, served at
+  `https://www.apex4traders.com/email/logo.png`). The tool checks that URL
+  answers with an image before a real send; deploy the site first, or use
+  `--text-only`.
+
+The HTML is byte-identical for every recipient, has one image (the logo, no
+query string, no token) and links only to URLs the owner wrote, unchanged. The
+Privacy page says the email shows the logo and that loading it appears in
+ordinary request logs; those logs are not used to find out who opened it. If
+that changes (anything per recipient in the image or links), the Privacy page
+and the form's promise change first.
 
 Output is counts and masked addresses only. `--status` shows progress.
 

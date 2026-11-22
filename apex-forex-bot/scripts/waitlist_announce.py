@@ -71,6 +71,9 @@ def main(argv=None):
     ap.add_argument("--allow-copy-flags", action="store_true",
                     help="send copy the outcome-promise check flagged; only "
                          "after reading it")
+    ap.add_argument("--text-only", action="store_true",
+                    help="send the plain-text part only, with no logo (default "
+                         "is text plus an HTML part carrying the logo)")
     ap.add_argument("--no-lock", action="store_true",
                     help="skip the one-run-at-a-time lease. Only if you are "
                          "certain nothing else is running")
@@ -96,7 +99,8 @@ def main(argv=None):
                       "Add --send to do it.")
                 return 0
             out = A.send_test(args.test_to, args.subject, body, contact,
-                              allow_copy_flags=args.allow_copy_flags)
+                              allow_copy_flags=args.allow_copy_flags,
+                              text_only=args.text_only)
             print(f"test email to {A.mask(args.test_to)}: {out['status']}"
                   + (f" ({out['reason']})" if out.get("reason") else ""))
             return 0 if out["status"] == "sent" else 1
@@ -105,7 +109,8 @@ def main(argv=None):
                   limit=args.limit, send=args.send, confirm=args.confirm,
                   retry_failed=args.retry_failed,
                   retry_unknown=args.retry_unknown,
-                  allow_copy_flags=args.allow_copy_flags, lock=not args.no_lock)
+                  allow_copy_flags=args.allow_copy_flags, lock=not args.no_lock,
+                  text_only=args.text_only)
     except A.AnnounceError as e:
         print(f"refused ({e.code}): {e.detail}", file=sys.stderr)
         return 2
@@ -125,6 +130,10 @@ def main(argv=None):
                   f"will not be written to.")
         print(f"  first, masked  : {', '.join(r['sample']) or '—'}")
         print(f"  provider ready : {'yes' if r['providerConfigured'] else 'NO'}")
+        logo = r["logoReachable"]
+        print(f"  format         : {r['format']}"
+              + ("" if logo is None else
+                 f"   (logo reachable: {'yes' if logo else 'NO - deploy the site first, or use --text-only'})"))
         print("  reminder       : open/click tracking must be OFF at the provider.")
         print(f"\nTo send exactly this, add:  --send --confirm \"{r['confirmation']}\"")
         return 0
