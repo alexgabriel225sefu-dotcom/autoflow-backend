@@ -208,15 +208,4 @@
 .lp-accent-dot[data-on="true"] { outline-color: var(--mkt-text); }
 .lp-accent-dot:focus-visible { outline-color: var(--mkt-text); }
 .lp-accent-name { min-width: 64px; font-weight: 600; color: var(--mkt-text); }
-.lp-accent-card { width: 100%; display: grid; grid-template-columns: 160px 1fr; border: 1px solid var(--lp-hair-strong); border-radius: 16px; background: var(--mkt-surface); overflow: hidden; }
-.lp-accent-side { display: grid; align-content: start; gap: 4px; padding: 16px; border-right: 1px solid var(--lp-hair); font-size: .875rem; color: var(--mkt-muted); }
-.lp-accent-side span { padding: 8px 10px; border-radius: 8px; }
-.lp-accent-side span[data-on] { background: var(--mkt-accent-wash); color: var(--mkt-accent-text); border: 1px solid var(--mkt-accent-line); }
-.lp-accent-main { display: grid; gap: 16px; padding: 24px; align-content: start; }
-.lp-accent-chip { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--mkt-text); }
-.lp-accent-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--mkt-accent); }
-.lp-accent-bar { height: 8px; border-radius: 999px; background: var(--lp-hair); overflow: hidden; }
-.lp-accent-bar b { display: block; width: 62%; height: 100%; background: var(--mkt-accent); }
-.lp-accent-btns { display: flex; gap: 12px; flex-wrap: wrap; }
 .lp-accent-note { margin: 0; text-align: center; font-size: .875rem; color: var(--mkt-dim); }
-@media (max-width: 520px) { .lp-accent-card { grid-template-columns: 1fr; } .lp-accent-side { grid-auto-flow: column; border-right: 0; border-bottom: 1px solid var(--lp-hair); } }
