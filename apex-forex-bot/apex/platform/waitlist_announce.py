@@ -27,11 +27,16 @@ NO COPY IS SHIPPED. The words are the owner's, supplied at run time
 module only refuses bad ones and adds the one thing every message must carry:
 how to be taken off the list.
 
-NOT A MARKETING SYSTEM. One plain-text message per address, per campaign. No
-HTML, no tags, no tracking pixel, no click-tracking links: that is the
-product's contract with the people on the list. (Open/click tracking is also a
-per-domain setting at the provider; keep it OFF there.)
+NOT A MARKETING SYSTEM. One message per address, per campaign: a plain-text
+part and an HTML part that carries the logo, and nothing else. The HTML is
+byte-identical for everybody. Its one external reference is the logo, a static
+file on this product's own site with no query string, so it cannot say who
+opened anything; every link is a URL the owner wrote, unchanged. No tags, no
+tracking pixel, no click-tracking links: that is the product's contract with
+the people on the list. (Open/click tracking is also a per-domain setting at
+the provider; keep it OFF there.)
 """
+import html as _html
 import json
 import os
 import re
@@ -52,6 +57,12 @@ DEFAULT_LIMIT = 100
 DEFAULT_DELAY_SEC = 0.6   # the provider allows two requests a second
 ANNOUNCE_TIMEOUT_SEC = 10
 LOCK_TTL_SEC = 3600
+
+# The one image in the HTML part: a static file on the product's own site, the
+# SAME URL for every recipient. No query string, no per-recipient token: it
+# cannot tell us who opened anything. (web/public/email/logo.png)
+LOGO_URL = "https://www.apex4traders.com/email/logo.png"
+LOGO_WIDTH = 280
 
 SENT, FAILED, UNKNOWN, SENDING = "sent", "failed", "unknown", "sending"
 
@@ -118,8 +129,88 @@ def mask(address):
     return f"{local[:1]}***@{host}" + (f".{tld}" if tld else "")
 
 
-def build_payload(address, subject, body, remove_contact):
-    """One plain-text message. The footer is not optional."""
+_URL = re.compile(r"https?://[^\s<>\"']+")
+
+
+def _footer_text(contact):
+    return ("You are receiving this once because you joined the Apex4Traders "
+            "early-access list. To be removed from the list, write to "
+            f"{contact}.")
+
+
+def _linkify(escaped_line):
+    """Turn a URL into a link to the SAME URL. Never rewritten, never wrapped."""
+    def link(m):
+        url = m.group(0)
+        trail = ""
+        while url and url[-1] in ".,;:!?)":
+            trail, url = url[-1] + trail, url[:-1]
+        return f'<a href="{url}" style="color:#141416;text-decoration:underline">{url}</a>{trail}'
+    return _URL.sub(link, escaped_line)
+
+
+def build_html(body, contact):
+    """The same message as the text part, with the logo on top.
+
+    Nothing here is generated from the recipient: the HTML is byte-identical
+    for everybody on the list. The only external reference is the logo, and
+    every link is a URL the owner wrote, unchanged.
+    """
+    blocks = []
+    for para in re.split(r"\n\s*\n", body.strip()):
+        text_lines, items = [], []
+
+        def flush_text():
+            if text_lines:
+                inner = "<br>".join(_linkify(_html.escape(ln)) for ln in text_lines)
+                blocks.append(f'<p style="margin:0 0 8px">{inner}</p>')
+                text_lines.clear()
+
+        def flush_items():
+            if items:
+                lis = "".join(
+                    f'<li style="margin:0 0 4px">{_linkify(_html.escape(it))}</li>'
+                    for it in items)
+                blocks.append(f'<ul style="margin:0 0 16px;padding-left:20px">{lis}</ul>')
+                items.clear()
+
+        for ln in (x.rstrip() for x in para.split("\n")):
+            if not ln.strip():
+                continue
+            if ln.lstrip().startswith("- "):
+                flush_text()
+                items.append(ln.lstrip()[2:])
+            else:
+                flush_items()
+                text_lines.append(ln)
+        flush_text()
+        flush_items()
+        # a paragraph that ends on text (not a list) gets the usual gap
+        if blocks and blocks[-1].startswith("<p"):
+            blocks[-1] = blocks[-1].replace("margin:0 0 8px", "margin:0 0 16px", 1)
+    safe_contact = _html.escape(contact)
+    footer = _html.escape(_footer_text("\x00")).replace("\x00", safe_contact)
+    return (
+        '<!doctype html><html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta name="color-scheme" content="light only"></head>'
+        '<body style="margin:0;padding:0;background:#ffffff">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="background:#ffffff"><tr><td align="center" style="padding:24px 16px">'
+        '<table role="presentation" width="560" cellpadding="0" cellspacing="0" '
+        'style="max-width:560px;width:100%"><tr><td '
+        'style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;'
+        'font-size:15px;line-height:24px;color:#141416">'
+        f'<img src="{LOGO_URL}" alt="Apex4Traders" width="{LOGO_WIDTH}" '
+        'style="display:block;border:0;height:auto;max-width:100%;margin:0 0 20px">'
+        + "".join(blocks) +
+        '<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e5e5e5;'
+        f'font-size:12px;line-height:18px;color:#6b6b6b">{footer}</p>'
+        '</td></tr></table></td></tr></table></body></html>')
+
+
+def build_payload(address, subject, body, remove_contact, *, html=True):
+    """A text part, and by default an HTML part with the logo. The footer is not optional."""
     contact = (remove_contact or "").strip()
     if not contact:
         raise AnnounceError("NO_REMOVE_CONTACT",
@@ -127,13 +218,10 @@ def build_payload(address, subject, body, remove_contact):
     sender = (os.getenv("A4T_WAITLIST_FROM_EMAIL") or "").strip()
     if not sender:
         raise AnnounceError("NOT_CONFIGURED", "A4T_WAITLIST_FROM_EMAIL is not set")
-    footer = (
-        "\n\n--\nYou are receiving this once because you joined the "
-        "Apex4Traders early-access list. To be removed from the list, write "
-        f"to {contact}."
-    )
     payload = {"from": sender, "to": [address], "subject": subject,
-               "text": body + footer}
+               "text": body + "\n\n--\n" + _footer_text(contact)}
+    if html:
+        payload["html"] = build_html(body, contact)
     reply_to = (os.getenv("A4T_WAITLIST_REPLY_TO") or "").strip()
     if reply_to:
         payload["reply_to"] = reply_to
@@ -175,6 +263,18 @@ def _deliver(payload, post):
     except Exception as exc:            # noqa: BLE001 - any failure is "unknown"
         return UNKNOWN, None, type(exc).__name__
     return SENT, (str(provider_id)[:80] if provider_id else None), None
+
+
+def _logo_reachable():
+    """True if the logo URL answers 200 with an image. A broken image in every
+    inbox is not something to find out from the recipients."""
+    try:
+        req = urllib.request.Request(LOGO_URL, method="HEAD",
+                                     headers={"User-Agent": "apex4traders-announce/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310 - fixed HTTPS URL
+            return resp.status == 200 and (resp.headers.get("Content-Type") or "").startswith("image/")
+    except Exception:                       # noqa: BLE001
+        return False
 
 
 # --------------------------------------------------------------------------- the list
@@ -267,7 +367,8 @@ def _release_run(campaign):
 def run(campaign, subject, body, *, remove_contact=None, limit=DEFAULT_LIMIT,
         send=False, confirm=None, retry_failed=False, retry_unknown=False,
         allow_copy_flags=False, lock=True, post=None, sleep=time.sleep,
-        delay=DEFAULT_DELAY_SEC, max_consecutive_failures=3, now=None):
+        delay=DEFAULT_DELAY_SEC, max_consecutive_failures=3, now=None,
+        text_only=False, logo_check=None):
     """Plan, or send, one campaign to the people who have not had it.
 
     `send=False` (the default) changes nothing and returns the plan together
@@ -290,6 +391,13 @@ def run(campaign, subject, body, *, remove_contact=None, limit=DEFAULT_LIMIT,
             "NOT_CONFIGURED",
             "provider not configured; missing: " + ", ".join(cfg["missing"]))
 
+    logo_ok = None if text_only else bool((logo_check or _logo_reachable)())
+    if send and logo_ok is False:
+        raise AnnounceError(
+            "LOGO_UNREACHABLE",
+            f"{LOGO_URL} does not answer with an image. Deploy the site "
+            "first, or pass text_only to send without the logo.")
+
     todo, held, unreadable = _plan(c, retry_failed, retry_unknown)
     batch = todo[:limit]
     phrase = f"SEND {c} TO {len(batch)}"
@@ -298,6 +406,8 @@ def run(campaign, subject, body, *, remove_contact=None, limit=DEFAULT_LIMIT,
         "held": held, "unreadable": unreadable,
         "sample": [mask(a) for _j, _k, a in batch[:3]],
         "providerConfigured": cfg["configured"],
+        "format": "text" if text_only else "html+text",
+        "logoReachable": logo_ok,
     }
     if not send:
         return dict(plan, dryRun=True, confirmation=phrase)
@@ -320,14 +430,14 @@ def run(campaign, subject, body, *, remove_contact=None, limit=DEFAULT_LIMIT,
     try:
         return _send_batch(v, batch, plan, remove_contact, retry_failed,
                            retry_unknown, post, sleep, delay,
-                           max_consecutive_failures, now)
+                           max_consecutive_failures, now, not text_only)
     finally:
         if lock:
             _release_run(c)
 
 
 def _send_batch(v, batch, plan, remove_contact, retry_failed, retry_unknown,
-                post, sleep, delay, max_consec, now):
+                post, sleep, delay, max_consec, now, with_html=True):
     c = v["campaign"]
     counts = {SENT: 0, FAILED: 0, UNKNOWN: 0}
     skipped, consecutive, stopped = 0, 0, None
@@ -339,7 +449,8 @@ def _send_batch(v, batch, plan, remove_contact, retry_failed, retry_unknown,
                                  retry_failed, retry_unknown):
             skipped += 1
             continue
-        payload = build_payload(address, v["subject"], v["body"], remove_contact)
+        payload = build_payload(address, v["subject"], v["body"], remove_contact,
+                                html=with_html)
         stamp = int(now if now is not None else time.time())
         # CLAIM BEFORE THE CALL, answer after. A crash in between leaves
         # 'sending', which is held: one uncertain email, never two.
@@ -365,7 +476,7 @@ def _send_batch(v, batch, plan, remove_contact, retry_failed, retry_unknown,
 
 
 def send_test(address, subject, body, remove_contact, *, post=None,
-              allow_copy_flags=False):
+              allow_copy_flags=False, text_only=False):
     """One real email to one address, to read it before the list does.
 
     Touches nothing on the list: no record is written and nobody is marked.
@@ -380,7 +491,8 @@ def send_test(address, subject, body, remove_contact, *, post=None,
         raise AnnounceError(
             "NOT_CONFIGURED",
             "provider not configured; missing: " + ", ".join(cfg["missing"]))
-    payload = build_payload(to, "[TEST] " + v["subject"], v["body"], remove_contact)
+    payload = build_payload(to, "[TEST] " + v["subject"], v["body"], remove_contact,
+                            html=not text_only)
     status_, provider_id, reason = _deliver(payload, post)
     out = {"status": status_}
     if provider_id:
