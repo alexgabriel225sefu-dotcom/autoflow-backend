@@ -1175,8 +1175,8 @@ gates or orders changed.
 
 1. **Branch:** `codex/fix-account-selection-state`, based on
    `claude/apex4traders-platform-v1`; no deploy or merge performed.
-2. **Commit:** working tree changes are not yet pushed. The fix is limited to
-   the dashboard account-selection display and its regression test.
+2. **Commit:** `4b15db86` is pushed in PR #199. The fix is limited to the
+   dashboard account-selection display and its regression test.
 3. **Found:** after a successful demo-account selection, the dashboard could
    continue rendering `Choose an account` while the status bar showed the
    selected demo account, when the follow-up status read was stale or failed.
@@ -1197,8 +1197,8 @@ gates or orders changed.
 8. **Security:** the change is presentation-only; the server remains the
    source of truth and no live path, environment value, gate or credential was
    touched.
-9. **Next:** run the web CI checks (`tsc`, ESLint, Vitest and Next build), then
-   push/open a PR if the owner wants the fix promoted.
+9. **Next:** wait for the four required CI jobs (`node`, `config-drift`,
+   `python`, `web`) on PR #199, then deploy only after all are green.
 10. **Blockers:** local web dependency installation is incomplete, so CI is
     required before calling this complete.
 
