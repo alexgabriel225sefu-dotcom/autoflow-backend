@@ -1,0 +1,27 @@
+/* Preview only: three candidate button animations, all on the landing tokens. */
+@property --pv-a { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+.pv-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: center; }
+
+/* A. shimmer: a light band crosses every few seconds, lift and arrow on hover */
+.pv-shimmer { position: relative; overflow: hidden; gap: 10px; transition: transform .2s cubic-bezier(.4,0,.2,1), box-shadow .2s cubic-bezier(.4,0,.2,1); }
+.pv-shimmer::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent); transform: skewX(-20deg); animation: pv-sweep 3.6s ease-in-out infinite; }
+.pv-shimmer:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.pv-shimmer:active { transform: translateY(0) scale(.98); }
+.pv-shimmer .pv-arrow { display: inline-block; transition: transform .2s cubic-bezier(.4,0,.2,1); }
+.pv-shimmer:hover .pv-arrow { transform: translateX(4px); }
+@keyframes pv-sweep { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+
+/* B. moving border: a conic gradient travels around the outline button */
+.pv-border { position: relative; border-color: transparent !important; background: var(--mkt-bg) !important; isolation: isolate; }
+.pv-border::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; z-index: -1; background: conic-gradient(from var(--pv-a), transparent 0 70%, var(--mkt-accent) 85%, transparent 100%); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: pv-spin 3s linear infinite; }
+.pv-border:hover::before { animation-duration: 1.2s; }
+@keyframes pv-spin { to { --pv-a: 360deg; } }
+
+/* C. magnetic: moves a few pixels toward the cursor (driven from the component) */
+.pv-magnet { transition: transform .15s cubic-bezier(.4,0,.2,1); will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-shimmer::after, .pv-border::before { animation: none; }
+  .pv-magnet, .pv-shimmer, .pv-shimmer .pv-arrow { transition: none; }
+}
