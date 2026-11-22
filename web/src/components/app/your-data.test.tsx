@@ -87,4 +87,16 @@ describe("Your data — delete", () => {
     await userEvent.click(screen.getByRole("button", { name: /delete my account/i }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
   });
+  it("says so, and does not silently leave, when the sign-in account could not be removed", async () => {
+    deleteAccount.mockResolvedValue({ ok: true, data: { ok: true, deleted: { rules: 1 }, authUserDeleted: false,
+      note: "Your sign-in account itself still exists and will be removed by support." } });
+    render(<YourData />);
+    await userEvent.type(screen.getByLabelText(/type delete to confirm/i), "DELETE");
+    await userEvent.click(screen.getByRole("button", { name: /delete my account/i }));
+    expect((await screen.findByRole("status")).textContent).toMatch(/still exists and will be removed by support/i);
+    expect(signOut).toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /back to the home page/i }));
+    expect(push).toHaveBeenCalledWith("/");
+  });
 });

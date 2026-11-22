@@ -33,6 +33,7 @@ export function YourData() {
   const [typed, setTyped] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [leftBehind, setLeftBehind] = useState<string | null>(null);
 
   async function runExport() {
     setExporting(true);
@@ -58,8 +59,33 @@ export function YourData() {
     // The account is gone server-side. A sign-out failing now (the login may
     // no longer exist) must not strand the person on a dead session.
     try { await createClient().auth.signOut(); } catch { /* already gone */ }
+    // If the sign-in record itself could not be removed, say so instead of
+    // leaving the person to find out by signing in again.
+    if (!r.data.authUserDeleted) {
+      setDeleting(false);
+      setLeftBehind(
+        r.data.note
+          ?? "Your data was deleted, but your sign-in account still exists and will be removed by support. Signing in again would start a new, empty account.",
+      );
+      return;
+    }
     router.push("/");
     router.refresh();
+  }
+
+  if (leftBehind) {
+    return (
+      <section className="card">
+        <div className="card-head"><h2>Your data was deleted</h2></div>
+        <div className="notice" role="status">{leftBehind}</div>
+        <p className="muted" style={{ fontSize: ".85rem" }}>
+          To have the sign-in account removed too, write to support@apex4traders.com from the address you signed up with.
+        </p>
+        <button className="btn btn-ghost" type="button" onClick={() => { router.push("/"); router.refresh(); }}>
+          Back to the home page
+        </button>
+      </section>
+    );
   }
 
   return (

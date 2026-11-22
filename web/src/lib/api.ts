@@ -978,6 +978,8 @@ export type AccountDeletion = {
   ok: true;
   deleted: Record<string, number>;
   authUserDeleted: boolean;
+  /** What the server could not do for the person, in plain words. */
+  note?: string;
 };
 
 /** The code given to a 404/501: the endpoint is not deployed on this server. */
