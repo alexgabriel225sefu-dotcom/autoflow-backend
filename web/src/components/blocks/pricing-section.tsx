@@ -7,16 +7,16 @@
  * values. This section therefore states no figure of its own: it reads
  * billing/offer and formats what comes back.
  *
- * The three states it can be in are kept distinct, because this screen is
- * read by somebody deciding whether to pay:
+ * A PRICE IS SHOWN ONLY WHILE IT CAN BE PAID.
  *
- *   answered     the price, from the server
- *   still asking a skeleton, never a placeholder price
- *   could not    a plain sentence saying so, and a retry — never a price we
- *                guessed, and never silence that reads as "free"
+ * Until the server says purchase is open (checkout on AND implemented), the
+ * paid card carries no figure at all: it is the live-trading waitlist card,
+ * "Waitlist" where the price would be, and nothing is for sale. The same goes
+ * while the offer is still loading and when it could not be read: the closed
+ * state is the safe default, so a price can never appear that cannot be paid,
+ * and a failed read can never be mistaken for "free".
  */
-import { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   formatOfferPrice,
   publicApi,
@@ -44,28 +44,51 @@ const DEMO_FEATURES = [
   "Full journal",
 ];
 
+const DEMO_PLAN: PricingPlan = {
+  id: "demo",
+  name: "Demo",
+  description: "Practice accounts, at no cost. No card. Free for 14 days.",
+  palette: "neutral",
+  price: "Free",
+  // The only plan anybody can act on today, so it carries the filled button.
+  ctaLabel: "Create an account",
+  ctaHref: "/signup",
+  features: DEMO_FEATURES,
+  footerNote: "No payment details required",
+  footerDesc:
+    "The free demo trial lasts 14 days, then demo automation pauses. Nothing on a practice account can move real money.",
+};
+
+/** The paid card while nothing can be bought: no price, a way to be told. */
+const LIVE_WAITLIST_PLAN: PricingPlan = {
+  id: "live_waitlist",
+  name: "Live trading",
+  description: "Real-money account access, for when live execution is enabled.",
+  palette: "accent",
+  price: "Waitlist",
+  priceNote: "Not open yet. No payment is taken.",
+  statusBadge: "Coming later",
+  ctaLabel: "Join the waitlist",
+  ctaHref: "#waitlist",
+  features: FOUNDER_FEATURES,
+  footerNote: "No payment is taken now",
+  footerDesc:
+    "Live trading is not available yet. Leaving your email costs nothing: we write to you once, when early access opens.",
+};
+
+/**
+ * Both have to be true. checkoutEnabled alone has meant "the flags are on"
+ * while POST billing/checkout still answers 501.
+ */
+export function purchaseOpen(offer: PublicOffer): boolean {
+  return offer.checkoutEnabled && offer.checkoutImplemented === true;
+}
+
 export function planFor(offer: PublicOffer): PricingPlan[] {
+  if (!purchaseOpen(offer)) return [DEMO_PLAN, LIVE_WAITLIST_PLAN];
   const lifetime = offer.periodDays === null;
-  // Both have to be true. checkoutEnabled alone has meant "the flags are
-  // on" while POST billing/checkout still answers 501.
-  const purchaseOpen = offer.checkoutEnabled && offer.checkoutImplemented === true;
   return [
-    {
-      id: "demo",
-      name: "Demo",
-      description: "Practice accounts, at no cost. No card. Free for 14 days.",
-      palette: "neutral",
-      price: "Free",
-      // The only plan anybody can act on today, so it carries the filled
-      // button. The paid card below is disabled, and a prominent button that
-      // refuses to be pressed is worse than a quiet one.
-      ctaLabel: "Create an account",
-      ctaHref: "/signup",
-      features: DEMO_FEATURES,
-      footerNote: "No payment details required",
-      footerDesc:
-        "The free demo trial lasts 14 days, then demo automation pauses. Nothing on a practice account can move real money.",
-    },
+    DEMO_PLAN,
     {
       id: offer.sku,
       name: "Founder",
@@ -76,19 +99,10 @@ export function planFor(offer: PublicOffer): PricingPlan[] {
       priceNote: lifetime
         ? "One-time payment, no renewal"
         : `One-time payment, access for ${offer.periodDays} days`,
-      ctaQuiet: !purchaseOpen,
       featuredLabel: lifetime ? "Lifetime access" : undefined,
       variant: lifetime ? "lifetime" : undefined,
-      // The same wording the button carries, from the same flag: a state
-      // read from the server, not a second opinion about it.
-      statusBadge: purchaseOpen ? undefined : "Not on sale yet",
-      ctaLabel: purchaseOpen ? "Get Founder access" : "Not on sale yet",
-      ctaHref: purchaseOpen ? "/license" : undefined,
-      ctaDisabled: !purchaseOpen,
-      // Said on the card rather than discovered at a checkout that refuses.
-      ctaNote: purchaseOpen
-        ? undefined
-        : "Live purchase is not yet open. Live execution is not enabled in this release, so this plan is not on sale yet.",
+      ctaLabel: "Get Founder access",
+      ctaHref: "/license",
       features: FOUNDER_FEATURES,
       footerNote: lifetime ? "No renewal, ever" : "Renewal terms apply",
       footerDesc:
@@ -100,51 +114,39 @@ export function planFor(offer: PublicOffer): PricingPlan[] {
 export function PricingSection() {
   const [result, setResult] = useState<ApiResult<PublicOffer> | null>(null);
 
-  const load = useCallback(async () => {
-    setResult(null);
-    setResult(await publicApi<PublicOffer>("billing/offer"));
+  useEffect(() => {
+    // Queued, not called from the effect body: setting state synchronously
+    // during commit is a cascading render. Same reason use-api.ts queues its
+    // own first read.
+    queueMicrotask(() => {
+      void publicApi<PublicOffer>("billing/offer").then(setResult);
+    });
   }, []);
 
-  useEffect(() => {
-    // Queued, not called from the effect body: `load` clears the result
-    // before it awaits, and doing that synchronously during commit is a
-    // cascading render. Same reason use-api.ts queues its own first read.
-    queueMicrotask(() => void load());
-  }, [load]);
-
+  // Closed unless the server has said otherwise. Loading and failure both
+  // land here, deliberately: see the header.
   const offer = result?.ok ? result.data : null;
+  const open = offer ? purchaseOpen(offer) : false;
+  const plans = offer ? planFor(offer) : [DEMO_PLAN, LIVE_WAITLIST_PLAN];
 
   return (
-    <section id="pricing" className="w-full">
-      {offer ? (
-        <PricingCards
-          eyebrow="Pricing"
-          title={offer.periodDays === null ? "One price. Lifetime access." : "Pricing"}
-          subtitle={offer.periodDays === null
-            ? "Pay once. No subscriptions and no renewals. Demo accounts are free."
-            : "Demo accounts are free. One paid plan, bought once."}
-          groups={[{ key: "all", label: "Plans", plans: planFor(offer) }]}
-        />
-      ) : result && !result.ok ? (
-        <div className="space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight">Pricing</h2>
-          {/* No figure here. A price we could not read must not be replaced
-              by one we remember, and an empty section would read as free. */}
-          <p className="text-sm text-muted-foreground">
-            The price could not be loaded just now. Demo accounts are free; the
-            paid plan&rsquo;s price is set on the server and is shown here once
-            it answers.
-          </p>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => void load()}>
-            <RefreshCw className="ico" aria-hidden /> Try again
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2" aria-busy="true">
-          <h2 className="text-3xl font-bold tracking-tight">Pricing</h2>
-          <p className="text-sm text-muted-foreground">Loading the current price&hellip;</p>
-        </div>
-      )}
+    <section className="w-full" aria-label="Plans">
+      <PricingCards
+        eyebrow={open ? "Pricing" : "Plans"}
+        title={
+          open
+            ? offer!.periodDays === null ? "One price. Lifetime access." : "Pricing"
+            : "Free demo now. Live trading next."
+        }
+        subtitle={
+          open
+            ? offer!.periodDays === null
+              ? "Pay once. No subscriptions and no renewals. Demo accounts are free."
+              : "Demo accounts are free. One paid plan, bought once."
+            : "Practice on a demo account at no cost. Live trading is not open yet: leave your email and we will write to you once, when it opens."
+        }
+        groups={[{ key: "all", label: "Plans", plans }]}
+      />
       <RefundPolicyNote className="mt-6 text-sm text-muted-foreground" />
     </section>
   );

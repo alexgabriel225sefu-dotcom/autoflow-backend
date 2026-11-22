@@ -174,3 +174,9 @@
 /* ── Trustpilot widget: drawn by Trustpilot, only placed and spaced here ── */
 .lp-trust { margin: 20px auto 0; max-width: 320px; min-height: 24px; }
 .lp-trust a { color: var(--mkt-muted); font-size: .875rem; text-decoration: none; }
+
+/* Live-trading waitlist box */
+.lp-wait { max-width: 560px; margin: 0 auto; }
+.lp-wait .wl-row { justify-content: center; }
+.lp-wait .wl-note, .lp-wait .wl-done, .lp-wait .wl-error { text-align: center; justify-content: center; }
+.lp-head-center .lp-eyebrow { margin-inline: auto; text-align: center; }
