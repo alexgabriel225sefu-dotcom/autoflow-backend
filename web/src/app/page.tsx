@@ -12,6 +12,8 @@ import { BrandLockup } from "@/components/brand/logo";
 import { LandingNav } from "@/components/marketing/landing-nav";
 import { HeroStage } from "@/components/marketing/hero-stage";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
+import { TourVideo } from "@/components/marketing/tour-video";
+import { AccentPicker } from "@/components/marketing/accent-picker";
 import { ProductGuide } from "@/components/marketing/product-guide";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { ORGANIZATION_LD, WEBSITE_LD } from "@/lib/json-ld";
@@ -53,6 +55,16 @@ export default function Landing() {
         <HeroStage />
       </div>
 
+      <section id="watch" className="lp-sec lp-sec-tight" aria-labelledby="watch-title">
+        <div className="mkt-wrap">
+          <div className="lp-head lp-head-center">
+            <p className="lp-eyebrow">The tour</p>
+            <h2 id="watch-title">The whole platform in 90 seconds.</h2>
+          </div>
+          <TourVideo />
+        </div>
+      </section>
+
       <section id="platforms" className="lp-strip" aria-labelledby="platforms-title">
         <div className="mkt-wrap lp-strip-in">
           <h2 id="platforms-title">Works with</h2>
@@ -73,7 +85,12 @@ export default function Landing() {
               <span className="lp-plat-status">Coming soon</span>
             </div>
           </div>
-          <p className="lp-strip-note">cTrader works today. More platforms are on the roadmap. No install path promised yet for MetaTrader.</p>
+          <ol className="lp-road" aria-label="Roadmap">
+            <li data-state="now"><b>Now</b><span>cTrader, on demo accounts</span></li>
+            <li><b>Next</b><span>MetaTrader 4 and 5</span></li>
+            <li><b>Then</b><span>Live trading. <a href="#waitlist">Join the waitlist</a></span></li>
+          </ol>
+          <p className="lp-strip-note">No dates are promised. No install path promised yet for MetaTrader.</p>
         </div>
       </section>
 
@@ -115,6 +132,17 @@ export default function Landing() {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section id="make-it-yours" className="lp-sec" aria-labelledby="accent-title">
+        <div className="mkt-wrap">
+          <div className="lp-head lp-head-center">
+            <p className="lp-eyebrow">Make it yours</p>
+            <h2 id="accent-title">Pick your accent. The page follows.</h2>
+            <p>Choose a colour here and watch this whole page change, the same way the platform does.</p>
+          </div>
+          <AccentPicker />
         </div>
       </section>
 

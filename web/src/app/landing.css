@@ -180,3 +180,43 @@
 .lp-wait .wl-row { justify-content: center; }
 .lp-wait .wl-note, .lp-wait .wl-done, .lp-wait .wl-error { text-align: center; justify-content: center; }
 .lp-head-center .lp-eyebrow { margin-inline: auto; text-align: center; }
+
+/* ── tour video ──────────────────────────────────────────────────────── */
+.lp-sec-tight { padding-bottom: 0; }
+.lp-tour { max-width: 960px; margin: 0 auto; }
+.lp-tour-frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid var(--lp-hair-strong); border-radius: 16px; background: var(--mkt-surface); }
+.lp-tour-play { all: unset; box-sizing: border-box; position: absolute; inset: 0; cursor: pointer; display: block; }
+.lp-tour-play img, .lp-tour-video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lp-tour-btn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px; border-radius: 999px; background: var(--mkt-accent); color: var(--mkt-on-accent); font-weight: 600; font-size: 1rem; box-shadow: 0 8px 32px rgba(0, 0, 0, .5); transition: background-color .15s cubic-bezier(.4, 0, .2, 1); }
+.lp-tour-play:hover .lp-tour-btn { background: var(--mkt-accent-deep); }
+.lp-tour-play:focus-visible { outline: 2px solid var(--mkt-text); outline-offset: 2px; }
+.lp-tour-note { margin: 12px 0 0; text-align: center; font-size: .875rem; line-height: 20px; color: var(--mkt-dim); }
+
+/* ── roadmap in the platforms strip ──────────────────────────────────── */
+.lp-road { grid-column: 1 / -1; margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.lp-road li { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px; border: 1px solid var(--lp-hair); border-radius: 12px; font-size: .9375rem; color: var(--mkt-muted); }
+.lp-road li[data-state="now"] { border-color: var(--mkt-accent-line); background: var(--mkt-accent-wash); color: var(--mkt-text); }
+.lp-road b { flex: none; width: 48px; font: 500 .75rem/16px var(--font-geist-mono), ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--mkt-dim); }
+.lp-road a { color: var(--mkt-text); text-underline-offset: 3px; }
+@media (min-width: 900px) { .lp-road { grid-template-columns: repeat(3, 1fr); grid-column: 2; } }
+
+/* ── accent picker ───────────────────────────────────────────────────── */
+.lp-accent { max-width: 720px; margin: 0 auto; display: grid; gap: 24px; justify-items: center; }
+.lp-accent-sw { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.lp-accent-dot { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; outline: 2px solid transparent; outline-offset: 3px; cursor: pointer; transition: transform .15s cubic-bezier(.4, 0, .2, 1), outline-color .15s cubic-bezier(.4, 0, .2, 1); }
+.lp-accent-dot:hover { transform: scale(1.08); }
+.lp-accent-dot[data-on="true"] { outline-color: var(--mkt-text); }
+.lp-accent-dot:focus-visible { outline-color: var(--mkt-text); }
+.lp-accent-name { min-width: 64px; font-weight: 600; color: var(--mkt-text); }
+.lp-accent-card { width: 100%; display: grid; grid-template-columns: 160px 1fr; border: 1px solid var(--lp-hair-strong); border-radius: 16px; background: var(--mkt-surface); overflow: hidden; }
+.lp-accent-side { display: grid; align-content: start; gap: 4px; padding: 16px; border-right: 1px solid var(--lp-hair); font-size: .875rem; color: var(--mkt-muted); }
+.lp-accent-side span { padding: 8px 10px; border-radius: 8px; }
+.lp-accent-side span[data-on] { background: var(--mkt-accent-wash); color: var(--mkt-accent-text); border: 1px solid var(--mkt-accent-line); }
+.lp-accent-main { display: grid; gap: 16px; padding: 24px; align-content: start; }
+.lp-accent-chip { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--mkt-text); }
+.lp-accent-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--mkt-accent); }
+.lp-accent-bar { height: 8px; border-radius: 999px; background: var(--lp-hair); overflow: hidden; }
+.lp-accent-bar b { display: block; width: 62%; height: 100%; background: var(--mkt-accent); }
+.lp-accent-btns { display: flex; gap: 12px; flex-wrap: wrap; }
+.lp-accent-note { margin: 0; text-align: center; font-size: .875rem; color: var(--mkt-dim); }
+@media (max-width: 520px) { .lp-accent-card { grid-template-columns: 1fr; } .lp-accent-side { grid-auto-flow: column; border-right: 0; border-bottom: 1px solid var(--lp-hair); } }
