@@ -261,6 +261,7 @@ export default function Landing() {
                 <li><a href="/terms">Terms</a></li>
                 <li><a href="/privacy">Privacy</a></li>
                 <li><a href="/refunds">Refunds</a></li>
+                <li><a href="https://anpc.ro" target="_blank" rel="noopener noreferrer">ANPC (consumer protection)</a></li>
               </ul>
             </div>
             <div>
