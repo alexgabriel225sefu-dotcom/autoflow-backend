@@ -49,3 +49,41 @@ The placeholder email body is intentionally plain. Final launch email copy is
 pending owner approval and must keep the same compliance rules as the landing
 page: no profit promise, no financial advice, demo-first, live trading not
 enabled.
+
+## Announcing that early access is open
+
+Operator tool: `apex-forex-bot/scripts/waitlist_announce.py`. It sends the one
+email the form promised, to the people who have not had it. Run it on the
+service (it needs `TOKEN_ENCRYPTION_KEY`, `RESEND_API_KEY` and
+`A4T_WAITLIST_FROM_EMAIL`). It ships **no copy**: the owner writes the message
+in a text file, and the owner approves it first.
+
+1. **Dry run (the default).** Prints how many would go, masked samples and the
+   exact phrase a real send needs. Changes nothing.
+2. **Test send.** `--test-to you@example.com --send` sends one real copy to one
+   address, marked `[TEST]`, and touches nothing on the list.
+3. **Send in daily batches.** `--limit 100 --send --confirm "SEND <campaign> TO <n>"`.
+   The phrase names the campaign and the exact number about to go; if the list
+   changed since the dry run it no longer matches. 100 a day stays inside the
+   provider's free daily limit.
+
+What it refuses, by design:
+
+- **A second email.** Re-running a campaign only reaches people who have not
+  had it. An uncertain outcome (timeout, 5xx, a crash mid-send) is **held**, not
+  retried: check the provider's log, then pass `--retry-unknown`. A refused one
+  (4xx, nothing went out) comes back with `--retry-failed`.
+- **A removed address.** Each address is re-read just before its turn.
+- **Copy that promises an outcome** (guarantees, returns, percentages). Override
+  with `--allow-copy-flags` only after reading it.
+- **No way off the list.** `--remove-contact` (or `A4T_WAITLIST_REMOVE_CONTACT`)
+  is required and is added to every message, with a `List-Unsubscribe` header
+  when it is an address.
+- **Two runs at once.** A lease per campaign; on a deployment with no shared
+  backend it asks you to confirm nothing else is running (`--no-lock`).
+- **A provider that is down.** Three failures in a row stop the run.
+
+Output is counts and masked addresses only. `--status` shows progress.
+
+Keep **open and click tracking OFF** for the sending domain in the provider's
+settings: the form promises no tracking, and that setting lives there, not here.
