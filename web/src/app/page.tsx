@@ -16,6 +16,7 @@ import { ProductGuide } from "@/components/marketing/product-guide";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { ORGANIZATION_LD, WEBSITE_LD } from "@/lib/json-ld";
 import { PricingSection } from "@/components/blocks/pricing-section";
+import { WaitlistForm } from "@/components/blocks/waitlist-form";
 import { trustpilotLinks } from "@/lib/trustpilot";
 import "./landing.css";
 
@@ -131,6 +132,22 @@ export default function Landing() {
       </section>
 
       <section id="pricing" className="lp-sec"><div className="mkt-wrap"><PricingSection /></div></section>
+
+      <section id="waitlist" className="lp-sec" aria-labelledby="waitlist-title">
+        <div className="mkt-wrap">
+          <div className="lp-head lp-head-center">
+            <p className="lp-eyebrow">Live trading</p>
+            <h2 id="waitlist-title">Live trading is coming. Be told first.</h2>
+            <p>
+              Demo accounts are the only thing you can use today. Leave your
+              email and we will write to you once, when early access opens.
+            </p>
+          </div>
+          <div className="lp-wait">
+            <WaitlistForm source="landing" />
+          </div>
+        </div>
+      </section>
 
       <section id="faq" className="lp-sec" aria-labelledby="faq-title">
         <div className="mkt-wrap">

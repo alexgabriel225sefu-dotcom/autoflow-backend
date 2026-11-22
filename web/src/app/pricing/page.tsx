@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand/logo";
 import { PricingSection } from "@/components/blocks/pricing-section";
+import { WaitlistForm } from "@/components/blocks/waitlist-form";
 
 export const metadata: Metadata = {
   title: "Pricing — Apex4Traders",
@@ -38,6 +39,17 @@ export default function PricingPage() {
 
         <section className="mkt-section">
           <PricingSection />
+        </section>
+
+        <section className="mkt-section" id="waitlist" aria-labelledby="waitlist-title">
+          <h2 id="waitlist-title" className="text-2xl font-semibold tracking-tight">
+            Live trading is coming. Be told first.
+          </h2>
+          <p className="mt-2 mb-4 text-sm text-muted-foreground">
+            Demo accounts are the only thing you can use today. Leave your
+            email and we will write to you once, when early access opens.
+          </p>
+          <WaitlistForm source="pricing" />
         </section>
 
         <footer className="mkt-foot">

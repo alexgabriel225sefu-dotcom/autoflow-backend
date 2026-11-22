@@ -24,7 +24,11 @@ describe("pricing page", () => {
     expect(screen.getByRole("link", { name: /get started/i }).getAttribute("href")).toBe("/signup");
     expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
     expect(screen.getByRole("link", { name: "Pricing" }).getAttribute("aria-current")).toBe("page");
-    await waitFor(() => expect(screen.getByText("$499")).toBeTruthy());
+    // Purchase is closed in this offer, so no price is shown; the waitlist is.
+    await screen.findByRole("link", { name: /join the waitlist/i });
+    expect(screen.queryByText("$499")).toBeNull();
+    expect(screen.getByRole("heading", { name: /be told first/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /get early access/i })).toBeTruthy();
     expect(screen.getByText(/Licence purchases are final and non-refundable once access is granted, except where required by law/)).toBeTruthy();
     expect(screen.getByText(/Demo conditions \(fills, spreads, slippage\) can differ from live trading/)).toBeTruthy();
   });
