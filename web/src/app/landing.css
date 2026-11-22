@@ -209,3 +209,17 @@
 .lp-accent-dot:focus-visible { outline-color: var(--mkt-text); }
 .lp-accent-name { min-width: 64px; font-weight: 600; color: var(--mkt-text); }
 .lp-accent-note { margin: 0; text-align: center; font-size: .875rem; color: var(--mkt-dim); }
+
+/* ── secondary call-to-action: a thin light travels around the outline ── */
+@property --lp-beam { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.lp-cta .mkt-btn-outline { position: relative; isolation: isolate; }
+.lp-cta .mkt-btn-outline::before {
+  content: ""; position: absolute; inset: -1px; z-index: -1; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: conic-gradient(from var(--lp-beam), transparent 0 70%, var(--mkt-accent) 85%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: lp-beam 3s linear infinite;
+}
+.lp-cta .mkt-btn-outline:hover::before { animation-duration: 1.2s; }
+@keyframes lp-beam { to { --lp-beam: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .lp-cta .mkt-btn-outline::before { animation: none; } }
