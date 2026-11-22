@@ -570,6 +570,20 @@ describe("dashboard — the account picker reports a refusal", () => {
     expect(screen.queryByText(/RATE_LIMITED/)).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("keeps a confirmed selection visible while the status read catches up", async () => {
+    // The POST is authoritative, but the following GET can briefly return the
+    // previous snapshot. The account must not appear to become unselected in
+    // that gap.
+    routes["ctrader/select"] = { ok: true, data: {
+      ctrader: { selected: { ctid: 902, mode: "demo" } },
+    } };
+    await renderDash();
+    await pick();
+    const combo = screen.getByRole("combobox", { name: /Account/i }) as HTMLSelectElement;
+    expect(combo.value).toBe("902");
+    expect(screen.queryByText("Choose an account above before starting.")).toBeNull();
+  });
 });
 
 /**

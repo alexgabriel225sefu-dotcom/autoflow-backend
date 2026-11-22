@@ -93,13 +93,27 @@ export default function Dashboard() {
   // one: it must survive the status reload that follows, which is the
   // moment the old code lost it.
   const [selectErr, setSelectErr] = useState<ApiError | null>(null);
+  // Keep a successful selection visible while the broker views revalidate.
+  // The status read can briefly be older than the POST response (or fail with
+  // a transient read error). Showing the placeholder in that gap made the
+  // dashboard contradict the status bar and suggested the account had not
+  // been selected. This is only a display hold: the server remains the source
+  // of truth for every read and every control.
+  const [selectedOverride, setSelectedOverride] = useState<{
+    ctid: number | string; mode: "demo" | "live";
+  } | null>(null);
   // What the last Start / Pause / Resume / Stop did, kept HERE and not inside
   // the button that was pressed: on a successful Stop that button unmounts, and
   // the sentence saying open positions were NOT closed went with it.
   const [controlResult, setControlResult] = useState<ControlResult | null>(null);
 
   const account = ct.result?.ok ? ct.result.data : null;
-  const selected = account?.selected ?? null;
+  const overrideIsLinked = selectedOverride
+    && account?.connected === true
+    && account.accounts.some((a) => String(a.ctid) === String(selectedOverride.ctid));
+  const selected = account?.connected
+    ? (account.selected ?? (overrideIsLinked ? selectedOverride : null))
+    : null;
   const running = auto.result?.ok ? auto.result.data : null;
   const licence = me.result?.ok ? me.result.data.licence.state : undefined;
   // The server's verdict, used as given. See ExecutionBadge for why this is
@@ -192,6 +206,10 @@ export default function Dashboard() {
     const r = await api("ctrader/select", { method: "POST", body: { ctid } });
     setBusy(false);
     if (!r.ok) setSelectErr(r);
+    if (r.ok) {
+      const chosen = account?.accounts.find((a) => String(a.ctid) === String(ctid));
+      if (chosen) setSelectedOverride({ ctid: chosen.ctid, mode: chosen.mode });
+    }
     invalidateBrokerViews();
   }
 

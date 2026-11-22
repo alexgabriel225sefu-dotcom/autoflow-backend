@@ -1171,3 +1171,34 @@ the hero asset returned `video/mp4`, 2,314,465 bytes, with an MP4 header; the
 Render web URL returned 200; and no error-level app logs appeared after the
 deploy started. No provider settings, environment values, payment paths, live
 gates or orders changed.
+## Current Codex session — dashboard account-selection state (2026-11-22)
+
+1. **Branch:** `codex/fix-account-selection-state`, based on
+   `claude/apex4traders-platform-v1`; no deploy or merge performed.
+2. **Commit:** working tree changes are not yet pushed. The fix is limited to
+   the dashboard account-selection display and its regression test.
+3. **Found:** after a successful demo-account selection, the dashboard could
+   continue rendering `Choose an account` while the status bar showed the
+   selected demo account, when the follow-up status read was stale or failed.
+4. **Changed:** `web/src/app/(app)/dashboard/page.tsx` now holds the server-
+   confirmed selection visible while broker views revalidate, and clears it
+   when the account is no longer linked or connected. No automation or broker
+   control is changed.
+5. **Tests added:** a dashboard regression test covers a successful nested
+   `ctrader/select` response followed by a stale status read; it asserts the
+   selected account remains in the picker and the start dead-end disappears.
+6. **Tests run:** `python -X utf8 apex-forex-bot/tests/test_platform_ctrader_link.py`
+   passed (all checks). Web tests could not be completed locally: the available
+   pnpm fallback began reinstalling the dependency tree from the registry and
+   was stopped; npm/npx are not installed in this environment.
+7. **Unverified integrations:** no production write, cTrader control, order,
+   provider dashboard or deployment was performed. The browser evidence was
+   read-only and the account identifier remains masked in reports.
+8. **Security:** the change is presentation-only; the server remains the
+   source of truth and no live path, environment value, gate or credential was
+   touched.
+9. **Next:** run the web CI checks (`tsc`, ESLint, Vitest and Next build), then
+   push/open a PR if the owner wants the fix promoted.
+10. **Blockers:** local web dependency installation is incomplete, so CI is
+    required before calling this complete.
+
