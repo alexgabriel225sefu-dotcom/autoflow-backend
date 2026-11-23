@@ -409,9 +409,8 @@ export default function TradePage() {
         <section className="card" aria-labelledby="t-review">
           <div className="card-head"><h2 id="t-review"><span className="step-no">5</span> Review</h2></div>
           <SetupSummary choice={c}
-            accountId={action.kind === "demo" || action.kind === "live" ? action.accountId : null}>
-            {startControl}
-          </SetupSummary>
+            accountId={action.kind === "demo" || action.kind === "live" ? action.accountId : null} />
+
           <dl className="trade-note">
             <div><dt>Symbols</dt><dd>{[c.symbol, ...c.also].filter(Boolean).join(", ") || "—"}</dd></div>
             <div><dt>Timeframe</dt><dd>{c.timeframe}</dd></div>
@@ -442,7 +441,7 @@ export default function TradePage() {
       {err ? <ErrorNotice error={err} /> : null}
       {note ? <div className="notice notice-warn" role="status">{note}</div> : null}
 
-      <div className="trade-bar" role="region" aria-label="Setup">
+      <div className="trade-bar" role="region" aria-label="Setup" data-step={step}>
         <div className="trade-bar-sum">
           <span className="label-xs">Step {step + 1} of {STEPS.length}</span>
           <span>{summary || "Nothing chosen yet"}</span>
@@ -454,7 +453,7 @@ export default function TradePage() {
           {step < 4 ? (
             <button type="button" className="btn" disabled={!!block}
                     onClick={() => setStep((n) => n + 1)}>Continue</button>
-          ) : null}
+          ) : startControl}
         </span>
         {step < 4 && block ? <span className="muted" style={{ fontSize: ".8rem" }}>{block}</span> : null}
       </div>

@@ -5,7 +5,7 @@
  * a start; it shows Request live access or Awaiting approval. No strategy
  * card shows a result the server did not publish.
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiResult, StrategyCatalogue } from "@/lib/api";
 
@@ -189,6 +189,13 @@ describe("the choices", () => {
   it("enables Start once every step is filled", async () => {
     await toReview();
     expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("keeps Start in the bottom bar on the last step, next to Back, where it cannot scroll away", async () => {
+    await toReview();
+    const bar = screen.getByRole("region", { name: "Setup" });
+    expect(within(bar).getByRole("button", { name: "Start on demo" })).toBeDefined();
+    expect(within(bar).getByRole("button", { name: "Back" })).toBeDefined();
   });
 
   it("works the money estimate out from the capital allocated, and says it is not a forecast", async () => {
