@@ -294,7 +294,7 @@ describe("the logo button", () => {
     fireEvent.click(btn);
     const dialog = screen.getByRole("dialog", { name: "Appearance" });
     expect(within(dialog).getByRole("radiogroup", { name: "Theme" })).toBeDefined();
-    expect(within(dialog).getAllByRole("radio", { name: /cream|ice|lilac|orchid|volt/i }).length).toBe(5);
+    expect(within(dialog).getAllByRole("radio", { name: /cream|blue|purple|pink|yellow/i }).length).toBe(5);
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Appearance" })).toBeNull();
   });

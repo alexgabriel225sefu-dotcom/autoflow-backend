@@ -26,10 +26,10 @@ export type ThemeId = (typeof THEMES)[number]["id"];
 
 export const ACCENTS = [
   { id: "cream", label: "Cream" },
-  { id: "ice", label: "Ice" },
-  { id: "lilac", label: "Lilac" },
-  { id: "orchid", label: "Orchid" },
-  { id: "volt", label: "Volt" },
+  { id: "ice", label: "Blue" },
+  { id: "lilac", label: "Purple" },
+  { id: "orchid", label: "Pink" },
+  { id: "volt", label: "Yellow" },
 ] as const;
 export type AccentId = (typeof ACCENTS)[number]["id"];
 
