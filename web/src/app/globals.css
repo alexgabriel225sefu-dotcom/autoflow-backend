@@ -2274,6 +2274,11 @@ body {
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .trade-bar .btn { flex: none; padding-inline: .9rem; }
+  /* On the last step the bar carries Start and its answer, so it wraps:
+     the summary on its own line, the buttons and any reason below it. */
+  .trade-bar[data-step="4"] { flex-wrap: wrap; }
+  .trade-bar[data-step="4"] .trade-bar-sum { flex-basis: 100%; }
+  .trade-bar[data-step="4"] .btn-row { flex-wrap: wrap; width: 100%; }
 }
 
 /* ── landing: the mark behind the hero, the partner strip, hairline rails ─
