@@ -42,6 +42,8 @@ type Health = {
   checks: Record<string, boolean | null | "not_applicable" | "market_closed">; warnings: string[];
   accountMode?: "demo" | "live" | null;
   accountId?: string | number | null;
+  /** Why the risk guard would not allow the next entry, in its own words. */
+  riskGuard?: { allowed: boolean | null; reasons: string[] } | null;
   linkedAccounts?: {
     mode?: string; accountId?: string | number; balance: number | null; equity: number | null;
     positions?: string; orders?: string; errorCode?: string | null; correlationId?: string | null;
@@ -95,6 +97,11 @@ export function HealthView() {
                 <li key={k} data-check={v === true ? "ok" : v === false ? "fail" : v === "not_applicable" ? "not-applicable" : v === "market_closed" ? "market-closed" : "unknown"}>
                   <strong>{CHECK_LABELS[k] ?? k}</strong>{" "}
                   <span className="muted">{checkText(v)}</span>
+                  {k === "risk" && v === false && d.riskGuard?.reasons?.length ? (
+                    <span className="muted" style={{ display: "block", fontSize: ".8rem" }}>
+                      Why: {d.riskGuard.reasons.join("; ")}.
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>

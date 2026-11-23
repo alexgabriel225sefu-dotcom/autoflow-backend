@@ -112,6 +112,15 @@ function PerformanceBlock({ period, mode, accountId }: {
       {d && d.status === "ok" ? (
         <>
           <section className="card">
+            {period === "all" && d.summary.trades > 0 ? (
+              <div className="notice notice-warn" role="note">
+                <p className="muted" style={{ margin: 0 }}>
+                  &ldquo;All time&rdquo; also adds older trades the engine recorded, and those
+                  cannot be tied to one account, so these totals can mix accounts.
+                  For this account alone, choose 30 days.
+                </p>
+              </div>
+            ) : null}
             {d.summary.trades === 0 ? (
               <p className="empty">
                 No closed trades in this period. This fills in as positions

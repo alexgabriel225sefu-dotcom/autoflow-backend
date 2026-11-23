@@ -40,6 +40,13 @@ describe("analysis views", () => {
     expect(screen.queryByText("Price data fresh")).not.toBeNull();
     expect(document.querySelector('[data-check="market-closed"]')).not.toBeNull();
   });
+  it("health says why the risk guard is not ready, in the guard's words", async () => {
+    answer = okv({ score: 86, status: "healthy", checks: { broker: true, risk: false },
+                   warnings: ["one or more health checks failed"],
+                   riskGuard: { allowed: false, reasons: ["weekly loss limit reached", "consecutive loss count is unknown or at its limit"] } });
+    render(<HealthView />);
+    await waitFor(() => expect(screen.queryByText(/Why: weekly loss limit reached; consecutive loss count/)).not.toBeNull());
+  });
   it("incidents render when the healthy payload omits notChecked", async () => {
     answer = okv({ status: "ok", incidents: [] });
     render(<IncidentsView />);
