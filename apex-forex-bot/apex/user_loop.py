@@ -1358,6 +1358,10 @@ def _make_broker(user, user_id=None, ctid=None):
         MIN_CONFIDENCE   = _setting_number(user, "min_confidence", 70, integer=True),
         STRATEGY         = (user.get("strategy") or "auto").lower(),
         AI_CONFIRM       = bool(user.get("ai_confirm", True)),  # /aiconfirm off = pure rule engine
+        # A platform rule the client wrote: strategy, stop, target and risk are the
+        # only things that decide. The engine's own vetoes and size changes stand
+        # down; day stop, risk guard, spread/broker checks and demo-only stay.
+        EXACT_RULE       = bool(user.get("exact_rule", False)),
         ATR_STOPS        = bool(user.get("atr_stops", True)),  # dynamic RR 1:2 by default
         # ── Strategy Builder knobs (all per-user, all enforced in the loop) ──
         HTF_CONFIRM      = bool(user.get("htf", True)),           # multi-timeframe gate — ON by default
@@ -2007,8 +2011,9 @@ def _loop(user_id, alert_fn, gen=None):
     # watches. Per-loop rather than global — two users on the same pair have
     # different accounts, risk and strategy, so they do not share an opinion.
     _signals = sentinel.SignalStore()
-    _sentinel_mode = str(getattr(cfg, "SENTINEL_MODE", "shadow")).lower()
-    _inst_mode = str(getattr(cfg, "INSTITUTIONAL_GATE", "shadow")).lower()
+    _exact_rule = bool(getattr(cfg, "EXACT_RULE", False))
+    _sentinel_mode = "off" if _exact_rule else str(getattr(cfg, "SENTINEL_MODE", "shadow")).lower()
+    _inst_mode = "off" if _exact_rule else str(getattr(cfg, "INSTITUTIONAL_GATE", "shadow")).lower()
     # nrm(symbol) -> the features and verdict of the last ACTUAL AI call.
     # Deliberately not the last published state: the state is republished every
     # tick with the current price, so comparing against it would reset the
@@ -4242,7 +4247,7 @@ def _loop(user_id, alert_fn, gen=None):
             # `active_mode` and not cfg.STRATEGY: in AUTO that is the engine
             # the regime already chose, so the gate is a no-op there by
             # construction rather than by luck.
-            if entry_ok:
+            if entry_ok and not _exact_rule:
                 try:
                     _rg_mode = getattr(cfg, "REGIME_GATE", "enforce")
                     _rg_refuse, _rg_why = regime_gate.decide(
@@ -4278,11 +4283,11 @@ def _loop(user_id, alert_fn, gen=None):
                         _skip(f"HTF gate: {action} blocked by H1 {htf_dir} trend")
             # Post-loss cooldown: the worst trade after a stop-out is the next
             # one taken 5 minutes later in the same falling knife.
-            if entry_ok and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
+            if entry_ok and not _exact_rule and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
                 left = int((_LOSS_COOLDOWN_MIN * 60 - (time.time() - last_loss_at)) / 60) + 1
                 entry_ok = False
                 _skip(f"post-loss cooldown ({left}m left)")
-            if entry_ok and last_close_at and last_loss_at and last_close_at == last_loss_at and \
+            if entry_ok and not _exact_rule and last_close_at and last_loss_at and last_close_at == last_loss_at and \
                time.time() - last_close_at < _CLOSE_COOLDOWN_MIN * 60:
                 left = int((_CLOSE_COOLDOWN_MIN * 60 - (time.time() - last_close_at)) / 60) + 1
                 entry_ok = False
@@ -4539,7 +4544,7 @@ def _loop(user_id, alert_fn, gen=None):
                 # Shadow by default: it records the verdict it WOULD have
                 # reached without changing behaviour, so the filter can be
                 # judged on real data before it may block a live trade.
-                _ev_mode = getattr(cfg, "EV_GATE_MODE", "shadow")
+                _ev_mode = "off" if _exact_rule else getattr(cfg, "EV_GATE_MODE", "shadow")
                 if _ev_mode != "off":
                     try:
                         _atr_pips = 0.0
@@ -4689,7 +4694,9 @@ def _loop(user_id, alert_fn, gen=None):
                 # volatile-regime cut below — that last one reads the market
                 # in front of it rather than the last three results, which is
                 # why it stays.
-                if regime.get("regime") == "volatile":
+                if _exact_rule:
+                    risk_mult = 1.0   # the client's risk % is the size, unmodified
+                elif regime.get("regime") == "volatile":
                     risk_mult *= 0.5
                 # Size off the account's starting balance (adjusted only for
                 # real deposits/withdrawals — see where startBalance shifts

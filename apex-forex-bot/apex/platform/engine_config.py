@@ -77,6 +77,8 @@ OWNED_KEYS = (
     # resolution described in `_automation_patch` — the two disagreeing, with
     # the boolean winning.
     "automation", "copilot",
+    # Marks the account as running a client's rule exactly (see translate).
+    "exact_rule",
 )
 
 # The engine levels, by name rather than by string literal at the call site.
@@ -307,6 +309,8 @@ def translate(doc):
                  "strategy that is still available, or rebuild it from "
                  "conditions.")
     applied["ai_confirm"] = False
+    # The rule decides alone: the engine's vetoes and size multipliers stand down.
+    applied["exact_rule"] = True
     applied["min_confidence"] = 0
     applied["htf"] = False
     applied["autopilot"] = False
