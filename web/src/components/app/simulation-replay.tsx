@@ -63,7 +63,7 @@ export function ReplayView() {
   const active = useMemo(() => rules.result?.ok && Array.isArray(rules.result.data?.rules)
     ? rules.result.data.rules.find((rule) => rule.state === "active")
     : undefined, [rules.result]);
-  const [symbol, setSymbol] = useState("EUR_USD");
+  const [symbol, setSymbol] = useState("EURUSD");
   const [timeframe, setTimeframe] = useState("1h");
   const [days, setDays] = useState(7);
   const [pos, setPos] = useState<{ n: number; len: number } | null>(null);

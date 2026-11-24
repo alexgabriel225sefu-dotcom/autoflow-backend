@@ -36,7 +36,7 @@ export function BacktestView() {
   // Defaults come from the chosen rule; typing in a field overrides them.
   const ruleId = chosenRule || list[0]?.ruleDocId || "";
   const selected = list.find((r) => r.ruleDocId === ruleId);
-  const symbol = symbolPick ?? selected?.symbols?.[0] ?? "EUR_USD";
+  const symbol = symbolPick ?? selected?.symbols?.[0] ?? "EURUSD";
   const timeframe = timeframePick ?? selected?.timeframe ?? "1h";
   const [spread, setSpread] = useState("1.5");
   const [slippage, setSlippage] = useState("0.5");
