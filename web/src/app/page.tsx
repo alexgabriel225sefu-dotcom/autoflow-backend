@@ -85,11 +85,6 @@ export default function Landing() {
               <span className="lp-plat-status">Coming soon</span>
             </div>
           </div>
-          <ol className="lp-road" aria-label="Roadmap">
-            <li data-state="now"><b>Now</b><span>cTrader, on demo accounts</span></li>
-            <li><b>Next</b><span>MetaTrader 4 and 5</span></li>
-            <li><b>Then</b><span>Live trading. <a href="#waitlist">Join the waitlist</a></span></li>
-          </ol>
           <p className="lp-strip-note">No dates are promised. No install path promised yet for MetaTrader.</p>
         </div>
       </section>

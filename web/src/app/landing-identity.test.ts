@@ -13,6 +13,12 @@ describe("landing provider roadmap", () => {
     expect((landing.match(/Coming soon/g) ?? []).length).toBe(2);
   });
 
+  it("has no Now / Next / Then roadmap list", () => {
+    expect(landing).not.toContain("lp-road");
+    expect(landing).not.toContain("on demo accounts");
+    expect(landing).not.toContain("Join the waitlist");
+  });
+
   it("does not promise that the future connectors are install-free", () => {
     expect(landing).toContain("No install path promised yet");
   });
