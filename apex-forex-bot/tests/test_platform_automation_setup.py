@@ -199,6 +199,18 @@ applied, _ = ECFG.translate(stored)
 scaled, state = ECFG.scale_risk_to_capital(applied, stored, 5000)
 check("1% of 1000 on a 5000 balance is 0.2% of the balance",
       state is None and abs(scaled["risk"] - 0.002) < 1e-9, str(scaled))
+check("2% of 1000 on a 5000 balance is a day stop of 0.4% of the balance",
+      state is None and abs(scaled["max_daily_loss_pct"] - 0.4) < 1e-9,
+      str(scaled))
+_night = ECFG.scale_risk_to_capital(applied, stored, 4452.08)[0]
+check("the night it was found on: 2% of 1000 on 4452 stops the day at 20, not 89",
+      abs(_night["max_daily_loss_pct"] / 100.0 * 4452.08 - 20.0) < 0.01,
+      str(_night))
+check("a balance below the allocation leaves the day stop as the rule named it",
+      abs(ECFG.scale_risk_to_capital(applied, stored, 800)[0]["max_daily_loss_pct"]
+          - applied["max_daily_loss_pct"]) < 1e-9)
+check("the scale does not touch the dict it was given",
+      applied["max_daily_loss_pct"] == 2.0 and "max_daily_loss_pct" in applied)
 check("without a balance the scale is refused, not guessed",
       ECFG.scale_risk_to_capital(applied, stored, None)[1] == "unchecked")
 unscaled, _ = ECFG.scale_risk_to_capital(applied, {"limits": {}}, None)
