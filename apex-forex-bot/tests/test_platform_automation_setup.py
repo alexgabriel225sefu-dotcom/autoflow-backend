@@ -196,6 +196,9 @@ check("risk, capital, daily loss, positions, stop and target are the body's",
       str({k: stored.get(k) for k in ("sizing", "limits", "stopLoss",
                                       "takeProfit", "strategy")}))
 applied, _ = ECFG.translate(stored)
+check("a platform rule runs exactly: the engine's own vetoes and size changes stand down",
+      applied.get("exact_rule") is True and "exact_rule" in ECFG.OWNED_KEYS,
+      str(applied.get("exact_rule")))
 scaled, state = ECFG.scale_risk_to_capital(applied, stored, 5000)
 check("1% of 1000 on a 5000 balance is 0.2% of the balance",
       state is None and abs(scaled["risk"] - 0.002) < 1e-9, str(scaled))
