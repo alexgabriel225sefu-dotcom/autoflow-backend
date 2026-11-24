@@ -525,12 +525,20 @@ def names_capital(doc):
 
 
 def scale_risk_to_capital(applied, doc, balance):
-    """(applied, state). Rebase `risk` onto the allocated capital.
+    """(applied, state). Rebase `risk` and the day's loss ceiling onto the
+    allocated capital.
 
     The engine sizes `risk` as a fraction of the whole balance. A client who
     allocated 1,000 of a 5,000 balance at 1% asked to risk 10, not 50. The
     fraction written to the account is scaled by min(balance, allocated) /
     balance so the money at risk is the money they named.
+
+    The day's loss ceiling (`max_daily_loss_pct`) is also a fraction of the
+    whole balance in `strategies.should_stop`, and the wizard tells the client
+    it is measured on the capital they allocated. Left unscaled, "stop the day
+    at 2%" on a 1,000 allocation of a 4,452 balance meant 89, not 20, and a
+    losing night ran to 48 without the stop ever tripping. It is scaled by the
+    same factor so the stop is the money the client named.
 
     `state` is None when nothing had to change or the scale was applied, and
     "unchecked" when the rule names an allocation and the balance cannot be
@@ -540,15 +548,17 @@ def scale_risk_to_capital(applied, doc, balance):
     """
     if not names_capital(doc):
         return applied, None
-    risk = (applied or {}).get("risk")
-    if not _num(risk):
+    scaled_keys = [k for k in ("risk", "max_daily_loss_pct")
+                   if _num((applied or {}).get(k))]
+    if not scaled_keys:
         return applied, None
     if not _num(balance) or balance <= 0:
         return dict(applied or {}), "unchecked"
     allocated = float(doc["limits"]["capitalAllocated"])
     base = min(float(balance), allocated)
     out = dict(applied)
-    out["risk"] = float(risk) * (base / float(balance))
+    for k in scaled_keys:
+        out[k] = float(applied[k]) * (base / float(balance))
     return out, None
 
 
