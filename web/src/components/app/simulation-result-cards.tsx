@@ -75,7 +75,9 @@ export function ForwardLedger({ events }: { events: ForwardEvent[] }) {
         {events.map((event, index) => <tr key={`${event.symbol ?? "unknown"}-${index}`}>
           <td>{event.signal ?? "unknown"}</td>
           <td>{event.decision ?? "unknown"}</td>
-          <td>{event.execution?.status ?? "unknown"} · price {event.execution?.price ?? "unknown"} · slippage {event.execution?.slippage ?? "unknown"}</td>
+          <td>{event.execution?.price == null && event.execution?.slippage == null
+            ? `${event.execution?.status ?? "recorded"} · no order, so no price or slippage`
+            : `${event.execution?.status ?? "unknown"} · price ${event.execution?.price ?? "unknown"} · slippage ${event.execution?.slippage ?? "unknown"}`}</td>
         </tr>)}
       </tbody></table></div>
     </section>

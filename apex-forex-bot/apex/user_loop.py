@@ -506,6 +506,19 @@ _SKIP_WARN_THROTTLE = 36  # "don't trade now" warnings — only every ~3h (was 3
 # Per (symbol, reason) cooldown for refusal alerts. Distinct reasons are never
 # suppressed by each other — only the identical one repeating tick after tick.
 _SKIP_ALERT_COOLDOWN_S = 3 * 3600
+def _stale_tick_limit(timeframe):
+    """Ticks with no NEW closed candle before a feed counts as frozen.
+
+    The detector used a flat 3 ticks (~15 min). On a 1h chart the newest closed
+    bar only changes once an hour, so a healthy feed tripped it every 15 minutes:
+    it dropped a good cTrader connection and spread-blocked the symbol. A feed is
+    frozen only after two full candles plus ten minutes of grace without one.
+    """
+    import math
+    return max(3, math.ceil((2 * sentinel.timeframe_seconds(timeframe) + 600)
+                            / float(_LOOP_INTERVAL)))
+
+
 _LOSS_COOLDOWN_MIN = 15   # pause after a loss — avoid revenge trades in the same move
 _CLOSE_COOLDOWN_MIN = 10  # pause after ANY close — prevent open/close churn
 
@@ -2834,10 +2847,11 @@ def _loop(user_id, alert_fn, gen=None):
                 _bs[1] += 1
             else:
                 bar_seen[_nrm(symbol)] = [_bt, 0]
-            if bar_seen[_nrm(symbol)][1] >= 3:  # ~15+ min with no new candle
+            _stale_limit = _stale_tick_limit(cfg.TIMEFRAME)
+            if bar_seen[_nrm(symbol)][1] >= _stale_limit:  # no new closed candle for 2 bars + 10 min
                 spread_blocked[_nrm(symbol)] = time.time() + 900  # rotate away 15 min
                 live_syms = [w for w in watchlist
-                             if bar_seen.get(_nrm(w), [0, 0])[1] < 3
+                             if bar_seen.get(_nrm(w), [0, 0])[1] < _stale_limit
                              and spread_blocked.get(_nrm(w), 0) <= time.time()]
                 # A long-lived cTrader connection can keep answering (heartbeats)
                 # while its trendbar stream goes stale. If EVERY watched symbol
