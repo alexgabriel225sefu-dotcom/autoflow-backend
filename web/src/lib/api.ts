@@ -903,6 +903,8 @@ export type WhyRead = {
   recorded: { at: number | null; symbol: string | null; reason: string }[];
   recordedCount: number;
   recordedReadable: boolean;
+  /** The newest check the rule made on a closed bar (journal), when it has made one. */
+  latestCheck?: { at: number | null; symbol: string | null; verdict: string | null; reason: string } | null;
 };
 
 export type RiskGuard = { state: "ok" | "holding" | "unknown"; reasons: string[] };

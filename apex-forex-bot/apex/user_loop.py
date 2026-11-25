@@ -1916,6 +1916,7 @@ def _loop(user_id, alert_fn, gen=None):
     data_fails = 0   # consecutive get_candles failures — alert the user at 3
     last_refresh_at = 0.0  # throttle cTrader token-refresh/reconnect attempts
     bar_seen = {}    # nrm(symbol) -> [newest_bar_time, ticks_unchanged]
+    hold_logged = {}  # nrm(symbol) -> bar time of the last journalled HOLD
     stale_alerted = 0.0  # throttle "feed frozen" alerts
     # Risk state is PERSISTED: a restart (redeploy, settings change, watchdog)
     # used to wipe the post-loss cooldown and the loss-streak risk ladder at
@@ -4079,6 +4080,28 @@ def _loop(user_id, alert_fn, gen=None):
 
             action = signal.get("action", "HOLD")
             confidence = signal.get("confidence", 0)
+
+            # A rule that finds nothing on a closed bar says so, once per bar.
+            # Preset strategies decide here in the engine, so without this the
+            # platform's journal showed only start/stop events and "why no
+            # trade" could not be answered from the screen. Platform accounts
+            # only (they own a journal); once per (symbol, bar), so a quiet
+            # night is a handful of lines, not one per tick.
+            if action == "HOLD" and getattr(cfg, "EXACT_RULE", False) and candles:
+                try:
+                    _hb = candles[-1].get("time")
+                    if hold_logged.get(_nrm(symbol)) != _hb:
+                        hold_logged[_nrm(symbol)] = _hb
+                        _hr = (signal.get("reasoning") or signal.get("reason")
+                               or "No setup on the last closed bar.")
+                        from apex.platform import signals as _psig
+                        _psig.record_hold(
+                            user_id, symbol=symbol, reason=_hr, price=price,
+                            bar_time=_hb, regime=(regime or {}).get("regime"))
+                        print(f"[UserLoop:{user_id}] HOLD {symbol}: {str(_hr)[:160]} "
+                              f"(bar {datetime.utcfromtimestamp(_hb).strftime('%m-%d %H:%M')}UTC)")
+                except Exception as _e:
+                    print(f"[UserLoop:{user_id}] hold record failed: {_e}")
 
             # ── Publish the Sentinel's view of this symbol ──
             # Until now the AI's opinion existed only for the duration of the
