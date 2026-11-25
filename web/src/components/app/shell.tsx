@@ -93,9 +93,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLockup size={22} />
         </Link>
 
-        <SideGroup label="Operations" items={destinations.filter((n) => n.group === "operations")} path={path} badge={badge} first />
-        <SideGroup label="Account" items={destinations.filter((n) => n.group === "account")} path={path} badge={badge} />
-        <SideGroup label="More" items={destinations.filter((n) => n.group === "more")} path={path} badge={badge} />
+        {/* Only the destination list scrolls, so on a short window the footer
+            (Appearance, Sign out) stays in view and its popover is not clipped. */}
+        <div className="side-scroll">
+          <SideGroup label="Operations" items={destinations.filter((n) => n.group === "operations")} path={path} badge={badge} first />
+          <SideGroup label="Account" items={destinations.filter((n) => n.group === "account")} path={path} badge={badge} />
+          <SideGroup label="More" items={destinations.filter((n) => n.group === "more")} path={path} badge={badge} />
+        </div>
 
         <div className="side-foot">
           <AppearanceMenu />
