@@ -85,4 +85,21 @@ describe("login", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("Email or password is incorrect");
     expect(push).not.toHaveBeenCalled();
   });
+
+  it("offers to resend the confirmation link when the email is not confirmed", async () => {
+    signIn.mockResolvedValue({ error: { message: "Email not confirmed", code: "email_not_confirmed" } });
+    await submit();
+    expect((await screen.findByRole("alert")).textContent).toContain("not confirmed");
+    // The message tells the person to request another link, so the way to do
+    // it has to be on this screen: they cannot reach Settings while signed out.
+    expect(screen.getByRole("button", { name: /resend the link/i })).toBeTruthy();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("does not offer a resend for a wrong password", async () => {
+    signIn.mockResolvedValue({ error: { message: "Invalid login credentials" } });
+    await submit();
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("button", { name: /resend the link/i })).toBeNull();
+  });
 });

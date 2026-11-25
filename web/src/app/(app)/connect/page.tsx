@@ -365,6 +365,12 @@ export default function ConnectPage() {
         ) : !pending ? (
           <>
             <p className="muted">
+              You need a cTrader ID with a demo account. If you do not have one
+              yet, open a free demo account with a broker that offers cTrader
+              first (it takes a few minutes and uses no real money), then come
+              back here.
+            </p>
+            <p className="muted">
               We will open cTrader in a new tab. Sign in there and approve
               access, then press &ldquo;Finish connecting&rdquo; on the page
               cTrader sends you back to. That button is what completes the

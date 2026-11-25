@@ -48,7 +48,7 @@ export function firstRunSteps({ me, ct, auto, rules }: Reads): FirstRunStep[] {
     { id: "email", label: "Confirm your email", state: email, href: "/settings",
       hint: "Connecting cTrader and activating a rule need a confirmed address." },
     { id: "connect", label: "Connect cTrader", state: connect, href: "/connect",
-      hint: "You authorise your own account; we never see your broker password." },
+      hint: "Needs a cTrader ID with a demo account. You authorise it yourself; we never see your broker password." },
     { id: "account", label: "Pick a demo account", state: account, href: "/accounts",
       hint: "The selected account is the one every read and order uses." },
     { id: "strategy", label: "Choose a strategy on Trade", state: strategy, href: "/trade",
