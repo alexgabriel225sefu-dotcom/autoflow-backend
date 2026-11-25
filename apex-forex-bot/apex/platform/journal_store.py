@@ -281,6 +281,10 @@ def record_signal(signal, *, correlation_id, user_id, **kw):
                                 user_id=user_id, **kw))
 
 
+def record_hold(**kw):
+    return append(_j.for_hold(**kw))
+
+
 def record_position_closed(position, *, correlation_id, user_id, **kw):
     return append(_j.for_position_closed(
         position, correlation_id=correlation_id, user_id=user_id, **kw))

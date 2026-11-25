@@ -312,6 +312,30 @@ def for_signal(signal, *, correlation_id, user_id, account_id=None,
         ts=ts)
 
 
+def for_hold(*, user_id, symbol, reason, correlation_id, price=None,
+             bar_time=None, regime=None, account_id=None, rule_doc_id=None,
+             rule_doc_version=None, ts=None):
+    """The rule ran on a closed bar and found nothing to act on.
+
+    A preset strategy runs inside the engine, not in this platform's evaluator,
+    so it never produced the HOLD entries the screen promises ("every check is
+    recorded, including the ones that decided to do nothing"). A client whose
+    rule stayed quiet overnight saw only start and stop events and could not
+    tell a working loop from a dead one. The shape matches `for_signal`, so the
+    journal screen renders it with the components it already has.
+    """
+    return JournalEntry(
+        kind=EVALUATION, correlation_id=correlation_id, status=HOLD,
+        user_id=user_id, account_id=account_id, rule_doc_id=rule_doc_id,
+        rule_doc_version=rule_doc_version, symbol=symbol,
+        snapshot={"symbol": symbol, "price": price, "barTime": bar_time,
+                  "regime": regime},
+        decision={"verdict": "HOLD", "reason": reason or "", "conditions": [],
+                  "executable": False, "refusalCode": None,
+                  "confidence": None},
+        ts=ts)
+
+
 def for_position_closed(position, *, correlation_id, user_id,
                         account_id=None, symbol=None, rule_doc_id=None,
                         rule_doc_version=None, ts=None):

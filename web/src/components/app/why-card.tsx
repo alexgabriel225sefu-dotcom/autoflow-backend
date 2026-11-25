@@ -45,6 +45,15 @@ export function WhyCard() {
             </p>
           ) : null}
 
+          {w.latestCheck ? (
+            <p className="muted" style={{ fontSize: ".85rem", marginTop: "var(--sp-2)" }}>
+              Last check
+              {w.latestCheck.at ? <> <When ts={w.latestCheck.at} /></> : null}
+              {w.latestCheck.symbol ? <> · {w.latestCheck.symbol}</> : null}
+              {" — "}{w.latestCheck.verdict === "HOLD" ? "no setup. " : ""}{w.latestCheck.reason}
+            </p>
+          ) : null}
+
           {w.skips.length ? (
             <>
               <h3 style={{ fontSize: ".85rem", marginTop: "var(--sp-3)" }}>
@@ -64,7 +73,7 @@ export function WhyCard() {
           {w.recorded.length ? (
             <>
               <h3 style={{ fontSize: ".85rem", marginTop: "var(--sp-3)" }}>
-                From the decision log
+                Earlier refusals (decision log)
               </h3>
               <ul className="plain-list">
                 {w.recorded.slice(0, 5).map((r, i) => (

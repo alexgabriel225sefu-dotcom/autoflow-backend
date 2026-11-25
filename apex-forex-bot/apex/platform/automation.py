@@ -438,6 +438,25 @@ def why(user_id, *, loop_reader=None, declines_reader=None,
         code, text = "watching", (
             "It is on and watching. It only enters when a setup passes every "
             "check, and most candidates are refused.")
+    # The newest thing the rule actually decided, from the journal. The
+    # "recorded" list below is the log of REFUSALS and can be a day old on a
+    # quiet rule, which read as "blocked by yesterday's reason". This says what
+    # the last check was, and when.
+    try:
+        from apex.platform import journal_store as _js
+        page = _js.query(str(user_id), status="hold", limit=1)
+        last = (page.get("entries") or [None])[0]
+        if last:
+            dec = last.get("decision") or {}
+            out["latestCheck"] = {
+                "at": last.get("ts"), "symbol": last.get("symbol"),
+                "verdict": dec.get("verdict"),
+                "reason": str(dec.get("reason") or "")[:200]}
+            if code == "watching" and out["latestCheck"]["reason"]:
+                text += (" Last check: "
+                         + out["latestCheck"]["reason"].rstrip(".") + ".")
+    except Exception:                                        # noqa: BLE001
+        pass
     out["reason"] = code
     out["summary"] = text
     return out

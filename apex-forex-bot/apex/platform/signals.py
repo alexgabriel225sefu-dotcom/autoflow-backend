@@ -243,6 +243,30 @@ def _running_context(user_id):
         return {}
 
 
+def record_hold(user_id, *, symbol, reason, price=None, bar_time=None,
+                regime=None):
+    """Journal "the rule looked at the last closed bar and found no setup".
+
+    Called by the loop once per new bar, so a quiet night is a handful of
+    entries rather than one per five-minute tick. Never raises: it runs on the
+    trading thread, and a lost explanation must not cost an execution.
+    """
+    try:
+        ctx = _running_context(user_id) or {}
+        _jstore.record_hold(
+            user_id=user_id, symbol=symbol,
+            reason=(_text(reason, 300)
+                    or "No setup on the last closed bar."),
+            price=_finite(price), bar_time=bar_time, regime=regime,
+            account_id=ctx.get("accountId"),
+            rule_doc_id=ctx.get("ruleDocId"),
+            correlation_id=ctx.get("correlationId") or _j.new_correlation_id())
+        return True
+    except Exception as e:                                  # noqa: BLE001
+        print(f"[Signals] hold record failed ({type(e).__name__})")
+        return False
+
+
 def engine_alert(user_id, payload):
     """The engine's alert sink for signals. Delivers, never trades, never raises.
 
