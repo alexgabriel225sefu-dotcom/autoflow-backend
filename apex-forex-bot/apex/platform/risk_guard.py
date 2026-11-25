@@ -155,6 +155,12 @@ def _number(value: Any) -> float | None:
 
 
 def _consecutive_losses(rows: Iterable[dict[str, Any]]) -> int | None:
+    rows = list(rows)
+    if not rows:
+        # The caller only gets here after a successful read. A read that found no
+        # closed trades is a real zero: there is no losing streak. Rows that exist
+        # but cannot be read still fall through to None below, and still block.
+        return 0
     ordered = sorted((r for r in rows if _number(r.get("closedAt")) is not None),
                      key=lambda r: float(r["closedAt"]), reverse=True)
     count = 0
