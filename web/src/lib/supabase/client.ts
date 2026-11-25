@@ -32,7 +32,12 @@ export function createClient() {
  * redirect once, then the callback exchanges that session into the normal
  * cookie-backed client.
  */
+// One instance for the page. Resend, reset and sign-up each used to build a new
+// client per call, and every instance starts its own session listeners.
+let implicitClient: ReturnType<typeof createImplicitSupabaseClient> | null = null;
+
 export function createImplicitClient() {
+  if (implicitClient) return implicitClient;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
@@ -40,12 +45,17 @@ export function createImplicitClient() {
       "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set",
     );
   }
-  return createImplicitSupabaseClient(url, key, {
+  implicitClient = createImplicitSupabaseClient(url, key, {
     auth: {
       flowType: "implicit",
       detectSessionInUrl: true,
       persistSession: true,
       autoRefreshToken: true,
+      // Its own storage key. It used the default, the same one the cookie-backed
+      // client above uses, which is what made Supabase log "Multiple GoTrueClient
+      // instances detected" and let two clients write one session slot.
+      storageKey: "a4t-implicit-auth",
     },
   });
+  return implicitClient;
 }
