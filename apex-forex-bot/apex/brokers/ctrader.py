@@ -602,6 +602,13 @@ def account_id(value, *, allow_zero=False):
     return number
 
 
+# One lock per pool key, so a connect takes the lock of ITS account only.
+# Connecting is slow (TCP + app auth + account auth, up to 15s each); doing it
+# under `_pool_lock` made one slow or broken account stall every other client's
+# broker calls, which is exactly what a burst of new sign-ups produces.
+_key_locks: dict = {}
+
+
 def _conn_for(env, access_token, ctid) -> _Conn:
     key = (str(env).lower(), account_id(ctid, allow_zero=True),
            _token_key(access_token))
@@ -609,8 +616,17 @@ def _conn_for(env, access_token, ctid) -> _Conn:
         c = _conns.get(key)
         if c and c._sock is not None:
             return c
+        klock = _key_locks.setdefault(key, threading.Lock())
+    with klock:
+        # Another caller for the same account may have connected while this
+        # one waited: share its socket rather than open a duplicate.
+        with _pool_lock:
+            c = _conns.get(key)
+            if c and c._sock is not None:
+                return c
         c = _Conn(env, access_token, ctid).connect()
-        _conns[key] = c
+        with _pool_lock:
+            _conns[key] = c
         return c
 
 
@@ -621,6 +637,8 @@ def _drop_conn(env, ctid):
         keys = [key for key in _conns
                 if key[0] == env_key and key[1] == account]
         conns = [_conns.pop(key) for key in keys]
+        for key in keys:
+            _key_locks.pop(key, None)
     for conn in conns:
         conn.close()
 
