@@ -391,6 +391,12 @@ body {
   gap: .15rem;
 }
 @media (min-width: 1024px) { .side { display: flex; } }
+/* The list of destinations is taller than a laptop window. It scrolls on its own
+   so the footer below (Appearance, Sign out) is always reachable. */
+.side-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; scrollbar-width: thin;
+}
 
 .side-brand {
   display: flex; align-items: center; gap: .55rem;
