@@ -189,6 +189,33 @@ def test_risk_guard_derives_real_trade_state_and_blocks_unreadable():
     assert risk_guard.evaluate(unknown)["allowed"] is False
 
 
+def test_risk_guard_is_ready_for_an_account_with_no_closed_trades():
+    # A successful read that finds no closed trades is a real zero, not an
+    # unknown. It used to come back as "unknown", so every brand-new client saw
+    # "Risk guard ready: no" and a health score of 86 until their first trade.
+    positions = {"status": "ok", "positions": []}
+    fresh = risk_guard.state_from_trades(
+        {"status": "ok", "trades": []}, {"balance": 1_000_000},
+        positions=positions, now=1_800_000_200)
+    assert fresh["readable"] is True
+    assert fresh["consecutiveLosses"] == 0
+    assert fresh["tradesToday"] == 0
+    verdict = risk_guard.evaluate(fresh)
+    assert verdict["allowed"] is True and verdict["mode"] == "ready", verdict["blocks"]
+
+    # Rows that exist but cannot be read are still unknown, and still block.
+    unreadable = risk_guard.state_from_trades(
+        {"status": "ok", "trades": [{"net": -5}]}, {"balance": 1000},
+        positions=positions, now=1_800_000_200)
+    assert unreadable["consecutiveLosses"] is None
+    assert risk_guard.evaluate(unreadable)["allowed"] is False
+
+    # A failed read is not a zero either.
+    failed = risk_guard.state_from_trades(
+        {"status": "unavailable"}, {"balance": 1000}, positions=positions)
+    assert risk_guard.evaluate(failed)["allowed"] is False
+
+
 def test_forward_persists_three_distinct_read_only_fields():
     import apex.user_store as us
     tmp_path = tempfile.mkdtemp(prefix="a4t-forward-")
