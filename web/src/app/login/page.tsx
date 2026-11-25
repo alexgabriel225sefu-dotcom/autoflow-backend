@@ -8,6 +8,7 @@ import { PasswordField } from "@/components/auth/password-field";
 import { AuthSubmit } from "@/components/auth/auth-submit";
 import { authErrorMessage } from "@/lib/supabase/auth-error";
 import { GoogleOption } from "@/components/auth/google-option";
+import { ResendConfirmation } from "@/components/auth/resend-confirmation";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -16,18 +17,27 @@ function LoginPageInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set only when the provider says the address is not confirmed yet, so the
+  // way to ask for another link is on this screen: a person who is not signed
+  // in cannot reach Settings, where it used to live.
+  const [unconfirmed, setUnconfirmed] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setUnconfirmed(false);
     const { error } = await createClient().auth.signInWithPassword({ email, password });
     setBusy(false);
     // Supabase's own message, not a friendlier one we wrote. "Email not
     // confirmed" and "Invalid credentials" need different actions from the
     // person reading them, and collapsing both into "Sign-in failed" hides
     // which one it was.
-    if (error) return setError(authErrorMessage(error.message, "signin"));
+    if (error) {
+      const text = `${error.message ?? ""} ${(error as { code?: string }).code ?? ""}`.toLowerCase();
+      setUnconfirmed(text.includes("email not confirmed") || text.includes("email_not_confirmed"));
+      return setError(authErrorMessage(error.message, "signin"));
+    }
     // Validated, never used raw: this value comes from the address bar and
     // this line navigates to it, which is an open redirect waiting to be
     // pointed at a phishing page.
@@ -51,6 +61,7 @@ function LoginPageInner() {
         <PasswordField label="Password" value={password} onChange={setPassword}
                        autoComplete="current-password" />
         {error ? <div className="notice notice-error" role="alert">{error}</div> : null}
+        {unconfirmed && email ? <ResendConfirmation email={email} /> : null}
         <AuthSubmit busy={busy} idle="Sign in" busyLabel="Signing in…" />
       </form>
     </AuthShell>
