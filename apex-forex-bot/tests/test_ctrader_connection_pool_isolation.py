@@ -124,6 +124,39 @@ try:
     check("concurrent callers for one account share one socket",
           len(slow_created) == 1 and slow_result and dup_result
           and slow_result[0] is dup_result[0])
+
+    # A socket closed by another thread mid-request used to surface as
+    # AttributeError ('NoneType' has no attribute 'settimeout'), which the
+    # read-only retry did not catch. It must be a ConnectionError, and the
+    # broker must retry it once on a fresh connection.
+    dead = _real_conn("demo", "t", 1)
+    for call in (lambda: dead._read_frame(1), dead._recv_some,
+                 lambda: dead._send(types.SimpleNamespace(
+                     payloadType=0, SerializeToString=lambda: b""))):
+        try:
+            call()
+            raised = None
+        except ConnectionError:
+            raised = "ConnectionError"
+        except Exception as e:  # noqa: BLE001
+            raised = type(e).__name__
+        check("a closed socket raises ConnectionError", raised == "ConnectionError")
+
+    class Stale:
+        def _request(self, *a, **k):
+            raise ConnectionError("cTrader connection closed")
+
+    class Fresh:
+        def _request(self, *a, **k):
+            return "ok"
+
+    conns = [Stale(), Fresh()]
+    cfg = types.SimpleNamespace(CTRADER_ENV="demo", CTRADER_ACCESS_TOKEN="t",
+                                CTRADER_ACCOUNT_ID=77)
+    broker = CT.CtraderBroker(cfg)
+    broker._conn = lambda: conns.pop(0)
+    check("a read retries once after the socket was closed under it",
+          broker._rpc(object(), object) == "ok")
 finally:
     CT._Conn = _real_conn
     CT._conns = _real_pool

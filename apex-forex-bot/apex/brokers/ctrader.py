@@ -423,6 +423,20 @@ class _Conn:
         self._other_limit = _RateLimit(_OTHER_PER_SEC)
 
     # -- framing --------------------------------------------------------------
+    def _live_sock(self):
+        """The socket, or ConnectionError if another thread closed it.
+
+        close() sets _sock to None from whichever thread drops the pooled
+        connection. A request already in flight then died with
+        AttributeError ('NoneType' has no attribute 'settimeout'/'recv'),
+        which the read-only retry in CtraderBroker._rpc does not catch.
+        ConnectionError is retried once on a fresh connection.
+        """
+        sock = self._sock
+        if sock is None:
+            raise ConnectionError("cTrader connection closed")
+        return sock
+
     def _send(self, msg):
         self._mid += 1
         cid = str(self._mid)
@@ -431,12 +445,12 @@ class _Conn:
         pm.payload = msg.SerializeToString()
         pm.clientMsgId = cid
         data = pm.SerializeToString()
-        self._sock.sendall(struct.pack(">I", len(data)) + data)
+        self._live_sock().sendall(struct.pack(">I", len(data)) + data)
         self._last_io = time.time()
         return cid
 
     def _read_frame(self, timeout=15):
-        self._sock.settimeout(timeout)
+        self._live_sock().settimeout(timeout)
         while len(self._buf) < 4:
             self._buf += self._recv_some()
         (length,) = struct.unpack(">I", self._buf[:4])
@@ -449,7 +463,7 @@ class _Conn:
         return pm
 
     def _recv_some(self):
-        chunk = self._sock.recv(8192)
+        chunk = self._live_sock().recv(8192)
         if not chunk:
             raise ConnectionError("cTrader connection closed")
         return chunk
