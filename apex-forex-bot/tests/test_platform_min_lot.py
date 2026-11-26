@@ -56,6 +56,8 @@ check("at 1 oz, about $100 of stop risks about $100", gold and 90 <= gold["riskU
 check("which is more than twice the 1% chosen", gold and gold["riskPct"] > 2 * gold["targetPct"], str(gold))
 check("and names the minimum and its unit", gold and gold["minUnits"] == 1.0 and gold["unitLabel"] == "oz", str(gold))
 check("the target is the client's own 1%", gold and abs(gold["targetUsd"] - 38.17) < 0.01, str(gold))
+check("it reports one candle's range in pips (gold: $40 = 400 pips)",
+      gold and gold["atrPips"] == 400.0, str(gold))
 
 print("\n[2] it does not cry wolf")
 eur = BR.estimate_min_lot(balance=3817.21, risk_fraction=0.01, symbol="EURUSD",
