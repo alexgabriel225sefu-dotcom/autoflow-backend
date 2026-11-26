@@ -1917,6 +1917,7 @@ def _loop(user_id, alert_fn, gen=None):
     last_refresh_at = 0.0  # throttle cTrader token-refresh/reconnect attempts
     bar_seen = {}    # nrm(symbol) -> [newest_bar_time, ticks_unchanged]
     hold_logged = {}  # nrm(symbol) -> bar time of the last journalled HOLD
+    entered_bar = {}  # nrm(symbol) -> bar time of the last entry (exact rules: one entry per signal bar)
     stale_alerted = 0.0  # throttle "feed frozen" alerts
     # Risk state is PERSISTED: a restart (redeploy, settings change, watchdog)
     # used to wipe the post-loss cooldown and the loss-streak risk ladder at
@@ -4318,6 +4319,20 @@ def _loop(user_id, alert_fn, gen=None):
                        (action == "SELL" and htf_dir == "BULLISH"):
                         entry_ok = False
                         _skip(f"HTF gate: {action} blocked by H1 {htf_dir} trend")
+            # One entry per signal bar. An exact rule decides on a CLOSED bar, and
+            # that verdict stays the same for the whole next hour. The loop ticks
+            # every five minutes, so once a stop-out left the account flat it
+            # re-entered the same verdict again and again: five SELLs on one bar,
+            # each stopped within minutes, -$55 in 35 minutes. The rule never
+            # asked for that, and the cooldowns below are skipped for exact rules
+            # on purpose. This leaves the rule alone and only stops it from
+            # trading one bar's signal more than once.
+            if entry_ok and _exact_rule and candles:
+                _eb = candles[-1].get("time")
+                if _eb is not None and entered_bar.get(_nrm(symbol)) == _eb:
+                    entry_ok = False
+                    _skip("already entered on this bar: one entry per signal bar",
+                          alert=False)
             # Post-loss cooldown: the worst trade after a stop-out is the next
             # one taken 5 minutes later in the same falling knife.
             if entry_ok and not _exact_rule and last_loss_at and time.time() - last_loss_at < _LOSS_COOLDOWN_MIN * 60:
@@ -4954,6 +4969,11 @@ def _loop(user_id, alert_fn, gen=None):
                             symbol, action, units, sl_price, tp_price,
                             _risk_usd, _risk_pct)
                         print(f"[UserLoop:{user_id}] ORDER {_order_line}")
+                        if candles:
+                            # Marked when the order is attempted, not when it
+                            # fills: a rejected or ambiguous submit must not be
+                            # retried on the same bar either.
+                            entered_bar[_nrm(symbol)] = candles[-1].get("time")
                         try:
                             from apex import control as _ctl
                             _ctl.event("order", f"{action} {symbol} units={units} @~{price} "
