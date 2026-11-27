@@ -478,6 +478,61 @@ def _start_broker_probe():
 # through a long outage they cannot see.
 _SUPERVISE_INTERVAL_S = int(os.getenv("A4T_SUPERVISE_INTERVAL_S") or 180)
 
+# THE DEPLOY HANDOFF. For the seconds a deploy overlaps two containers, the
+# incoming one finds every loop's lease still held by the retiring one and
+# correctly refuses to start a second owner. It used to then sleep a whole
+# supervisor interval, so every deploy left every client unattended for about
+# three minutes after the old container had already let go. While any loop is
+# waiting behind another instance, the wait below checks the lease every
+# `_HANDOFF_POLL_S` (one cheap read per waiting user) and revives the loop once
+# it is free, after `_HANDOFF_SETTLE_S` more seconds so a tick the retiring
+# container was already inside has finished. The atomic lease claim in the
+# engine is still the only thing that grants ownership: this decides WHEN to
+# ask, never WHETHER an owner is allowed.
+_HANDOFF_POLL_S = float(os.getenv("A4T_HANDOFF_POLL_S") or 3)
+_HANDOFF_SETTLE_S = float(os.getenv("A4T_HANDOFF_SETTLE_S") or 5)
+
+
+def _supervise_wait(interval_s, *, auto, own, clock=time.monotonic,
+                    sleep=time.sleep, poll_s=None, settle_s=None):
+    """Wait out one supervisor interval, taking over released loops early.
+
+    With nothing waiting behind another instance this is a plain sleep. With
+    something waiting, it polls those users' leases and revives each as soon as
+    its lease is free. It returns when the interval is over, whatever happened.
+    """
+    poll_s = _HANDOFF_POLL_S if poll_s is None else poll_s
+    settle_s = _HANDOFF_SETTLE_S if settle_s is None else settle_s
+    end = clock() + interval_s
+    if not auto.handoff_waiting():
+        sleep(interval_s)
+        return
+    while clock() < end:
+        sleep(max(0.0, min(poll_s, end - clock())))
+        waiting = auto.handoff_waiting()
+        if not waiting:
+            sleep(max(0.0, end - clock()))
+            return
+        # Only a lease the store CONFIRMS is gone (or ours) counts. A store
+        # that cannot be asked is not "free": the normal supervisor cycle still
+        # runs, but this fast path must not guess.
+        _ready = (own.LEASE_FREE, own.LEASE_OURS)
+        free = [u for u in waiting if own.lease_state(u) in _ready]
+        if not free:
+            continue
+        sleep(settle_s)
+        # Still free after the settle? A lease that came back was taken by
+        # someone else in the meantime, and that is not ours to contest.
+        free = [u for u in free if own.lease_state(u) in _ready]
+        if not free:
+            continue
+        try:
+            alive, revived = auto.supervise(only=free)
+            print(f"[API] handoff: {len(free)} lease(s) released by the "
+                  f"retiring instance, {revived} loop(s) taken over")
+        except Exception as e:                               # noqa: BLE001
+            print(f"[API] handoff retry failed: {type(e).__name__}: {e}")
+
 
 def _supervise_platform_loops():
     """Keep platform automation running across restarts. Nothing did this.
@@ -507,6 +562,7 @@ def _supervise_platform_loops():
     """
     def _run():
         from apex.platform import automation as _auto
+        from apex import ownership as _own
         # On boot first: the restart that killed the loops is the event this
         # is here for.
         try:
@@ -527,7 +583,7 @@ def _supervise_platform_loops():
         _HEARTBEAT_EVERY = 10          # ~30 min at the default interval
         _cycle = 0
         while True:
-            time.sleep(_SUPERVISE_INTERVAL_S)
+            _supervise_wait(_SUPERVISE_INTERVAL_S, auto=_auto, own=_own)
             _cycle += 1
             try:
                 alive, revived = _auto.supervise()

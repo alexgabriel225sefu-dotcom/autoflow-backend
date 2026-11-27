@@ -216,6 +216,38 @@ def heartbeat(user_id):
     return False
 
 
+# What `lease_state` can answer.
+LEASE_FREE = "free"            # the store answered: nobody holds it
+LEASE_OURS = "ours"            # we hold it
+LEASE_OTHER = "other"          # another instance holds it
+LEASE_UNKNOWN = "unknown"      # the store could not be asked
+
+
+def lease_state(user_id):
+    """Who holds this user's lease, read once and told apart from "unreadable".
+
+    A cheap read (one GET), for a caller that only wants to know WHEN to try
+    again after being refused behind another instance. It is not a decision and
+    not a fence: the only authority on ownership remains the atomic claim in
+    `acquire`, so a stale answer can make a caller try too early (and be
+    refused) or too late, never run a second owner.
+
+    An unreachable store is LEASE_UNKNOWN, never LEASE_FREE. Reading "could not
+    ask" as "nobody holds it" would let a retry run while the retiring
+    container still owns the loop, and a demo loop whose lease cannot be read
+    starts unfenced.
+    """
+    if not shared_backed():
+        return LEASE_FREE           # nothing else can contend for it
+    try:
+        cur = user_store.get_blob_strict(_key(str(user_id)))
+    except Exception:                                        # noqa: BLE001
+        return LEASE_UNKNOWN
+    if cur is None:
+        return LEASE_FREE
+    return LEASE_OURS if str(cur) == INSTANCE_ID else LEASE_OTHER
+
+
 def due(user_id):
     """True when the lease should be renewed now. Cheap enough to call per tick."""
     with _lock:

@@ -35,6 +35,7 @@ decide for itself.
 
 import hashlib
 import re
+import threading
 import time
 import uuid
 
@@ -77,6 +78,12 @@ _STOPPED_RECORD = {"state": "stopped", "ruleDocId": None, "mode": None,
 # raises one distinct operator alert; a success or a healthy loop resets it.
 REPEAT_FAILURE_THRESHOLD = 3
 _revive_failures = {}
+# Users whose revival was last refused because another instance still holds
+# their loop's lease: the normal state of the incoming container for the
+# seconds a deploy takes. The server polls these cheaply and retries as soon as
+# the lease is free instead of sleeping out a whole supervisor interval.
+_handoff_waiting = set()
+_handoff_lock = threading.Lock()
 # Refusals that are the client's own decision, not a fault worth a page.
 _QUIET_REFUSALS = ("STOPPED_MEANWHILE",)
 
@@ -92,6 +99,13 @@ def _quiet_revival_refusal(code, detail):
     """
     if code in _QUIET_REFUSALS:
         return True
+    return (code == "ENGINE_REFUSED"
+            and "another instance" in str(detail or "").lower())
+
+
+def _handoff_refusal(code, detail):
+    """True when a refusal is the engine standing down behind another
+    instance's lease, so the loop is worth retrying as soon as it is released."""
     return (code == "ENGINE_REFUSED"
             and "another instance" in str(detail or "").lower())
 
@@ -1239,8 +1253,27 @@ def _revival_failed(uid, cause):
         pass
 
 
-def supervise(*, starter=None, mode_lister=None):
+def handoff_waiting():
+    """Users whose revival is waiting on another instance's lease, sorted."""
+    with _handoff_lock:
+        return sorted(_handoff_waiting)
+
+
+def _handoff_note(uid, waiting):
+    with _handoff_lock:
+        if waiting:
+            _handoff_waiting.add(uid)
+        else:
+            _handoff_waiting.discard(uid)
+
+
+def supervise(*, starter=None, mode_lister=None, only=None):
     """Restart platform loops whose thread died. Returns (alive, revived).
+
+    `only` limits the pass to those users. It exists for the deploy handoff:
+    the server retries just the users whose lease has been released, without
+    re-reading everyone. Every check below still runs for each of them, and the
+    engine's atomic lease claim is still what decides ownership.
 
     THE BUG THIS EXISTS TO FIX, AND IT WAS LIVE
 
@@ -1276,8 +1309,11 @@ def supervise(*, starter=None, mode_lister=None):
     """
     from apex import user_loop, user_store
     alive = revived = 0
-    for uid in (user_store.all_active() or []):
+    seen = set()
+    for uid in (user_store.all_active() if only is None else only) or []:
         uid = str(uid)
+        seen.add(uid)
+        _handoff_note(uid, False)       # set again below if it is refused
         try:
             if not _link.is_platform_account(uid):
                 # The bot's account, not ours. This process has no the platform
@@ -1332,6 +1368,8 @@ def supervise(*, starter=None, mode_lister=None):
             # the broker cannot confirm the mode. Say which, and leave the
             # record alone so the client still sees what they asked for.
             print(f"[Automation] not reviving {uid}: {e.code} — {e.detail}")
+            if _handoff_refusal(e.code, e.detail):
+                _handoff_note(uid, True)
             if not _quiet_revival_refusal(e.code, e.detail):
                 _revival_failed(uid, f"revival_refused:{e.code}")
             else:
@@ -1345,6 +1383,10 @@ def supervise(*, starter=None, mode_lister=None):
             print(f"[Automation] reviving {uid} failed: "
                   f"{type(e).__name__}: {e}")
             _revival_failed(uid, f"revival_failed:{type(e).__name__}")
+    if only is None:
+        # A user no longer active has nothing left to hand over.
+        with _handoff_lock:
+            _handoff_waiting.intersection_update(seen)
     return alive, revived
 
 
