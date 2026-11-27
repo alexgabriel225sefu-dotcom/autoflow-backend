@@ -21,7 +21,7 @@ export default function LiveAccessPage() {
   const [note, setNote] = useState<string | null>(null);
   const gate = status.result?.ok ? status.result.data : null;
 
-  async function post(path: "live/accept" | "live/request") {
+  async function post(path: "live/accept" | "live/request" | "live/withdraw") {
     setBusy(path);
     setError(null);
     setNote(null);
@@ -33,7 +33,9 @@ export default function LiveAccessPage() {
     }
     setNote(path === "live/accept"
       ? "The current published versions are recorded as accepted."
-      : "The request is on file. It does not connect a broker account.");
+      : path === "live/withdraw"
+        ? "Your acceptance is withdrawn. Live access stays closed until you accept again."
+        : "The request is on file. It does not connect a broker account.");
     invalidate("live/status", "me");
   }
 
@@ -60,7 +62,13 @@ export default function LiveAccessPage() {
         <button type="button" disabled={busy !== null} onClick={() => void post("live/request")}>
           {busy === "live/request" ? "Sending…" : "Request a live account connection"}
         </button>
+        <button type="button" disabled={busy !== null} onClick={() => void post("live/withdraw")}>
+          {busy === "live/withdraw" ? "Withdrawing…" : "Withdraw my acceptance"}
+        </button>
       </div>
+      <p className="muted">
+        An acceptance expires after a set period and has to be given again.
+      </p>
       <p className="muted" style={{ marginTop: "var(--sp-3)" }}>
         <Link href="/license">Licence</Link>
         {" · "}
