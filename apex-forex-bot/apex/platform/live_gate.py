@@ -44,6 +44,17 @@ _ACCEPT_DETAIL = {
     "tax": "You have not accepted the current tax terms.",
 }
 
+# Consent expires (spec section 2: "a consent given once, a year ago, is not
+# informed consent for a loop running today"). A client who accepted the
+# current versions longer ago than this is treated as not having accepted them
+# until they re-affirm. The length is a PROVISIONAL engineering default, not a
+# legal position: it is an open owner/legal question in docs/LIVE_READINESS.md.
+# It is a constant on purpose. An environment variable here would be one more
+# knob that could silently lengthen consent on a deployment.
+CONSENT_MAX_AGE_S = 180 * 86400
+# A recorded acceptance that claims to be from the future is not evidence.
+_CONSENT_CLOCK_SKEW_S = 300
+
 _VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _USER = re.compile(r"^[A-Za-z0-9_.:@+-]{1,128}$")
 
@@ -170,7 +181,28 @@ def _request_status(rec):
     return "none"
 
 
-def public_verdict(user_id, *, release_switch, live_accounts_allowed):
+def consent_fresh(entry, *, now=None):
+    """True only for an acceptance that carries a usable, recent timestamp.
+
+    A missing, non-numeric, future-dated or too-old `acceptedAt` is not fresh.
+    Unknown is closed, here as everywhere in this module.
+    """
+    if not isinstance(entry, dict):
+        return False
+    try:
+        at = float(entry.get("acceptedAt"))
+    except (TypeError, ValueError):
+        return False
+    if at != at:
+        return False
+    now = time.time() if now is None else float(now)
+    if at > now + _CONSENT_CLOCK_SKEW_S:
+        return False
+    return (now - at) <= CONSENT_MAX_AGE_S
+
+
+def public_verdict(user_id, *, release_switch, live_accounts_allowed,
+                   now=None):
     """What the client may be shown. No payment reference and no actor.
 
     A rejection may carry the scrubbed reason. The operator id is not on
@@ -212,7 +244,13 @@ def public_verdict(user_id, *, release_switch, live_accounts_allowed):
             continue
         got = ((accepted or {}).get(doc) or {}) if isinstance(accepted, dict) else {}
         if str(got.get("version") or "") == str(version):
-            conditions.append(_cond(code + "_ACCEPTED", "ok", "Accepted."))
+            if consent_fresh(got, now=now):
+                conditions.append(_cond(code + "_ACCEPTED", "ok", "Accepted."))
+            else:
+                conditions.append(_cond(
+                    code + "_ACCEPTED", "missing",
+                    f"Your acceptance of the {name.lower()} has expired or "
+                    f"cannot be dated. Accept again to re-confirm."))
         else:
             conditions.append(_cond(
                 code + "_ACCEPTED", "missing", _ACCEPT_DETAIL[doc]))
@@ -348,8 +386,14 @@ def publish(document, version, *, actor):
     return current[document]
 
 
-def accept_current(user_id):
-    """The client accepts whatever versions are published. The body cannot pick one."""
+def accept_current(user_id, *, now=None):
+    """The client accepts whatever versions are published. The body cannot pick one.
+
+    Accepting again re-affirms: an acceptance of the current version that has
+    aged past CONSENT_MAX_AGE_S is recorded afresh, in the audit trail and on
+    the acceptance record, rather than skipped as "already accepted".
+    """
+    now = time.time() if now is None else float(now)
     uid = _check_user(str(user_id))
     published, err = _load(_key("published"))
     if err is not None:
@@ -372,7 +416,8 @@ def accept_current(user_id):
     accepted = dict(accepted or {})
     for doc, version in targets:
         already = accepted.get(doc) if isinstance(accepted.get(doc), dict) else {}
-        if str(already.get("version") or "") == version:
+        if (str(already.get("version") or "") == version
+                and consent_fresh(already, now=now)):
             continue
 
         def write(audit, doc=doc, version=version):
@@ -381,7 +426,38 @@ def accept_current(user_id):
                 version=version, granted=True)
 
         _audit_required(write)
-        accepted[doc] = {"version": version, "acceptedAt": time.time()}
+        accepted[doc] = {"version": version, "acceptedAt": now}
+        _store._write_strict(_key(f"accept:{uid}"), accepted)
+    return accepted
+
+
+def withdraw_consent(user_id):
+    """The client takes their acceptance back. The gate closes at once.
+
+    Each withdrawal is written to the audit trail BEFORE the acceptance record
+    is cleared, so a trail that cannot be written leaves the consent standing
+    and the caller sees the failure rather than a silent half-withdrawal. The
+    next live order, and the next supervisor pass over a running live loop,
+    both see the closed gate.
+    """
+    uid = _check_user(str(user_id))
+    accepted, err = _load(_key(f"accept:{uid}"))
+    if err is not None:
+        raise LiveGateError("STORE_UNAVAILABLE", _scrub(err), status=503)
+    accepted = dict(accepted or {})
+    for doc in DOCUMENTS:
+        entry = accepted.get(doc)
+        version = entry.get("version") if isinstance(entry, dict) else None
+        if not version:
+            continue
+
+        def write(audit, doc=doc, version=str(version)):
+            audit.record_consent_change(
+                user_id=uid, actor=uid, document=doc,
+                version=version, granted=False)
+
+        _audit_required(write)
+        accepted.pop(doc, None)
         _store._write_strict(_key(f"accept:{uid}"), accepted)
     return accepted
 
@@ -630,6 +706,11 @@ def _http(method, route, principal, body):
         return 200, dict({"ok": True}, **_verdict_for(uid))
     if route == "live/accept" and method == "POST":
         accept_current(uid)
+        return 200, dict({"ok": True}, **_verdict_for(uid))
+    if route == "live/withdraw" and method == "POST":
+        # Takes no body: it withdraws this caller's own acceptance and nothing
+        # else, and cannot name another user.
+        withdraw_consent(uid)
         return 200, dict({"ok": True}, **_verdict_for(uid))
     if route == "live/request" and method == "POST":
         # `mode` in the body is ignored. This records a request; it does not

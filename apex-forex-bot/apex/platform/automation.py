@@ -1239,7 +1239,141 @@ def _revival_failed(uid, cause):
         pass
 
 
-def supervise(*, starter=None, mode_lister=None):
+def live_wind_down_reason(user_id, rec):
+    """Why a RUNNING live loop must stop now, as (code, detail), or None.
+
+    Spec section 8: a stop must reach a loop that is already running, not only
+    refuse the next start, and the platform must halt on its OWN uncertainty
+    and wind down rather than carry on over stale state. Every order is already
+    refused by the order gate the moment any of these turns false; this is the
+    half that ends the loop and says so, so a client is not left looking at
+    RUNNING over a loop that can no longer trade.
+
+    Pure reads, no broker call. The broker is asked for the account's mode on
+    every order (`live_execution.guard_engine_order`), which is the right
+    cadence for that question; asking it again here for every live loop on
+    every supervisor pass would only add broker traffic.
+
+    Fail closed in every branch. A read that raises is not an answer, and for a
+    live loop "I could not tell" means stop. Returns None only when each check
+    positively held.
+    """
+    uid = str(user_id)
+    account = rec.get("accountId")
+
+    try:
+        _emerg.check(user_id=uid, mode=LIVE)
+    except _emerg.Halted as e:
+        return (e.code, str(e))
+    except Exception as e:                                   # noqa: BLE001
+        return ("HALT_UNREADABLE",
+                f"the emergency stop could not be read ({type(e).__name__})")
+
+    try:
+        if not _ent.live_execution_enabled():
+            return ("LIVE_NOT_ENABLED",
+                    "the live release switch is closed on this deployment")
+        if _ent.entitlement_of(uid) != _ent.PAID_LIVE:
+            return ("NOT_ENTITLED",
+                    "this account no longer holds the plan that covers "
+                    "real-money trading")
+        ready = _ent.live_readiness(uid)
+        if ready.get("open") is not True:
+            code = ("LIVE_GATE_UNKNOWN" if ready.get("status") == "unknown"
+                    else "LIVE_GATE_CLOSED")
+            return (code, ready.get("summary") or _ent.LIVE_REFUSAL)
+    except Exception as e:                                   # noqa: BLE001
+        return ("LIVE_GATE_UNKNOWN",
+                f"the live gate could not be read ({type(e).__name__})")
+
+    try:
+        from apex.platform import live_pilot as _pilot
+        refusal = _pilot.check_identity(uid, account)
+        if refusal:
+            return refusal
+    except Exception as e:                                   # noqa: BLE001
+        return ("PILOT_UNREADABLE",
+                f"the live pilot could not be read ({type(e).__name__})")
+
+    try:
+        selected = _link.selected_ctid(uid)
+    except Exception as e:                                   # noqa: BLE001
+        return ("ACCOUNT_UNREADABLE",
+                f"the selected account could not be read "
+                f"({type(e).__name__})")
+    if selected is None:
+        return ("PLATFORM_DISCONNECTED",
+                "the broker account was disconnected while this loop ran")
+    if account is None or str(selected) != str(account):
+        return ("ACCOUNT_CHANGED",
+                "the selected account is no longer the account this loop "
+                "started on")
+
+    try:
+        rule = _store.get(uid, rec.get("ruleDocId"))
+        for symbol in (rule.get("symbols") or [None]):
+            _emerg.check(user_id=uid, symbol=symbol, mode=LIVE)
+    except _emerg.Halted as e:
+        return (e.code, str(e))
+    except Exception as e:                                   # noqa: BLE001
+        return ("RULE_UNREADABLE",
+                f"the running rule could not be read ({type(e).__name__})")
+    return None
+
+
+def _wind_down_live(user_id, rec, code, detail, *, stopper=None):
+    """Stop a live loop that may no longer trade, and say why. True if stopped.
+
+    Stops through `stop()`, so the record, the engine settings and the
+    notification follow the same path as a client pressing Stop, including the
+    sentence that says positions were NOT closed. The record then becomes
+    BLOCKED with the reason, not STOPPED: STOPPED reads as "you stopped it",
+    and the supervisor does not revive a BLOCKED loop either way.
+
+    This does not close positions and says so. Flattening is an order, and the
+    reason for most wind-downs is that orders are no longer allowed.
+    """
+    uid = str(user_id)
+    try:
+        out = stop(uid, stopper=stopper)
+    except Exception as e:                                   # noqa: BLE001
+        # The loop may still be ticking. Its orders are refused by the order
+        # gate regardless, so this is loud rather than fatal.
+        print(f"[Automation] could not wind down the live loop for {uid} "
+              f"after {code} ({type(e).__name__})")
+        try:
+            _alerts.log_event("error", "live_wind_down_failed", user_id=uid,
+                              code=code)
+            _alerts.notify_ops("live_wind_down_failed", user_id=uid)
+        except Exception:                                    # noqa: BLE001
+            pass
+        return False
+    reason = (f"live trading was stopped by the platform ({code}): {detail}")
+    _write(uid, {"state": BLOCKED, "ruleDocId": rec.get("ruleDocId"),
+                 "mode": rec.get("mode"), "accountId": rec.get("accountId"),
+                 "blockReason": reason, "blockCode": code,
+                 "blockedAt": time.time()})
+    try:
+        from apex.platform import audit as _audit
+        _audit.record_refusal(
+            user_id=uid, actor="system:supervisor",
+            account_id=rec.get("accountId"), gate="live_wind_down",
+            code=code, reason=detail)
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[Automation] the live wind-down of {uid} could not be "
+              f"audited ({type(e).__name__}) - the loop was still stopped")
+    try:
+        _notify.notify(
+            uid, type=_notify.SYSTEM, title="Live automation stopped",
+            body=f"{reason}. {out.get('flattenReason') or ''}".strip())
+        _alerts.log_event("warn", "live_wind_down", user_id=uid, code=code)
+        _alerts.notify_ops("live_wind_down", user_id=uid)
+    except Exception:                                        # noqa: BLE001
+        pass
+    return True
+
+
+def supervise(*, starter=None, mode_lister=None, stopper=None):
     """Restart platform loops whose thread died. Returns (alive, revived).
 
     THE BUG THIS EXISTS TO FIX, AND IT WAS LIVE
@@ -1308,6 +1442,21 @@ def supervise(*, starter=None, mode_lister=None):
             print(f"[Automation] {uid} is not licensed — marked blocked, "
                   f"not started")
             continue
+        # A RUNNING live loop is held to the live conditions every pass, not
+        # only when it starts: a closed switch, a halt, withdrawn consent or a
+        # changed account ends it here instead of leaving it to be refused
+        # order by order.
+        if rec.get("mode") == LIVE:
+            try:
+                wind = live_wind_down_reason(uid, rec)
+            except Exception as e:                           # noqa: BLE001
+                wind = ("LIVE_CHECK_FAILED",
+                        f"the live conditions could not be checked "
+                        f"({type(e).__name__})")
+            if wind:
+                _wind_down_live(uid, rec, wind[0], wind[1], stopper=stopper)
+                _revive_failures.pop(uid, None)
+                continue
         if user_loop.is_running(uid):
             alive += 1
             _revive_failures.pop(uid, None)
