@@ -340,6 +340,125 @@ describe("the minimum-size warning", () => {
   });
 });
 
+describe("the starting stop and target", () => {
+  const READ = (atrPips: number, over: Record<string, unknown> = {}) => ok({
+    connected: true, status: "ok", accountId: 7, mode: "demo",
+    minLot: {
+      symbol: "XAUUSD", timeframe: "1h", minUnits: 1, unitLabel: "oz", units: 1,
+      stopDistance: 100, targetUsd: 38.17, targetPct: 1, riskUsd: 30, riskPct: 0.8,
+      exceeds: false, basis: "2.5 x ATR(14) on the last bars", atrPips, ...over,
+    },
+  });
+  const stop = () => screen.getByLabelText("Stop loss pips") as HTMLInputElement;
+  const target = () => screen.getByLabelText("Take profit pips") as HTMLInputElement;
+  async function riskForGold() {
+    await toStrategy(/^XAUUSD$/);
+    choose(/Trend Following/);
+    cont();
+    await screen.findByLabelText("Capital allocated");
+  }
+  const postedBody = () => calls.find((c) => c.path === "automation/setup"
+    && c.init?.method === "POST")!.init!.body as Record<string, unknown>;
+  async function startFromRisk() {
+    fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
+    choose(/Approval Required/);
+    cont();
+    choose(/^Demo$/);
+    cont();
+    fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
+    await waitFor(() => expect(calls.some((c) => c.path === "automation/setup"
+      && c.init?.method === "POST")).toBe(true));
+  }
+
+  it("prefills 2.5 candles and twice that once the reading arrives, and explains it", async () => {
+    routes["trade/min-lot"] = READ(140);
+    await riskForGold();
+    await waitFor(() => expect(stop().value).toBe("350"), { timeout: 3000 });
+    expect(target().value).toBe("700");
+    const note = await screen.findByText(/Starting numbers for XAUUSD on 1h/);
+    expect(note.textContent).toMatch(/350 pips/);
+    expect(note.textContent).toMatch(/not from any result/);
+  });
+
+  it("keeps the old starting point when no reading arrives", async () => {
+    routes["trade/min-lot"] = ok({ connected: true, status: "unavailable", reason: "timeout" });
+    await riskForGold();
+    await screen.findByText(/could not check the broker's minimum size/i, undefined, { timeout: 3000 });
+    expect(stop().value).toBe("20");
+    expect(target().value).toBe("40");
+    expect(screen.queryByText(/Starting numbers for/)).toBeNull();
+  });
+
+  it("caps at the field maxima", async () => {
+    routes["trade/min-lot"] = READ(900);
+    await riskForGold();
+    await waitFor(() => expect(stop().value).toBe("500"), { timeout: 3000 });
+    expect(target().value).toBe("1000");
+    expect(Number(stop().max)).toBe(500);
+    expect(Number(target().max)).toBe(2000);
+  });
+
+  it("never overwrites a stop the client typed, even when the reading arrives afterwards", async () => {
+    let release: (v: unknown) => void = () => {};
+    const gate = new Promise((r) => { release = r; });
+    routes["trade/min-lot"] = (() => gate) as unknown as () => unknown;
+    await riskForGold();
+    fireEvent.change(stop(), { target: { value: "45" } });
+    release(READ(140));
+    await waitFor(() => expect(calls.some((c) => c.path.startsWith("trade/min-lot"))).toBe(true), { timeout: 3000 });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(stop().value).toBe("45");
+    expect(target().value).toBe("40");
+    expect(screen.queryByText(/Starting numbers for/)).toBeNull();
+  });
+
+  it("never overwrites the target the client typed, and leaves the stop alone with it", async () => {
+    routes["trade/min-lot"] = READ(140);
+    await riskForGold();
+    await waitFor(() => expect(stop().value).toBe("350"), { timeout: 3000 });
+    fireEvent.change(target(), { target: { value: "500" } });
+    fireEvent.change(screen.getByLabelText("Custom risk per trade, percent"), { target: { value: "0.5" } });
+    await waitFor(() => expect(calls.filter((c) => c.path.startsWith("trade/min-lot")).length).toBeGreaterThan(1),
+      { timeout: 3000 });
+    expect(target().value).toBe("500");
+    expect(stop().value).toBe("350");
+  });
+
+  it("keeps the stop-smaller-than-a-candle warning and its button working", async () => {
+    routes["trade/min-lot"] = READ(140);
+    await riskForGold();
+    await waitFor(() => expect(stop().value).toBe("350"), { timeout: 3000 });
+    expect(screen.queryByText(/Your \d+-pip stop is/)).toBeNull();
+    fireEvent.change(stop(), { target: { value: "30" } });
+    const warn = await screen.findByText(/Your 30-pip stop is 0\.2/);
+    expect(warn.textContent).toMatch(/It is your choice/);
+    fireEvent.click(screen.getByRole("button", { name: /Use 350 pips stop, 700 target/ }));
+    expect(stop().value).toBe("350");
+    expect(target().value).toBe("700");
+  });
+
+  it("sends stopSource default for an untouched stop", async () => {
+    routes["trade/min-lot"] = READ(140);
+    await riskForGold();
+    await waitFor(() => expect(stop().value).toBe("350"), { timeout: 3000 });
+    await startFromRisk();
+    expect(postedBody().stopSource).toBe("default");
+    expect(postedBody().stopLossPips).toBe(350);
+    expect(postedBody().takeProfitPips).toBe(700);
+  });
+
+  it("sends stopSource client once the client has typed", async () => {
+    routes["trade/min-lot"] = READ(140);
+    await riskForGold();
+    await waitFor(() => expect(stop().value).toBe("350"), { timeout: 3000 });
+    fireEvent.change(stop(), { target: { value: "120" } });
+    await startFromRisk();
+    expect(postedBody().stopSource).toBe("client");
+    expect(postedBody().stopLossPips).toBe(120);
+  });
+});
+
 describe("Start on demo", () => {
   it("posts the setup once, with what was chosen", async () => {
     await toRisk();

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CtraderStatus, Execution, MinLot, MinLotRead, StrategyPreset } from "@/lib/api";
 import {
-  EMPTY_CHOICE, minLotNotice, minLotPath, missingChoices, riskAmounts, ROW_LIMIT, stopNotice,
-  startState, SYMBOLS, symbolView, tradeBody, type TradeChoice,
+  atrDefaults, EMPTY_CHOICE, minLotNotice, minLotPath, missingChoices, riskAmounts, ROW_LIMIT, stopNotice,
+  setupPayload, startState, SYMBOLS, symbolView, tradeBody, type TradeChoice,
 } from "./trade-model";
 
 const STRAT: StrategyPreset = {
@@ -329,5 +329,73 @@ describe("a stop smaller than one typical candle", () => {
   });
   it("never suggests more than the field allows", () => {
     expect(stopNotice(rd(900), C)?.suggestPips).toBe(500);
+  });
+});
+
+describe("the stop and target the wizard starts from", () => {
+  const C = { symbol: "XAUUSD", timeframe: "1h" };
+  const rd = (atrPips?: number, over: Partial<MinLot> = {}): MinLotRead => ({
+    connected: true, status: "ok",
+    minLot: {
+      symbol: "XAUUSD", timeframe: "1h", minUnits: 1, unitLabel: "oz", units: 1,
+      stopDistance: 100, targetUsd: 38, targetPct: 1, riskUsd: 38, riskPct: 1,
+      exceeds: false, basis: "x", atrPips, ...over,
+    },
+  });
+
+  it("is two and a half candles for the stop and twice that for the target", () => {
+    const d = atrDefaults(rd(140), C);
+    expect(d?.stop).toBe(350);
+    expect(d?.target).toBe(700);
+    expect(d?.capped).toBe(false);
+  });
+  it("differs by instrument: a calm pair gets a small stop, gold a large one", () => {
+    expect(atrDefaults(rd(8, { symbol: "EURUSD" }), { symbol: "EURUSD", timeframe: "1h" })?.stop).toBe(20);
+    expect(atrDefaults(rd(140), C)?.stop).toBeGreaterThan(300);
+  });
+  it("never goes below one pip", () => {
+    expect(atrDefaults(rd(0.1), C)?.stop).toBe(1);
+  });
+  it("caps the stop at the input maximum of 500, and the target at 2000", () => {
+    const d = atrDefaults(rd(900), C);
+    expect(d?.stop).toBe(500);
+    expect(d?.target).toBe(1000);
+    expect(d?.capped).toBe(true);
+    expect(d?.text).toContain("the most the field allows");
+    expect(atrDefaults(rd(900), C)!.target).toBeLessThanOrEqual(2000);
+  });
+  it("explains the numbers and says they are not a result", () => {
+    const d = atrDefaults(rd(140), C)!;
+    expect(d.text).toContain("XAUUSD");
+    expect(d.text).toContain("350 pips");
+    expect(d.text).toContain("700 pips");
+    expect(d.text).toMatch(/not from any result/);
+    expect(d.text).toMatch(/numbers are yours/);
+  });
+  it("gives nothing without a usable reading for exactly this choice", () => {
+    expect(atrDefaults(null, C)).toBeNull();
+    expect(atrDefaults(rd(undefined), C)).toBeNull();
+    expect(atrDefaults(rd(0), C)).toBeNull();
+    expect(atrDefaults({ connected: false, status: "unavailable" }, C)).toBeNull();
+    expect(atrDefaults(rd(140, { symbol: "EURUSD" }), C)).toBeNull();
+    expect(atrDefaults(rd(140, { timeframe: "15m" }), C)).toBeNull();
+  });
+});
+
+describe("saying where the stop came from", () => {
+  const chosen: TradeChoice = {
+    ...EMPTY_CHOICE, symbol: "EURUSD", strategy: STRAT,
+    capitalAllocated: "1000", level: "full", account: "demo",
+  };
+  it("leaves stopSource out unless the page says", () => {
+    expect("stopSource" in setupPayload(chosen)).toBe(false);
+  });
+  it("carries the page's word, and changes no other field", () => {
+    const plain = setupPayload(chosen);
+    const dflt = setupPayload(chosen, { stopSource: "default" });
+    expect(dflt.stopSource).toBe("default");
+    expect(setupPayload(chosen, { stopSource: "client" }).stopSource).toBe("client");
+    const { stopSource: _s, ...rest } = dflt;
+    expect(rest).toEqual(plain);
   });
 });
