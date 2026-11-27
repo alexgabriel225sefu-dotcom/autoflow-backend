@@ -218,24 +218,28 @@ def callback_page(status, payload):
 <title>{title} — Apex4Traders</title>
 <style>
  :root{{color-scheme:dark}}
+ /* The site's own palette (web/src/app/globals.css): near-black page, graphite
+    card, a cream pill for the action. This page was navy with a teal button,
+    which read as another product in the middle of connecting a broker. */
  body{{margin:0;min-height:100vh;display:flex;align-items:center;
-   justify-content:center;background:#0b0f19;color:#e6e9f0;
-   font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+   justify-content:center;background:#08080A;color:#F7F6F2;
+   font:16px/1.55 Poppins,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
    padding:24px}}
- .card{{max-width:26rem;width:100%;background:#141a28;border:1px solid #232c40;
+ .card{{max-width:26rem;width:100%;background:#131317;border:1px solid #2A2A31;
    border-radius:14px;padding:28px}}
- h1{{font-size:1.4rem;margin:0 0 14px}}
+ h1{{font-size:1.35rem;margin:0 0 14px;font-weight:600}}
  h1::before{{content:"";display:inline-block;width:10px;height:10px;
    border-radius:50%;margin-right:10px;vertical-align:middle}}
- .ok h1::before{{background:#34d399}} .bad h1::before{{background:#f87171}}
- p{{margin:0 0 12px;color:#aeb6c7}} strong{{color:#e6e9f0}}
+ .ok h1::before{{background:#18A35C}} .bad h1::before{{background:#FF9484}}
+ p{{margin:0 0 12px;color:#A9A7A0}} strong{{color:#F7F6F2}}
  .code{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;
-   color:#f87171}}
+   color:#FF9484}}
  .ref{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;
-   color:#8b93a7;user-select:all}}
- .btn{{display:block;margin-top:20px;padding:14px 18px;border-radius:10px;
-   background:#2dd4bf;color:#06221e;text-decoration:none;font-weight:600;
+   color:#8D8B84;user-select:all}}
+ .btn{{display:block;margin-top:20px;padding:14px 18px;border-radius:999px;
+   background:#F7F6F2;color:#111113;text-decoration:none;font-weight:600;
    text-align:center}}
+ .btn:hover{{background:#FFFFFF}}
 </style></head>
 <body><div class="card {tone}"><h1>{title}</h1>{body}{button}</div></body></html>"""
 
