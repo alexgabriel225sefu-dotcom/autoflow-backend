@@ -5516,6 +5516,15 @@ def _entitled(user_id):
         from apex.platform import licence as _plic
         if _plic.status_for(user_id).get("state") == _plic.ACTIVE:
             return True
+        # EXPIRED and REVOKED are definite answers from the store that holds the
+        # entitlement, not a missing record. They must not fall through to the
+        # legacy access store below, whose unreachable-means-allow rule exists
+        # to protect paying chat clients: during an outage there it let a
+        # platform trial that had run out keep a loop alive. A missing record
+        # (NONE) still falls through, because a store that cannot be read can
+        # look the same and must not stop a paying client.
+        if _plic.status_for(user_id).get("state") in (_plic.EXPIRED, _plic.REVOKED):
+            return False
     except Exception:
         pass
     try:

@@ -120,6 +120,27 @@ check("names a next step", "contact support" in low, msg)
 check("no reconnect riddle", "reconnect once a plan" not in low, msg)
 check("no price or legal claim", "$" not in msg and "refund" not in low, msg)
 
+print("\n[8] an access-store outage does not keep an expired trial running")
+# `_entitled` falls back to the legacy access store, which answers "unknown, so
+# allow" when it cannot be read (to protect paying chat clients). A platform
+# trial that had run out used to pass through that door: a definite EXPIRED
+# answer from the licence store must be final.
+import apex.access as _access
+from apex import user_loop as _ul
+_real_state = _access.allowed_state
+try:
+    _access.allowed_state = lambda c: "unknown"
+    check("expired trial, access store unreachable: no loop",
+          _ul._entitled(USER) is False)
+    _revoked = "00000000-0000-4000-8000-0000000000aa"
+    L.grant(_revoked, plan=P.DEMO_TRIAL, expires_at=clock[0] + 86400)
+    L.revoke(_revoked)
+    check("a revoked licence is final too", _ul._entitled(_revoked) is False)
+    check("a user with no licence record still falls through (outage safe)",
+          _ul._entitled("00000000-0000-4000-8000-00000000abcd") is True)
+finally:
+    _access.allowed_state = _real_state
+
 print()
 if _fails:
     print(f"{len(_fails)} FAILED: {_fails}")
