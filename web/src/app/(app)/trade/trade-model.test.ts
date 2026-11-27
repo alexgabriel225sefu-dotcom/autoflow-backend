@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CtraderStatus, Execution, MinLot, MinLotRead, StrategyPreset } from "@/lib/api";
 import {
-  EMPTY_CHOICE, minLotNotice, minLotPath, missingChoices, riskAmounts, ROW_LIMIT,
+  EMPTY_CHOICE, minLotNotice, minLotPath, missingChoices, riskAmounts, ROW_LIMIT, stopNotice,
   startState, SYMBOLS, symbolView, tradeBody, type TradeChoice,
 } from "./trade-model";
 
@@ -293,5 +293,41 @@ describe("the broker's minimum size against the chosen risk", () => {
     expect(minLotNotice(read(), { ...GOLD, timeframe: "15m" })).toBeNull();
     expect(minLotNotice(read(), { ...GOLD, riskPercent: "2" })).toBeNull();
     expect(minLotNotice(read(), { ...GOLD, riskPercent: "1.0" })).not.toBeNull();
+  });
+});
+
+describe("a stop smaller than one typical candle", () => {
+  const C = { symbol: "XAUUSD", timeframe: "1h", stopLossPips: "30" };
+  const rd = (atrPips?: number, over: Partial<MinLot> = {}): MinLotRead => ({
+    connected: true, status: "ok",
+    minLot: {
+      symbol: "XAUUSD", timeframe: "1h", minUnits: 1, unitLabel: "oz", units: 1,
+      stopDistance: 100, targetUsd: 38, targetPct: 1, riskUsd: 38, riskPct: 1,
+      exceeds: false, basis: "x", atrPips, ...over,
+    },
+  });
+
+  it("says so, with a wider stop of two and a half candles", () => {
+    const n = stopNotice(rd(140), C);
+    expect(n?.suggestPips).toBe(350);
+    expect(n?.text).toContain("30-pip stop");
+    expect(n?.text).toContain("0.2");
+  });
+  it("is silent when the stop is at least one candle", () => {
+    expect(stopNotice(rd(140), { ...C, stopLossPips: "140" })).toBeNull();
+    expect(stopNotice(rd(140), { ...C, stopLossPips: "300" })).toBeNull();
+  });
+  it("is silent without a usable reading, and never reassures", () => {
+    expect(stopNotice(null, C)).toBeNull();
+    expect(stopNotice(rd(undefined), C)).toBeNull();
+    expect(stopNotice({ connected: false, status: "unavailable" }, C)).toBeNull();
+    expect(stopNotice(rd(140), { ...C, stopLossPips: "" })).toBeNull();
+  });
+  it("ignores a reading for another instrument or timeframe", () => {
+    expect(stopNotice(rd(140, { symbol: "EURUSD" }), C)).toBeNull();
+    expect(stopNotice(rd(140, { timeframe: "15m" }), C)).toBeNull();
+  });
+  it("never suggests more than the field allows", () => {
+    expect(stopNotice(rd(900), C)?.suggestPips).toBe(500);
   });
 });

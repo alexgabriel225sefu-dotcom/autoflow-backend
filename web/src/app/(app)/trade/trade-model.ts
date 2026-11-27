@@ -242,6 +242,41 @@ export function minLotNotice(
   };
 }
 
+/**
+ * A stop that sits inside one typical candle, or null when it does not.
+ *
+ * The wizard starts every instrument at 20 pips, whatever it is. On gold that
+ * is $2 against hourly candles of about $14, and a stop that small is reached
+ * by ordinary movement before the setup can play out: a demo account took
+ * eight stop-outs in a row on a $3 stop. This says so, as an observation about
+ * the market's size and not a claim about results, and offers a wider stop. It
+ * never blocks: the client's number stays theirs.
+ */
+export function stopNotice(
+  r: MinLotRead | null | undefined,
+  c: Pick<TradeChoice, "symbol" | "timeframe" | "stopLossPips">,
+): { text: string; suggestPips: number } | null {
+  if (!r || r.status !== "ok" || !r.minLot) return null;
+  const m = r.minLot;
+  const atr = m.atrPips;
+  if (typeof atr !== "number" || !(atr > 0)) return null;
+  // An answer for another instrument or timeframe is stale: the choice moved
+  // while it was on its way.
+  if (m.symbol !== c.symbol || m.timeframe !== c.timeframe) return null;
+  const stop = num(c.stopLossPips);
+  if (stop === null || stop <= 0 || stop >= atr) return null;
+  const suggestPips = Math.min(500, Math.max(1, Math.round(2.5 * atr)));
+  return {
+    suggestPips,
+    text:
+      `Your ${stop}-pip stop is ${(stop / atr).toFixed(1)}\u00d7 one typical ` +
+      `${m.timeframe} candle for ${m.symbol} (about ${atr} pips). A stop smaller ` +
+      `than a candle is usually reached by ordinary price movement, not because ` +
+      `the setup was wrong. It is your choice; a wider stop means fewer, ` +
+      `smaller positions for the same risk.`,
+  };
+}
+
 /** What is still to choose, in the order the page asks for it. Empty = ready. */
 export function missingChoices(c: TradeChoice): string[] {
   const out: string[] = [];

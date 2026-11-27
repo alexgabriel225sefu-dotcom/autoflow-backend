@@ -20,7 +20,7 @@ import { StrategyStep } from "./strategy-step";
 import {
   DAILY_LOSS_CEILING, EMPTY_CHOICE, LIVE_RISK_CAP, RISK_PICKS, ROW_LIMIT,
   TIMEFRAME_CHOICES, accountAction, minLotNotice, minLotPath, riskAmounts,
-  setupPayload, stepBlock, symbolView, type TradeChoice,
+  setupPayload, stepBlock, stopNotice, symbolView, type TradeChoice,
 } from "./trade-model";
 
 /**
@@ -68,6 +68,7 @@ export default function TradePage() {
   const minLot = useRead<MinLotRead>(useDebounced(
     step >= 2 ? minLotPath(c) : null, 400));
   const lotNotice = minLot.result?.ok ? minLotNotice(minLot.result.data, c) : null;
+  const stopWarn = minLot.result?.ok ? stopNotice(minLot.result.data, c) : null;
   const running = auto.result?.ok && auto.result.data.state === "running";
   const catalogue = lib.result?.ok ? lib.result.data : null;
   const strategies = useMemo(() => catalogue?.strategies ?? [], [catalogue]);
@@ -342,6 +343,18 @@ export default function TradePage() {
               <span className="field-note">These pip values are used exactly for the stop and target.</span>
             </label>
           </div>
+          {stopWarn ? (
+            <div className="notice notice-warn" role="status">
+              {stopWarn.text}{" "}
+              <button type="button" className="btn btn-quiet"
+                      onClick={() => {
+                        set("stopLossPips", String(stopWarn.suggestPips));
+                        set("takeProfitPips", String(stopWarn.suggestPips * 2));
+                      }}>
+                Use {stopWarn.suggestPips} pips stop, {stopWarn.suggestPips * 2} target
+              </button>
+            </div>
+          ) : null}
           {lotNotice ? (
             <div className={lotNotice.tone === "warn" ? "notice notice-warn" : "field-note"}
                  role="status">{lotNotice.text}</div>

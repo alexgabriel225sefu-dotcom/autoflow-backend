@@ -560,6 +560,8 @@ export type MinLot = {
   unitLabel: string;
   units: number;
   stopDistance: number;
+  /** One typical candle's range (ATR 14), in pips. */
+  atrPips?: number;
   targetUsd: number;
   targetPct: number;
   riskUsd: number;

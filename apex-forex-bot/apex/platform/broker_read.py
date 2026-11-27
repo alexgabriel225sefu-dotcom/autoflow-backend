@@ -729,6 +729,9 @@ def estimate_min_lot(*, balance, risk_fraction, symbol, price, atr, broker_min=N
         "unitLabel": forex.unit_label(symbol),
         "units": units,
         "stopDistance": round(distance, 5),
+        # One typical candle's range (ATR 14) in pips, so the Trade page can say
+        # whether the client's own stop sits inside normal noise.
+        "atrPips": round(forex.to_pips(atr, symbol, price), 1),
         "targetUsd": round(target_usd, 2),
         "targetPct": round(risk_fraction * 100, 2),
         "riskUsd": round(risk_usd, 2),
