@@ -7,6 +7,7 @@ from apex import user_store, indicators, ai, strategies, forex, news, market
 from apex import access, sentinel, institutional, cot, ledger
 from apex import automation, gates, ownership, news_alerts, regime_gate
 from apex import strategy_api
+from apex import loss_brake
 # Registering the shipped modules is what makes strategy_api.get() return
 # anything. Without this the registry is empty, every lookup misses, and the
 # loop silently falls back to calling the engine directly -- working, but with
@@ -1924,7 +1925,20 @@ def _loop(user_id, alert_fn, gen=None):
     # exactly the moment they mattered most — right after losses.
     last_loss_at = float(user.get("last_loss_at") or 0)   # entry cooldown anchor (any losing close)
     last_close_at = float(user.get("last_close_at") or 0) # re-entry lock after ANY close — kills open/close churn
-    loss_streak = int(user.get("loss_streak") or 0)       # counted and reported only — the risk ladder it used to drive was removed
+    # The streak is counted and reported, and the loss-streak brake below reads
+    # it. A stored value that is not a number is UNKNOWN, not 0 (the old
+    # int(...) crashed the loop start on it): the brake then holds entries for
+    # the rest of today. A missing value is no history, which is a real 0.
+    _stored_streak = loss_brake.parse_stored_count(user.get("loss_streak"))
+    _stored_unread = loss_brake.parse_stored_count(user.get("loss_streak_unread"))
+    loss_streak = _stored_streak or 0
+    # Closes since the last known win whose result could not be read. They are
+    # counted as possible losses by the brake, never as zero.
+    unread_closes = _stored_unread or 0
+    streak_unreadable_day = (datetime.now().strftime("%Y-%m-%d")
+                             if _stored_streak is None or _stored_unread is None
+                             else None)
+    brake_alerted = {}  # day -> True once the client was told (fallback when there is no shared store)
     # The ladder is a within-session brake, but nothing ever cleared it: a
     # streak survived indefinitely, so losses from days ago still quartered
     # today's position size and the only escape was a winning trade. Everything
@@ -1944,15 +1958,21 @@ def _loop(user_id, alert_fn, gen=None):
         Two counters for the same thing, disagreeing, because only one of them
         was ever re-read.
         """
-        nonlocal loss_streak
-        if not (loss_streak and last_loss_at):
+        nonlocal loss_streak, unread_closes
+        if not ((loss_streak and last_loss_at) or (unread_closes and last_close_at)):
             return False
-        day = datetime.fromtimestamp(last_loss_at).strftime("%Y-%m-%d")
+        # The streak is dated by its last losing close, unread closes by the
+        # last close of any kind: the newest of the two is when it last moved.
+        anchor = max(last_loss_at if loss_streak else 0,
+                     last_close_at if unread_closes else 0)
+        day = datetime.fromtimestamp(anchor).strftime("%Y-%m-%d")
         if day == datetime.now().strftime("%Y-%m-%d"):
             return False
-        print(f"[UserLoop:{user_id}] loss streak of {loss_streak} was from "
+        print(f"[UserLoop:{user_id}] loss streak of {loss_streak}"
+              f"{f' (+{unread_closes} unread)' if unread_closes else ''} was from "
               f"{day} — cleared for the new trading day")
         loss_streak = 0
+        unread_closes = 0
         return True
 
     # Cleared at startup too — but the persist has to wait until
@@ -1965,7 +1985,8 @@ def _loop(user_id, alert_fn, gen=None):
         try:
             user_store.update(user_id, {"last_loss_at": last_loss_at,
                                         "last_close_at": last_close_at,
-                                        "loss_streak": loss_streak})
+                                        "loss_streak": loss_streak,
+                                        "loss_streak_unread": unread_closes})
         except Exception as e:
             print(f"[UserLoop:{user_id}] risk-state persist failed: {e}")
 
@@ -2234,6 +2255,10 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     elif net is not None and net > 0:
                         loss_streak = 0
+                        unread_closes = 0   # a known win ends the run, unread closes included
+                        streak_unreadable_day = None
+                    elif net is None:
+                        unread_closes += 1  # result unreadable: a possible loss to the brake, never a zero
                     last_close_at = time.time()
                     _persist_risk_state()
                     if net is not None:
@@ -2639,6 +2664,10 @@ def _loop(user_id, alert_fn, gen=None):
                         last_loss_at = time.time()
                     elif est_pnl is not None and est_pnl > 0:
                         loss_streak = 0
+                        unread_closes = 0   # a known win ends the run, unread closes included
+                        streak_unreadable_day = None
+                    elif est_pnl is None:
+                        unread_closes += 1  # result unreadable: a possible loss to the brake, never a zero
                     last_close_at = time.time()
                     _persist_risk_state()
                     if est_pnl is not None:
@@ -3153,6 +3182,11 @@ def _loop(user_id, alert_fn, gen=None):
                             loss_streak += 1
                         elif pnl_est is not None and pnl_est > 0:
                             loss_streak = 0
+                            unread_closes = 0   # a known win ends the run, unread closes included
+                            streak_unreadable_day = None
+                        elif pnl_est is None:
+                            unread_closes += 1  # result unreadable: a possible loss to the brake, never a zero
+                            last_close_at = time.time()
                         _persist_risk_state()
                         if pnl_est is not None:
                             strategies.record_trade(pnl_est > 0, pnl_est,
@@ -3439,6 +3473,8 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     else:
                         loss_streak = 0
+                        unread_closes = 0   # a known win ends the run, unread closes included
+                        streak_unreadable_day = None
                     result = {"action": "CLOSE", "symbol": symbol,
                               "price": exit_price, "entryPrice": open_pos.get("entryPrice"),
                               "grossPnl": round(gross, 2), "costUsd": round(cost_usd, 2),
@@ -3694,6 +3730,8 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     else:
                         loss_streak = 0
+                        unread_closes = 0   # a known win ends the run, unread closes included
+                        streak_unreadable_day = None
                     result = {"action": "CLOSE", "symbol": _wsym, "price": exit_price,
                               "entryPrice": open_pos.get("entryPrice"),
                               "side": open_pos.get("entrySide") or open_pos.get("side"),
@@ -3880,6 +3918,8 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     else:
                         loss_streak = 0
+                        unread_closes = 0   # a known win ends the run, unread closes included
+                        streak_unreadable_day = None
                     result = {"action": "CLOSE", "symbol": _nsym, "price": exit_price,
                               "entryPrice": _np.get("entryPrice"),
                               "side": _np.get("entrySide") or _np.get("side"),
@@ -4319,6 +4359,35 @@ def _loop(user_id, alert_fn, gen=None):
                        (action == "SELL" and htf_dir == "BULLISH"):
                         entry_ok = False
                         _skip(f"HTF gate: {action} blocked by H1 {htf_dir} trend")
+            # Loss-streak brake. Losses in a row reaching the limit (default 5,
+            # GuardLimits.max_consecutive_losses) stop NEW entries for the rest
+            # of the trading day, exact rules included: they skip the post-loss
+            # cooldowns by design, so this is their only pause. It only refuses
+            # the entry; it never closes, orders or changes what the rule
+            # decides. Unread results count as possible losses, an unreadable
+            # stored streak holds entries for the day, and no history is 0.
+            if entry_ok:
+                _lb = loss_brake.decide(
+                    loss_streak, unread_closes,
+                    unreadable=(streak_unreadable_day
+                                == datetime.now().strftime("%Y-%m-%d")))
+                if _lb["block"]:
+                    entry_ok = False
+                    _skip(_lb["reason"], alert=False)
+                    _brake_day = datetime.now().strftime("%Y-%m-%d")
+                    if alert_fn and not brake_alerted.get(_brake_day):
+                        # One message a day. The shared claim survives a restart
+                        # or a second instance; the dict covers no shared store.
+                        _won = user_store.claim(f"lossbrake:{user_id}:{_brake_day}",
+                                                ttl_s=26 * 3600)
+                        brake_alerted.clear()
+                        brake_alerted[_brake_day] = True
+                        if _won is not False:
+                            try:
+                                alert_fn(user_id, {"action": "STOP",
+                                                   "reasons": [_lb["reason"]]})
+                            except Exception as e:
+                                print(f"[UserLoop:{user_id}] loss-brake alert failed: {e}")
             # One entry per signal bar. An exact rule decides on a CLOSED bar, and
             # that verdict stays the same for the whole next hour. The loop ticks
             # every five minutes, so once a stop-out left the account flat it
@@ -5160,6 +5229,8 @@ def _loop(user_id, alert_fn, gen=None):
                                 loss_streak += 1
                             elif net > 0:
                                 loss_streak = 0
+                                unread_closes = 0   # a known win ends the run, unread closes included
+                                streak_unreadable_day = None
                             result = {"action": "CLOSE", "symbol": symbol, "price": exit_fill,
                                       "entryPrice": entry_fill, "grossPnl": round(gross, 2),
                                       "costUsd": round(cost_usd, 2), "netPnl": round(net, 2),
@@ -5379,6 +5450,8 @@ def _loop(user_id, alert_fn, gen=None):
                         loss_streak += 1
                     elif net > 0:
                         loss_streak = 0
+                        unread_closes = 0   # a known win ends the run, unread closes included
+                        streak_unreadable_day = None
                     result = {"action": "CLOSE", "symbol": symbol, "price": exit_price,
                               "entryPrice": open_pos.get("entryPrice"),
                               "side": open_pos.get("entrySide") or open_pos.get("side"),
