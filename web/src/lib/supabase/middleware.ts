@@ -100,7 +100,11 @@ export async function updateSession(request: NextRequest) {
     to.searchParams.set("next", nextTarget(pathname, request.nextUrl.search));
     return NextResponse.redirect(to);
   }
-  if (user && (pathname === "/login" || pathname === "/signup")) {
+  // `?reauth=1` is set by "Sign in again" on a page that was told it has no
+  // session while this check says it has one. Without the exception that
+  // button leads to /login and straight back to the page that sent it.
+  if (user && (pathname === "/login" || pathname === "/signup")
+      && !request.nextUrl.searchParams.has("reauth")) {
     const to = request.nextUrl.clone();
     to.pathname = "/dashboard";
     to.search = "";

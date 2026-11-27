@@ -121,6 +121,8 @@ async function loaded() {
   await screen.findByRole("radio", { name: "EURUSD" });
 }
 const choose = (name: RegExp) => fireEvent.click(screen.getByRole("radio", { name }));
+// With live closed there is no demo/live choice to click: demo is already taken.
+const pickDemo = () => { if (screen.queryByRole("radio", { name: /^Demo$/ })) choose(/^Demo$/); };
 const cont = () => fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
 async function toStrategy(symbol: RegExp = /^EURUSD$/) {
@@ -140,11 +142,12 @@ async function toAccount() {
   fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
   choose(/Approval Required/);
   cont();
-  await screen.findByRole("radio", { name: "Demo" });
+  await screen.findByRole("heading", { level: 2, name: /Account/ });
 }
 async function toReview() {
   await toAccount();
-  choose(/^Demo$/);
+  // With live closed there is no choice to make: demo is already taken.
+  if (screen.queryByRole("radio", { name: /^Demo$/ })) choose(/^Demo$/);
   cont();
   await screen.findByRole("heading", { name: /Review/ });
 }
@@ -266,7 +269,7 @@ describe("my methods", () => {
     fireEvent.change(await screen.findByLabelText("Capital allocated"), { target: { value: "10000" } });
     choose(/Approval Required/);
     cont();
-    choose(/^Demo$/);
+    pickDemo();
     cont();
     fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
@@ -334,7 +337,7 @@ describe("the minimum-size warning", () => {
     fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
     choose(/Approval Required/);
     cont();
-    choose(/^Demo$/);
+    pickDemo();
     cont();
     expect((screen.getByRole("button", { name: "Start on demo" }) as HTMLButtonElement).disabled).toBe(false);
   });
@@ -363,7 +366,7 @@ describe("the starting stop and target", () => {
     fireEvent.change(screen.getByLabelText("Capital allocated"), { target: { value: "10000" } });
     choose(/Approval Required/);
     cont();
-    choose(/^Demo$/);
+    pickDemo();
     cont();
     fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
@@ -467,7 +470,7 @@ describe("Start on demo", () => {
     fireEvent.change(screen.getByLabelText(/Stop the day at/i), { target: { value: "3" } });
     choose(/Approval Required/);
     cont();
-    choose(/^Demo$/);
+    pickDemo();
     cont();
     fireEvent.click(await screen.findByRole("button", { name: "Start on demo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
@@ -512,7 +515,7 @@ describe("Start on demo", () => {
 describe("live", () => {
   it("a closed live account turns Start into the next step and starts nothing", async () => {
     routes["ctrader/status"] = live;
-    routes.me = me({ canAutomate: false, accountMode: "live", liveGate: {
+    routes.me = me({ canAutomate: false, accountMode: "live", liveExecutionEnabled: true, liveGate: {
       open: false, status: "closed", summary: "Terms not accepted yet.", conditions: [], missing: [],
       request: { status: "none" }, checkoutOpen: false } });
     await toAccount();
@@ -528,7 +531,7 @@ describe("live", () => {
 
   it("a pending request reads as waiting for approval", async () => {
     routes["ctrader/status"] = live;
-    routes.me = me({ canAutomate: false, accountMode: "live", liveGate: {
+    routes.me = me({ canAutomate: false, accountMode: "live", liveExecutionEnabled: true, liveGate: {
       open: false, status: "closed", summary: "x", conditions: [], missing: [],
       request: { status: "pending" }, checkoutOpen: false } });
     await toAccount();
@@ -538,7 +541,7 @@ describe("live", () => {
 
   it("an account the server allows still needs a confirmation that names it and says real money", async () => {
     routes["ctrader/status"] = live;
-    routes.me = me({ canAutomate: true, accountMode: "live", liveGate: { open: true, status: "open", summary: "cleared", request: { status: "approved" } } });
+    routes.me = me({ canAutomate: true, accountMode: "live", liveExecutionEnabled: true, liveGate: { open: true, status: "open", summary: "cleared", request: { status: "approved" } } });
     await toAccount();
     choose(/^Live$/);
     cont();
@@ -551,7 +554,7 @@ describe("live", () => {
 
   it("a server that refuses to execute live does not celebrate", async () => {
     routes["ctrader/status"] = live;
-    routes.me = me({ canAutomate: true, accountMode: "live" });
+    routes.me = me({ canAutomate: true, accountMode: "live", liveExecutionEnabled: true });
     routes["automation/setup"] = (init?: Call["init"]) => init?.method === "POST"
       ? ok({ started: false, executed: false, account: "live",
              live: { open: false, state: "request", label: "Request live access", summary: "The gate is closed." } })
@@ -563,5 +566,36 @@ describe("live", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Yes" }));
     expect(await screen.findByText(/The gate is closed/)).toBeDefined();
     expect(fireStartConfetti).not.toHaveBeenCalled();
+  });
+});
+
+describe("the account step when live trading is closed", () => {
+  it("does not ask demo or live: it says this runs on demo, and demo is already chosen", async () => {
+    await toAccount();
+    expect(screen.queryByRole("radio", { name: /^Live$/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /^Demo$/ })).toBeNull();
+    expect(screen.getByText(/runs on your demo account/i)).toBeDefined();
+    expect(screen.getByText(/no live order can be sent/i)).toBeDefined();
+    cont();
+    await screen.findByRole("heading", { name: /Review/ });
+    expect(screen.getByRole("button", { name: "Start on demo" })).toBeDefined();
+  });
+
+  it("still offers both when the server says live is open", async () => {
+    routes.me = me({ liveExecutionEnabled: true });
+    await toAccount();
+    expect(screen.getByRole("radio", { name: /^Demo$/ })).toBeDefined();
+    expect(screen.getByRole("radio", { name: /^Live$/ })).toBeDefined();
+  });
+});
+
+describe("the instrument class filter", () => {
+  it("is a wrapping group of chips, not equal-width columns that print over each other", async () => {
+    await loaded();
+    const group = screen.queryByRole("radiogroup", { name: "Instrument class" });
+    if (group) {
+      expect(group.className).toContain("chips");
+      expect(group.className).not.toContain("segc");
+    }
   });
 });

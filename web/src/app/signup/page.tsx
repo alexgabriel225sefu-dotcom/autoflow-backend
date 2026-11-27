@@ -11,6 +11,7 @@ import { authErrorMessage } from "@/lib/supabase/auth-error";
 import { GoogleOption } from "@/components/auth/google-option";
 import { inboxLink } from "@/lib/inbox-link";
 import { ResendConfirmation } from "@/components/auth/resend-confirmation";
+import { useConfirmationWatch } from "@/components/auth/use-confirmation-watch";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -19,6 +20,14 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // The link is usually opened in another app or tab. This page carries on by
+  // itself once that has happened, instead of waiting for a click that is not
+  // coming.
+  useConfirmationWatch({
+    enabled: sent, email: email.trim(), password,
+    onConfirmed: () => { router.replace("/dashboard"); router.refresh(); },
+  });
 
   function validate() {
     const trimmed = email.trim();
@@ -76,6 +85,10 @@ export default function SignUpPage() {
         <p className="auth-lead" style={{ marginTop: "1.2rem" }}>
           You will need to confirm it before connecting a cTrader account
           or activating a rule.
+        </p>
+        <p className="auth-lead">
+          Once you confirm, this page continues by itself. You can confirm in
+          your mail app or on another device.
         </p>
         {inbox ? (
           <p className="auth-lead">

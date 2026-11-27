@@ -18,6 +18,7 @@ import type { ApiError, Execution, ReadState } from "@/lib/api";
 // but nothing selected".
 import { plainErrorTitle, plainRead } from "./plain";
 import { BusyNotice } from "./busy-notice";
+import { signInAgain } from "@/lib/supabase/reauth";
 
 export function StatusPill({
   mode, accountId,
@@ -88,7 +89,14 @@ export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () 
       {error.problems?.length ? (
         <ul className="problems">{error.problems.map((p) => <li key={p}>{p}</li>)}</ul>
       ) : null}
-      {onRetry ? (
+      {error.code === "AUTH_REQUIRED" ? (
+        // Retrying cannot help: the page has no session. The one thing that
+        // does is signing in again, so that is the button.
+        <button className="btn btn-sm" onClick={() => { void signInAgain(); }}
+                style={{ marginTop: ".6rem" }}>
+          Sign in again
+        </button>
+      ) : onRetry ? (
         <button className="btn btn-ghost btn-sm" onClick={onRetry} style={{ marginTop: ".6rem" }}>
           <RefreshCw className="ico" aria-hidden /> Try again
         </button>

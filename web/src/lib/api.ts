@@ -109,6 +109,36 @@ export const REQUEST_TIMEOUT_MS = 25_000;
 
 const TIMED_OUT = Symbol("timed out");
 
+/** How long to wait before asking for the session a second time. */
+export const SESSION_RETRY_MS = 350;
+
+/**
+ * The access token, asked for up to three ways.
+ *
+ * A session that was set a moment ago (the page a confirmation link lands on,
+ * a refresh finishing in another tab) can be missing from the first read and
+ * present in the second. Reporting "sign in again" for that instant was seen
+ * on a phone right after confirming an email: the page had loaded, the
+ * session was real, and every card said AUTH_REQUIRED. So a missing session
+ * is read once more after a short wait, and then a refresh is tried, before
+ * it is given up as signed out.
+ */
+async function sessionToken(): Promise<string | null> {
+  const supabase = createClient();
+  const read = async () => (await supabase.auth.getSession()).data.session?.access_token ?? null;
+  const first = await read();
+  if (first) return first;
+  await new Promise((resolve) => setTimeout(resolve, SESSION_RETRY_MS));
+  const second = await read();
+  if (second) return second;
+  try {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function bearer(): Promise<string | null | typeof TIMED_OUT> {
   // THE SESSION LOOKUP HAS A DEADLINE. `getSession` can wait on a storage lock
   // held by another tab, or on a token refresh over a connection that has
@@ -118,8 +148,7 @@ async function bearer(): Promise<string | null | typeof TIMED_OUT> {
   // deadline turns that into an answer the page can show and retry.
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const lookup = createClient().auth.getSession()
-      .then(({ data }) => data.session?.access_token ?? null);
+    const lookup = sessionToken();
     const deadline = new Promise<typeof TIMED_OUT>((resolve) => {
       timer = setTimeout(() => resolve(TIMED_OUT), SESSION_TIMEOUT_MS);
     });
