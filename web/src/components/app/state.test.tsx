@@ -6,7 +6,10 @@
  * being guarded is a confident empty table rendered over a 503.
  */
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+const signInAgain = vi.fn();
+vi.mock("@/lib/supabase/reauth", () => ({ signInAgain: () => signInAgain() }));
+
 import { ErrorNotice, ReadPanel, StatusPill } from "./state";
 
 describe("ReadPanel", () => {
@@ -92,5 +95,24 @@ describe("ErrorNotice", () => {
     }} />);
     expect(screen.getByText("symbols: required")).toBeDefined();
     expect(screen.getByText(/stopLoss.mode/)).toBeDefined();
+  });
+
+  it("offers Sign in again, not a retry that cannot work, when the page has no session", () => {
+    const retry = vi.fn();
+    render(<ErrorNotice onRetry={retry} error={{
+      ok: false, status: 401, code: "AUTH_REQUIRED", message: "Sign in to continue.",
+    }} />);
+    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+    screen.getByRole("button", { name: "Sign in again" }).click();
+    expect(signInAgain).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it("keeps Try again for every other failure", () => {
+    render(<ErrorNotice onRetry={() => {}} error={{
+      ok: false, status: 0, code: "NETWORK", message: "Network error",
+    }} />);
+    expect(screen.getByRole("button", { name: /try again/i })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Sign in again" })).toBeNull();
   });
 });

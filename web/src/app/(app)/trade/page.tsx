@@ -71,6 +71,9 @@ export default function TradePage() {
   const status = accounts.result?.ok ? accounts.result.data : null;
   const execution = me.result?.ok ? me.result.data.execution : null;
   const action = accountAction(c.account, { status, execution });
+  // Hidden only when the server says live is closed; while that is unknown the
+  // choice stays, so a failed read never removes an option that may be real.
+  const liveOffered = execution?.liveExecutionEnabled !== false;
   const amounts = riskAmounts({
     accountSize: c.capitalAllocated, riskPercent: c.riskPercent,
     dailyLossPercent: c.dailyLossPercent,
@@ -131,6 +134,14 @@ export default function TradePage() {
     invalidate("ctrader/status", "accounts", "me", "automation");
     await accounts.reload();
   }
+
+  // With live closed there is nothing to choose: take the demo account as soon
+  // as the account step is reached, so Continue is not waiting on a click that
+  // has only one possible answer.
+  useEffect(() => {
+    if (step >= 3 && !liveOffered && c.account !== "demo" && status) chooseAccount("demo");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, liveOffered, c.account, status]);
 
   function chooseAccount(intent: "demo" | "live") {
     set("account", intent);
@@ -226,15 +237,18 @@ export default function TradePage() {
                    onChange={(e) => setQuery(e.target.value)} />
           </div>
           {view.classes.length > 1 ? (
-            <SegmentedControl
-              label="Instrument class"
-              value={symClass}
-              onChange={setSymClass}
-              options={[
-                { value: "all", label: "All" },
-                ...view.classes.map((k) => ({ value: k.id, label: `${k.label} · ${k.count}` })),
-              ]}
-            />
+            // Wrapping chips, not the equal-width segmented control: the class
+            // labels differ in length ("Other · 412" against "All"), and seven
+            // of them in equal columns printed over each other on a phone.
+            <div className="chips" role="radiogroup" aria-label="Instrument class">
+              {[{ id: "all", label: "All" },
+                ...view.classes.map((k) => ({ id: k.id, label: `${k.label} · ${k.count}` }))]
+                .map((o) => (
+                  <button key={o.id} type="button" role="radio" className="chip"
+                          aria-checked={symClass === o.id}
+                          onClick={() => setSymClass(o.id)}>{o.label}</button>
+                ))}
+            </div>
           ) : null}
           {!broker.result ? <Spinner label="Reading your broker's instruments" /> : null}
           <div className="chips chips-symbols" role="radiogroup" aria-label="Instrument">
@@ -418,14 +432,24 @@ export default function TradePage() {
           {status && !status.connected ? (
             <p>No broker connected yet. <Link href="/connect">Connect cTrader</Link> to run a strategy on an account.</p>
           ) : null}
-          <div className="chips" role="radiogroup" aria-label="Account">
-            <button type="button" role="radio" className="chip" data-mode="demo"
-                    aria-checked={c.account === "demo"}
-                    onClick={() => chooseAccount("demo")}>Demo</button>
-            <button type="button" role="radio" className="chip" data-mode="live"
-                    aria-checked={c.account === "live"}
-                    onClick={() => chooseAccount("live")}>Live</button>
-          </div>
+          {liveOffered ? (
+            <div className="chips" role="radiogroup" aria-label="Account">
+              <button type="button" role="radio" className="chip" data-mode="demo"
+                      aria-checked={c.account === "demo"}
+                      onClick={() => chooseAccount("demo")}>Demo</button>
+              <button type="button" role="radio" className="chip" data-mode="live"
+                      aria-checked={c.account === "live"}
+                      onClick={() => chooseAccount("live")}>Live</button>
+            </div>
+          ) : (
+            // Live trading is not open on this platform, so asking "demo or
+            // live?" is a question with one answer. It says so, and demo is
+            // already chosen.
+            <p className="trade-note" role="status">
+              This runs on your demo account. Live trading is not open yet, so
+              no live order can be sent.
+            </p>
+          )}
           {status?.connected ? (
             <p className="muted trade-note">
               Connected: {status.accounts.map((a) => `#${a.ctid} ${a.mode === "live" ? "LIVE" : "demo"}`).join(", ") || "none"}.

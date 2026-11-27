@@ -4,18 +4,20 @@
  * same "check your email" screen either way, so the page does not say
  * whether the address is already registered.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
+const replace = vi.fn();
+const signInWithPassword = vi.fn();
 const refresh = vi.fn();
 const signUp = vi.fn();
 const setSession = vi.fn();
 const resend = vi.fn();
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, refresh }),
+  useRouter: () => ({ push, refresh, replace }),
 }));
 
 vi.mock("next/link", () => ({
@@ -29,7 +31,11 @@ vi.mock("@/lib/supabase/client", () => ({
     auth: { signUp: (body: unknown) => signUp(body), resend: (body: unknown) => resend(body) },
   }),
   createClient: () => ({
-    auth: { setSession: (session: unknown) => setSession(session), resend: (body: unknown) => resend(body) },
+    auth: {
+      setSession: (session: unknown) => setSession(session),
+      resend: (body: unknown) => resend(body),
+      signInWithPassword: (body: unknown) => signInWithPassword(body),
+    },
   }),
 }));
 
@@ -37,6 +43,9 @@ import SignUpPage from "./page";
 
 beforeEach(() => {
   push.mockReset();
+  replace.mockReset();
+  signInWithPassword.mockReset();
+  signInWithPassword.mockResolvedValue({ error: { message: "Email not confirmed", code: "email_not_confirmed" } });
   refresh.mockReset();
   signUp.mockReset();
   setSession.mockReset();
@@ -148,4 +157,33 @@ describe("sign up", () => {
     expect(signUp).not.toHaveBeenCalled();
   });
 
+});
+
+describe("after the link is confirmed somewhere else", () => {
+  async function waitingScreen() {
+    signUp.mockResolvedValue({ data: { session: null }, error: null });
+    await submit();
+    await screen.findByText(/Check your email/i);
+  }
+
+  it("says the page carries on by itself", async () => {
+    await waitingScreen();
+    expect(screen.getByText(/this page continues by itself/i)).toBeDefined();
+  });
+
+  it("goes to the dashboard by itself once sign-in works", async () => {
+    await waitingScreen();
+    signInWithPassword.mockResolvedValue({ error: null });
+    await act(async () => { window.dispatchEvent(new Event("focus")); await Promise.resolve(); });
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: "ada@example.test", password: "long-enough" });
+  });
+
+  it("stays on the screen while the address is still unconfirmed", async () => {
+    await waitingScreen();
+    await act(async () => { window.dispatchEvent(new Event("focus")); await Promise.resolve(); });
+    await waitFor(() => expect(signInWithPassword).toHaveBeenCalled());
+    expect(replace).not.toHaveBeenCalled();
+    expect(screen.getByText(/Check your email/i)).toBeDefined();
+  });
 });

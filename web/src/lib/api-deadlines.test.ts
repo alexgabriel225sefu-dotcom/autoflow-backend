@@ -11,16 +11,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let getSession: () => Promise<{ data: { session: { access_token: string } | null } }>;
+let refreshSession: () => Promise<{ data: { session: { access_token: string } | null } }>;
 
 vi.mock("./supabase/client", () => ({
-  createClient: () => ({ auth: { getSession: () => getSession() } }),
+  createClient: () => ({ auth: {
+    getSession: () => getSession(),
+    refreshSession: () => refreshSession(),
+  } }),
 }));
 
-import { api, CODES, REQUEST_TIMEOUT_MS, SESSION_TIMEOUT_MS } from "./api";
+import { api, CODES, REQUEST_TIMEOUT_MS, SESSION_RETRY_MS, SESSION_TIMEOUT_MS } from "./api";
 
 beforeEach(() => {
   vi.useFakeTimers();
   getSession = async () => ({ data: { session: { access_token: "t" } } });
+  refreshSession = async () => ({ data: { session: null } });
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
@@ -51,7 +56,45 @@ describe("the session lookup has a deadline", () => {
 
   it("no session at all is still AUTH_REQUIRED (sign in), not a timeout", async () => {
     getSession = async () => ({ data: { session: null } });
-    const r = await api("me");
+    const pending = api("me");
+    await vi.advanceTimersByTimeAsync(SESSION_RETRY_MS + 10);
+    const r = await pending;
+    expect(!r.ok && r.code).toBe(CODES.AUTH_REQUIRED);
+  });
+
+  it("a session that appears a moment later is used, not reported as signed out", async () => {
+    // Seen on a phone right after confirming an email: the page had loaded,
+    // the session was real, and the first read still came back empty.
+    let reads = 0;
+    getSession = async () => ({ data: { session: ++reads >= 2 ? { access_token: "late" } : null } });
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = api("me");
+    await vi.advanceTimersByTimeAsync(SESSION_RETRY_MS + 10);
+    const r = await pending;
+    expect(r.ok).toBe(true);
+    const init = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init[1].headers as Record<string, string>).Authorization).toBe("Bearer late");
+  });
+
+  it("a refresh is tried before giving up, and its token is used", async () => {
+    getSession = async () => ({ data: { session: null } });
+    refreshSession = async () => ({ data: { session: { access_token: "renewed" } } });
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = api("me");
+    await vi.advanceTimersByTimeAsync(SESSION_RETRY_MS + 10);
+    expect((await pending).ok).toBe(true);
+    const init = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init[1].headers as Record<string, string>).Authorization).toBe("Bearer renewed");
+  });
+
+  it("a refresh that throws still ends as AUTH_REQUIRED", async () => {
+    getSession = async () => ({ data: { session: null } });
+    refreshSession = async () => { throw new Error("no session"); };
+    const pending = api("me");
+    await vi.advanceTimersByTimeAsync(SESSION_RETRY_MS + 10);
+    const r = await pending;
     expect(!r.ok && r.code).toBe(CODES.AUTH_REQUIRED);
   });
 });
