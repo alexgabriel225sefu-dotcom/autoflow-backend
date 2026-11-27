@@ -1,6 +1,6 @@
 "use client";
 import { InstrumentArt, InstrumentCard } from "@/components/app/instrument-art";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   api, type ApiError, type AutomationState, type CtraderStatus, type Me,
@@ -19,7 +19,7 @@ import { groupByFamily } from "../rules/new/strategy/catalog";
 import { StrategyStep } from "./strategy-step";
 import {
   DAILY_LOSS_CEILING, EMPTY_CHOICE, LIVE_RISK_CAP, RISK_PICKS, ROW_LIMIT,
-  TIMEFRAME_CHOICES, accountAction, minLotNotice, minLotPath, riskAmounts,
+  TIMEFRAME_CHOICES, accountAction, atrDefaults, minLotNotice, minLotPath, riskAmounts,
   setupPayload, stepBlock, stopNotice, symbolView, type TradeChoice,
 } from "./trade-model";
 
@@ -55,8 +55,18 @@ export default function TradePage() {
   const [showAll, setShowAll] = useState(false);
   const [tab, setTab] = useState<"ready" | "mine">("ready");
   const [methodErr, setMethodErr] = useState<ApiError | null>(null);
+  // True once the client has typed in the stop or target, or taken the wider
+  // stop the warning offers. From then on no default is ever written over them.
+  // A ref as well as state: the effects below read it at the moment they run.
+  const [stopsEdited, setStopsEdited] = useState(false);
+  const editedRef = useRef(false);
   const set = <K extends keyof TradeChoice>(k: K, v: TradeChoice[K]) =>
     setC((x) => ({ ...x, [k]: v }));
+  const setStops = (stop: string, target: string) => {
+    editedRef.current = true;
+    setStopsEdited(true);
+    setC((x) => ({ ...x, stopLossPips: stop, takeProfitPips: target }));
+  };
 
   const status = accounts.result?.ok ? accounts.result.data : null;
   const execution = me.result?.ok ? me.result.data.execution : null;
@@ -69,6 +79,24 @@ export default function TradePage() {
     step >= 2 ? minLotPath(c) : null, 400));
   const lotNotice = minLot.result?.ok ? minLotNotice(minLot.result.data, c) : null;
   const stopWarn = minLot.result?.ok ? stopNotice(minLot.result.data, c) : null;
+  const defaults = !stopsEdited && minLot.result?.ok
+    ? atrDefaults(minLot.result.data, c) : null;
+  const defStop = defaults ? String(defaults.stop) : null;
+  const defTarget = defaults ? String(defaults.target) : null;
+  // Another instrument or timeframe makes the prefilled numbers stale, so an
+  // untouched pair goes back to the starting point until the new reading comes.
+  useEffect(() => {
+    if (editedRef.current) return;
+    setC((x) => (x.stopLossPips === EMPTY_CHOICE.stopLossPips
+      && x.takeProfitPips === EMPTY_CHOICE.takeProfitPips ? x
+      : { ...x, stopLossPips: EMPTY_CHOICE.stopLossPips,
+          takeProfitPips: EMPTY_CHOICE.takeProfitPips }));
+  }, [c.symbol, c.timeframe]);
+  useEffect(() => {
+    if (editedRef.current || defStop === null || defTarget === null) return;
+    setC((x) => (x.stopLossPips === defStop && x.takeProfitPips === defTarget ? x
+      : { ...x, stopLossPips: defStop, takeProfitPips: defTarget }));
+  }, [defStop, defTarget]);
   const running = auto.result?.ok && auto.result.data.state === "running";
   const catalogue = lib.result?.ok ? lib.result.data : null;
   const strategies = useMemo(() => catalogue?.strategies ?? [], [catalogue]);
@@ -121,7 +149,7 @@ export default function TradePage() {
   async function go(): Promise<string> {
     setErr(null); setNote("");
     let body;
-    try { body = setupPayload(c); } catch { return "The setup is incomplete."; }
+    try { body = setupPayload(c, { stopSource: stopsEdited ? "client" : "default" }); } catch { return "The setup is incomplete."; }
     const res = await api<SetupResult>("automation/setup", { method: "POST", body });
     if (!res.ok) { setErr(res); return "Not started."; }
     invalidate("rules", "me", "automation");
@@ -334,23 +362,26 @@ export default function TradePage() {
             <label className="field"><span>Stop loss <span className="hint">pips</span></span>
               <input type="number" min="1" max="500" step="1" aria-label="Stop loss pips"
                      value={c.stopLossPips}
-                     onChange={(e) => set("stopLossPips", e.target.value)} />
+                     onChange={(e) => { editedRef.current = true; setStopsEdited(true);
+                                        set("stopLossPips", e.target.value); }} />
             </label>
             <label className="field"><span>Take profit <span className="hint">pips</span></span>
               <input type="number" min="1" max="2000" step="1" aria-label="Take profit pips"
                      value={c.takeProfitPips}
-                     onChange={(e) => set("takeProfitPips", e.target.value)} />
+                     onChange={(e) => { editedRef.current = true; setStopsEdited(true);
+                                        set("takeProfitPips", e.target.value); }} />
               <span className="field-note">These pip values are used exactly for the stop and target.</span>
             </label>
           </div>
+          {defaults && c.stopLossPips === defStop && c.takeProfitPips === defTarget ? (
+            <div className="field-note" role="status">{defaults.text}</div>
+          ) : null}
           {stopWarn ? (
             <div className="notice notice-warn" role="status">
               {stopWarn.text}{" "}
               <button type="button" className="btn btn-quiet"
-                      onClick={() => {
-                        set("stopLossPips", String(stopWarn.suggestPips));
-                        set("takeProfitPips", String(stopWarn.suggestPips * 2));
-                      }}>
+                      onClick={() => setStops(String(stopWarn.suggestPips),
+                                              String(stopWarn.suggestPips * 2))}>
                 Use {stopWarn.suggestPips} pips stop, {stopWarn.suggestPips * 2} target
               </button>
             </div>

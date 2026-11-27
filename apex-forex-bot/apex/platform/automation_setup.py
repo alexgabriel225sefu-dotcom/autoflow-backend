@@ -82,6 +82,17 @@ POSITIONS_MIN = 1
 POSITIONS_MAX = 8
 STOP_MIN = 1.0
 STOP_MAX = 500.0
+
+# A stop the CLIENT did not choose (the wizard's untouched default) is held to
+# the floor the engine applies to a stop it places itself: never inside spread
+# and noise, which is at least 4x the current spread and 20 pips (user_loop,
+# ATR stops). A stop the client typed is theirs and is never checked against
+# it. The wizard says which it is in `stopSource`; a body without the field is
+# read as the client's own choice, so existing callers are not refused
+# anything new.
+STOP_FLOOR_PIPS = 20.0
+STOP_SPREAD_MULTIPLE = 4.0
+STOP_SOURCES = ("default", "client")
 TARGET_MIN = 1.0
 TARGET_MAX = 2000.0
 SYMBOLS_MAX = 8
@@ -191,6 +202,61 @@ def _add(problems, field, detail):
     problems.append(f"{field}: {detail}")
 
 
+def stop_floor_pips(spread_pips=None):
+    """The smallest stop, in pips, a non-client stop may have.
+
+    The 20-pip floor, or four times the live spread when that is larger. An
+    unreadable or non-positive spread leaves the 20-pip floor: the check never
+    depends on a read succeeding to refuse the obviously small stop.
+    """
+    floor = STOP_FLOOR_PIPS
+    if _num(spread_pips) and spread_pips > 0:
+        floor = max(floor, STOP_SPREAD_MULTIPLE * float(spread_pips))
+    return floor
+
+
+def default_stop_problems(body, spread_pips=None):
+    """Problems with a stop that came from the wizard's default, not the client.
+
+    Empty for a stop the client chose, for a body that does not say, and for a
+    stop at or above the floor. The message names the floor and how it was
+    reached, so a client can see why and pick their own stop.
+    """
+    if not isinstance(body, dict) or body.get("stopSource") != "default":
+        return []
+    stop = body.get("stopLossPips")
+    if not _num(stop):
+        return []
+    floor = stop_floor_pips(spread_pips)
+    if stop >= floor:
+        return []
+    why = (f"four times the live spread of {float(spread_pips):g} pips"
+           if _num(spread_pips) and spread_pips > 0
+           and STOP_SPREAD_MULTIPLE * float(spread_pips) > STOP_FLOOR_PIPS
+           else f"the {STOP_FLOOR_PIPS:g}-pip floor")
+    return [f"stopLossPips: {stop:g} pips was not chosen by you and is inside "
+            f"spread and noise ({why}); set a stop of at least {floor:g} pips "
+            f"yourself, or use a wider one"]
+
+
+def _live_spread_pips(user_id, symbol, ctid=None):
+    """The symbol's live spread in pips, or None when it cannot be read.
+
+    A read, never an order. Any failure is None, which leaves the static floor.
+    """
+    try:
+        from apex.platform import broker_read as _br
+        q = _br.quote(user_id, symbol=symbol, ctid=ctid)
+        if not isinstance(q, dict) or q.get("status") != "ok":
+            return None
+        bid, ask = float(q["bid"]), float(q["ask"])
+        if not (bid > 0 and ask >= bid):
+            return None
+        return _fx.spread_pips(bid, ask, symbol)
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
 def validate(body, *, known_strategy_ids=None):
     """Problems with `body`. Empty means the numbers may be stored."""
     problems = []
@@ -239,6 +305,14 @@ def validate(body, *, known_strategy_ids=None):
              STOP_MIN, STOP_MAX)
     _between(problems, "takeProfitPips", body.get("takeProfitPips"),
              TARGET_MIN, TARGET_MAX)
+
+    src = body.get("stopSource")
+    if src is not None and src not in STOP_SOURCES:
+        _add(problems, "stopSource", "must be " + " or ".join(STOP_SOURCES))
+    else:
+        # The part of the check that needs no read. The live-spread part runs
+        # in submit(), which is allowed to ask the broker.
+        problems.extend(default_stop_problems(body))
 
     strategy = body.get("strategy")
     source = body.get("sourceRuleId")
@@ -338,7 +412,8 @@ def preview(user_id):
     return out
 
 
-def submit(user_id, body, *, starter=None, gate_reader=None, binder=None):
+def submit(user_id, body, *, starter=None, gate_reader=None, binder=None,
+           spread_reader=None):
     """Validate, and start only when the account and the gate allow it.
 
     A live body whose gate is not open returns `executed: false` and does
@@ -361,6 +436,14 @@ def submit(user_id, body, *, starter=None, gate_reader=None, binder=None):
                     "live": view}
 
     account_id = (binder or _bind)(user_id, body["account"])
+    if body.get("stopSource") == "default":
+        # Only a stop the client did not choose is compared with the live
+        # spread. A read that fails leaves the static 20-pip floor in place.
+        spread = (spread_reader or _live_spread_pips)(
+            user_id, (body.get("symbols") or [""])[0], account_id)
+        problems = default_stop_problems(body, spread)
+        if problems:
+            raise SetupInvalid(problems)
     source = None
     if body.get("sourceRuleId"):
         try:

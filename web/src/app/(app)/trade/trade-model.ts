@@ -277,6 +277,49 @@ export function stopNotice(
   };
 }
 
+/** The input maxima of the stop and target fields. */
+export const STOP_MAX_PIPS = 500;
+export const TARGET_MAX_PIPS = 2000;
+/** The default stop is this many typical candles; the target is twice the stop. */
+export const DEFAULT_STOP_CANDLES = 2.5;
+
+/**
+ * The stop and target the wizard prefills for the chosen instrument and
+ * timeframe, from the candle size the min-lot read already returns, or null
+ * when there is no usable reading for exactly this choice.
+ *
+ * Every instrument used to start at 20 pips / 40 pips. On gold that is $2
+ * against hourly candles of about $14, so the starting point was inside the
+ * market's noise for the one client who never touched it. This is a starting
+ * point and nothing more: the page applies it only while neither field has
+ * been edited, and the server holds a stop that arrives marked as the default
+ * to the engine's own floor. The numbers come from candle size, not from any
+ * result, and the note says so.
+ */
+export function atrDefaults(
+  r: MinLotRead | null | undefined,
+  c: Pick<TradeChoice, "symbol" | "timeframe">,
+): { stop: number; target: number; atrPips: number; capped: boolean; text: string } | null {
+  if (!r || r.status !== "ok" || !r.minLot) return null;
+  const m = r.minLot;
+  const atr = m.atrPips;
+  if (typeof atr !== "number" || !(atr > 0)) return null;
+  if (m.symbol !== c.symbol || m.timeframe !== c.timeframe) return null;
+  const raw = Math.max(1, Math.round(DEFAULT_STOP_CANDLES * atr));
+  const stop = Math.min(STOP_MAX_PIPS, raw);
+  const target = Math.min(TARGET_MAX_PIPS, stop * 2);
+  const capped = raw > STOP_MAX_PIPS;
+  return {
+    stop, target, atrPips: atr, capped,
+    text:
+      `Starting numbers for ${m.symbol} on ${m.timeframe}: one typical candle is ` +
+      `about ${atr} pips, so the stop starts at ${DEFAULT_STOP_CANDLES}\u00d7 that ` +
+      `(${stop} pips${capped ? `, the most the field allows` : ""}) and the target ` +
+      `at twice the stop (${target} pips). They come from candle size, not from ` +
+      `any result. Change either box and the numbers are yours.`,
+  };
+}
+
 /** What is still to choose, in the order the page asks for it. Empty = ready. */
 export function missingChoices(c: TradeChoice): string[] {
   const out: string[] = [];
@@ -332,13 +375,21 @@ export type SetupPayload = {
   takeProfitPips: number;
   automationLevel: string;
   account: "demo" | "live";
+  /** Whether the stop is the wizard's own default or one the client chose. The
+   *  server holds only a default to the spread-and-noise floor. */
+  stopSource?: StopSource;
 };
+
+export type StopSource = "default" | "client";
 
 /**
  * The one body POST /automation/setup accepts. The server rebuilds the rule
  * from it and is the check that matters; this only sends a body it will accept.
  */
-export function setupPayload(c: TradeChoice): SetupPayload {
+export function setupPayload(
+  c: TradeChoice,
+  opts: { stopSource?: StopSource } = {},
+): SetupPayload {
   if (!c.symbol || (!c.strategy && !c.custom)) {
     throw new Error("a strategy or method is required");
   }
@@ -368,8 +419,9 @@ export function setupPayload(c: TradeChoice): SetupPayload {
     automationLevel: c.level,
     account: c.account,
   };
-  if (c.strategy) return { ...shared, strategy: c.strategy.id };
-  return { ...shared, sourceRuleId: c.custom!.ruleDocId };
+  const withSource = opts.stopSource ? { ...shared, stopSource: opts.stopSource } : shared;
+  if (c.strategy) return { ...withSource, strategy: c.strategy.id };
+  return { ...withSource, sourceRuleId: c.custom!.ruleDocId };
 }
 
 /**
