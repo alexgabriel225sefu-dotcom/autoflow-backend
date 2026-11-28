@@ -9,7 +9,7 @@ export function ContentShell({ children }: { children: React.ReactNode }) {
         <nav className="mkt-nav">
           <Link href="/" prefetch={false} aria-label="Apex4Traders home"><BrandLockup size={24} /></Link>
           <span className="mkt-nav-mid">
-            <Link href="/#product">Product</Link>
+            <Link href="/#product" prefetch={false}>Product</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/guide">Guides</Link>
             <Link href="/pricing">Pricing</Link>
