@@ -1,0 +1,23 @@
+# EXAMPLE ONLY — a standalone Render Static Site.
+# Do NOT merge this into the production Apex4Traders render.yaml.
+# Create a new Static Site in the Render dashboard (or a separate Blueprint)
+# after the user approves the page.
+
+# services:
+#   - type: web
+#     name: apex-affiliate-landing
+#     runtime: static
+#     buildCommand: npm run build
+#     staticPublishPath: dist
+#     # Optional SPA rewrite:
+#     # routes:
+#     #   - type: rewrite
+#     #     source: /*
+#     #     destination: /index.html
+
+# Place the real site in its own folder or repo, for example:
+#   apex-affiliate-page/
+#     index.html
+#     assets/
+#
+# Public URL is assigned by Render after the user creates the service.

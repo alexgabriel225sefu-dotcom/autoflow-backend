@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apex4Traders — internal metrics (sample)</title>
+  <!--
+    Starter template for the admin-metrics-dashboard skill.
+    Design rules adapted from OpenMausBot data-dashboards (Apache-2.0).
+    This file is original. Replace the sample CSV before any real use.
+    Charting: ECharts 6.1.0 pinned from jsDelivr — do not switch to @latest.
+  -->
+  <style>
+    :root {
+      --bg: #0A0B0D;
+      --card: #14161A;
+      --ink: #F5F7FA;
+      --muted: #8A93A0;
+      --line: #2A2E36;
+      --accent: #22E07A;
+      --bad: #FF3B3B;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+    }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+    header { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
+    h1 { font-size: 24px; letter-spacing: -0.03em; margin: 0; }
+    .note, footer { color: var(--muted); font-size: 13px; }
+    .banner { background: #3a2a00; color: #ffd978; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+    .kpi-label { color: var(--muted); font-size: 12px; }
+    .kpi-value { font-size: 30px; font-weight: 650; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .chart { height: 320px; }
+    .grid { display: grid; gap: 16px; }
+    @media (min-width: 800px) { .split { grid-template-columns: 1fr 1fr; } }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; }
+    select { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+    .err { color: var(--bad); }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+</head>
+<body>
+  <main>
+    <div class="banner" id="sample-banner">SAMPLE DATA — not live Apex figures. Replace data.csv or the embedded CSV before use. Internal only.</div>
+    <header>
+      <div>
+        <h1>Apex4Traders — internal metrics</h1>
+        <p class="note" id="range">Loading…</p>
+      </div>
+      <label>Period
+        <select id="period">
+          <option value="all">All days</option>
+        </select>
+      </label>
+    </header>
+    <div id="error" class="err" hidden></div>
+    <section class="kpis" id="kpis"></section>
+    <section class="card">
+      <h2 style="margin:0 0 4px;font-size:16px">How many licences were sold over time?</h2>
+      <p class="note" id="sales-note"></p>
+      <div id="sales-chart" class="chart" role="img" aria-label="Licences sold per day"></div>
+    </section>
+    <section class="grid split" style="margin-top:16px">
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:16px">Where did paid licences come from?</h2>
+        <p class="note" id="source-note"></p>
+        <div id="source-chart" class="chart" role="img" aria-label="Licences by attribution source"></div>
+      </div>
+      <div class="card">
+        <h2 style="margin:0 0 4px;font-size:16px">Daily detail</h2>
+        <div style="overflow:auto">
+          <table id="detail">
+            <thead><tr><th>Date</th><th>Licences</th><th>Refunds</th><th>Demo signups</th><th>Referrals</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <footer id="source-line" style="margin-top:24px"></footer>
+  </main>
+  <script id="embedded-data" type="text/csv">date,source,licences,refunds,demo_signups,referrals
+2026-11-01,direct,2,0,11,1
+2026-11-01,affiliate,1,0,4,3
+2026-11-08,direct,3,1,9,0
+2026-11-08,affiliate,2,0,6,4
+2026-11-15,direct,1,0,14,2
+2026-11-15,affiliate,4,0,8,5
+2026-11-22,direct,2,0,10,1
+2026-11-22,affiliate,3,0,7,4
+</script>
+  <script>
+    const CONFIG = {
+      currency: "USD",
+      source: "Sample CSV bundled with the skill — replace before real use",
+      updated: "2026-11-28",
+      licencePrice: 497
+    };
+
+    const money = new Intl.NumberFormat("en-US", { style: "currency", currency: CONFIG.currency, maximumFractionDigits: 0 });
+    const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
+    function parseCsv(text) {
+      const lines = text.trim().split(/\r?\n/);
+      const headers = lines.shift().split(",");
+      return lines.map((line) => {
+        const cols = line.split(",");
+        const row = {};
+        headers.forEach((h, i) => { row[h] = cols[i]; });
+        row.licences = Number(row.licences);
+        row.refunds = Number(row.refunds);
+        row.demo_signups = Number(row.demo_signups);
+        row.referrals = Number(row.referrals);
+        return row;
+      });
+    }
+
+    function sum(rows, key) { return rows.reduce((a, r) => a + r[key], 0); }
+
+    function byDay(rows) {
+      const map = new Map();
+      for (const r of rows) {
+        const d = map.get(r.date) || { date: r.date, licences: 0, refunds: 0, demo_signups: 0, referrals: 0 };
+        d.licences += r.licences; d.refunds += r.refunds;
+        d.demo_signups += r.demo_signups; d.referrals += r.referrals;
+        map.set(r.date, d);
+      }
+      return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    function bySource(rows) {
+      const map = new Map();
+      for (const r of rows) map.set(r.source, (map.get(r.source) || 0) + r.licences);
+      return [...map.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    }
+
+    const theme = {
+      backgroundColor: "transparent",
+      textStyle: { color: "#8A93A0", fontFamily: "system-ui" },
+      axisLine: { lineStyle: { color: "#2A2E36" } },
+      splitLine: { lineStyle: { color: "#2A2E36" } }
+    };
+
+    async function loadRows() {
+      try {
+        const res = await fetch("data.csv", { cache: "no-store" });
+        if (res.ok) return parseCsv(await res.text());
+      } catch (_) { /* fall back to embedded */ }
+      return parseCsv(document.getElementById("embedded-data").textContent);
+    }
+
+    function render(all) {
+      const period = document.getElementById("period");
+      const days = [...new Set(all.map((r) => r.date))].sort();
+      if (period.options.length === 1) {
+        for (const d of days) {
+          const opt = document.createElement("option");
+          opt.value = d; opt.textContent = d; period.appendChild(opt);
+        }
+      }
+      const rows = period.value === "all" ? all : all.filter((r) => r.date === period.value);
+      const daily = byDay(rows);
+      const licences = sum(rows, "licences");
+      const refunds = sum(rows, "refunds");
+      const demos = sum(rows, "demo_signups");
+      const refs = sum(rows, "referrals");
+      const net = licences - refunds;
+
+      document.getElementById("range").textContent =
+        (period.value === "all" ? `${days[0] || "—"} to ${days[days.length - 1] || "—"}` : period.value)
+        + " · refreshed " + CONFIG.updated;
+
+      document.getElementById("kpis").innerHTML = [
+        ["Net licences", String(net)],
+        ["Gross sales (list)", money.format(net * CONFIG.licencePrice)],
+        ["Refunds", String(refunds)],
+        ["Demo signups", String(demos)],
+        ["Affiliate referrals", String(refs)]
+      ].map(([label, value]) => `<div class="card"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div></div>`).join("");
+
+      document.getElementById("sales-note").textContent = net === 0
+        ? "No licences in this period."
+        : `${net} net licences in view (${licences} sold, ${refunds} refunded).`;
+
+      const sales = echarts.init(document.getElementById("sales-chart"));
+      sales.setOption({
+        ...theme,
+        tooltip: { trigger: "axis" },
+        grid: { left: 40, right: 16, top: 16, bottom: 32 },
+        xAxis: { type: "category", data: daily.map((d) => d.date), axisLine: theme.axisLine },
+        yAxis: { type: "value", min: 0, splitLine: theme.splitLine, axisLabel: { formatter: compact.format } },
+        series: [{
+          type: "bar",
+          data: daily.map((d) => d.licences),
+          name: "Licences",
+          itemStyle: { color: "#22E07A", borderRadius: [4, 4, 0, 0] }
+        }]
+      });
+
+      const sources = bySource(rows);
+      document.getElementById("source-note").textContent = sources.length
+        ? sources.map((s) => `${s.name}: ${s.value}`).join(" · ")
+        : "No rows.";
+      const src = echarts.init(document.getElementById("source-chart"));
+      src.setOption({
+        ...theme,
+        tooltip: { trigger: "axis" },
+        grid: { left: 80, right: 24, top: 16, bottom: 24 },
+        xAxis: { type: "value", min: 0, splitLine: theme.splitLine },
+        yAxis: { type: "category", data: sources.map((s) => s.name).reverse(), axisLine: theme.axisLine },
+        series: [{
+          type: "bar",
+          data: sources.map((s) => s.value).reverse(),
+          name: "Licences",
+          itemStyle: { color: "#22E07A", borderRadius: [0, 4, 4, 0] }
+        }]
+      });
+
+      document.querySelector("#detail tbody").innerHTML = daily.map((d) =>
+        `<tr><td>${d.date}</td><td>${d.licences}</td><td>${d.refunds}</td><td>${d.demo_signups}</td><td>${d.referrals}</td></tr>`
+      ).join("");
+
+      document.getElementById("source-line").textContent =
+        `Source: ${CONFIG.source}. Licence list price used for the gross-sales tile: ${money.format(CONFIG.licencePrice)}. Internal sample. Not financial advice.`;
+    }
+
+    loadRows().then((rows) => {
+      const period = document.getElementById("period");
+      period.addEventListener("change", () => render(rows));
+      render(rows);
+    }).catch((err) => {
+      document.getElementById("error").hidden = false;
+      document.getElementById("error").textContent = "Could not read data: " + err.message;
+    });
+  </script>
+</body>
+</html>
