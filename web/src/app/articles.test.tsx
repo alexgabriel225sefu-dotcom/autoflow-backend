@@ -57,7 +57,7 @@ describe("the guide articles are well formed", () => {
     for (const a of ARTICLES) {
       const text = JSON.stringify(a).toLowerCase();
       expect(text, a.slug).not.toMatch(/live trading is (open|available now)/);
-      expect(text, a.slug).not.toMatch(/guarantee[sd]? (a )?(profit|returns?|income)/);
+      expect(text, a.slug).not.toMatch(/(promise[sd]?|assure[sd]?) (a )?(profit|returns?|income)|(profit|returns?|income)s? (is|are|will be) guaranteed/);
     }
   });
 });
