@@ -59,7 +59,7 @@ export function ArticleView({ article }: { article: Article }) {
       <article className={styles.page}>
         <header className={styles.hero}>
           <nav className={styles.crumbs} aria-label="Breadcrumb">
-            <Link href="/">Home</Link> <span aria-hidden>/</span> <Link href="/guide">Guides</Link>
+            <Link href="/" prefetch={false}>Home</Link> <span aria-hidden>/</span> <Link href="/guide">Guides</Link>
           </nav>
           <h1 id="article-title" className={styles.title}>{article.title}</h1>
           <p className={styles.meta}>

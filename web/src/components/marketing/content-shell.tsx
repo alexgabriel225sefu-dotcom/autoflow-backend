@@ -7,7 +7,7 @@ export function ContentShell({ children }: { children: React.ReactNode }) {
     <main className="mkt">
       <div className="mkt-wrap">
         <nav className="mkt-nav">
-          <Link href="/" aria-label="Apex4Traders home"><BrandLockup size={24} /></Link>
+          <Link href="/" prefetch={false} aria-label="Apex4Traders home"><BrandLockup size={24} /></Link>
           <span className="mkt-nav-mid">
             <Link href="/#product">Product</Link>
             <Link href="/faq">FAQ</Link>
@@ -25,7 +25,7 @@ export function ContentShell({ children }: { children: React.ReactNode }) {
           <span>
             <Link href="/faq">FAQ</Link> · <Link href="/guide">Guides</Link> · <Link href="/pricing">Pricing</Link> ·{" "}
             <Link href="/terms">Terms</Link> · <Link href="/privacy">Privacy</Link> ·{" "}
-            <Link href="/">Home</Link>
+            <Link href="/" prefetch={false}>Home</Link>
           </span>
         </footer>
       </div>

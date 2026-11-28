@@ -24,7 +24,7 @@ export function AuthShell({
         <span className={`${styles.glow} ${styles.g3}`} />
       </div>
       <section className="auth-main">
-        <Link href="/" className="auth-logo" aria-label="Apex4Traders — home">
+        <Link href="/" prefetch={false} className="auth-logo" aria-label="Apex4Traders — home">
           <BrandLockup size={24} />
         </Link>
         <div className={`auth-block ${styles.block}`}>

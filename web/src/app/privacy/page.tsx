@@ -43,7 +43,7 @@ export default function PrivacyPage() {
       <ReadingProgress />
       <div className="legacy">
         <div style={{ marginBottom: "var(--sp-5)" }}>
-          <Link href="/"><BrandLockup size={24} /></Link>
+          <Link href="/" prefetch={false}><BrandLockup size={24} /></Link>
         </div>
 
         <h1>Privacy Policy</h1>

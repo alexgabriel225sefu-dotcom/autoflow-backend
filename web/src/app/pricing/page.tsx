@@ -24,7 +24,7 @@ export default function PricingPage() {
     <main className="mkt">
       <div className="mkt-wrap">
         <nav className="mkt-nav">
-          <Link href="/" aria-label="Apex4Traders home"><BrandLockup size={24} /></Link>
+          <Link href="/" prefetch={false} aria-label="Apex4Traders home"><BrandLockup size={24} /></Link>
           <span className="mkt-nav-mid">
             <Link href="/#product">Product</Link>
             <Link href="/#features">Features</Link>
@@ -58,7 +58,7 @@ export default function PricingPage() {
           <span>
             <Link href="/terms">Terms</Link> · <Link href="/refunds">Refunds</Link> ·{" "}
             <Link href="/tax">Tax</Link> · <Link href="/privacy">Privacy</Link> ·{" "}
-            <Link href="/">Home</Link>
+            <Link href="/" prefetch={false}>Home</Link>
           </span>
         </footer>
       </div>
