@@ -62,6 +62,8 @@ const EXPECTED: Record<string, "public" | "protected"> = {
   "/configurator": "public",          // arrives from an OLD receipt, no session
   "/pricing": "public",               // the price, linked from the landing page
   "/faq": "public",                   // indexable content page
+  "/guide": "public",                 // indexable hub of the guide articles
+  "/guide/[slug]": "public",          // indexable guide articles
   "/guide/test-a-rule-on-demo": "public", // indexable content page
 
   "/admin/audit": "protected",          // operator audit; the server refuses everyone else
