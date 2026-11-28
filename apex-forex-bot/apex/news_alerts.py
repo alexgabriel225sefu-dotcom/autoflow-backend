@@ -78,7 +78,7 @@ def event_id(ev) -> str:
     fills in.
     """
     raw = "|".join(str(ev.get(k) or "") for k in ("currency", "title", "time"))
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha1(raw.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
 
 
 def _claim(key) -> bool:

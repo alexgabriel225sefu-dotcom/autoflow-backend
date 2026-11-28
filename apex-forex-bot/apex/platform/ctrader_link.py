@@ -43,7 +43,6 @@ as the key it came from. It works with no extra token configured.
 import base64
 import hashlib
 import hmac
-import json
 import os
 import secrets
 import threading

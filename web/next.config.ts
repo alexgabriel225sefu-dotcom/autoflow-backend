@@ -163,6 +163,17 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: contentSecurityPolicy() },
         ],
       },
+      {
+        // Files served from /public (logos, product screens, video) were sent
+        // with max-age=0, so every page view asked for them again. A day is
+        // short enough that a replaced screenshot reaches visitors the next
+        // day, and the stale-while-revalidate window keeps repeat views fast.
+        // Hashed /_next/static files already cache for a year on their own.
+        source: "/:all*(png|jpg|jpeg|webp|svg|mp4|webm|ico)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" },
+        ],
+      },
     ];
   },
 };

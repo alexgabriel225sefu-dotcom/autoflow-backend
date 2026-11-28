@@ -34,7 +34,6 @@ decide for itself.
 """
 
 import hashlib
-import re
 import threading
 import time
 import uuid
@@ -616,7 +615,7 @@ _noted_refusals = {}
 
 def _duplicate_engine_note(user_id, message, *, window_s=3600):
     """True when this exact sentence was already filed for this user."""
-    digest = hashlib.sha1(message.encode()).hexdigest()[:12]
+    digest = hashlib.sha1(message.encode(), usedforsecurity=False).hexdigest()[:12]
     try:
         first = user_store.claim(
             f"eng-note:{user_id}:{digest}", ttl_s=window_s)
@@ -709,7 +708,7 @@ def _record_starter_failure(user_id, corr, conn, exc, *, revive):
     if revive:
         try:
             first = user_store.claim(
-                f"revive-err:{user_id}:{hashlib.sha1(cause.encode()).hexdigest()[:12]}",
+                f"revive-err:{user_id}:{hashlib.sha1(cause.encode(), usedforsecurity=False).hexdigest()[:12]}",
                 ttl_s=3600)
         except Exception:                                    # noqa: BLE001
             first = None

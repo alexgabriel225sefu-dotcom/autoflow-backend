@@ -28,8 +28,6 @@ recoverable, while the other order would index an entry that was never
 written.
 """
 
-import json
-import time
 import uuid
 
 from apex import user_store
