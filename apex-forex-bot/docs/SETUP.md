@@ -26,26 +26,26 @@ A free demo account gives you real market data and risk-free practice:
 2. Log in with a free GitHub account
 3. When Railway asks for **Root Directory**, type: `apex-forex-bot`
 
-### 2. Create your Telegram bot
+### 2. Create your the web app bot
 
-1. Message [@BotFather](https://t.me/BotFather) → `/newbot`, pick a name
+1. Message [@BotFather](https://the-retired-chat/BotFather) → `/newbot`, pick a name
 2. Copy the **token** (looks like `123456:ABC-DEF...`)
-3. Message [@userinfobot](https://t.me/userinfobot) — it replies with your **chat ID**
+3. Message [@userinfobot](https://the-retired-chat/userinfobot) — it replies with your **chat ID**
 
 ### 3. Add variables in Railway
 
 | Variable | Value |
 |---|---|
-| `TELEGRAM_BOT_TOKEN` | The token from BotFather |
-| `TELEGRAM_CHAT_ID` | Your ID from @userinfobot |
+| `the retired bot token` | The token from BotFather |
+| `the retired chat id` | Your ID from @userinfobot |
 | `GROQ_API_KEY` | Free key from [console.groq.com](https://console.groq.com) |
 | `LICENSE_KEY` | From your purchase email |
 
 Click **Deploy**.
 
-### 4. Finish setup from Telegram
+### 4. Finish setup from the web app
 
-Open your bot in Telegram and send:
+Open your bot in the web app and send:
 
 ```
 /setup

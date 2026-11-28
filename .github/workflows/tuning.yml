@@ -7,48 +7,6 @@ on:
     paths: ['.github/workflows/tuning.yml']
 
 jobs:
-  crypto:
-    name: Crypto parameter sweep
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install deps
-        working-directory: apex-trade-bot
-        run: npm install --omit=dev
-      - name: Sweep
-        working-directory: apex-trade-bot
-        env:
-          PAPER_TRADING: 'true'
-          BT_CANDLES: '4800'
-        run: |
-          run_cfg () {
-            echo ""
-            echo "############ CFG=$1 SYM=$2 ############"
-            shift 2
-            env "$@" BT_SYMBOL="$SYM" node src/backtest.js | grep -E "Perioadă|Win rate|Rezultat|Expectancy|Exituri|Max draw" || true
-          }
-          # ── Runda 9A: ADA a 3-a fereastră 4800c — confirmare finală ─────────────────
-          # R7C: ADA sl1.6-rr2 +0.59% (4800c). R8C: ADA sl1.6-rr2 +0.59% (4800c fresh).
-          # R8A: ADA sl1.6-rr2 +1.04% (9600c). Confirmăm cu o a 3-a fereastră scurtă.
-          echo "======== RUNDA 9A: ADA a 3-a fereastră 4800c + BNB ca reper negativ ========"
-          for SYM in ADAUSDT BNBUSDT SOLUSDT; do
-            export SYM
-            run_cfg mc5-sl1.6-rr2  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.032 BT_CANDLES=4800
-          done
-
-          echo ""
-          echo "======== RUNDA 9B: Configurație default finală — toți 5 simboluri, aceeași fereastră ========"
-          # Rulăm configurația exactă din config.js default pe toți 5 simboluri noi
-          # pentru a vedea performanța agregată a botului ca un tot.
-          for SYM in XRPUSDT SOLUSDT BTCUSDT ADAUSDT ETHUSDT; do
-            export SYM
-            run_cfg final-default  "$SYM" MIN_CRITERIA=5 TRAILING_STOP=false BREAKEVEN_AT_R=0 STOP_LOSS_PCT=0.016 TAKE_PROFIT_PCT=0.032 BT_CANDLES=4800
-          done
-
   forex:
     name: Forex parameter sweep
     runs-on: ubuntu-latest

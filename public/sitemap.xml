@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- There is no public website right now: the platform is operated from
+     Telegram. Only the legal pages this host still serves are listed. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://aicashsystem.space/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://aicashsystem.space/guide</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://aicashsystem.space/free</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://aicashsystem.space/affiliate.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://aicashsystem.space/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://aicashsystem.space/terms</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
 </urlset>
