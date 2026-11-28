@@ -119,11 +119,10 @@ type ReadLike = {
  * would read as "nothing here".
  */
 export function ReadPanel({
-  read, children, emptyLabel, onReconnect,
+  read, children, onReconnect,
 }: {
   read: ReadLike;
   children: React.ReactNode;
-  emptyLabel?: string;
   onReconnect?: () => void;
 }) {
   if (read.status === "ok") return <>{children}</>;

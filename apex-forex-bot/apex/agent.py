@@ -64,7 +64,7 @@ _recent = {}
 
 def _subject_key(kind, user_id, symbol, extra=""):
     raw = f"{kind}:{user_id}:{str(symbol).upper()}:{extra}"
-    return hashlib.sha1(raw.encode()).hexdigest()[:16]
+    return hashlib.sha1(raw.encode(), usedforsecurity=False).hexdigest()[:16]
 
 
 def reset_memory():

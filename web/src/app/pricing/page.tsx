@@ -38,6 +38,7 @@ export default function PricingPage() {
         </nav>
 
         <section className="mkt-section">
+          <h1 className="sr-only">Pricing</h1>
           <PricingSection />
         </section>
 

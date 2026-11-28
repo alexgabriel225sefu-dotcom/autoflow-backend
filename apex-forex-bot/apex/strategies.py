@@ -377,16 +377,6 @@ def cooldown_remaining(cooldown_min, user_id=None, symbol=None):
     return 0 if elapsed >= cooldown_min else int(cooldown_min - elapsed) + 1
 
 
-def cooldown_remaining(cooldown_min, user_id=None):
-    """Ed Seykota: after a loss, the worst trade is the revenge trade.
-    Returns minutes left until entries are allowed again (0 = clear)."""
-    s = get_session(user_id)
-    if not s["lastLossAt"] or cooldown_min <= 0:
-        return 0
-    elapsed = (time.time() - s["lastLossAt"]) / 60
-    return 0 if elapsed >= cooldown_min else int(cooldown_min - elapsed) + 1
-
-
 def htf_trend(candles):
     """Higher-timeframe trend via EMA50 (Livermore: trade WITH the tape).
     Price above rising EMA = BULLISH, below falling EMA = BEARISH, else NEUTRAL."""

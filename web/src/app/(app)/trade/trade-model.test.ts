@@ -395,7 +395,7 @@ describe("saying where the stop came from", () => {
     const dflt = setupPayload(chosen, { stopSource: "default" });
     expect(dflt.stopSource).toBe("default");
     expect(setupPayload(chosen, { stopSource: "client" }).stopSource).toBe("client");
-    const { stopSource: _s, ...rest } = dflt;
+    const rest = Object.fromEntries(Object.entries(dflt).filter(([key]) => key !== "stopSource"));
     expect(rest).toEqual(plain);
   });
 });
