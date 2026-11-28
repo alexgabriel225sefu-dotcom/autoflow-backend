@@ -11,7 +11,7 @@ export function ContentShell({ children }: { children: React.ReactNode }) {
           <span className="mkt-nav-mid">
             <Link href="/#product">Product</Link>
             <Link href="/faq">FAQ</Link>
-            <Link href="/guide/test-a-rule-on-demo">Guide</Link>
+            <Link href="/guide">Guides</Link>
             <Link href="/pricing">Pricing</Link>
           </span>
           <span className="mkt-nav-links">
@@ -23,7 +23,7 @@ export function ContentShell({ children }: { children: React.ReactNode }) {
         <footer className="mkt-foot">
           <span>© Apex4Traders</span>
           <span>
-            <Link href="/faq">FAQ</Link> · <Link href="/pricing">Pricing</Link> ·{" "}
+            <Link href="/faq">FAQ</Link> · <Link href="/guide">Guides</Link> · <Link href="/pricing">Pricing</Link> ·{" "}
             <Link href="/terms">Terms</Link> · <Link href="/privacy">Privacy</Link> ·{" "}
             <Link href="/">Home</Link>
           </span>

@@ -21,8 +21,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // robots.txt and sitemap.xml are for crawlers, which have no session. Left in
+  // robots.txt, sitemap.xml and the llms files are for crawlers and AI assistants, which have no session. Left in
   // the matcher they were answered with a redirect to /login, so a search engine
   // could not read what it may index.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|webp|mp4|webm|glb)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|llms(?:-full)?\\.txt|.*\\.(?:svg|png|jpg|webp|mp4|webm|glb)$).*)"],
 };

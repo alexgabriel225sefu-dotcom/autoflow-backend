@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   Eye,
   GaugeCircle,
@@ -244,7 +245,8 @@ export default function Landing() {
             <div>
               <h3>Resources</h3>
               <ul>
-                <li><a href="/guide/test-a-rule-on-demo">Test a rule on demo</a></li>
+                <li><Link href="/guide/test-a-rule-on-demo">Test a rule on demo</Link></li>
+                <li><Link href="/guide">All guides</Link></li>
                 <li><a href="/faq">FAQ</a></li>
                 <li><a href="/pricing">Pricing</a></li>
                 <li><a href={trustpilotLinks().reviewUrl} target="_blank" rel="noopener noreferrer">Review us on Trustpilot</a></li>
