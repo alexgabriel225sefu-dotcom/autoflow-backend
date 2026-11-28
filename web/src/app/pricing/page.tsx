@@ -26,10 +26,10 @@ export default function PricingPage() {
         <nav className="mkt-nav">
           <Link href="/" prefetch={false} aria-label="Apex4Traders home"><BrandLockup size={24} /></Link>
           <span className="mkt-nav-mid">
-            <Link href="/#product">Product</Link>
-            <Link href="/#features">Features</Link>
+            <Link href="/#product" prefetch={false}>Product</Link>
+            <Link href="/#features" prefetch={false}>Features</Link>
             <Link href="/pricing" aria-current="page">Pricing</Link>
-            <Link href="/#resources">Resources</Link>
+            <Link href="/#resources" prefetch={false}>Resources</Link>
           </span>
           <span className="mkt-nav-links">
             <a className="mkt-navlink" href="/login">Log in</a>
