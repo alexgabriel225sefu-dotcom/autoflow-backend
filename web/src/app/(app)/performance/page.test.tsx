@@ -48,6 +48,15 @@ describe("PerformancePage", () => {
     expect(paths).toContain("performance?period=all&mode=demo");
   });
 
+  it("warns, above the totals, that All time can mix accounts, and not for a 30-day window", async () => {
+    answer = ok();
+    render(<PerformancePage />);
+    await waitFor(() => expect(screen.queryByText(/can mix accounts/)).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "30 days" }));
+    await waitFor(() => expect(paths).toContain("performance?period=month&mode=demo"));
+    await waitFor(() => expect(screen.queryByText(/can mix accounts/)).toBeNull());
+  });
+
   it("choosing a period asks the server for that period", async () => {
     answer = ok();
     render(<PerformancePage />);

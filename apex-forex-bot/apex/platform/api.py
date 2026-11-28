@@ -760,6 +760,17 @@ def _dispatch(method, route, headers, body, query=None):
             guard=guard)
         score["accountId"] = selected.get("ctid")
         score["accountMode"] = selected.get("mode")
+        # Say WHY the guard is not ready, in the guard's own words. "no" with
+        # no reason reads as a fault when it is usually a limit that was hit.
+        if isinstance(guard, dict):
+            score["riskGuard"] = {
+                "allowed": guard.get("allowed") is True,
+                "reasons": [str(b.get("reason")) for b in (guard.get("blocks") or [])
+                            if isinstance(b, dict) and b.get("reason")],
+            }
+        else:
+            score["riskGuard"] = {"allowed": None,
+                                  "reasons": ["the risk guard could not be evaluated just now"]}
         try:
             from apex.platform import account_reads as _account_reads
             snap = _account_reads.snapshot(p.user_id)
