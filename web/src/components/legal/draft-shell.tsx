@@ -43,7 +43,7 @@ export function DraftShell({
       <ReadingProgress />
       <div className="legacy">
         <div style={{ marginBottom: "var(--sp-5)" }}>
-          <Link href="/"><BrandLockup size={24} /></Link>
+          <Link href="/" prefetch={false}><BrandLockup size={24} /></Link>
         </div>
         <h1>{title}</h1>
         <p className="dim" style={{ fontSize: ".8rem" }}>
