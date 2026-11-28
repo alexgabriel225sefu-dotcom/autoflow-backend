@@ -5,6 +5,11 @@ import { RULE_CONDITIONS } from "./rule-conditions";
 import { DEMO_VS_LIVE } from "./demo-vs-live";
 import { RISK_AND_STOPS } from "./risk-and-stops";
 import { TRADING_JOURNAL } from "./trading-journal";
+import { DEMO_SHOWS } from "./demo-shows";
+import { TRUST_CHECKLIST } from "./trust-checklist";
+import { PREVIEW_VS_RUN } from "./preview-vs-run";
+import { RISK_GUARD } from "./risk-guard";
+import { NO_TRADE } from "./no-trade";
 
 export type { Article, ArticleFaq, ArticleSection, ArticleTable } from "./types";
 
@@ -16,6 +21,11 @@ export const ARTICLES: readonly Article[] = [
   DEMO_VS_LIVE,
   RISK_AND_STOPS,
   TRADING_JOURNAL,
+  TRUST_CHECKLIST,
+  DEMO_SHOWS,
+  PREVIEW_VS_RUN,
+  RISK_GUARD,
+  NO_TRADE,
 ];
 
 export function articleBySlug(slug: string): Article | undefined {
